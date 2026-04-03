@@ -1,0 +1,60 @@
+# VCS and local metadata
+.git
+.gitignore
+.dockerignore
+.idea
+.vscode
+
+# Secrets/local env
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.crt
+*.p12
+
+# Build/test/runtime artifacts
+bin/
+dist/
+build/
+coverage/
+*.coverprofile
+coverage.out
+*.out
+*.test
+*.log
+*.pid
+stdout
+
+# Caches
+.cache/
+.gocache/
+.gomodcache/
+node_modules/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+.work/
+
+# Temp files
+*.tmp
+*.temp
+*.bak
+*.orig
+*.rej
+*~
+.tmp_cookie*.txt
+
+# Local helper files
+docker-compose.local.yml
+LOCAL_RELEASE_RULES.md
+local_checks/
+
+# Legacy/side projects not needed for main image builds
+waf-old/
+bunkerweb/
+SCC/

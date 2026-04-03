@@ -1,0 +1,123 @@
+# Easy-mode compiler directives for this site.
+
+client_max_body_size {{ .MaxClientSize }};
+set $waf_rate_limited_max_age {{ .RateLimitBanSeconds }};
+set $waf_rate_limited_active 0;
+set $waf_rate_limited_escalated 0;
+
+if ($waf_rate_limited_max_age ~ "^[1-9][0-9]*$") {
+    set $waf_rate_limited_active 1;
+}
+if ($cookie_{{ .RateLimitCookieVar }} != "1") {
+    set $waf_rate_limited_active 0;
+}
+if ($cookie_{{ .RateLimitEscalationCookieVar }} = "1") {
+    set $waf_rate_limited_escalated 1;
+}
+if ($waf_rate_limited_escalated = 1) {
+    return 403;
+}
+if ($waf_rate_limited_active = 1) {
+    return 429;
+}
+
+if ($request_method !~ {{ .AllowedMethodsPattern }}) {
+    return 405;
+}
+
+{{- if .ReferrerPolicy }}
+add_header Referrer-Policy "{{ .ReferrerPolicy }}" always;
+{{- end }}
+{{- if .ContentSecurityPolicy }}
+add_header Content-Security-Policy "{{ .ContentSecurityPolicy }}" always;
+{{- end }}
+{{- if .PermissionsPolicy }}
+add_header Permissions-Policy "{{ .PermissionsPolicy }}" always;
+{{- end }}
+{{- if .UseCORS }}
+add_header Access-Control-Allow-Origin "{{ .CORSAllowedOrigins }}" always;
+add_header Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS" always;
+add_header Access-Control-Allow-Headers "*" always;
+{{- end }}
+
+{{- if .ReverseProxyCustomHost }}
+proxy_set_header Host {{ .ReverseProxyCustomHost }};
+{{- end }}
+{{- if .ReverseProxySSLSNI }}
+proxy_ssl_server_name on;
+{{- if .ReverseProxySSLSNIName }}
+proxy_ssl_name {{ .ReverseProxySSLSNIName }};
+{{- end }}
+{{- else }}
+proxy_ssl_server_name off;
+{{- end }}
+{{- if .ReverseProxyWebsocket }}
+proxy_http_version 1.1;
+proxy_set_header Upgrade $http_upgrade;
+proxy_set_header Connection "upgrade";
+{{- end }}
+{{- if .ReverseProxyKeepalive }}
+proxy_set_header Connection "";
+{{- end }}
+
+{{- if .UseAuthBasic }}
+auth_basic "{{ .AuthBasicRealm }}";
+auth_basic_user_file {{ .AuthBasicUserFile }};
+{{- end }}
+
+{{- if .UseModSecurity }}
+modsecurity_rules_file /etc/waf/modsecurity/easy/{{ .SiteID }}.conf;
+{{- end }}
+
+{{- if .AntibotEnabled }}
+# Easy antibot guard: requests are challenged unless a token/cookie is present.
+set $waf_antibot_verified 0;
+if ($arg_waf_antibot = "ok") { set $waf_antibot_verified 1; }
+if ($cookie_waf_antibot = "ok") { set $waf_antibot_verified 1; }
+if ($request_uri = "{{ .AntibotURI }}") { set $waf_antibot_verified 1; }
+if ($waf_antibot_verified = 0) { return 403; }
+add_header X-WAF-Antibot-Mode "{{ .AntibotChallenge }}" always;
+{{- if .AntibotRecaptchaHint }}
+add_header X-WAF-Antibot-Provider "recaptcha" always;
+{{- end }}
+{{- if .AntibotHcaptchaHint }}
+add_header X-WAF-Antibot-Provider "hcaptcha" always;
+{{- end }}
+{{- if .AntibotTurnstileHint }}
+add_header X-WAF-Antibot-Provider "turnstile" always;
+{{- end }}
+{{- end }}
+
+{{- range .BlacklistIP }}
+deny {{ . }};
+{{- end }}
+
+{{- range .BlacklistUserAgent }}
+if ($http_user_agent ~* "{{ . }}") { return 403; }
+{{- end }}
+
+{{- range .BlacklistURI }}
+if ($request_uri ~* "{{ . }}") { return 403; }
+{{- end }}
+
+{{- if .WhitelistCountry }}
+if ($http_cf_ipcountry != "") {
+    set $waf_country_allowed 0;
+{{- range .WhitelistCountry }}
+    if ($http_cf_ipcountry = "{{ . }}") { set $waf_country_allowed 1; }
+{{- end }}
+    if ($waf_country_allowed = 0) { return 403; }
+}
+{{- end }}
+
+{{- if .BlacklistCountry }}
+if ($http_cf_ipcountry != "") {
+{{- range .BlacklistCountry }}
+    if ($http_cf_ipcountry = "{{ . }}") { return 403; }
+{{- end }}
+}
+{{- end }}
+
+{{- if not .UseModSecurity }}
+modsecurity off;
+{{- end }}

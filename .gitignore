@@ -1,0 +1,68 @@
+# Secrets and local config
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.crt
+*.p12
+
+# Build artifacts
+bin/
+dist/
+build/
+coverage/
+*.coverprofile
+coverage.out
+*.test
+*.out
+
+# Caches
+.cache/
+.gocache/
+.gomodcache/
+
+# Dependency folders
+node_modules/
+
+# Python/tooling caches
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+scc/
+waf-old/
+.work/
+
+# IDE/editor
+.idea/
+.vscode/
+*.code-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temp and backup files
+*.tmp
+*.temp
+*.bak
+*.orig
+*.rej
+*~
+.tmp_cookie*.txt
+
+# Logs and local runtime files
+*.log
+*.pid
+stdout
+
+# Local overrides
+docker-compose.local.yml
+LOCAL_RELEASE_RULES.md
+local_checks/
+TASKS*.md
+ROADMAP*.md
+PROMPT_UPDATED.md

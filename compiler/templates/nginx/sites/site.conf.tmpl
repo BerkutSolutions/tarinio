@@ -1,0 +1,123 @@
+upstream {{ .UpstreamName }} {
+    server {{ .UpstreamAddress }};
+}
+
+server {
+{{- if .ListenHTTP }}
+    listen 80;
+{{- end }}
+{{- if .ListenHTTPS }}
+    listen 443 ssl;
+    include /etc/waf/tls/{{ .SiteID }}.conf;
+    error_page 497 =307 https://$http_host$request_uri;
+{{- end }}
+    set $waf_site_id "{{ .SiteIDSlug }}";
+    set $waf_host_allowed 0;
+{{- range .ServerNames }}
+    if ($host = "{{ . }}") { set $waf_host_allowed 1; }
+{{- end }}
+    if ($waf_host_allowed = 0) { return 421; }
+    server_name {{ range $index, $name := .ServerNames }}{{ if $index }} {{ end }}{{ $name }}{{ end }};
+    include /etc/waf/nginx/access/{{ .SiteID }}.conf;
+    add_header Server-Timing "rid;desc=$arg_rid,ip;desc=$arg_ip,ts;desc=$arg_ts" always;
+    proxy_intercept_errors on;
+    error_page 400 /__waf_errors/{{ .SiteID }}/400.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+    error_page 401 /__waf_errors/{{ .SiteID }}/401.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+    error_page 403 /__waf_errors/{{ .SiteID }}/403.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+    error_page 404 /__waf_errors/{{ .SiteID }}/404.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+    error_page 405 /__waf_errors/{{ .SiteID }}/405.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+    error_page 408 /__waf_errors/{{ .SiteID }}/408.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+    error_page 421 /__waf_errors/{{ .SiteID }}/421.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+    error_page 429 /__waf_errors/{{ .SiteID }}/429.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+    error_page 500 /__waf_errors/{{ .SiteID }}/500.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+    error_page 502 /__waf_errors/{{ .SiteID }}/502.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+    error_page 503 /__waf_errors/{{ .SiteID }}/503.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+    error_page 504 /__waf_errors/{{ .SiteID }}/504.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+
+    location = /__waf_errors/{{ .SiteID }}/400.html {
+        internal;
+        alias /etc/waf/errors/{{ .SiteID }}/400.html;
+    }
+
+    location = /__waf_errors/{{ .SiteID }}/401.html {
+        internal;
+        alias /etc/waf/errors/{{ .SiteID }}/401.html;
+    }
+
+    location = /__waf_errors/{{ .SiteID }}/403.html {
+        internal;
+        alias /etc/waf/errors/{{ .SiteID }}/403.html;
+    }
+
+    location = /__waf_errors/{{ .SiteID }}/404.html {
+        internal;
+        alias /etc/waf/errors/{{ .SiteID }}/404.html;
+    }
+
+    location = /__waf_errors/{{ .SiteID }}/405.html {
+        internal;
+        alias /etc/waf/errors/{{ .SiteID }}/405.html;
+    }
+
+    location = /__waf_errors/{{ .SiteID }}/408.html {
+        internal;
+        alias /etc/waf/errors/{{ .SiteID }}/408.html;
+    }
+
+    location = /__waf_errors/{{ .SiteID }}/421.html {
+        internal;
+        alias /etc/waf/errors/{{ .SiteID }}/421.html;
+    }
+
+    location = /__waf_errors/{{ .SiteID }}/429.html {
+        internal;
+        if ($cookie_{{ .RateLimitCookie }} = "1") {
+            add_header Set-Cookie "{{ .RateLimitEscalationCookie }}=1; Max-Age=$waf_rate_limited_max_age; Path=/; SameSite=Lax; Secure" always;
+        }
+        add_header Set-Cookie "{{ .RateLimitCookie }}=1; Max-Age=$waf_rate_limited_max_age; Path=/; SameSite=Lax; Secure" always;
+        alias /etc/waf/errors/{{ .SiteID }}/429.html;
+    }
+
+    location = /__waf_errors/{{ .SiteID }}/500.html {
+        internal;
+        alias /etc/waf/errors/{{ .SiteID }}/500.html;
+    }
+
+    location = /__waf_errors/{{ .SiteID }}/502.html {
+        internal;
+        alias /etc/waf/errors/{{ .SiteID }}/502.html;
+    }
+
+    location = /__waf_errors/{{ .SiteID }}/503.html {
+        internal;
+        alias /etc/waf/errors/{{ .SiteID }}/503.html;
+    }
+
+    location = /__waf_errors/{{ .SiteID }}/504.html {
+        internal;
+        alias /etc/waf/errors/{{ .SiteID }}/504.html;
+    }
+
+    location ^~ /api/ {
+        proxy_intercept_errors off;
+        modsecurity on;
+        modsecurity_rules_file /etc/waf/modsecurity/sites/{{ .SiteID }}.conf;
+        include /etc/waf/nginx/ratelimits/{{ .SiteID }}.conf;
+        include /etc/waf/nginx/easy/{{ .SiteID }}.conf;
+{{- if .PassHostHeader }}
+        proxy_set_header Host $http_host;
+{{- end }}
+        proxy_pass {{ .ProxyPassTarget }};
+    }
+
+    location / {
+        modsecurity on;
+        modsecurity_rules_file /etc/waf/modsecurity/sites/{{ .SiteID }}.conf;
+        include /etc/waf/nginx/ratelimits/{{ .SiteID }}.conf;
+        include /etc/waf/nginx/easy/{{ .SiteID }}.conf;
+{{- if .PassHostHeader }}
+        proxy_set_header Host $http_host;
+{{- end }}
+        proxy_pass {{ .ProxyPassTarget }};
+    }
+}

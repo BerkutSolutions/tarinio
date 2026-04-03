@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WAF Admin | Login</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; background: radial-gradient(circle at top, #142744 0%, #050b18 60%, #030711 100%); color: #e8eefc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .waf-fallback-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; }
+    .waf-fallback-card { width: min(560px, 100%); border: 1px solid #294d7f; border-radius: 14px; background: linear-gradient(180deg, #12233d, #0a1529); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.38); padding: 22px; }
+    .waf-fallback-title { margin: 0; font-size: 24px; font-weight: 700; }
+    .waf-fallback-sub { margin: 10px 0 0; font-size: 14px; color: #afc3e7; }
+    .waf-fallback-badge { display: inline-block; margin-top: 14px; padding: 4px 10px; border-radius: 999px; border: 1px solid #365f95; background: #0d1c34; color: #b4cbef; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
+    .waf-fallback-hint { margin-top: 14px; font-size: 13px; color: #93add8; }
+  </style>
+  <script>
+    (function () {
+      function toCode(input) {
+        var value = Number(input || 0);
+        if (value === 403 || value === 429) return value;
+        return 429;
+      }
+      function renderBlocked(opts) {
+        if (window.__wafBlockedRendered) return;
+        window.__wafBlockedRendered = true;
+        var code = toCode(opts && opts.code);
+        var title = code === 403 ? "403 Доступ ограничен" : "429 Слишком много запросов";
+        var text = code === 403
+          ? "Доступ временно ограничен защитой WAF/Anti-DDoS."
+          : "Сработала защита от флуда. Подождите, пока завершится окно блокировки.";
+        document.body.innerHTML = '<div class="waf-fallback-wrap"><article class="waf-fallback-card"><h1 class="waf-fallback-title">' + title + '</h1><p class="waf-fallback-sub">' + text + '</p><span class="waf-fallback-badge">Защита активна</span><p class="waf-fallback-hint">Обновляйте страницу позже. Пока блокировка активна, основной интерфейс скрыт.</p></article></div>';
+      }
+      window.__wafRenderBlocked = renderBlocked;
+      window.__wafMarkBoot = function () { window.__wafBootOk = true; };
+      window.addEventListener("error", function (event) {
+        var target = event && event.target;
+        if (!target) return;
+        var tag = String(target.tagName || "").toLowerCase();
+        if (tag !== "link" && tag !== "script" && tag !== "img") return;
+        var source = String(target.href || target.src || "");
+        if (source.indexOf("/static/") >= 0) {
+          renderBlocked({ code: 429 });
+        }
+      }, true);
+      fetch("/api/setup/status", { credentials: "include", cache: "no-store", headers: { Accept: "application/json" } })
+        .then(function (response) {
+          if (response.status === 403 || response.status === 429) {
+            renderBlocked({ code: response.status });
+          }
+        })
+        .catch(function () {});
+    })();
+  </script>
+  <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon16.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon32.png">
+  <link rel="icon" type="image/png" sizes="48x48" href="/static/favicon48.png">
+  <link rel="icon" type="image/png" sizes="64x64" href="/static/favicon64.png">
+  <link rel="stylesheet" href="/static/styles.css?v=20260402-anti-ddos-1" onerror="window.__wafRenderBlocked && window.__wafRenderBlocked({ code: 429 })">
+  <link rel="stylesheet" href="/static/waf.css?v=20260402-anti-ddos-1" onerror="window.__wafRenderBlocked && window.__wafRenderBlocked({ code: 429 })">
+</head>
+<body class="login-body">
+  <div class="login-wrapper">
+    <div class="login-card">
+      <img class="login-logo" src="/static/logo500x300.png" alt="Berkut Solutions - TARINIO" onerror="this.style.display='none'">
+      <h1 data-i18n="login.title">Berkut Solutions - TARINIO</h1>
+      <p class="muted" data-i18n="login.subtitle">Standalone control plane login</p>
+      <div class="alert" id="login-alert" hidden></div>
+      <form id="login-form" method="post" action="javascript:void(0)" novalidate>
+        <label for="username" data-i18n="login.username">Username</label>
+        <input id="username" name="username" autocomplete="username" required>
+        <label for="password" data-i18n="login.password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required>
+        <button type="submit" class="btn primary" id="login-submit-btn" data-i18n="login.submit">Sign in</button>
+        <button type="button" class="btn ghost" id="login-passkey-btn" data-i18n="auth.passkeys.loginBtn" hidden>Sign in with passkey</button>
+      </form>
+    </div>
+  </div>
+  <script type="module" src="/static/js/login.js?v=20260402-anti-ddos-1" onload="window.__wafMarkBoot && window.__wafMarkBoot()" onerror="window.__wafRenderBlocked && window.__wafRenderBlocked({ code: 429 })"></script>
+</body>
+</html>

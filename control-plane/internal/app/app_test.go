@@ -1,0 +1,88 @@
+package app
+
+import (
+	"bytes"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"waf/control-plane/internal/config"
+)
+
+func TestNew_WiresHTTPServerAndRevisionStore(t *testing.T) {
+	cfg := config.Config{
+		HTTPAddr:         "127.0.0.1:8080",
+		RuntimeRoot:      "/tmp/runtime",
+		RevisionStoreDir: t.TempDir(),
+		AuthIssuer:       "WAF",
+		BootstrapAdmin: config.BootstrapAdminConfig{
+			Enabled:  true,
+			ID:       "admin",
+			Username: "admin",
+			Email:    "admin@example.test",
+			Password: "admin",
+		},
+	}
+
+	application, err := New(cfg)
+	if err != nil {
+		t.Fatalf("app bootstrap failed: %v", err)
+	}
+	if application.HTTPServer == nil || application.RevisionStore == nil || application.RevisionSnapshotStore == nil || application.RevisionService == nil || application.RevisionCompileService == nil || application.ApplyService == nil || application.EventStore == nil || application.EventService == nil || application.ReportService == nil || application.JobStore == nil || application.JobService == nil || application.RedisBackend == nil || application.RoleStore == nil || application.SessionStore == nil || application.UserStore == nil || application.AuthService == nil || application.SiteStore == nil || application.SiteService == nil || application.ManualBanService == nil || application.UpstreamStore == nil || application.UpstreamService == nil || application.CertificateStore == nil || application.CertificateService == nil || application.CertificateMaterialStore == nil || application.CertificateUploadService == nil || application.LetsEncryptService == nil || application.TLSConfigStore == nil || application.TLSConfigService == nil || application.WAFPolicyStore == nil || application.WAFPolicyService == nil || application.AccessPolicyStore == nil || application.AccessPolicyService == nil || application.RateLimitPolicyStore == nil || application.RateLimitPolicyService == nil {
+		t.Fatal("expected app dependencies to be wired")
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	resp := httptest.NewRecorder()
+	application.HTTPServer.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200 from health endpoint, got %d", resp.Code)
+	}
+}
+
+func TestNew_ProtectsControlPlaneEndpointsWithAuth(t *testing.T) {
+	cfg := config.Config{
+		HTTPAddr:         "127.0.0.1:8080",
+		RuntimeRoot:      "/tmp/runtime",
+		RevisionStoreDir: t.TempDir(),
+		AuthIssuer:       "WAF",
+		BootstrapAdmin: config.BootstrapAdminConfig{
+			Enabled:  true,
+			ID:       "admin",
+			Username: "admin",
+			Email:    "admin@example.test",
+			Password: "admin",
+		},
+	}
+
+	application, err := New(cfg)
+	if err != nil {
+		t.Fatalf("app bootstrap failed: %v", err)
+	}
+
+	protectedReq := httptest.NewRequest(http.MethodGet, "/api/sites", nil)
+	protectedResp := httptest.NewRecorder()
+	application.HTTPServer.Handler().ServeHTTP(protectedResp, protectedReq)
+	if protectedResp.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 without session, got %d", protectedResp.Code)
+	}
+
+	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"username":"admin","password":"admin"}`))
+	loginResp := httptest.NewRecorder()
+	application.HTTPServer.Handler().ServeHTTP(loginResp, loginReq)
+	if loginResp.Code != http.StatusOK {
+		t.Fatalf("expected 200 from login, got %d", loginResp.Code)
+	}
+	cookies := loginResp.Result().Cookies()
+	if len(cookies) == 0 {
+		t.Fatal("expected auth cookie after login")
+	}
+
+	authedReq := httptest.NewRequest(http.MethodGet, "/api/sites", nil)
+	authedReq.AddCookie(cookies[0])
+	authedResp := httptest.NewRecorder()
+	application.HTTPServer.Handler().ServeHTTP(authedResp, authedReq)
+	if authedResp.Code != http.StatusOK {
+		t.Fatalf("expected 200 with session, got %d", authedResp.Code)
+	}
+}

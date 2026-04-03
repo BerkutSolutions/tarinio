@@ -1,0 +1,123 @@
+﻿<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WAF Test Login</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f7fb;
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: #475569;
+      --accent: #0f766e;
+      --accent-hover: #0b5b56;
+      --border: #cbd5e1;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      background: radial-gradient(circle at 20% 20%, #dbeafe 0%, var(--bg) 45%, #e2e8f0 100%);
+      color: var(--text);
+      padding: 16px;
+    }
+
+    .card {
+      width: min(440px, 100%);
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: 0 24px 48px rgba(15, 23, 42, 0.1);
+      padding: 28px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 26px;
+    }
+
+    p {
+      margin: 0 0 18px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    label {
+      display: block;
+      font-size: 14px;
+      margin: 0 0 6px;
+      color: var(--muted);
+    }
+
+    input {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 11px 12px;
+      margin: 0 0 14px;
+      font-size: 15px;
+    }
+
+    input:focus {
+      outline: 2px solid #99f6e4;
+      outline-offset: 1px;
+      border-color: var(--accent);
+    }
+
+    button {
+      width: 100%;
+      border: 0;
+      border-radius: 10px;
+      padding: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      color: #ffffff;
+      background: var(--accent);
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: var(--accent-hover);
+    }
+
+    .hint {
+      margin-top: 14px;
+      font-size: 13px;
+      color: #334155;
+      background: #f8fafc;
+      border: 1px dashed var(--border);
+      border-radius: 10px;
+      padding: 10px;
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>Тестовый login</h1>
+    <p>Страница нужна для проверки проксирования через NGINX и обработки запросов WAF.</p>
+
+    <form method="post" action="/login" autocomplete="off">
+      <label for="username">Логин</label>
+      <input id="username" name="username" type="text" placeholder="admin" required>
+
+      <label for="password">Пароль</label>
+      <input id="password" name="password" type="password" placeholder="********" required>
+
+      <button type="submit">Войти</button>
+    </form>
+
+    <div class="hint">
+      Проверка: откройте https://localhost:8080 и отправьте форму с разными payload в полях.
+    </div>
+  </main>
+</body>
+</html>

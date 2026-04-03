@@ -1,0 +1,295 @@
+package config
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+
+	"waf/control-plane/internal/coordination/redis"
+)
+
+const (
+	defaultHTTPAddr         = "127.0.0.1:8080"
+	defaultRuntimeRoot      = "/var/lib/waf"
+	defaultRevisionsDir     = "control-plane"
+	defaultRuntimeHealthURL = "http://127.0.0.1:8081/readyz"
+	defaultRuntimeReloadURL = "http://127.0.0.1:8081/reload"
+)
+
+// Config contains the minimal control-plane process configuration for the MVP skeleton.
+type Config struct {
+	HTTPAddr         string
+	RuntimeRoot      string
+	RevisionStoreDir string
+	AuthIssuer       string
+	Security         SecurityConfig
+	RuntimeHealthURL string
+	RuntimeReloadURL string
+	BootstrapAdmin   BootstrapAdminConfig
+	DevFastStart     DevFastStartConfig
+	Redis            redis.Config
+}
+
+type SecurityConfig struct {
+	Pepper   string
+	WebAuthn WebAuthnConfig
+}
+
+type WebAuthnConfig struct {
+	Enabled bool
+	RPID    string
+	RPName  string
+	Origins []string
+}
+
+type BootstrapAdminConfig struct {
+	Enabled  bool
+	ID       string
+	Username string
+	Email    string
+	Password string
+}
+
+type DevFastStartConfig struct {
+	Enabled           bool
+	Host              string
+	CertificateID     string
+	ManagementSiteID  string
+	UpstreamHost      string
+	UpstreamPort      int
+	RetryDelaySeconds int
+	MaxAttempts       int
+}
+
+func LoadFromEnv() (Config, error) {
+	cfg := Config{
+		HTTPAddr:         defaultHTTPAddr,
+		RuntimeRoot:      defaultRuntimeRoot,
+		RevisionStoreDir: filepath.Join(defaultRuntimeRoot, defaultRevisionsDir),
+		AuthIssuer:       "WAF",
+		Security: SecurityConfig{
+			Pepper: "waf-dev-pepper-change-me",
+			WebAuthn: WebAuthnConfig{
+				Enabled: true,
+				RPName:  "TARINIO",
+			},
+		},
+		RuntimeHealthURL: defaultRuntimeHealthURL,
+		RuntimeReloadURL: defaultRuntimeReloadURL,
+		BootstrapAdmin: BootstrapAdminConfig{
+			Enabled:  false,
+			ID:       "admin",
+			Username: "admin",
+			Email:    "admin@localhost",
+			Password: "admin",
+		},
+		DevFastStart: DevFastStartConfig{
+			Enabled:           false,
+			Host:              "localhost",
+			CertificateID:     "control-plane-localhost-tls",
+			ManagementSiteID:  "control-plane-access",
+			UpstreamHost:      "ui",
+			UpstreamPort:      80,
+			RetryDelaySeconds: 2,
+			MaxAttempts:       30,
+		},
+		Redis: redis.DefaultConfig(),
+	}
+
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_HTTP_ADDR")); value != "" {
+		cfg.HTTPAddr = value
+	}
+	if value := strings.TrimSpace(os.Getenv("WAF_RUNTIME_ROOT")); value != "" {
+		cfg.RuntimeRoot = value
+		cfg.RevisionStoreDir = filepath.Join(value, defaultRevisionsDir)
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_REVISION_STORE_DIR")); value != "" {
+		cfg.RevisionStoreDir = value
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_AUTH_ISSUER")); value != "" {
+		cfg.AuthIssuer = value
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_SECURITY_PEPPER")); value != "" {
+		cfg.Security.Pepper = value
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_WEBAUTHN_ENABLED")); value != "" {
+		cfg.Security.WebAuthn.Enabled = !strings.EqualFold(value, "false") && value != "0"
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_WEBAUTHN_RPID")); value != "" {
+		cfg.Security.WebAuthn.RPID = strings.ToLower(value)
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_WEBAUTHN_RP_NAME")); value != "" {
+		cfg.Security.WebAuthn.RPName = value
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_WEBAUTHN_ORIGINS")); value != "" {
+		parts := strings.Split(value, ",")
+		origins := make([]string, 0, len(parts))
+		for _, item := range parts {
+			origin := strings.TrimSpace(item)
+			if origin == "" {
+				continue
+			}
+			origins = append(origins, origin)
+		}
+		cfg.Security.WebAuthn.Origins = origins
+	}
+	if value := strings.TrimSpace(os.Getenv("WAF_RUNTIME_HEALTH_URL")); value != "" {
+		cfg.RuntimeHealthURL = value
+	}
+	if value := strings.TrimSpace(os.Getenv("WAF_RUNTIME_RELOAD_URL")); value != "" {
+		cfg.RuntimeReloadURL = value
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_BOOTSTRAP_ADMIN_ID")); value != "" {
+		cfg.BootstrapAdmin.ID = value
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_BOOTSTRAP_ADMIN_ENABLED")); value != "" {
+		cfg.BootstrapAdmin.Enabled = !strings.EqualFold(value, "false") && value != "0"
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_BOOTSTRAP_ADMIN_USERNAME")); value != "" {
+		cfg.BootstrapAdmin.Username = value
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_BOOTSTRAP_ADMIN_EMAIL")); value != "" {
+		cfg.BootstrapAdmin.Email = value
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_BOOTSTRAP_ADMIN_PASSWORD")); value != "" {
+		cfg.BootstrapAdmin.Password = value
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_DEV_FAST_START_ENABLED")); value != "" {
+		cfg.DevFastStart.Enabled = !strings.EqualFold(value, "false") && value != "0"
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_DEV_FAST_START_HOST")); value != "" {
+		cfg.DevFastStart.Host = value
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_DEV_FAST_START_CERTIFICATE_ID")); value != "" {
+		cfg.DevFastStart.CertificateID = value
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID")); value != "" {
+		cfg.DevFastStart.ManagementSiteID = value
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_DEV_FAST_START_UPSTREAM_HOST")); value != "" {
+		cfg.DevFastStart.UpstreamHost = value
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_DEV_FAST_START_UPSTREAM_PORT")); value != "" {
+		port, err := strconv.Atoi(value)
+		if err != nil || port <= 0 || port > 65535 {
+			return Config{}, fmt.Errorf("dev fast start upstream port must be between 1 and 65535")
+		}
+		cfg.DevFastStart.UpstreamPort = port
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_DEV_FAST_START_RETRY_DELAY_SECONDS")); value != "" {
+		seconds, err := strconv.Atoi(value)
+		if err != nil || seconds <= 0 {
+			return Config{}, fmt.Errorf("dev fast start retry delay must be a positive integer")
+		}
+		cfg.DevFastStart.RetryDelaySeconds = seconds
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_DEV_FAST_START_MAX_ATTEMPTS")); value != "" {
+		attempts, err := strconv.Atoi(value)
+		if err != nil || attempts <= 0 {
+			return Config{}, fmt.Errorf("dev fast start max attempts must be a positive integer")
+		}
+		cfg.DevFastStart.MaxAttempts = attempts
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_REDIS_ADDR")); value != "" {
+		cfg.Redis.Addr = value
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_REDIS_USERNAME")); value != "" {
+		cfg.Redis.Username = value
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_REDIS_PASSWORD")); value != "" {
+		cfg.Redis.Password = value
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_REDIS_DB")); value != "" {
+		db, err := redis.ParseDB(value)
+		if err != nil {
+			return Config{}, err
+		}
+		cfg.Redis.DB = db
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_REDIS_DIAL_TIMEOUT_SECONDS")); value != "" {
+		seconds, err := strconv.Atoi(value)
+		if err != nil || seconds <= 0 {
+			return Config{}, fmt.Errorf("redis dial timeout must be a positive integer")
+		}
+		cfg.Redis.DialTimeout = time.Duration(seconds) * time.Second
+	}
+
+	if err := validate(cfg); err != nil {
+		return Config{}, err
+	}
+	return cfg, nil
+}
+
+func validate(cfg Config) error {
+	if strings.TrimSpace(cfg.HTTPAddr) == "" {
+		return fmt.Errorf("http addr is required")
+	}
+	host, port, err := splitHostPort(cfg.HTTPAddr)
+	if err != nil {
+		return fmt.Errorf("invalid http addr: %w", err)
+	}
+	if strings.TrimSpace(host) == "" {
+		return fmt.Errorf("http addr host is required")
+	}
+	if _, err := strconv.Atoi(port); err != nil {
+		return fmt.Errorf("http addr port must be numeric")
+	}
+	if strings.TrimSpace(cfg.RevisionStoreDir) == "" {
+		return fmt.Errorf("revision store dir is required")
+	}
+	if strings.TrimSpace(cfg.AuthIssuer) == "" {
+		return fmt.Errorf("auth issuer is required")
+	}
+	if strings.TrimSpace(cfg.Security.Pepper) == "" {
+		return fmt.Errorf("security pepper is required")
+	}
+	if cfg.Security.WebAuthn.Enabled && strings.TrimSpace(cfg.Security.WebAuthn.RPName) == "" {
+		return fmt.Errorf("webauthn rp name is required when enabled")
+	}
+	if strings.TrimSpace(cfg.RuntimeHealthURL) == "" {
+		return fmt.Errorf("runtime health url is required")
+	}
+	if strings.TrimSpace(cfg.RuntimeReloadURL) == "" {
+		return fmt.Errorf("runtime reload url is required")
+	}
+	if cfg.BootstrapAdmin.Enabled {
+		if strings.TrimSpace(cfg.BootstrapAdmin.ID) == "" || strings.TrimSpace(cfg.BootstrapAdmin.Username) == "" || strings.TrimSpace(cfg.BootstrapAdmin.Email) == "" || strings.TrimSpace(cfg.BootstrapAdmin.Password) == "" {
+			return fmt.Errorf("bootstrap admin config is required when enabled")
+		}
+	}
+	if cfg.DevFastStart.Enabled {
+		if !cfg.BootstrapAdmin.Enabled {
+			return fmt.Errorf("dev fast start requires bootstrap admin to be enabled")
+		}
+		if strings.TrimSpace(cfg.DevFastStart.Host) == "" {
+			return fmt.Errorf("dev fast start host is required when enabled")
+		}
+		if strings.TrimSpace(cfg.DevFastStart.CertificateID) == "" {
+			return fmt.Errorf("dev fast start certificate id is required when enabled")
+		}
+		if strings.TrimSpace(cfg.DevFastStart.ManagementSiteID) == "" {
+			return fmt.Errorf("dev fast start management site id is required when enabled")
+		}
+		if strings.TrimSpace(cfg.DevFastStart.UpstreamHost) == "" {
+			return fmt.Errorf("dev fast start upstream host is required when enabled")
+		}
+		if cfg.DevFastStart.UpstreamPort <= 0 || cfg.DevFastStart.UpstreamPort > 65535 {
+			return fmt.Errorf("dev fast start upstream port must be between 1 and 65535")
+		}
+	}
+	if strings.TrimSpace(cfg.Redis.Addr) == "" {
+		return fmt.Errorf("redis addr is required")
+	}
+	return nil
+}
+
+func splitHostPort(addr string) (string, string, error) {
+	index := strings.LastIndex(addr, ":")
+	if index == -1 || index == len(addr)-1 {
+		return "", "", fmt.Errorf("expected host:port")
+	}
+	return addr[:index], addr[index+1:], nil
+}

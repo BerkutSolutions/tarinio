@@ -1,0 +1,399 @@
+name: tarinio-testpage
+
+services:
+  control-plane:
+    build:
+      context: ../../..
+      dockerfile: control-plane/Dockerfile
+    container_name: tarinio-test-control-plane-mgmt
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      CONTROL_PLANE_HTTP_ADDR: 0.0.0.0:8080
+      WAF_RUNTIME_ROOT: /var/lib/waf
+      CONTROL_PLANE_REDIS_ADDR: redis-mgmt:6379
+      WAF_RUNTIME_HEALTH_URL: http://runtime:8081/readyz
+      WAF_RUNTIME_RELOAD_URL: http://runtime:8081/reload
+      POSTGRES_DSN: ${MGMT_POSTGRES_DSN:-postgres://waf:waf@postgres-mgmt:5432/waf?sslmode=disable}
+      WAF_DEFAULT_LIMIT_REQ_RATE: ${MGMT_WAF_DEFAULT_LIMIT_REQ_RATE:-20r/s}
+      WAF_DEFAULT_BAD_BEHAVIOR_BAN_TIME_SECONDS: ${MGMT_WAF_DEFAULT_BAD_BEHAVIOR_BAN_TIME_SECONDS:-10}
+      CONTROL_PLANE_BOOTSTRAP_ADMIN_ENABLED: "true"
+      CONTROL_PLANE_BOOTSTRAP_ADMIN_ID: admin
+      CONTROL_PLANE_BOOTSTRAP_ADMIN_USERNAME: admin
+      CONTROL_PLANE_BOOTSTRAP_ADMIN_EMAIL: admin@localhost
+      CONTROL_PLANE_BOOTSTRAP_ADMIN_PASSWORD: admin
+      CONTROL_PLANE_DEV_FAST_START_ENABLED: "true"
+      CONTROL_PLANE_DEV_FAST_START_HOST: ${MGMT_WAF_DOMAIN:-localhost}
+      CONTROL_PLANE_DEV_FAST_START_CERTIFICATE_ID: ${MGMT_WAF_CERTIFICATE_ID:-testpage-mgmt-localhost-tls}
+      CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID: ${MGMT_WAF_SITE_ID:-testpage-mgmt-localhost-site}
+      CONTROL_PLANE_DEV_FAST_START_UPSTREAM_HOST: "172.30.0.10"
+      CONTROL_PLANE_DEV_FAST_START_UPSTREAM_PORT: ${MGMT_WAF_UPSTREAM_PORT:-80}
+      CONTROL_PLANE_DEV_FAST_START_RETRY_DELAY_SECONDS: "2"
+      CONTROL_PLANE_DEV_FAST_START_MAX_ATTEMPTS: "60"
+    volumes:
+      - waf-test-mgmt-runtime-data:/var/lib/waf
+      - waf-test-mgmt-control-plane-data:/var/lib/waf/control-plane
+      - waf-test-mgmt-certificates-data:/var/lib/waf/control-plane/certificate-materials
+      - /var/run/docker.sock:/var/run/docker.sock
+    expose:
+      - "8080"
+    depends_on:
+      redis-mgmt:
+        condition: service_healthy
+      postgres-mgmt:
+        condition: service_healthy
+      runtime:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - waf-test-net
+
+  runtime:
+    build:
+      context: ../../..
+      dockerfile: runtime/image/Dockerfile
+    container_name: tarinio-test-runtime-mgmt
+    restart: unless-stopped
+    environment:
+      WAF_RUNTIME_ROOT: /var/lib/waf
+      WAF_RUNTIME_HEALTH_ADDR: 0.0.0.0:8081
+      # L4 thresholds are sourced from runtime bundle (/etc/waf/l4guard/config.json),
+      # compiled from control-plane anti-DDoS settings.
+      WAF_L4_GUARD_ADAPTIVE_PATH: /etc/waf/l4guard-adaptive/adaptive.json
+      WAF_L4_GUARD_REAPPLY_INTERVAL_SECONDS: ${WAF_L4_GUARD_REAPPLY_INTERVAL_SECONDS:-5}
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - waf-test-mgmt-runtime-data:/var/lib/waf:ro
+      - waf-test-mgmt-nginx-logs:/var/log/nginx
+      - waf-test-mgmt-l4-adaptive:/etc/waf/l4guard-adaptive:ro
+    ports:
+      - "${MGMT_WAF_HTTPS_PORT:-8080}:443"
+    expose:
+      - "80"
+      - "8081"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8081/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - waf-test-net
+
+  redis-mgmt:
+    image: redis:7-alpine
+    container_name: tarinio-test-redis-mgmt
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - waf-test-net
+
+  postgres-mgmt:
+    image: postgres:15-alpine
+    container_name: tarinio-test-postgres-mgmt
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${MGMT_POSTGRES_USER:-waf}
+      POSTGRES_PASSWORD: ${MGMT_POSTGRES_PASSWORD:-waf}
+      POSTGRES_DB: ${MGMT_POSTGRES_DB:-waf}
+    volumes:
+      - waf-test-mgmt-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${MGMT_POSTGRES_USER:-waf} -d ${MGMT_POSTGRES_DB:-waf}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - waf-test-net
+
+  ui:
+    build:
+      context: ../../..
+      dockerfile: ui/Dockerfile
+    container_name: tarinio-test-ui
+    restart: unless-stopped
+    volumes:
+      - ../../../ui/nginx.testpage.conf:/etc/nginx/conf.d/default.conf:ro
+      - waf-test-app-control-plane-data:/var/lib/waf/control-plane-app:ro
+      - waf-test-request-archive-data:/var/lib/waf/request-archive:ro
+    expose:
+      - "80"
+    networks:
+      waf-test-net:
+        ipv4_address: 172.30.0.10
+
+  control-plane-test:
+    build:
+      context: ../../..
+      dockerfile: control-plane/Dockerfile
+    container_name: tarinio-test-control-plane-app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      CONTROL_PLANE_HTTP_ADDR: 0.0.0.0:8080
+      WAF_RUNTIME_ROOT: /var/lib/waf
+      CONTROL_PLANE_REDIS_ADDR: redis-mgmt:6379
+      WAF_RUNTIME_HEALTH_URL: http://runtime-test:8081/readyz
+      WAF_RUNTIME_RELOAD_URL: http://runtime-test:8081/reload
+      POSTGRES_DSN: ${TEST_POSTGRES_DSN:-postgres://waf:waf@postgres-app:5432/waf?sslmode=disable}
+      WAF_DEFAULT_LIMIT_REQ_RATE: ${TEST_WAF_DEFAULT_LIMIT_REQ_RATE:-5r/s}
+      WAF_DEFAULT_BAD_BEHAVIOR_BAN_TIME_SECONDS: ${TEST_WAF_DEFAULT_BAD_BEHAVIOR_BAN_TIME_SECONDS:-10}
+      CONTROL_PLANE_BOOTSTRAP_ADMIN_ENABLED: "true"
+      CONTROL_PLANE_BOOTSTRAP_ADMIN_ID: admin
+      CONTROL_PLANE_BOOTSTRAP_ADMIN_USERNAME: admin
+      CONTROL_PLANE_BOOTSTRAP_ADMIN_EMAIL: admin@localhost
+      CONTROL_PLANE_BOOTSTRAP_ADMIN_PASSWORD: admin
+      CONTROL_PLANE_DEV_FAST_START_ENABLED: "true"
+      CONTROL_PLANE_DEV_FAST_START_HOST: ${TEST_WAF_DOMAIN:-localhost}
+      CONTROL_PLANE_DEV_FAST_START_CERTIFICATE_ID: ${TEST_WAF_CERTIFICATE_ID:-testpage-app-localhost-tls}
+      CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID: ${TEST_WAF_SITE_ID:-testpage-app-localhost-site}
+      CONTROL_PLANE_DEV_FAST_START_UPSTREAM_HOST: "172.30.0.20"
+      CONTROL_PLANE_DEV_FAST_START_UPSTREAM_PORT: ${TEST_WAF_UPSTREAM_PORT:-80}
+      CONTROL_PLANE_DEV_FAST_START_RETRY_DELAY_SECONDS: "2"
+      CONTROL_PLANE_DEV_FAST_START_MAX_ATTEMPTS: "60"
+    volumes:
+      - waf-test-app-runtime-data:/var/lib/waf
+      - waf-test-app-control-plane-data:/var/lib/waf/control-plane
+      - waf-test-app-certificates-data:/var/lib/waf/control-plane/certificate-materials
+      - /var/run/docker.sock:/var/run/docker.sock
+    expose:
+      - "8080"
+    depends_on:
+      redis-mgmt:
+        condition: service_healthy
+      postgres-app:
+        condition: service_healthy
+      runtime-test:
+        condition: service_healthy
+      test-login-app:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - waf-test-net
+
+  runtime-test:
+    build:
+      context: ../../..
+      dockerfile: runtime/image/Dockerfile
+    container_name: tarinio-test-runtime-app
+    restart: unless-stopped
+    environment:
+      WAF_RUNTIME_ROOT: /var/lib/waf
+      WAF_RUNTIME_HEALTH_ADDR: 0.0.0.0:8081
+      # L4 thresholds are sourced from runtime bundle (/etc/waf/l4guard/config.json),
+      # compiled from control-plane anti-DDoS settings.
+      WAF_L4_GUARD_ADAPTIVE_PATH: /etc/waf/l4guard-adaptive/adaptive.json
+      WAF_L4_GUARD_REAPPLY_INTERVAL_SECONDS: ${WAF_L4_GUARD_REAPPLY_INTERVAL_SECONDS:-5}
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - waf-test-app-runtime-data:/var/lib/waf:ro
+      - waf-test-app-nginx-logs:/var/log/nginx
+      - waf-test-app-l4-adaptive:/etc/waf/l4guard-adaptive:ro
+    ports:
+      - "${TEST_APP_WAF_HTTPS_PORT:-8081}:443"
+    expose:
+      - "80"
+      - "8081"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8081/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - waf-test-net
+
+  postgres-app:
+    image: postgres:15-alpine
+    container_name: tarinio-test-postgres-app
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${TEST_POSTGRES_USER:-waf}
+      POSTGRES_PASSWORD: ${TEST_POSTGRES_PASSWORD:-waf}
+      POSTGRES_DB: ${TEST_POSTGRES_DB:-waf}
+    volumes:
+      - waf-test-app-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${TEST_POSTGRES_USER:-waf} -d ${TEST_POSTGRES_DB:-waf}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - waf-test-net
+
+  cli:
+    build:
+      context: ../../..
+      dockerfile: cli/Dockerfile
+    container_name: tarinio-test-cli
+    profiles:
+      - tools
+    environment:
+      WAF_CLI_BASE_URL: http://control-plane:8080
+    networks:
+      - waf-test-net
+
+  test-login-app:
+    image: nginx:1.27-alpine
+    container_name: tarinio-test-login-app
+    restart: unless-stopped
+    volumes:
+      - ../../test-login-app/index.html:/usr/share/nginx/html/index.html:ro
+    expose:
+      - "80"
+    networks:
+      waf-test-net:
+        ipv4_address: 172.30.0.20
+
+  request-archive:
+    build:
+      context: ../../..
+      dockerfile: deploy/compose/testpage/request-archive/Dockerfile
+    container_name: tarinio-test-request-archive
+    restart: unless-stopped
+    environment:
+      REQUEST_ARCHIVE_MAX_FILE_SIZE_MB: ${REQUEST_ARCHIVE_MAX_FILE_SIZE_MB:-256}
+      REQUEST_ARCHIVE_MAX_FILES: ${REQUEST_ARCHIVE_MAX_FILES:-7}
+      REQUEST_ARCHIVE_RETENTION_DAYS: ${REQUEST_ARCHIVE_RETENTION_DAYS:-2}
+    depends_on:
+      runtime:
+        condition: service_started
+      runtime-test:
+        condition: service_started
+    volumes:
+      - waf-test-mgmt-nginx-logs:/logs/mgmt:ro
+      - waf-test-app-nginx-logs:/logs/app:ro
+      - waf-test-request-archive-data:/archive
+    networks:
+      - waf-test-net
+
+  ddos-model-mgmt:
+    build:
+      context: ../../..
+      dockerfile: deploy/compose/testpage/ddos-model/Dockerfile
+    container_name: tarinio-test-ddos-model-mgmt
+    restart: unless-stopped
+    environment:
+      MODEL_LOG_PATH: /logs/access.log
+      MODEL_STATE_PATH: /state/model-state.json
+      MODEL_OUTPUT_PATH: /out/adaptive.json
+      MODEL_RUNTIME_ROOT: /var/lib/waf
+      MODEL_POLL_INTERVAL_SECONDS: ${DDOS_MODEL_POLL_INTERVAL_SECONDS:-2}
+      MODEL_DECAY_LAMBDA: ${DDOS_MODEL_DECAY_LAMBDA:-0.08}
+      MODEL_THROTTLE_THRESHOLD: ${DDOS_MODEL_THROTTLE_THRESHOLD:-2.5}
+      MODEL_DROP_THRESHOLD: ${DDOS_MODEL_DROP_THRESHOLD:-6.0}
+      MODEL_HOLD_SECONDS: ${DDOS_MODEL_HOLD_SECONDS:-60}
+      MODEL_THROTTLE_RATE_PER_SECOND: ${DDOS_MODEL_THROTTLE_RATE_PER_SECOND:-3}
+      MODEL_THROTTLE_BURST: ${DDOS_MODEL_THROTTLE_BURST:-6}
+      MODEL_THROTTLE_TARGET: ${DDOS_MODEL_THROTTLE_TARGET:-REJECT}
+      MODEL_WEIGHT_429: ${DDOS_MODEL_WEIGHT_429:-1.0}
+      MODEL_WEIGHT_403: ${DDOS_MODEL_WEIGHT_403:-1.8}
+      MODEL_WEIGHT_444: ${DDOS_MODEL_WEIGHT_444:-2.2}
+      MODEL_EMERGENCY_RPS: ${DDOS_MODEL_EMERGENCY_RPS:-180}
+      MODEL_EMERGENCY_UNIQUE_IPS: ${DDOS_MODEL_EMERGENCY_UNIQUE_IPS:-40}
+      MODEL_EMERGENCY_PER_IP_RPS: ${DDOS_MODEL_EMERGENCY_PER_IP_RPS:-60}
+      MODEL_WEIGHT_EMERGENCY_BOTNET: ${DDOS_MODEL_WEIGHT_EMERGENCY_BOTNET:-6.0}
+      MODEL_WEIGHT_EMERGENCY_SINGLE: ${DDOS_MODEL_WEIGHT_EMERGENCY_SINGLE:-4.0}
+    depends_on:
+      runtime:
+        condition: service_started
+    volumes:
+      - waf-test-mgmt-nginx-logs:/logs:ro
+      - waf-test-mgmt-runtime-data:/var/lib/waf:ro
+      - waf-test-mgmt-ddos-model-state:/state
+      - waf-test-mgmt-l4-adaptive:/out
+    networks:
+      - waf-test-net
+
+  ddos-model-app:
+    build:
+      context: ../../..
+      dockerfile: deploy/compose/testpage/ddos-model/Dockerfile
+    container_name: tarinio-test-ddos-model-app
+    restart: unless-stopped
+    environment:
+      MODEL_LOG_PATH: /logs/access.log
+      MODEL_STATE_PATH: /state/model-state.json
+      MODEL_OUTPUT_PATH: /out/adaptive.json
+      MODEL_RUNTIME_ROOT: /var/lib/waf
+      MODEL_POLL_INTERVAL_SECONDS: ${DDOS_MODEL_POLL_INTERVAL_SECONDS:-2}
+      MODEL_DECAY_LAMBDA: ${DDOS_MODEL_DECAY_LAMBDA:-0.08}
+      MODEL_THROTTLE_THRESHOLD: ${DDOS_MODEL_THROTTLE_THRESHOLD:-2.5}
+      MODEL_DROP_THRESHOLD: ${DDOS_MODEL_DROP_THRESHOLD:-6.0}
+      MODEL_HOLD_SECONDS: ${DDOS_MODEL_HOLD_SECONDS:-60}
+      MODEL_THROTTLE_RATE_PER_SECOND: ${DDOS_MODEL_THROTTLE_RATE_PER_SECOND:-3}
+      MODEL_THROTTLE_BURST: ${DDOS_MODEL_THROTTLE_BURST:-6}
+      MODEL_THROTTLE_TARGET: ${DDOS_MODEL_THROTTLE_TARGET:-REJECT}
+      MODEL_WEIGHT_429: ${DDOS_MODEL_WEIGHT_429:-1.0}
+      MODEL_WEIGHT_403: ${DDOS_MODEL_WEIGHT_403:-1.8}
+      MODEL_WEIGHT_444: ${DDOS_MODEL_WEIGHT_444:-2.2}
+      MODEL_EMERGENCY_RPS: ${DDOS_MODEL_EMERGENCY_RPS:-180}
+      MODEL_EMERGENCY_UNIQUE_IPS: ${DDOS_MODEL_EMERGENCY_UNIQUE_IPS:-40}
+      MODEL_EMERGENCY_PER_IP_RPS: ${DDOS_MODEL_EMERGENCY_PER_IP_RPS:-60}
+      MODEL_WEIGHT_EMERGENCY_BOTNET: ${DDOS_MODEL_WEIGHT_EMERGENCY_BOTNET:-6.0}
+      MODEL_WEIGHT_EMERGENCY_SINGLE: ${DDOS_MODEL_WEIGHT_EMERGENCY_SINGLE:-4.0}
+    depends_on:
+      runtime-test:
+        condition: service_started
+    volumes:
+      - waf-test-app-nginx-logs:/logs:ro
+      - waf-test-app-runtime-data:/var/lib/waf:ro
+      - waf-test-app-ddos-model-state:/state
+      - waf-test-app-l4-adaptive:/out
+    networks:
+      - waf-test-net
+
+networks:
+  waf-test-net:
+    name: waf-test-net
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+
+volumes:
+  waf-test-mgmt-runtime-data:
+    name: waf-test-mgmt-runtime-data
+  waf-test-mgmt-control-plane-data:
+    name: waf-test-mgmt-control-plane-data
+  waf-test-mgmt-certificates-data:
+    name: waf-test-mgmt-certificates-data
+  waf-test-mgmt-postgres-data:
+    name: waf-test-mgmt-postgres-data
+  waf-test-app-runtime-data:
+    name: waf-test-app-runtime-data
+  waf-test-mgmt-nginx-logs:
+    name: waf-test-mgmt-nginx-logs
+  waf-test-app-nginx-logs:
+    name: waf-test-app-nginx-logs
+  waf-test-mgmt-l4-adaptive:
+    name: waf-test-mgmt-l4-adaptive
+  waf-test-app-l4-adaptive:
+    name: waf-test-app-l4-adaptive
+  waf-test-mgmt-ddos-model-state:
+    name: waf-test-mgmt-ddos-model-state
+  waf-test-app-ddos-model-state:
+    name: waf-test-app-ddos-model-state
+  waf-test-request-archive-data:
+    name: waf-test-request-archive-data
+  waf-test-app-control-plane-data:
+    name: waf-test-app-control-plane-data
+  waf-test-app-certificates-data:
+    name: waf-test-app-certificates-data
+  waf-test-app-postgres-data:
+    name: waf-test-app-postgres-data

@@ -1,0 +1,6 @@
+SecRuleEngine {{ .EngineMode }}
+{{- if .IncludeCRS }}
+Include /etc/waf/modsecurity/crs-setup.conf
+Include /etc/waf/modsecurity/coreruleset/rules/*.conf
+Include {{ .OverridesRef }}
+{{- end }}

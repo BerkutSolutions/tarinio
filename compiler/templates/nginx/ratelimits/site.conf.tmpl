@@ -1,0 +1,6 @@
+{{- if .Enabled }}
+limit_req zone={{ .ZoneName }} burst={{ .Burst }} nodelay;
+limit_req_status {{ .StatusCode }};
+limit_conn {{ .ConnZoneName }} {{ .ConnectionLimit }};
+limit_conn_status {{ .StatusCode }};
+{{- end }}

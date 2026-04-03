@@ -1,0 +1,228 @@
+services:
+  control-plane:
+    build:
+      context: ../../..
+      dockerfile: control-plane/Dockerfile
+    container_name: tarinio-control-plane
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      CONTROL_PLANE_HTTP_ADDR: 0.0.0.0:8080
+      WAF_RUNTIME_ROOT: /var/lib/waf
+      CONTROL_PLANE_REDIS_ADDR: redis:6379
+      WAF_RUNTIME_HEALTH_URL: http://runtime:8081/readyz
+      WAF_RUNTIME_RELOAD_URL: http://runtime:8081/reload
+      WAF_DEFAULT_BAD_BEHAVIOR_BAN_TIME_SECONDS: ${WAF_DEFAULT_BAD_BEHAVIOR_BAN_TIME_SECONDS:-300}
+      WAF_DEFAULT_BAD_BEHAVIOR_THRESHOLD: ${WAF_DEFAULT_BAD_BEHAVIOR_THRESHOLD:-20}
+      WAF_DEFAULT_BAD_BEHAVIOR_COUNT_TIME_SECONDS: ${WAF_DEFAULT_BAD_BEHAVIOR_COUNT_TIME_SECONDS:-30}
+      WAF_DEFAULT_LIMIT_CONN_MAX_HTTP1: ${WAF_DEFAULT_LIMIT_CONN_MAX_HTTP1:-80}
+      WAF_DEFAULT_LIMIT_CONN_MAX_HTTP2: ${WAF_DEFAULT_LIMIT_CONN_MAX_HTTP2:-160}
+      WAF_DEFAULT_LIMIT_CONN_MAX_HTTP3: ${WAF_DEFAULT_LIMIT_CONN_MAX_HTTP3:-160}
+      WAF_DEFAULT_LIMIT_REQ_RATE: ${WAF_DEFAULT_LIMIT_REQ_RATE:-30r/s}
+      WAF_DEFAULT_ANTIDDOS_CONN_LIMIT: ${WAF_DEFAULT_ANTIDDOS_CONN_LIMIT:-80}
+      WAF_DEFAULT_ANTIDDOS_RATE_PER_SECOND: ${WAF_DEFAULT_ANTIDDOS_RATE_PER_SECOND:-120}
+      WAF_DEFAULT_ANTIDDOS_RATE_BURST: ${WAF_DEFAULT_ANTIDDOS_RATE_BURST:-240}
+      WAF_DEFAULT_ANTIDDOS_PORTS: ${WAF_DEFAULT_ANTIDDOS_PORTS:-80,443}
+      WAF_DEFAULT_ANTIDDOS_DESTINATION_IP: ${WAF_DEFAULT_ANTIDDOS_DESTINATION_IP:-172.18.0.4}
+      WAF_DEFAULT_ANTIDDOS_ENFORCE_L7_RATE_LIMIT: ${WAF_DEFAULT_ANTIDDOS_ENFORCE_L7_RATE_LIMIT:-false}
+      WAF_DEFAULT_ANTIDDOS_L7_REQUESTS_PER_SECOND: ${WAF_DEFAULT_ANTIDDOS_L7_REQUESTS_PER_SECOND:-25}
+      WAF_DEFAULT_ANTIDDOS_L7_BURST: ${WAF_DEFAULT_ANTIDDOS_L7_BURST:-50}
+      WAF_DEFAULT_ANTIDDOS_L7_STATUS_CODE: ${WAF_DEFAULT_ANTIDDOS_L7_STATUS_CODE:-429}
+      WAF_DEFAULT_ANTIDDOS_MODEL_ENABLED: ${WAF_DEFAULT_ANTIDDOS_MODEL_ENABLED:-true}
+      WAF_DEFAULT_ANTIDDOS_MODEL_POLL_INTERVAL_SECONDS: ${WAF_DEFAULT_ANTIDDOS_MODEL_POLL_INTERVAL_SECONDS:-2}
+      WAF_DEFAULT_ANTIDDOS_MODEL_DECAY_LAMBDA: ${WAF_DEFAULT_ANTIDDOS_MODEL_DECAY_LAMBDA:-0.08}
+      WAF_DEFAULT_ANTIDDOS_MODEL_THROTTLE_THRESHOLD: ${WAF_DEFAULT_ANTIDDOS_MODEL_THROTTLE_THRESHOLD:-2.5}
+      WAF_DEFAULT_ANTIDDOS_MODEL_DROP_THRESHOLD: ${WAF_DEFAULT_ANTIDDOS_MODEL_DROP_THRESHOLD:-6.0}
+      WAF_DEFAULT_ANTIDDOS_MODEL_HOLD_SECONDS: ${WAF_DEFAULT_ANTIDDOS_MODEL_HOLD_SECONDS:-60}
+      WAF_DEFAULT_ANTIDDOS_MODEL_THROTTLE_RATE_PER_SECOND: ${WAF_DEFAULT_ANTIDDOS_MODEL_THROTTLE_RATE_PER_SECOND:-3}
+      WAF_DEFAULT_ANTIDDOS_MODEL_THROTTLE_BURST: ${WAF_DEFAULT_ANTIDDOS_MODEL_THROTTLE_BURST:-6}
+      WAF_DEFAULT_ANTIDDOS_MODEL_THROTTLE_TARGET: ${WAF_DEFAULT_ANTIDDOS_MODEL_THROTTLE_TARGET:-REJECT}
+      WAF_DEFAULT_ANTIDDOS_MODEL_WEIGHT_429: ${WAF_DEFAULT_ANTIDDOS_MODEL_WEIGHT_429:-1.0}
+      WAF_DEFAULT_ANTIDDOS_MODEL_WEIGHT_403: ${WAF_DEFAULT_ANTIDDOS_MODEL_WEIGHT_403:-1.8}
+      WAF_DEFAULT_ANTIDDOS_MODEL_WEIGHT_444: ${WAF_DEFAULT_ANTIDDOS_MODEL_WEIGHT_444:-2.2}
+      WAF_DEFAULT_ANTIDDOS_MODEL_EMERGENCY_RPS: ${WAF_DEFAULT_ANTIDDOS_MODEL_EMERGENCY_RPS:-180}
+      WAF_DEFAULT_ANTIDDOS_MODEL_EMERGENCY_UNIQUE_IPS: ${WAF_DEFAULT_ANTIDDOS_MODEL_EMERGENCY_UNIQUE_IPS:-40}
+      WAF_DEFAULT_ANTIDDOS_MODEL_EMERGENCY_PER_IP_RPS: ${WAF_DEFAULT_ANTIDDOS_MODEL_EMERGENCY_PER_IP_RPS:-60}
+      WAF_DEFAULT_ANTIDDOS_MODEL_WEIGHT_EMERGENCY_BOTNET: ${WAF_DEFAULT_ANTIDDOS_MODEL_WEIGHT_EMERGENCY_BOTNET:-6.0}
+      WAF_DEFAULT_ANTIDDOS_MODEL_WEIGHT_EMERGENCY_SINGLE: ${WAF_DEFAULT_ANTIDDOS_MODEL_WEIGHT_EMERGENCY_SINGLE:-4.0}
+      POSTGRES_DSN: ${POSTGRES_DSN:-postgres://waf:waf@postgres:5432/waf?sslmode=disable}
+    volumes:
+      - waf-runtime-data:/var/lib/waf
+      - waf-control-plane-data:/var/lib/waf/control-plane
+      - waf-certificates-data:/var/lib/waf/control-plane/certificate-materials
+      - /var/run/docker.sock:/var/run/docker.sock
+    expose:
+      - "8080"
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - waf-net
+
+  runtime:
+    build:
+      context: ../../..
+      dockerfile: runtime/image/Dockerfile
+    container_name: tarinio-runtime
+    restart: unless-stopped
+    depends_on:
+      ui:
+        condition: service_started
+    environment:
+      WAF_RUNTIME_ROOT: /var/lib/waf
+      WAF_RUNTIME_HEALTH_ADDR: 0.0.0.0:8081
+      # L4 thresholds are sourced from runtime bundle (/etc/waf/l4guard/config.json),
+      # compiled from control-plane anti-DDoS settings.
+      WAF_L4_GUARD_ADAPTIVE_PATH: /etc/waf/l4guard-adaptive/adaptive.json
+      WAF_L4_GUARD_REAPPLY_INTERVAL_SECONDS: ${WAF_L4_GUARD_REAPPLY_INTERVAL_SECONDS:-5}
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - waf-runtime-data:/var/lib/waf:ro
+      - waf-nginx-logs:/var/log/nginx
+      - waf-l4-adaptive:/etc/waf/l4guard-adaptive:ro
+    ports:
+      - "443:443"
+    expose:
+      - "80"
+      - "8081"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8081/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - waf-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: tarinio-redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - waf-net
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: tarinio-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-waf}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-waf}
+      POSTGRES_DB: ${POSTGRES_DB:-waf}
+    volumes:
+      - waf-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-waf} -d ${POSTGRES_DB:-waf}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - waf-net
+
+  ui:
+    build:
+      context: ../../..
+      dockerfile: ui/Dockerfile
+    container_name: tarinio-ui
+    restart: unless-stopped
+    depends_on:
+      control-plane:
+        condition: service_healthy
+    expose:
+      - "80"
+    healthcheck:
+      test: ["CMD-SHELL", "/bin/busybox wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - waf-net
+
+  ddos-model:
+    build:
+      context: ../../..
+      dockerfile: deploy/compose/default/ddos-model/Dockerfile
+    container_name: tarinio-ddos-model
+    restart: unless-stopped
+    environment:
+      MODEL_LOG_PATH: /logs/access.log
+      MODEL_STATE_PATH: /state/model-state.json
+      MODEL_OUTPUT_PATH: /out/adaptive.json
+      MODEL_RUNTIME_ROOT: /var/lib/waf
+      MODEL_POLL_INTERVAL_SECONDS: ${DDOS_MODEL_POLL_INTERVAL_SECONDS:-2}
+      MODEL_DECAY_LAMBDA: ${DDOS_MODEL_DECAY_LAMBDA:-0.08}
+      MODEL_THROTTLE_THRESHOLD: ${DDOS_MODEL_THROTTLE_THRESHOLD:-2.5}
+      MODEL_DROP_THRESHOLD: ${DDOS_MODEL_DROP_THRESHOLD:-6.0}
+      MODEL_HOLD_SECONDS: ${DDOS_MODEL_HOLD_SECONDS:-60}
+      MODEL_THROTTLE_RATE_PER_SECOND: ${DDOS_MODEL_THROTTLE_RATE_PER_SECOND:-3}
+      MODEL_THROTTLE_BURST: ${DDOS_MODEL_THROTTLE_BURST:-6}
+      MODEL_THROTTLE_TARGET: ${DDOS_MODEL_THROTTLE_TARGET:-REJECT}
+      MODEL_WEIGHT_429: ${DDOS_MODEL_WEIGHT_429:-1.0}
+      MODEL_WEIGHT_403: ${DDOS_MODEL_WEIGHT_403:-1.8}
+      MODEL_WEIGHT_444: ${DDOS_MODEL_WEIGHT_444:-2.2}
+      MODEL_EMERGENCY_RPS: ${DDOS_MODEL_EMERGENCY_RPS:-180}
+      MODEL_EMERGENCY_UNIQUE_IPS: ${DDOS_MODEL_EMERGENCY_UNIQUE_IPS:-40}
+      MODEL_EMERGENCY_PER_IP_RPS: ${DDOS_MODEL_EMERGENCY_PER_IP_RPS:-60}
+      MODEL_WEIGHT_EMERGENCY_BOTNET: ${DDOS_MODEL_WEIGHT_EMERGENCY_BOTNET:-6.0}
+      MODEL_WEIGHT_EMERGENCY_SINGLE: ${DDOS_MODEL_WEIGHT_EMERGENCY_SINGLE:-4.0}
+    depends_on:
+      runtime:
+        condition: service_started
+    volumes:
+      - waf-nginx-logs:/logs:ro
+      - waf-runtime-data:/var/lib/waf:ro
+      - waf-ddos-model-state:/state
+      - waf-l4-adaptive:/out
+    healthcheck:
+      test: ["CMD-SHELL", "test -s /out/adaptive.json || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+    networks:
+      - waf-net
+
+  cli:
+    build:
+      context: ../../..
+      dockerfile: cli/Dockerfile
+    container_name: tarinio-cli
+    profiles:
+      - tools
+    environment:
+      WAF_CLI_BASE_URL: http://control-plane:8080
+    networks:
+      - waf-net
+
+networks:
+  waf-net:
+    name: waf-net
+
+volumes:
+  waf-runtime-data:
+    name: waf-runtime-data
+  waf-control-plane-data:
+    name: waf-control-plane-data
+  waf-certificates-data:
+    name: waf-certificates-data
+  waf-postgres-data:
+    name: waf-postgres-data
+  waf-nginx-logs:
+    name: waf-nginx-logs
+  waf-l4-adaptive:
+    name: waf-l4-adaptive
+  waf-ddos-model-state:
+    name: waf-ddos-model-state

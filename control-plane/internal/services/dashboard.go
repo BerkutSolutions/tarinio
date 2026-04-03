@@ -1,0 +1,540 @@
+package services
+
+import (
+	"bufio"
+	"net/http"
+	"os"
+	"runtime"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+
+	"waf/control-plane/internal/events"
+)
+
+type dashboardEventReader interface {
+	List() ([]events.Event, error)
+}
+
+type DashboardService struct {
+	events          dashboardEventReader
+	requests        RuntimeRequestCollector
+	runtimeReadyURL string
+	httpClient      *http.Client
+}
+
+type DashboardServiceStatus struct {
+	Name      string `json:"name"`
+	Up        bool   `json:"up"`
+	CheckedAt string `json:"checked_at"`
+}
+
+type DashboardTimeCount struct {
+	Label     string `json:"label"`
+	Timestamp string `json:"timestamp"`
+	Count     int    `json:"count"`
+}
+
+type DashboardKeyCount struct {
+	Key   string `json:"key"`
+	Count int    `json:"count"`
+}
+
+type DashboardSystemStats struct {
+	CPUCores           int     `json:"cpu_cores"`
+	CPULoadPercent     float64 `json:"cpu_load_percent"`
+	MemoryTotalBytes   uint64  `json:"memory_total_bytes"`
+	MemoryUsedBytes    uint64  `json:"memory_used_bytes"`
+	MemoryFreeBytes    uint64  `json:"memory_free_bytes"`
+	MemoryUsedPercent  float64 `json:"memory_used_percent"`
+	Goroutines         int     `json:"goroutines"`
+	ControlPlaneHeapMB uint64  `json:"control_plane_heap_mb"`
+}
+
+type DashboardStats struct {
+	GeneratedAt            string                   `json:"generated_at"`
+	Services               []DashboardServiceStatus `json:"services"`
+	ServicesUp             int                      `json:"services_up"`
+	ServicesDown           int                      `json:"services_down"`
+	RequestsDay            int                      `json:"requests_day"`
+	RequestsSeries         []DashboardTimeCount     `json:"requests_series"`
+	BlockedSeries          []DashboardTimeCount     `json:"blocked_series"`
+	AttacksDay             int                      `json:"attacks_day"`
+	BlockedAttacksDay      int                      `json:"blocked_attacks_day"`
+	UniqueAttackerIPsDay   int                      `json:"unique_attacker_ips_day"`
+	PopularErrors          []DashboardKeyCount      `json:"popular_errors"`
+	TopAttackerIPs         []DashboardKeyCount      `json:"top_attacker_ips"`
+	TopAttackerCountries   []DashboardKeyCount      `json:"top_attacker_countries"`
+	MostAttackedURLs       []DashboardKeyCount      `json:"most_attacked_urls"`
+	System                 DashboardSystemStats     `json:"system"`
+	ObservationWindowHours int                      `json:"observation_window_hours"`
+}
+
+func NewDashboardService(events dashboardEventReader, requests RuntimeRequestCollector, runtimeReadyURL string) *DashboardService {
+	return &DashboardService{
+		events:          events,
+		requests:        requests,
+		runtimeReadyURL: strings.TrimSpace(runtimeReadyURL),
+		httpClient: &http.Client{
+			Timeout: 1500 * time.Millisecond,
+		},
+	}
+}
+
+func (s *DashboardService) Stats() (DashboardStats, error) {
+	now := time.Now().UTC()
+	cutoff := now.Add(-24 * time.Hour)
+
+	out := DashboardStats{
+		GeneratedAt:            now.Format(time.RFC3339Nano),
+		ObservationWindowHours: 24,
+	}
+
+	out.Services = s.collectServiceStatus(now)
+	for _, item := range out.Services {
+		if item.Up {
+			out.ServicesUp++
+		} else {
+			out.ServicesDown++
+		}
+	}
+
+	requestRows, err := s.collectRequests()
+	if err != nil {
+		return DashboardStats{}, err
+	}
+	requestsDay, requestsSeries, blockedFromRequestsSeries, blockedFromRequestsDay, popularErrors := summarizeRequests(requestRows, cutoff, now)
+	out.RequestsDay = requestsDay
+	out.RequestsSeries = requestsSeries
+	out.BlockedSeries = blockedFromRequestsSeries
+	out.PopularErrors = popularErrors
+
+	eventItems, err := s.collectEvents()
+	if err != nil {
+		return DashboardStats{}, err
+	}
+	attacksDay, blockedAttacksDay, uniqueIPsDay, topIPs, topCountries, topURLs, blockedFromEventsSeries, eventErrors := summarizeAttackEvents(eventItems, cutoff, now)
+	out.AttacksDay = attacksDay
+	out.BlockedAttacksDay = blockedAttacksDay
+	out.UniqueAttackerIPsDay = uniqueIPsDay
+	out.TopAttackerIPs = topIPs
+	out.TopAttackerCountries = topCountries
+	out.MostAttackedURLs = topURLs
+	out.BlockedSeries = blockedFromEventsSeries
+	out.BlockedSeries = mergeSeriesMax(out.BlockedSeries, blockedFromRequestsSeries)
+	if blockedFromRequestsDay > out.BlockedAttacksDay {
+		out.BlockedAttacksDay = blockedFromRequestsDay
+	}
+	out.PopularErrors = mergeKeyCountsSum(out.PopularErrors, eventErrors, 7)
+	out.System = collectSystemStats()
+	return out, nil
+}
+
+func (s *DashboardService) collectServiceStatus(now time.Time) []DashboardServiceStatus {
+	checkedAt := now.Format(time.RFC3339Nano)
+	statuses := []DashboardServiceStatus{
+		{Name: "control-plane", Up: true, CheckedAt: checkedAt},
+	}
+	if s.runtimeReadyURL != "" {
+		statuses = append(statuses, DashboardServiceStatus{
+			Name:      "runtime",
+			Up:        s.urlHealthy(s.runtimeReadyURL),
+			CheckedAt: checkedAt,
+		})
+	}
+	return statuses
+}
+
+func (s *DashboardService) urlHealthy(rawURL string) bool {
+	req, err := http.NewRequest(http.MethodGet, rawURL, nil)
+	if err != nil {
+		return false
+	}
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode >= 200 && resp.StatusCode < 300
+}
+
+func (s *DashboardService) collectRequests() ([]map[string]any, error) {
+	if s.requests == nil {
+		return []map[string]any{}, nil
+	}
+	items, err := s.requests.Collect()
+	if err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func (s *DashboardService) collectEvents() ([]events.Event, error) {
+	if s.events == nil {
+		return []events.Event{}, nil
+	}
+	return s.events.List()
+}
+
+func summarizeRequests(items []map[string]any, cutoff, now time.Time) (int, []DashboardTimeCount, []DashboardTimeCount, int, []DashboardKeyCount) {
+	var total int
+	series := map[time.Time]int{}
+	blockedSeries := map[time.Time]int{}
+	var blockedTotal int
+	errorCounts := map[string]int{}
+
+	for _, row := range items {
+		entry, ok := row["entry"].(map[string]any)
+		if !ok {
+			continue
+		}
+		uri := strings.TrimSpace(asString(entry["uri"]))
+		siteID := strings.TrimSpace(asString(entry["site"]))
+		if shouldSkipInternalRequest(uri, siteID) {
+			continue
+		}
+		when := parseAnyTime(entry["timestamp"])
+		if when.IsZero() {
+			when = parseAnyTime(row["ingested_at"])
+		}
+		if when.IsZero() || when.Before(cutoff) {
+			continue
+		}
+		total++
+		bucket := when.UTC().Truncate(time.Hour)
+		series[bucket]++
+		statusCode := parseAnyInt(entry["status"])
+		if statusCode == 403 || statusCode == 429 || statusCode == 444 {
+			blockedTotal++
+			blockedSeries[bucket]++
+		}
+		if statusCode >= 400 && statusCode <= 599 {
+			errorCounts[strconv.Itoa(statusCode)]++
+		}
+	}
+
+	seriesOut := buildHourlySeries(series, now)
+	blockedOut := buildHourlySeries(blockedSeries, now)
+	return total, seriesOut, blockedOut, blockedTotal, topCounts(errorCounts, 7)
+}
+
+func summarizeAttackEvents(items []events.Event, cutoff, now time.Time) (int, int, int, []DashboardKeyCount, []DashboardKeyCount, []DashboardKeyCount, []DashboardTimeCount, []DashboardKeyCount) {
+	var attacks int
+	var blocked int
+	ipCounts := map[string]int{}
+	countryCounts := map[string]int{}
+	urlCounts := map[string]int{}
+	errorCounts := map[string]int{}
+	uniqueIPs := map[string]struct{}{}
+	blockedByHour := map[time.Time]int{}
+
+	for _, item := range items {
+		if item.Type != events.TypeSecurityAccess && item.Type != events.TypeSecurityRateLimit && item.Type != events.TypeSecurityWAF {
+			continue
+		}
+		when := parseAnyTime(item.OccurredAt)
+		if when.IsZero() || when.Before(cutoff) {
+			continue
+		}
+		if shouldSkipInternalRequest("", item.SiteID) {
+			continue
+		}
+		// Not every security event should be counted as an "attack" in the dashboard.
+		// Runtime may emit warning signals like "burst detected (not blocked)" during normal admin UI activity.
+		// If backend explicitly marks the event as not blocked, treat it as an alert and skip it from attack metrics.
+		if raw, ok := item.Details["blocked"]; ok {
+			if flag, typeOK := raw.(bool); typeOK && !flag {
+				continue
+			}
+		}
+
+		attacks++
+		ip := strings.TrimSpace(asString(item.Details["client_ip"]))
+		if ip == "" {
+			ip = strings.TrimSpace(asString(item.Details["ip"]))
+		}
+		if ip != "" {
+			uniqueIPs[ip] = struct{}{}
+			ipCounts[ip]++
+		}
+
+		urlPath := strings.TrimSpace(asString(item.Details["path"]))
+		if urlPath == "" {
+			urlPath = strings.TrimSpace(asString(item.Details["uri"]))
+		}
+		if urlPath != "" {
+			urlCounts[urlPath]++
+		}
+
+		country := strings.ToUpper(strings.TrimSpace(asString(item.Details["country"])))
+		if country == "" {
+			country = strings.ToUpper(strings.TrimSpace(asString(item.Details["client_country"])))
+		}
+		if country == "" {
+			country = "UNKNOWN"
+		}
+		countryCounts[country]++
+		statusCode := parseAnyInt(item.Details["status"])
+		if statusCode >= 400 && statusCode <= 599 {
+			errorCounts[strconv.Itoa(statusCode)]++
+		}
+
+		if isBlockedEvent(item) {
+			blocked++
+			blockedByHour[when.UTC().Truncate(time.Hour)]++
+		}
+	}
+
+	return attacks, blocked, len(uniqueIPs), topCounts(ipCounts, 10), topCounts(countryCounts, 10), topCounts(urlCounts, 10), buildHourlySeries(blockedByHour, now), topCounts(errorCounts, 7)
+}
+
+func buildHourlySeries(values map[time.Time]int, now time.Time) []DashboardTimeCount {
+	end := now.UTC().Truncate(time.Hour)
+	start := end.Add(-23 * time.Hour)
+	out := make([]DashboardTimeCount, 0, 24)
+	for i := 0; i < 24; i++ {
+		ts := start.Add(time.Duration(i) * time.Hour)
+		out = append(out, DashboardTimeCount{
+			Label:     ts.Format("15:04"),
+			Timestamp: ts.Format(time.RFC3339),
+			Count:     values[ts],
+		})
+	}
+	return out
+}
+
+func shouldSkipInternalRequest(uri string, siteID string) bool {
+	path := strings.ToLower(strings.TrimSpace(uri))
+	site := strings.ToLower(strings.TrimSpace(siteID))
+	site = strings.ReplaceAll(site, "_", "-")
+	if site == "control-plane-access" || site == "control-plane" || site == "ui" {
+		return true
+	}
+	if path == "" {
+		return false
+	}
+	return strings.HasPrefix(path, "/api/dashboard") ||
+		strings.HasPrefix(path, "/dashboard") ||
+		strings.HasPrefix(path, "/healthz") ||
+		strings.HasPrefix(path, "/readyz") ||
+		strings.HasPrefix(path, "/login")
+}
+
+func mergeSeriesMax(primary []DashboardTimeCount, secondary []DashboardTimeCount) []DashboardTimeCount {
+	if len(primary) == 0 {
+		return append([]DashboardTimeCount(nil), secondary...)
+	}
+	secMap := make(map[string]DashboardTimeCount, len(secondary))
+	for _, item := range secondary {
+		secMap[item.Timestamp] = item
+	}
+	out := make([]DashboardTimeCount, 0, len(primary))
+	for _, item := range primary {
+		other, ok := secMap[item.Timestamp]
+		if ok && other.Count > item.Count {
+			item.Count = other.Count
+		}
+		out = append(out, item)
+	}
+	return out
+}
+
+func mergeKeyCountsSum(primary []DashboardKeyCount, secondary []DashboardKeyCount, limit int) []DashboardKeyCount {
+	sums := map[string]int{}
+	for _, item := range primary {
+		key := strings.TrimSpace(item.Key)
+		if key == "" {
+			continue
+		}
+		sums[key] += item.Count
+	}
+	for _, item := range secondary {
+		key := strings.TrimSpace(item.Key)
+		if key == "" {
+			continue
+		}
+		sums[key] += item.Count
+	}
+	return topCounts(sums, limit)
+}
+
+func isBlockedEvent(item events.Event) bool {
+	if blocked, ok := item.Details["blocked"].(bool); ok {
+		return blocked
+	}
+	status := parseAnyInt(item.Details["status"])
+	return status == 403 || status == 429 || status == 444
+}
+
+func topCounts(values map[string]int, limit int) []DashboardKeyCount {
+	out := make([]DashboardKeyCount, 0, len(values))
+	for key, count := range values {
+		if strings.TrimSpace(key) == "" || count <= 0 {
+			continue
+		}
+		out = append(out, DashboardKeyCount{Key: key, Count: count})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Count == out[j].Count {
+			return out[i].Key < out[j].Key
+		}
+		return out[i].Count > out[j].Count
+	})
+	if limit > 0 && len(out) > limit {
+		out = out[:limit]
+	}
+	return out
+}
+
+func collectSystemStats() DashboardSystemStats {
+	total, free := readMemoryFromProc()
+	used := uint64(0)
+	if total >= free {
+		used = total - free
+	}
+	usedPercent := 0.0
+	if total > 0 {
+		usedPercent = float64(used) * 100 / float64(total)
+	}
+
+	memStats := runtime.MemStats{}
+	runtime.ReadMemStats(&memStats)
+
+	return DashboardSystemStats{
+		CPUCores:           runtime.NumCPU(),
+		CPULoadPercent:     readCPULoadPercent(),
+		MemoryTotalBytes:   total,
+		MemoryUsedBytes:    used,
+		MemoryFreeBytes:    free,
+		MemoryUsedPercent:  round1(usedPercent),
+		Goroutines:         runtime.NumGoroutine(),
+		ControlPlaneHeapMB: memStats.HeapAlloc / (1024 * 1024),
+	}
+}
+
+func readCPULoadPercent() float64 {
+	load1, ok := readLoadAverage1()
+	if !ok {
+		return 0
+	}
+	cores := runtime.NumCPU()
+	if cores <= 0 {
+		return 0
+	}
+	return round1(load1 * 100 / float64(cores))
+}
+
+func readLoadAverage1() (float64, bool) {
+	content, err := os.ReadFile("/proc/loadavg")
+	if err != nil {
+		return 0, false
+	}
+	fields := strings.Fields(string(content))
+	if len(fields) < 1 {
+		return 0, false
+	}
+	value, err := strconv.ParseFloat(fields[0], 64)
+	if err != nil {
+		return 0, false
+	}
+	return value, true
+}
+
+func readMemoryFromProc() (uint64, uint64) {
+	file, err := os.Open("/proc/meminfo")
+	if err != nil {
+		return 0, 0
+	}
+	defer file.Close()
+
+	var totalKB uint64
+	var availableKB uint64
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "MemTotal:") {
+			totalKB = parseMemInfoKB(line)
+		} else if strings.HasPrefix(line, "MemAvailable:") {
+			availableKB = parseMemInfoKB(line)
+		}
+	}
+	if totalKB == 0 {
+		return 0, 0
+	}
+	return totalKB * 1024, availableKB * 1024
+}
+
+func parseMemInfoKB(line string) uint64 {
+	fields := strings.Fields(line)
+	if len(fields) < 2 {
+		return 0
+	}
+	value, err := strconv.ParseUint(fields[1], 10, 64)
+	if err != nil {
+		return 0
+	}
+	return value
+}
+
+func parseAnyTime(value any) time.Time {
+	raw := strings.TrimSpace(asString(value))
+	if raw == "" {
+		return time.Time{}
+	}
+	if ts, err := time.Parse(time.RFC3339Nano, raw); err == nil {
+		return ts.UTC()
+	}
+	if ts, err := time.Parse(time.RFC3339, raw); err == nil {
+		return ts.UTC()
+	}
+	return time.Time{}
+}
+
+func parseAnyInt(value any) int {
+	switch typed := value.(type) {
+	case int:
+		return typed
+	case int32:
+		return int(typed)
+	case int64:
+		return int(typed)
+	case float64:
+		return int(typed)
+	case float32:
+		return int(typed)
+	case string:
+		parsed, err := strconv.Atoi(strings.TrimSpace(typed))
+		if err != nil {
+			return 0
+		}
+		return parsed
+	default:
+		return 0
+	}
+}
+
+func asString(value any) string {
+	switch typed := value.(type) {
+	case string:
+		return typed
+	case []byte:
+		return string(typed)
+	case int:
+		return strconv.Itoa(typed)
+	case int32:
+		return strconv.Itoa(int(typed))
+	case int64:
+		return strconv.FormatInt(typed, 10)
+	case float64:
+		return strconv.Itoa(int(typed))
+	case float32:
+		return strconv.Itoa(int(typed))
+	default:
+		return ""
+	}
+}
+
+func round1(value float64) float64 {
+	return float64(int(value*10+0.5)) / 10
+}

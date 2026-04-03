@@ -1,0 +1,54 @@
+package config
+
+import (
+	"os"
+	"testing"
+)
+
+func TestLoadFromEnv_Defaults(t *testing.T) {
+	t.Setenv("CONTROL_PLANE_HTTP_ADDR", "")
+	t.Setenv("WAF_RUNTIME_ROOT", "")
+	t.Setenv("CONTROL_PLANE_REVISION_STORE_DIR", "")
+
+	cfg, err := LoadFromEnv()
+	if err != nil {
+		t.Fatalf("load config failed: %v", err)
+	}
+	if cfg.HTTPAddr == "" || cfg.RuntimeRoot == "" || cfg.RevisionStoreDir == "" {
+		t.Fatal("expected defaults to be populated")
+	}
+}
+
+func TestLoadFromEnv_Overrides(t *testing.T) {
+	t.Setenv("CONTROL_PLANE_HTTP_ADDR", "127.0.0.1:9090")
+	t.Setenv("CONTROL_PLANE_REVISION_STORE_DIR", "/tmp/control-plane")
+	t.Setenv("WAF_RUNTIME_ROOT", "/tmp/runtime")
+	t.Setenv("CONTROL_PLANE_REDIS_ADDR", "127.0.0.1:6380")
+	t.Setenv("CONTROL_PLANE_REDIS_DB", "2")
+
+	cfg, err := LoadFromEnv()
+	if err != nil {
+		t.Fatalf("load config failed: %v", err)
+	}
+	if cfg.HTTPAddr != "127.0.0.1:9090" {
+		t.Fatalf("unexpected addr: %s", cfg.HTTPAddr)
+	}
+	if cfg.RevisionStoreDir != "/tmp/control-plane" {
+		t.Fatalf("unexpected revision store dir: %s", cfg.RevisionStoreDir)
+	}
+	if cfg.Redis.Addr != "127.0.0.1:6380" || cfg.Redis.DB != 2 {
+		t.Fatalf("unexpected redis config: %+v", cfg.Redis)
+	}
+}
+
+func TestLoadFromEnv_InvalidAddr(t *testing.T) {
+	t.Setenv("CONTROL_PLANE_HTTP_ADDR", "invalid")
+	_, err := LoadFromEnv()
+	if err == nil {
+		t.Fatal("expected invalid addr error")
+	}
+}
+
+func TestMain(m *testing.M) {
+	os.Exit(m.Run())
+}

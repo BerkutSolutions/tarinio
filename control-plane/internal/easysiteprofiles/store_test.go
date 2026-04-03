@@ -1,0 +1,225 @@
+package easysiteprofiles
+
+import (
+	"slices"
+	"testing"
+)
+
+func TestDefaultProfile_HasExpectedDefaults(t *testing.T) {
+	profile := DefaultProfile("site-a")
+	if profile.SiteID != "site-a" {
+		t.Fatalf("unexpected site id: %s", profile.SiteID)
+	}
+	if profile.FrontService.SecurityMode != SecurityModeBlock {
+		t.Fatalf("unexpected security mode: %s", profile.FrontService.SecurityMode)
+	}
+	if profile.SecurityAntibot.AntibotChallenge != AntibotChallengeNo {
+		t.Fatalf("unexpected antibot default: %s", profile.SecurityAntibot.AntibotChallenge)
+	}
+	if got := len(profile.SecurityBehaviorAndLimits.BadBehaviorStatusCodes); got != 7 {
+		t.Fatalf("expected 7 default bad behavior codes, got %d", got)
+	}
+}
+
+func TestDefaultProfile_ControlPlaneAccessIncludesAPIMethods(t *testing.T) {
+	profile := DefaultProfile("control-plane-access")
+	required := []string{"PUT", "PATCH", "DELETE"}
+	for _, method := range required {
+		found := false
+		for _, item := range profile.HTTPBehavior.AllowedMethods {
+			if item == method {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("expected %s in default allowed methods for control-plane-access, got %+v", method, profile.HTTPBehavior.AllowedMethods)
+		}
+	}
+}
+
+func TestDefaultProfile_ControlPlaneAccessUsesHigherRateLimitsWithout429Escalation(t *testing.T) {
+	profile := DefaultProfile("control-plane-access")
+
+	if profile.SecurityBehaviorAndLimits.LimitConnMaxHTTP1 < 200 {
+		t.Fatalf("expected higher http/1 conn limit for control-plane-access, got %d", profile.SecurityBehaviorAndLimits.LimitConnMaxHTTP1)
+	}
+	if profile.SecurityBehaviorAndLimits.LimitConnMaxHTTP2 < 400 {
+		t.Fatalf("expected higher http/2 conn limit for control-plane-access, got %d", profile.SecurityBehaviorAndLimits.LimitConnMaxHTTP2)
+	}
+	if profile.SecurityBehaviorAndLimits.LimitConnMaxHTTP3 < 400 {
+		t.Fatalf("expected higher http/3 conn limit for control-plane-access, got %d", profile.SecurityBehaviorAndLimits.LimitConnMaxHTTP3)
+	}
+	if profile.SecurityBehaviorAndLimits.LimitReqRate != "80r/s" {
+		t.Fatalf("expected higher request rate for control-plane-access, got %s", profile.SecurityBehaviorAndLimits.LimitReqRate)
+	}
+	if slices.Contains(profile.SecurityBehaviorAndLimits.BadBehaviorStatusCodes, 429) {
+		t.Fatalf("expected control-plane-access bad behavior codes to exclude 429, got %+v", profile.SecurityBehaviorAndLimits.BadBehaviorStatusCodes)
+	}
+}
+
+func TestStore_CreateUpdateGetDelete(t *testing.T) {
+	store, err := NewStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+
+	profile := DefaultProfile("site-a")
+	profile.FrontService.ServerName = "WWW.Example.COM"
+	profile.SecurityBehaviorAndLimits.LimitReqRate = "100 r/s"
+
+	created, err := store.Create(profile)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if created.FrontService.ServerName != "www.example.com" {
+		t.Fatalf("expected normalized host, got %s", created.FrontService.ServerName)
+	}
+	if created.SecurityBehaviorAndLimits.LimitReqRate != "100r/s" {
+		t.Fatalf("expected normalized rate, got %s", created.SecurityBehaviorAndLimits.LimitReqRate)
+	}
+
+	got, ok, err := store.Get("site-a")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected profile to exist")
+	}
+	if got.SiteID != "site-a" {
+		t.Fatalf("unexpected profile site id: %s", got.SiteID)
+	}
+
+	got.SecurityAntibot.AntibotChallenge = AntibotChallengeCookie
+	updated, err := store.Update(got)
+	if err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	if updated.SecurityAntibot.AntibotChallenge != AntibotChallengeCookie {
+		t.Fatalf("unexpected antibot mode after update: %s", updated.SecurityAntibot.AntibotChallenge)
+	}
+
+	if err := store.Delete("site-a"); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	_, ok, err = store.Get("site-a")
+	if err != nil {
+		t.Fatalf("get after delete: %v", err)
+	}
+	if ok {
+		t.Fatal("expected profile to be deleted")
+	}
+}
+
+func TestStore_CreateRejectsUnsupportedBadBehaviorCode(t *testing.T) {
+	store, err := NewStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	profile := DefaultProfile("site-a")
+	profile.SecurityBehaviorAndLimits.BadBehaviorStatusCodes = []int{400, 999}
+	if _, err := store.Create(profile); err == nil {
+		t.Fatal("expected validation error for unsupported bad behavior code")
+	}
+}
+
+func TestStore_CreateRejectsRecaptchaWithoutSecrets(t *testing.T) {
+	store, err := NewStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	profile := DefaultProfile("site-a")
+	profile.SecurityAntibot.AntibotChallenge = AntibotChallengeRecaptcha
+	profile.SecurityAntibot.AntibotRecaptchaSitekey = "site-key"
+	profile.SecurityAntibot.AntibotRecaptchaSecret = ""
+	if _, err := store.Create(profile); err == nil {
+		t.Fatal("expected validation error for missing recaptcha secret")
+	}
+}
+
+func TestStore_CreateRejectsAuthBasicWithoutPassword(t *testing.T) {
+	store, err := NewStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	profile := DefaultProfile("site-a")
+	profile.SecurityAuthBasic.UseAuthBasic = true
+	profile.SecurityAuthBasic.AuthBasicUser = "admin"
+	profile.SecurityAuthBasic.AuthBasicPassword = ""
+	if _, err := store.Create(profile); err == nil {
+		t.Fatal("expected validation error for missing auth basic password")
+	}
+}
+
+func TestStore_CreateRejectsCountryConflict(t *testing.T) {
+	store, err := NewStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	profile := DefaultProfile("site-a")
+	profile.SecurityCountryPolicy.BlacklistCountry = []string{"US", "EU"}
+	profile.SecurityCountryPolicy.WhitelistCountry = []string{"US"}
+	if _, err := store.Create(profile); err == nil {
+		t.Fatal("expected validation error for conflicting country selectors")
+	}
+}
+
+func TestStore_CreateRejectsInvalidCountrySelector(t *testing.T) {
+	store, err := NewStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	profile := DefaultProfile("site-a")
+	profile.SecurityCountryPolicy.BlacklistCountry = []string{"INVALID_SELECTOR"}
+	if _, err := store.Create(profile); err == nil {
+		t.Fatal("expected validation error for invalid country selector")
+	}
+}
+
+func TestStore_CreateRejectsInvalidModSecurityCustomPath(t *testing.T) {
+	store, err := NewStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	profile := DefaultProfile("site-a")
+	profile.SecurityModSecurity.CustomConfiguration.Path = "../modsec/bad.conf"
+	if _, err := store.Create(profile); err == nil {
+		t.Fatal("expected validation error for invalid modsecurity custom path")
+	}
+}
+
+func TestStore_CreateRejectsInvalidModSecurityCRSVersion(t *testing.T) {
+	store, err := NewStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	profile := DefaultProfile("site-a")
+	profile.SecurityModSecurity.ModSecurityCRSVersion = "v4"
+	if _, err := store.Create(profile); err == nil {
+		t.Fatal("expected validation error for invalid modsecurity crs version")
+	}
+}
+
+func TestStore_UpdateAutoRepairsControlPlaneAccessAPIMethods(t *testing.T) {
+	store, err := NewStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	profile := DefaultProfile("control-plane-access")
+	profile.FrontService.ServerName = "localhost"
+	created, err := store.Create(profile)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	created.HTTPBehavior.AllowedMethods = []string{"GET", "POST", "HEAD", "OPTIONS"}
+	updated, err := store.Update(created)
+	if err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	required := []string{"GET", "POST", "HEAD", "OPTIONS", "PUT", "PATCH", "DELETE"}
+	for _, method := range required {
+		if !slices.Contains(updated.HTTPBehavior.AllowedMethods, method) {
+			t.Fatalf("expected method %s after auto repair, got %+v", method, updated.HTTPBehavior.AllowedMethods)
+		}
+	}
+}

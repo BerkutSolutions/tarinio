@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ .StatusCode }} {{ .Title }}</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #09111c;
+      --panel: rgba(17, 28, 43, 0.94);
+      --line: rgba(132, 170, 255, 0.2);
+      --text: #eef4ff;
+      --muted: rgba(238, 244, 255, 0.74);
+      --accent: {{ .Accent }};
+      --accent-soft: {{ .AccentSoft }};
+      --ok: #55d39e;
+      --warn: #ffc667;
+      --bad: #ff7f7f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", Inter, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 15% 15%, rgba(95, 149, 255, 0.18), transparent 30%),
+        radial-gradient(circle at 85% 0%, rgba(84, 211, 162, 0.12), transparent 28%),
+        var(--bg);
+      display: grid;
+      place-items: center;
+      padding: 28px;
+    }
+    .shell {
+      width: min(1080px, 100%);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background: var(--panel);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
+      overflow: hidden;
+    }
+    .hero {
+      padding: 28px 30px 18px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 18px;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .code {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.04);
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .code strong {
+      color: var(--text);
+      font-size: 22px;
+      letter-spacing: 0.5px;
+    }
+    .title {
+      font-size: clamp(34px, 5vw, 56px);
+      line-height: 1;
+      margin: 0;
+    }
+    .subtitle {
+      margin: 10px 0 0;
+      color: var(--muted);
+      max-width: 760px;
+      font-size: 17px;
+      line-height: 1.55;
+    }
+    .meta {
+      margin-top: 12px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .meta-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.02em;
+    }
+    .meta-item strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+    .body {
+      padding: 24px 30px 30px;
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 18px;
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 18px;
+      background: rgba(8, 14, 24, 0.56);
+    }
+    .card h2 {
+      margin: 0 0 14px;
+      font-size: 15px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+    }
+    .state-grid {
+      display: grid;
+      gap: 12px;
+    }
+    .state {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 15px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .state strong {
+      display: block;
+      font-size: 15px;
+      margin-bottom: 4px;
+    }
+    .state span {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      padding: 0 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .ok { color: #d7f8ea; background: rgba(85, 211, 158, 0.16); border: 1px solid rgba(85, 211, 158, 0.3); }
+    .warn { color: #ffeabf; background: rgba(255, 198, 103, 0.16); border: 1px solid rgba(255, 198, 103, 0.28); }
+    .bad { color: #ffd4d4; background: rgba(255, 127, 127, 0.16); border: 1px solid rgba(255, 127, 127, 0.28); }
+    .accent {
+      background: linear-gradient(135deg, var(--accent-soft), transparent);
+      border-color: rgba(255, 255, 255, 0.08);
+    }
+    .list {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+    .footer {
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    @media (max-width: 860px) {
+      .body {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <div>
+        <div class="code"><strong>{{ .StatusCode }}</strong><span>{{ .Category }}</span></div>
+        <h1 class="title">{{ .Title }}</h1>
+        <p class="subtitle">{{ .Summary }}</p>
+        <div class="meta">
+          <div class="meta-item"><span>Request ID</span><strong id="req-id">n/a</strong></div>
+          <div class="meta-item"><span>Client IP</span><strong id="client-ip">n/a</strong></div>
+          <div class="meta-item"><span>Timestamp</span><strong id="req-time">n/a</strong></div>
+        </div>
+      </div>
+    </section>
+    <section class="body">
+      <article class="card accent">
+        <h2>What happened</h2>
+        <div class="state-grid">
+          <div class="state">
+            <div>
+              <strong>Client request</strong>
+              <span>{{ .ClientStateText }}</span>
+            </div>
+            <span class="pill {{ .ClientStateTone }}">{{ .ClientStateLabel }}</span>
+          </div>
+          <div class="state">
+            <div>
+              <strong>WAF layer</strong>
+              <span>{{ .WAFStateText }}</span>
+            </div>
+            <span class="pill {{ .WAFStateTone }}">{{ .WAFStateLabel }}</span>
+          </div>
+          <div class="state">
+            <div>
+              <strong>Upstream service</strong>
+              <span>{{ .UpstreamStateText }}</span>
+            </div>
+            <span class="pill {{ .UpstreamStateTone }}">{{ .UpstreamStateLabel }}</span>
+          </div>
+        </div>
+      </article>
+      <article class="card">
+        <h2>What to do next</h2>
+        <ol class="list">
+          {{- range .Suggestions }}
+          <li>{{ . }}</li>
+          {{- end }}
+        </ol>
+        <div class="footer">TARINIO handled this response with an internal fallback page so the failure mode stays readable.</div>
+      </article>
+    </section>
+  </main>
+  <script>
+    (function () {
+      function readFromServerTiming(metricName) {
+        try {
+          var entries = performance.getEntriesByType("navigation");
+          if (!entries || !entries.length) {
+            return "";
+          }
+          var nav = entries[0];
+          if (!nav.serverTiming || !nav.serverTiming.length) {
+            return "";
+          }
+          for (var i = 0; i < nav.serverTiming.length; i += 1) {
+            var metric = nav.serverTiming[i];
+            if (metric && metric.name === metricName && metric.description) {
+              return String(metric.description);
+            }
+          }
+        } catch (error) {
+          return "";
+        }
+        return "";
+      }
+
+      var params = new URLSearchParams(window.location.search || "");
+      var requestID = params.get("rid") || readFromServerTiming("rid") || "n/a";
+      var clientIP = params.get("ip") || readFromServerTiming("ip") || "n/a";
+      var rawMillis = params.get("ts") || readFromServerTiming("ts");
+
+      var timestamp = "n/a";
+      if (rawMillis) {
+        var asNumber = Number(rawMillis);
+        if (!Number.isNaN(asNumber) && Number.isFinite(asNumber)) {
+          var date = new Date(asNumber * 1000);
+          if (!Number.isNaN(date.getTime())) {
+            timestamp = date.toISOString();
+          }
+        }
+      }
+
+      var reqIDNode = document.getElementById("req-id");
+      var clientIPNode = document.getElementById("client-ip");
+      var timeNode = document.getElementById("req-time");
+      if (reqIDNode) reqIDNode.textContent = requestID;
+      if (clientIPNode) clientIPNode.textContent = clientIP;
+      if (timeNode) timeNode.textContent = timestamp;
+    })();
+  </script>
+</body>
+</html>

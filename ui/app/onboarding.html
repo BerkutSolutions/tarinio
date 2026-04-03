@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WAF Admin | Onboarding</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; background: radial-gradient(circle at top, #142744 0%, #050b18 60%, #030711 100%); color: #e8eefc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .waf-fallback-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; }
+    .waf-fallback-card { width: min(560px, 100%); border: 1px solid #294d7f; border-radius: 14px; background: linear-gradient(180deg, #12233d, #0a1529); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.38); padding: 22px; }
+    .waf-fallback-title { margin: 0; font-size: 24px; font-weight: 700; }
+    .waf-fallback-sub { margin: 10px 0 0; font-size: 14px; color: #afc3e7; }
+  </style>
+  <script>
+    (function () {
+      function renderBlocked(code) {
+        if (window.__wafBlockedRendered) return;
+        window.__wafBlockedRendered = true;
+        var status = Number(code || 429) === 403 ? 403 : 429;
+        var title = status === 403 ? "403 Доступ ограничен" : "429 Слишком много запросов";
+        document.body.innerHTML = '<div class="waf-fallback-wrap"><article class="waf-fallback-card"><h1 class="waf-fallback-title">' + title + '</h1><p class="waf-fallback-sub">Защита активна. Повторите попытку позже.</p></article></div>';
+      }
+      window.__wafRenderBlocked = function (opts) { renderBlocked(opts && opts.code); };
+    })();
+  </script>
+  <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon16.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon32.png">
+  <link rel="icon" type="image/png" sizes="48x48" href="/static/favicon48.png">
+  <link rel="icon" type="image/png" sizes="64x64" href="/static/favicon64.png">
+  <link rel="stylesheet" href="/static/styles.css?v=20260402-anti-ddos-1" onerror="window.__wafRenderBlocked && window.__wafRenderBlocked({ code: 429 })">
+  <link rel="stylesheet" href="/static/waf.css?v=20260402-anti-ddos-1" onerror="window.__wafRenderBlocked && window.__wafRenderBlocked({ code: 429 })">
+</head>
+<body>
+  <main class="waf-onboarding-shell">
+    <section class="waf-card waf-onboarding-card">
+      <div class="waf-card-head">
+        <div>
+          <h1 class="waf-onboarding-title" data-i18n="onboarding.title">Initial setup</h1>
+          <div class="muted" data-i18n="onboarding.subtitle">First-run onboarding for the standalone WAF control plane.</div>
+        </div>
+        <span id="onboarding-step-badge" class="badge badge-neutral">Step 1 / 3</span>
+      </div>
+      <div class="waf-card-body waf-stack">
+        <div class="waf-onboarding-steps">
+          <div class="waf-step is-active" data-step-indicator="1" data-i18n="onboarding.step1">1. User creation</div>
+          <div class="waf-step" data-step-indicator="2" data-i18n="onboarding.step2">2. Site + TLS</div>
+          <div class="waf-step" data-step-indicator="3" data-i18n="onboarding.step3">3. Confirm</div>
+        </div>
+        <div id="onboarding-feedback"></div>
+
+        <section class="waf-onboarding-stage" data-step="1">
+          <div class="waf-stack">
+            <div class="waf-note" id="admin-setup-note" data-i18n="onboarding.admin.noteBootstrap">Create the first admin user for the standalone WAF control plane.</div>
+            <div class="waf-form-grid">
+              <div class="waf-field">
+                <label for="admin-username" data-i18n="onboarding.admin.username">Username</label>
+                <input id="admin-username" autocomplete="username" required>
+              </div>
+              <div class="waf-field">
+                <label for="admin-email" data-i18n="onboarding.admin.email">Email (optional)</label>
+                <input id="admin-email" type="email" autocomplete="email" data-i18n-placeholder="onboarding.admin.emailPlaceholder" placeholder="admin@example.com">
+              </div>
+              <div class="waf-field">
+                <label for="admin-password" data-i18n="onboarding.admin.password">Password</label>
+                <div class="waf-password-field">
+                  <input id="admin-password" type="password" autocomplete="new-password" required>
+                  <button class="waf-password-toggle" type="button" id="admin-password-toggle" data-target="admin-password" data-i18n-title="onboarding.admin.passwordToggleShow" title="Show password" aria-pressed="false">
+                    <span class="waf-password-icon-eye" aria-hidden="true">
+                      <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 5c5.2 0 9.6 3 11 7-1.4 4-5.8 7-11 7S2.4 16 1 12c1.4-4 5.8-7 11-7Zm0 2C8 7 4.6 9.1 3.1 12 4.6 14.9 8 17 12 17s7.4-2.1 8.9-5C19.4 9.1 16 7 12 7Zm0 2.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5Z"/></svg>
+                    </span>
+                    <span class="waf-password-icon-off waf-hidden" aria-hidden="true">
+                      <svg viewBox="0 0 24 24"><path fill="currentColor" d="M2.7 3.8 1.3 5.2l3 3A12.8 12.8 0 0 0 1 12c1.4 4 5.8 7 11 7 2 0 3.9-.4 5.5-1.1l3.2 3.1 1.4-1.4ZM9.2 13.1a3 3 0 0 1 1.7-4l3.1 3.1a3 3 0 0 1-4.8.9Zm6.5.6-4.5-4.5c.3-.1.5-.2.8-.2a3 3 0 0 1 3 3c0 .6-.1 1.2-.3 1.7ZM12 5c5.2 0 9.6 3 11 7-.6 1.8-1.9 3.4-3.6 4.6L17.9 15A9.8 9.8 0 0 0 20.9 12C19.4 9.1 16 7 12 7c-.8 0-1.6.1-2.4.3L8 5.7A13 13 0 0 1 12 5Z"/></svg>
+                    </span>
+                  </button>
+                </div>
+              </div>
+              <div class="waf-field">
+                <label for="admin-password-confirm" data-i18n="onboarding.admin.passwordConfirm">Confirm password</label>
+                <div class="waf-password-field">
+                  <input id="admin-password-confirm" type="password" autocomplete="new-password" required>
+                  <button class="waf-password-toggle" type="button" id="admin-password-confirm-toggle" data-target="admin-password-confirm" data-i18n-title="onboarding.admin.passwordToggleShow" title="Show password" aria-pressed="false">
+                    <span class="waf-password-icon-eye" aria-hidden="true">
+                      <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 5c5.2 0 9.6 3 11 7-1.4 4-5.8 7-11 7S2.4 16 1 12c1.4-4 5.8-7 11-7Zm0 2C8 7 4.6 9.1 3.1 12 4.6 14.9 8 17 12 17s7.4-2.1 8.9-5C19.4 9.1 16 7 12 7Zm0 2.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5Z"/></svg>
+                    </span>
+                    <span class="waf-password-icon-off waf-hidden" aria-hidden="true">
+                      <svg viewBox="0 0 24 24"><path fill="currentColor" d="M2.7 3.8 1.3 5.2l3 3A12.8 12.8 0 0 0 1 12c1.4 4 5.8 7 11 7 2 0 3.9-.4 5.5-1.1l3.2 3.1 1.4-1.4ZM9.2 13.1a3 3 0 0 1 1.7-4l3.1 3.1a3 3 0 0 1-4.8.9Zm6.5.6-4.5-4.5c.3-.1.5-.2.8-.2a3 3 0 0 1 3 3c0 .6-.1 1.2-.3 1.7ZM12 5c5.2 0 9.6 3 11 7-.6 1.8-1.9 3.4-3.6 4.6L17.9 15A9.8 9.8 0 0 0 20.9 12C19.4 9.1 16 7 12 7c-.8 0-1.6.1-2.4.3L8 5.7A13 13 0 0 1 12 5Z"/></svg>
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="waf-onboarding-stage waf-hidden" data-step="2">
+          <form id="site-tls-form" class="waf-form">
+            <div class="waf-form-grid">
+              <div class="waf-field full">
+                <label for="site-host" data-i18n="onboarding.site.host">Detected site address</label>
+                <input id="site-host" data-i18n-placeholder="onboarding.site.hostPlaceholder" placeholder="localhost or example.com">
+              </div>
+            </div>
+            <div class="waf-form-grid">
+              <label class="waf-checkbox"><input id="tls-letsencrypt" type="radio" name="tls-mode" checked><span data-i18n="onboarding.site.tlsManaged">Generate certificate from WAF (Let's Encrypt flow)</span></label>
+              <label class="waf-checkbox"><input id="tls-self-signed" type="radio" name="tls-mode"><span data-i18n="onboarding.site.tlsSelfSigned">Self-signed development fallback</span></label>
+            </div>
+            <div class="waf-note" data-i18n="onboarding.site.note">The WAF control plane issues and stores certificate material for this site. In local development, the existing issuance flow uses the built-in development certificate generator.</div>
+          </form>
+        </section>
+
+        <section class="waf-onboarding-stage waf-hidden" data-step="3">
+          <div id="onboarding-summary" class="waf-stack"></div>
+        </section>
+
+        <div class="waf-actions waf-actions-between waf-onboarding-actions">
+          <button class="btn ghost" type="button" id="onboarding-back" data-i18n="common.back">Back</button>
+          <button class="btn primary" type="button" id="onboarding-next" data-i18n="common.next">Next</button>
+          <button class="btn primary waf-hidden" type="button" id="onboarding-apply" data-i18n="common.apply">Apply</button>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="/static/js/onboarding.js?v=20260402-anti-ddos-1" onerror="window.__wafRenderBlocked && window.__wafRenderBlocked({ code: 429 })"></script>
+</body>
+</html>

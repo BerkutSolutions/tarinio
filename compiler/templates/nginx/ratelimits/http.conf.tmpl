@@ -1,0 +1,4 @@
+{{- range .Entries }}
+limit_req_zone $binary_remote_addr zone={{ .ZoneName }}:10m rate={{ .Rate }};
+limit_conn_zone $binary_remote_addr zone={{ .ConnZoneName }}:10m;
+{{- end }}
