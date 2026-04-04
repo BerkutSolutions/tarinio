@@ -95,7 +95,8 @@ ok "containers started"
 
 section "Done"
 echo "TARINIO is starting."
-echo "Admin UI: http://<server-ip>:8080/login"
+echo "Initial setup UI (temporary): http://<server-ip>:8080/login"
+echo "After onboarding: https://<your-domain>/login"
 echo "WAF HTTP:  http://<server-ip>/"
 echo "WAF HTTPS: https://<server-ip>/"
 echo

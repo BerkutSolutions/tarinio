@@ -91,8 +91,7 @@ function syncStepRoute(replaceHistory = false) {
 
 function httpsUrl(path = "/") {
   const host = window.location.hostname || "localhost";
-  const port = window.location.port ? `:${window.location.port}` : "";
-  return `https://${host}${port}${path}`;
+  return `https://${host}${path}`;
 }
 
 function detectSiteHost() {
@@ -386,7 +385,7 @@ function renderSummary() {
         </div>
         <div class="waf-field full">
           <div class="waf-note">${escapeHtml(t("onboarding.confirm.afterApply"))}</div>
-          <div>${escapeHtml(t("onboarding.confirm.afterApplyText", { url: `https://${host}${window.location.port ? `:${window.location.port}` : ""}` }))}</div>
+          <div>${escapeHtml(t("onboarding.confirm.afterApplyText", { url: `https://${host}` }))}</div>
         </div>
       </div>
     </div>

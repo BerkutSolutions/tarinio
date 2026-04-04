@@ -82,6 +82,17 @@ func (h *CertificateACMEHandler) issue(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 		return
 	}
+	if job.Status == jobs.StatusFailed {
+		message := strings.TrimSpace(job.Result)
+		if message == "" {
+			message = "acme issue failed"
+		}
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"error": message,
+			"job":   job,
+		})
+		return
+	}
 	writeJSON(w, http.StatusCreated, job)
 }
 
@@ -94,6 +105,17 @@ func (h *CertificateACMEHandler) issueSelfSigned(w http.ResponseWriter, r *http.
 	job, err := h.selfSigned.Issue(withActorIP(r), req.CertificateID, req.CommonName, req.SANList, nil)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		return
+	}
+	if job.Status == jobs.StatusFailed {
+		message := strings.TrimSpace(job.Result)
+		if message == "" {
+			message = "self-signed issue failed"
+		}
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"error": message,
+			"job":   job,
+		})
 		return
 	}
 	writeJSON(w, http.StatusCreated, job)
@@ -112,6 +134,17 @@ func (h *CertificateACMEHandler) renew(w http.ResponseWriter, r *http.Request) {
 			status = http.StatusNotFound
 		}
 		writeJSON(w, status, map[string]any{"error": err.Error()})
+		return
+	}
+	if job.Status == jobs.StatusFailed {
+		message := strings.TrimSpace(job.Result)
+		if message == "" {
+			message = "acme renew failed"
+		}
+		writeJSON(w, http.StatusBadRequest, map[string]any{
+			"error": message,
+			"job":   job,
+		})
 		return
 	}
 	writeJSON(w, http.StatusCreated, job)
