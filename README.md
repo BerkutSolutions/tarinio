@@ -8,7 +8,7 @@
 
 Berkut Solutions - TARINIO - self-hosted платформа защиты и контроля веб-трафика (WAF/CRS + L4/L7 Anti-DDoS) с централизованным управлением изменениями через ревизии.
 
-Актуальная версия: `1.0.0`
+Актуальная версия: `1.0.1`
 
 ## Суть продукта
 
@@ -62,10 +62,10 @@ TARINIO перехватывает входящий трафик до бизне
 
 ## Запуск и эксплуатация
 
-- Быстрый старт: [`QUICKSTART.md`](QUICKSTART.md)
 - Деплой: [`docs/ru/deploy.md`](docs/ru/deploy.md)
 - Runbook (диагностика и восстановление): [`docs/ru/runbook.md`](docs/ru/runbook.md)
 - Обновление и откат: [`docs/ru/upgrade.md`](docs/ru/upgrade.md)
+- Compose профили: [`deploy/compose/README.md`](deploy/compose/README.md)
 
 ## Скриншоты
 
@@ -74,3 +74,4 @@ TARINIO перехватывает входящий трафик до бизне
 ![Скриншот 2](ui/app/static/screen2.png)
 
 ![Скриншот 3](ui/app/static/screen3.png)
+
