@@ -1,4 +1,4 @@
-# Core Domain Model
+﻿# Core Domain Model
 
 Status: Finalized for Stage 0 task `Define core domain model`
 Date: 2026-03-31
@@ -547,3 +547,4 @@ Concrete mapping in MVP:
 - `Site` + `RateLimitPolicy` -> limit zone and enforcement directives
 - `Revision` -> versioned compiled bundle used for validation, apply, activation, and rollback
 - `Job`, `Event`, `User`, `Role`, `AuditEvent` -> no direct runtime config, but govern and trace the lifecycle of changes
+

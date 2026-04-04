@@ -1,4 +1,4 @@
-# Stage 1 End-to-End Validation
+﻿# Stage 1 End-to-End Validation
 
 Date: `2026-04-01`
 
@@ -62,3 +62,4 @@ Stage 1 clean first-run now behaves as a product flow:
 - Development certificate flow is still a local WAF-managed development certificate, not real public Let's Encrypt issuance.
 - HTTPS verification from Windows CLI tooling may depend on local Schannel behavior; runtime-internal HTTPS serving is verified directly in-container.
 - Stage 1 still remains single-node only and baseline-only for anti-DDoS protection.
+

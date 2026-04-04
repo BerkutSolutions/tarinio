@@ -1,4 +1,4 @@
-# MVP Deployment Topology
+﻿# MVP Deployment Topology
 
 Status: Finalized for Stage 0 task `Define MVP deployment topology`
 Date: 2026-03-31
@@ -422,3 +422,4 @@ For single-node MVP:
 - PostgreSQL stores persistent truth
 - Redis stores ephemeral coordination only
 - externally exposed surface is minimized to runtime and, when needed, restricted admin API access
+

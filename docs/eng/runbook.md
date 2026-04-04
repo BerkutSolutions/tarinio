@@ -1,6 +1,6 @@
-# Runbook (EN)
+﻿# Runbook (EN)
 
-Documentation baseline: `1.0.0`
+Documentation baseline: `1.0.2`
 
 ## Basic checks
 
@@ -18,3 +18,4 @@ Use container logs:
 - `control-plane`
 - `runtime`
 - `worker`
+

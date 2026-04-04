@@ -1,4 +1,4 @@
-# Standalone Product Boundary
+﻿# Standalone Product Boundary
 
 Status: Finalized for Stage 0 task `Define standalone product boundary`
 
@@ -295,3 +295,4 @@ For MVP, the product boundary is:
 
 Any implementation decision that violates this ownership model is outside the
 approved Stage 0 architecture.
+

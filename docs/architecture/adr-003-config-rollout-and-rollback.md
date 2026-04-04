@@ -1,4 +1,4 @@
-# ADR-003: Config Rollout and Rollback Flow
+﻿# ADR-003: Config Rollout and Rollback Flow
 
 Status: Accepted
 Date: 2026-03-31
@@ -327,3 +327,4 @@ No runtime-affecting change is complete unless it:
 - reloads successfully
 - passes health-check
 - can roll back safely to the last known good revision
+

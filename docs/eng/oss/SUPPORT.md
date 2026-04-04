@@ -15,3 +15,4 @@ Product: **Berkut Solutions - TARINIO**
 - `GET /healthz`
 - UI: `Settings -> About` (version)
 - validate and re-apply the last stable revision
+

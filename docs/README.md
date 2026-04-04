@@ -1,12 +1,13 @@
 ﻿# Documentation
 
-Version baseline: `1.0.1`
+Version baseline: `1.0.2`
 
 This directory contains the release-synced technical documentation for TARINIO.
 
 Primary entry points:
 - Russian: `docs/ru/README.md`
 - English: `docs/eng/README.md`
+- AIO one-command installer: `scripts/install-aio.sh`
 - Architecture RU: `docs/ru/architecture.md`
 - Architecture EN: `docs/eng/architecture.md`
 - API RU: `docs/ru/api.md`
@@ -34,4 +35,5 @@ OSS policy docs (i18n):
 Root product overview:
 - `README.md`
 - `README.en.md`
+
 

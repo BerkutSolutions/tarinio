@@ -78,7 +78,7 @@ func RenderEasyArtifacts(sites []SiteInput, profiles []EasyProfileInput) ([]Arti
 		}
 		profile.AllowedMethods = sortedUnique(profile.AllowedMethods)
 		if len(profile.AllowedMethods) == 0 {
-			profile.AllowedMethods = []string{"GET", "POST", "HEAD", "OPTIONS"}
+			profile.AllowedMethods = []string{"GET", "POST", "HEAD", "OPTIONS", "PUT", "PATCH", "DELETE"}
 		}
 		profile.PermissionsPolicy = sortedUnique(profile.PermissionsPolicy)
 		profile.CORSAllowedOrigins = sortedUnique(profile.CORSAllowedOrigins)
@@ -141,7 +141,7 @@ func RenderEasyArtifacts(sites []SiteInput, profiles []EasyProfileInput) ([]Arti
 		if !ok {
 			profile = EasyProfileInput{
 				SiteID:                    site.ID,
-				AllowedMethods:            []string{"GET", "POST", "HEAD", "OPTIONS"},
+				AllowedMethods:            []string{"GET", "POST", "HEAD", "OPTIONS", "PUT", "PATCH", "DELETE"},
 				MaxClientSize:             "100m",
 				UseModSecurity:            true,
 				UseLimitConn:              true,

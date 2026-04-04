@@ -1,16 +1,35 @@
-# Deploy (EN)
+﻿# Deploy (EN)
 
-Documentation baseline: `1.0.0`
+Documentation baseline: `1.0.2`
 
-## Docker Compose
+## AIO Quick Start (one command)
 
-Docker Compose is the recommended path for local and single-node deployments.
+You can start the full TARINIO stack (auto-start profile) with a single command:
 
-1. Review `.env.example` and create `.env` (secrets, `TZ`, DB parameters).
-2. Start the compose stack from `deploy/compose/`.
-3. Open the UI and complete admin bootstrap.
+```bash
+curl -fsSL https://raw.githubusercontent.com/BerkutSolutions/tarinio/main/scripts/install-aio.sh | sh
+```
+
+By default, the script:
+- clones/updates the repo into `/opt/tarinio`
+- uses branch `main`
+- starts `deploy/compose/auto-start`
+
+After startup:
+- `http://<server-ip>/login`
+- `https://<server-ip>/login`
+
+## Manual Docker Compose run
+
+1. Review `.env.example` and create `.env`.
+2. Start the profile:
+
+```bash
+docker compose -f deploy/compose/default/docker-compose.yml up -d --build
+```
 
 ## Notes
 
-- Runtime must stay offline (no CDN/online runtime dependencies;.
-- For production, set secrets explicitly and enable HTTPS.
+- Use `auto-start` for quick local bootstrap.
+- Use `default` for a production-oriented local run (`ui` on `80`, `runtime` on `443`).
+- For production, use non-default secrets and HTTPS.

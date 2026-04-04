@@ -1,4 +1,4 @@
-# Adaptive DDoS Model (Independent Container)
+﻿# Adaptive DDoS Model (Independent Container)
 
 ## Why this exists
 
@@ -155,3 +155,4 @@ docker compose exec ddos-model-app sh -lc "cat /out/adaptive.json"
   - L4 guard ignores adaptive part and keeps static rules.
 - If runtime cannot apply adaptive rules:
   - error is logged, next periodic cycle retries.
+

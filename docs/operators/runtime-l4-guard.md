@@ -1,4 +1,4 @@
-# Runtime L4 Guard
+﻿# Runtime L4 Guard
 
 This document defines the MVP L4 anti-DDoS baseline for the runtime container.
 
@@ -112,3 +112,4 @@ Typical requirement:
 - `NET_ADMIN`
 
 If the process cannot manage `iptables`, bootstrap fails and the runtime container does not continue as if protection were active.
+

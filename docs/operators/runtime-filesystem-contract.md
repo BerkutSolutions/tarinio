@@ -1,4 +1,4 @@
-# Runtime Filesystem Contract
+﻿# Runtime Filesystem Contract
 
 Status: Stage 1 runtime contract for `S1-17`
 
@@ -120,3 +120,4 @@ For single-node MVP:
 - `/etc/waf/current` is derived
 - bundle-relative paths stay stable from compiler through runtime
 - identical artifacts must keep identical relative paths at every stage
+

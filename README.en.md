@@ -8,7 +8,7 @@
 
 Berkut Solutions - TARINIO is a self-hosted web traffic protection and control platform (WAF/CRS + L4/L7 Anti-DDoS) with centralized change management through revisions.
 
-Current version: `1.0.1`
+Current version: `1.0.2`
 
 ## Product Overview
 
@@ -62,6 +62,10 @@ This provides reproducible changes, auditable operations, and one control loop f
 
 ## Run and Operations
 
+- AIO one-command start:
+  - `curl -fsSL https://raw.githubusercontent.com/BerkutSolutions/tarinio/main/scripts/install-aio.sh | sh`
+- Project image:
+  - `docker pull ghcr.io/berkutsolutions/tarinio:latest`
 - Deploy: [`docs/eng/deploy.md`](docs/eng/deploy.md)
 - Runbook (diagnostics and recovery): [`docs/eng/runbook.md`](docs/eng/runbook.md)
 - Upgrade and rollback: [`docs/eng/upgrade.md`](docs/eng/upgrade.md)
@@ -74,4 +78,5 @@ This provides reproducible changes, auditable operations, and one control loop f
 ![Screenshot 2](ui/app/static/screen2.png)
 
 ![Screenshot 3](ui/app/static/screen3.png)
+
 

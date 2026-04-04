@@ -1,4 +1,4 @@
-# Stage 1 Scope Freeze
+﻿# Stage 1 Scope Freeze
 
 Status: Finalized for Stage 0 task `Freeze Stage 1 scope`
 Date: 2026-03-31
@@ -258,3 +258,4 @@ No Stage 1 feature may assume:
 If a proposed Stage 1 feature is not clearly inside `In Scope`, it is out of scope until explicitly approved.
 
 If a proposed change pushes the product toward enterprise management, plugin systems, advanced analytics, or non-MVP complexity, it must be rejected during Stage 1 execution.
+

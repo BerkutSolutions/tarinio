@@ -1,16 +1,35 @@
-# Deploy (RU)
+﻿# Deploy (RU)
 
-Базовая версия документации: `1.0.0`
+Базовая версия документации: `1.0.2`
 
-## Docker Compose
+## Быстрый AIO-старт (одна команда)
 
-Рекомендуемый путь для локального и single-node развёртывания — Docker Compose.
+Полный стек TARINIO (auto-start профиль) можно поднять одной командой:
 
-1. Проверьте `.env.example` и подготовьте `.env` (секреты, `TZ`, параметры БД).
-2. Запустите Compose из `deploy/compose/`.
-3. Откройте UI и выполните bootstrap администратора.
+```bash
+curl -fsSL https://raw.githubusercontent.com/BerkutSolutions/tarinio/main/scripts/install-aio.sh | sh
+```
+
+По умолчанию скрипт:
+- клонирует/обновляет репозиторий в `/opt/tarinio`
+- выбирает ветку `main`
+- поднимает `deploy/compose/auto-start`
+
+После запуска:
+- `http://<server-ip>/login`
+- `https://<server-ip>/login`
+
+## Ручной запуск через Docker Compose
+
+1. Проверьте `.env.example` и подготовьте `.env`.
+2. Запустите профиль:
+
+```bash
+docker compose -f deploy/compose/default/docker-compose.yml up -d --build
+```
 
 ## Примечания
 
-- В рантайме запрещены внешние CDN/онлайн-зависимости.
-- Для prod задавайте секреты и включайте HTTPS.
+- Для быстрого локального запуска используйте профиль `auto-start`.
+- Для боевого локального сценария используйте `default` (`ui` на `80`, `runtime` на `443`).
+- Для production задавайте недефолтные секреты и включайте HTTPS.

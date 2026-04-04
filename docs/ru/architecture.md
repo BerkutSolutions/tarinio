@@ -1,21 +1,22 @@
-# Архитектура TARINIO (обзор)
+﻿# РђСЂС…РёС‚РµРєС‚СѓСЂР° TARINIO (РѕР±Р·РѕСЂ)
 
-Базовая версия документации: `1.0.0`
+Р‘Р°Р·РѕРІР°СЏ РІРµСЂСЃРёСЏ РґРѕРєСѓРјРµРЅС‚Р°С†РёРё: `1.0.2`
 
-TARINIO — standalone self-hosted WAF на базе NGINX + ModSecurity + OWASP CRS.
+TARINIO вЂ” standalone self-hosted WAF РЅР° Р±Р°Р·Рµ NGINX + ModSecurity + OWASP CRS.
 
-## Ключевые принципы
+## РљР»СЋС‡РµРІС‹Рµ РїСЂРёРЅС†РёРїС‹
 
-- Source of truth для намерений оператора — control-plane (хранилище + ревизии).
-- Runtime не редактируется вручную: он потребляет только активный compiled bundle.
-- Любые изменения проходят через ревизии: compile → validate → apply → rollback.
+- Source of truth РґР»СЏ РЅР°РјРµСЂРµРЅРёР№ РѕРїРµСЂР°С‚РѕСЂР° вЂ” control-plane (С…СЂР°РЅРёР»РёС‰Рµ + СЂРµРІРёР·РёРё).
+- Runtime РЅРµ СЂРµРґР°РєС‚РёСЂСѓРµС‚СЃСЏ РІСЂСѓС‡РЅСѓСЋ: РѕРЅ РїРѕС‚СЂРµР±Р»СЏРµС‚ С‚РѕР»СЊРєРѕ Р°РєС‚РёРІРЅС‹Р№ compiled bundle.
+- Р›СЋР±С‹Рµ РёР·РјРµРЅРµРЅРёСЏ РїСЂРѕС…РѕРґСЏС‚ С‡РµСЂРµР· СЂРµРІРёР·РёРё: compile в†’ validate в†’ apply в†’ rollback.
 
-## Источник истины (Stage 0)
+## РСЃС‚РѕС‡РЅРёРє РёСЃС‚РёРЅС‹ (Stage 0)
 
-Полный набор архитектурных документов (обязательная основа):
+РџРѕР»РЅС‹Р№ РЅР°Р±РѕСЂ Р°СЂС…РёС‚РµРєС‚СѓСЂРЅС‹С… РґРѕРєСѓРјРµРЅС‚РѕРІ (РѕР±СЏР·Р°С‚РµР»СЊРЅР°СЏ РѕСЃРЅРѕРІР°):
 - `docs/architecture/adr-001-runtime-control-plane-split.md`
 - `docs/architecture/adr-002-config-compilation-model.md`
 - `docs/architecture/adr-003-config-rollout-and-rollback.md`
 - `docs/architecture/core-domain-model.md`
 - `docs/architecture/mvp-deployment-topology.md`
 - `docs/architecture/mvp-ui-information-architecture.md`
+

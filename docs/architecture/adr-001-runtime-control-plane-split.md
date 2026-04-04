@@ -1,4 +1,4 @@
-# ADR-001: Runtime / Control-Plane Split
+﻿# ADR-001: Runtime / Control-Plane Split
 
 Status: Accepted
 Date: 2026-03-31
@@ -98,3 +98,4 @@ If a feature requires runtime behavior, it must first be expressible as:
 - controlled apply flow
 
 If it cannot satisfy that chain, it is not ready for Stage 1 implementation.
+

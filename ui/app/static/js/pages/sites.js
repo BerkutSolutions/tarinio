@@ -358,7 +358,7 @@ function defaultSiteDraft() {
     reverse_proxy_ssl_sni_name: "",
     reverse_proxy_websocket: true,
     reverse_proxy_keepalive: true,
-    allowed_methods: ["GET", "POST", "HEAD", "OPTIONS"],
+    allowed_methods: ["GET", "POST", "HEAD", "OPTIONS", "PUT", "PATCH", "DELETE"],
     max_client_size: "100m",
     http2: true,
     http3: false,

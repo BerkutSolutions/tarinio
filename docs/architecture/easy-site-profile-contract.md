@@ -1,4 +1,4 @@
-# Easy Site Profile Contract (T2-01)
+﻿# Easy Site Profile Contract (T2-01)
 
 Status: Completed contract definition for `T2-01` (extended)  
 Date: 2026-04-01
@@ -58,7 +58,7 @@ Included groups:
     "reverse_proxy_keepalive": true
   },
   "http_behavior": {
-    "allowed_methods": ["GET", "POST", "HEAD", "OPTIONS"],
+    "allowed_methods": ["GET", "POST", "HEAD", "OPTIONS", "PUT", "PATCH", "DELETE"],
     "max_client_size": "100m",
     "http2": true,
     "http3": false,
@@ -320,3 +320,4 @@ These names are internal reference mapping only; they must not be rendered in Ea
 - this contract is accepted as source for `T2-02`, `T2-03`, `T2-04`
 - next tasks implement backend-first (no UI-first contract drift)
 - UI labels stay human-readable and technical identifiers remain internal
+

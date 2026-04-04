@@ -6,6 +6,12 @@ This directory contains deployment profiles for TARINIO:
 - `auto-start/` - localhost operator profile with auto bootstrap and dev fast start.
 - `testpage/` - local test profile with extra protected test page.
 
+## AIO one-command start
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/BerkutSolutions/tarinio/main/scripts/install-aio.sh | sh
+```
+
 ## Run from repository root
 
 ```powershell
@@ -26,3 +32,4 @@ Profile docs:
 - `deploy/compose/default/README.md`
 - `deploy/compose/auto-start/README.md`
 - `deploy/compose/testpage/README.md`
+

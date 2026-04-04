@@ -146,7 +146,7 @@ type EasySiteProfile struct {
 }
 
 func DefaultProfile(siteID string) EasySiteProfile {
-	allowedMethods := []string{"GET", "POST", "HEAD", "OPTIONS"}
+	allowedMethods := []string{"GET", "POST", "HEAD", "OPTIONS", "PUT", "PATCH", "DELETE"}
 	isManagementSite := normalizeID(siteID) == "control-plane-access"
 	if isManagementSite {
 		allowedMethods = []string{"GET", "POST", "HEAD", "OPTIONS", "PUT", "PATCH", "DELETE"}

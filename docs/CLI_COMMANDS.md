@@ -241,3 +241,4 @@ Full guide:
 ## Full deployment (GUI + test page)
 
 `testpage` profile already includes both endpoints in one command.
+

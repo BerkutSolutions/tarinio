@@ -1,4 +1,4 @@
-# Anti-DDoS Runbook
+﻿# Anti-DDoS Runbook
 
 This runbook describes safe tuning and rollback for the `Anti-DDoS` section (`/anti-ddos`).
 
@@ -57,3 +57,4 @@ If change is too aggressive:
 4. Return to `/anti-ddos`, relax values, then re-run compile/apply.
 
 Rollback is revision-based and does not require manual runtime file edits.
+

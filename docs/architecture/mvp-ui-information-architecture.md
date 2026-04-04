@@ -1,4 +1,4 @@
-# MVP UI Information Architecture
+﻿# MVP UI Information Architecture
 
 Status: Finalized for Stage 0 task `Freeze MVP UI information architecture`
 Date: 2026-03-31
@@ -561,3 +561,4 @@ The MVP UI structure is fixed around a small set of operator tasks:
 - manage local administration
 
 The UI remains a direct reflection of the accepted domain model and control-plane API.
+
