@@ -88,6 +88,7 @@
       - NET_RAW
     volumes:
       - waf-runtime-data:/var/lib/waf:ro
+      - waf-control-plane-data:/var/lib/waf/control-plane:ro
       - waf-nginx-logs:/var/log/nginx
       - waf-l4-adaptive:/etc/waf/l4guard-adaptive:ro
     ports:

@@ -4,11 +4,11 @@
   <img src="ui/app/static/logo500x300.png" alt="Berkut TARINIO logo" width="240">
 </p>
 
-[������� ������](README.md)
+[Russian version](README.md)
 
 Berkut Solutions - TARINIO is a self-hosted web traffic protection and control platform (WAF/CRS + L4/L7 Anti-DDoS) with centralized change management through revisions.
 
-Current version: `1.0.8`
+Current version: `1.0.9`
 
 ## Product Overview
 
@@ -60,15 +60,15 @@ This provides reproducible changes, auditable operations, and one control loop f
 - English docs: [`docs/eng/README.md`](docs/eng/README.md)
 - CLI commands: [`docs/CLI_COMMANDS.md`](docs/CLI_COMMANDS.md)
 
-## Run and Operations
+## Quick Start
 
-- AIO one-command start:
+- AIO one-command install:
   - `curl -fsSL https://raw.githubusercontent.com/BerkutSolutions/tarinio/main/scripts/install-aio.sh | sh`
-- Project image:
+- Docker image:
   - `docker pull ghcr.io/berkutsolutions/tarinio:latest`
 - Deploy: [`docs/eng/deploy.md`](docs/eng/deploy.md)
-- Runbook (diagnostics and recovery): [`docs/eng/runbook.md`](docs/eng/runbook.md)
-- Upgrade and rollback: [`docs/eng/upgrade.md`](docs/eng/upgrade.md)
+- Runbook: [`docs/eng/runbook.md`](docs/eng/runbook.md)
+- Upgrade/rollback: [`docs/eng/upgrade.md`](docs/eng/upgrade.md)
 - Compose profiles: [`deploy/compose/README.md`](deploy/compose/README.md)
 
 ## Screenshots
@@ -78,8 +78,3 @@ This provides reproducible changes, auditable operations, and one control loop f
 ![Screenshot 2](ui/app/static/screen2.png)
 
 ![Screenshot 3](ui/app/static/screen3.png)
-
-
-
-
-

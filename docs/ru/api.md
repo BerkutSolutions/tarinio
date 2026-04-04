@@ -1,10 +1,10 @@
-# API (RU)
+﻿# API (RU)
 
-Базовая версия документации: `1.0.6`
+Базовая версия документации: `1.0.9`
 
 ## Release notes
 
-### 1.0.6 (2026-04-03)
+### 1.0.9 (2026-04-03)
 
 - Брендинг TARINIO и единая версия через `meta.go`.
 - Добавлен расширенный `/api/app/meta` (version/name/links).
@@ -82,5 +82,6 @@
 
 - Compile: `POST /api/revisions/compile`
 - Apply: `POST /api/revisions/{revisionID}/apply`
+
 
 

@@ -1,6 +1,6 @@
-# Security (EN)
+﻿# Security (EN)
 
-Documentation baseline: `1.0.6`
+Documentation baseline: `1.0.9`
 
 ## Production baseline
 
@@ -11,5 +11,6 @@ Documentation baseline: `1.0.6`
 - enable tamper-evident audit with `BERKUT_AUDIT_SIGNING_KEY`
 
 The full production baseline is defined in project release documentation and production configuration.
+
 
 

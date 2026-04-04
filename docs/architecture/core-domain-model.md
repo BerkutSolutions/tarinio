@@ -549,3 +549,4 @@ Concrete mapping in MVP:
 - `Job`, `Event`, `User`, `Role`, `AuditEvent` -> no direct runtime config, but govern and trace the lifecycle of changes
 
 
+

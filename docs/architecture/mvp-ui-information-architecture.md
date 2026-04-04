@@ -563,3 +563,4 @@ The MVP UI structure is fixed around a small set of operator tasks:
 The UI remains a direct reflection of the accepted domain model and control-plane API.
 
 
+
