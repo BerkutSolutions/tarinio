@@ -1618,7 +1618,16 @@ async function upsertSiteResources(draft, ctx, existingSite, existingUpstream, e
           await ctx.api.post("/api/tls-configs", tlsPayload);
         }
       } else {
-        await ctx.api.post("/api/tls-configs", tlsPayload);
+        try {
+          await ctx.api.post("/api/tls-configs", tlsPayload);
+        } catch (error) {
+          const message = String(error?.message || "").toLowerCase();
+          const hasConflict = error?.status === 409 || message.includes("already exists");
+          if (!hasConflict) {
+            throw error;
+          }
+          await ctx.api.put(`/api/tls-configs/${encodeURIComponent(sitePayload.id)}`, tlsPayload);
+        }
         rollbackable(async () => deleteIgnoreNotFound(`/api/tls-configs/${encodeURIComponent(sitePayload.id)}`));
       }
     }
@@ -2355,7 +2364,44 @@ export async function renderSites(container, ctx) {
         return;
       }
       try {
+        const upstreamsForSite = state.upstreams.filter((item) => String(item?.site_id || "") === siteID);
+        const linkedTLS = state.tlsBySite.get(siteID) || null;
+        const linkedCertificateID = String(linkedTLS?.certificate_id || "").trim();
+
+        // Remove dependents first so a re-create does not fail on stale leftovers.
+        for (const upstream of upstreamsForSite) {
+          await ctx.api.delete(`/api/upstreams/${encodeURIComponent(String(upstream.id || ""))}`).catch((error) => {
+            if (error?.status !== 404) {
+              throw error;
+            }
+          });
+        }
+        await ctx.api.delete(`/api/tls-configs/${encodeURIComponent(siteID)}`).catch((error) => {
+          if (error?.status !== 404) {
+            throw error;
+          }
+        });
+        await ctx.api.delete(`/api/access-policies/${encodeURIComponent(`easy-${siteID}-access`)}`).catch((error) => {
+          if (error?.status !== 404) {
+            throw error;
+          }
+        });
+
         await ctx.api.delete(`/api/sites/${encodeURIComponent(siteID)}`);
+
+        // If certificate became orphaned, remove it too.
+        if (linkedCertificateID) {
+          const tlsConfigs = await ctx.api.get("/api/tls-configs").catch(() => []);
+          const stillUsed = Array.isArray(tlsConfigs) && tlsConfigs.some((item) => String(item?.certificate_id || "") === linkedCertificateID);
+          if (!stillUsed) {
+            await ctx.api.delete(`/api/certificates/${encodeURIComponent(linkedCertificateID)}`).catch((error) => {
+              if (error?.status !== 404) {
+                throw error;
+              }
+            });
+          }
+        }
+
         ctx.notify(ctx.t("toast.siteDeleted"));
         back();
       } catch (error) {

@@ -66,3 +66,5 @@ local_checks/
 TASKS*.md
 ROADMAP*.md
 PROMPT_UPDATED.md
+scripts/release.sh
+scripts/release.ps1

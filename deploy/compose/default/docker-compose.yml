@@ -91,6 +91,7 @@ services:
       - waf-nginx-logs:/var/log/nginx
       - waf-l4-adaptive:/etc/waf/l4guard-adaptive:ro
     ports:
+      - "80:80"
       - "443:443"
     expose:
       - "80"
@@ -142,8 +143,6 @@ services:
     depends_on:
       control-plane:
         condition: service_healthy
-    ports:
-      - "80:80"
     expose:
       - "80"
     healthcheck:
