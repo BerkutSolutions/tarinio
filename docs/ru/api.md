@@ -1,27 +1,27 @@
-﻿# API (RU)
+# API (RU)
 
-Р‘Р°Р·РѕРІР°СЏ РІРµСЂСЃРёСЏ РґРѕРєСѓРјРµРЅС‚Р°С†РёРё: `1.0.3`
+Базовая версия документации: `1.0.4`
 
 ## Release notes
 
-### 1.0.3 (2026-04-03)
+### 1.0.4 (2026-04-03)
 
-- Р‘СЂРµРЅРґРёРЅРі TARINIO Рё РµРґРёРЅР°СЏ РІРµСЂСЃРёСЏ С‡РµСЂРµР· `meta.go`.
-- Р”РѕР±Р°РІР»РµРЅ СЂР°СЃС€РёСЂРµРЅРЅС‹Р№ `/api/app/meta` (version/name/links).
+- Брендинг TARINIO и единая версия через `meta.go`.
+- Добавлен расширенный `/api/app/meta` (version/name/links).
 
-## РћР±С‰РёРµ РїСЂР°РІРёР»Р°
+## Общие правила
 
-- Р’СЃРµ РѕС‚РІРµС‚С‹ вЂ” JSON.
-- РђСѓС‚РµРЅС‚РёС„РёРєР°С†РёСЏ вЂ” С‡РµСЂРµР· СЃРµСЃСЃРёСЋ (cookie) РїРѕСЃР»Рµ Р»РѕРіРёРЅР°.
-- РџСЂР°РІР° РїСЂРѕРІРµСЂСЏСЋС‚СЃСЏ РЅР° СЃРµСЂРІРµСЂРµ РґР»СЏ РєР°Р¶РґРѕРіРѕ endpoint (zero-trust).
+- Все ответы — JSON.
+- Аутентификация — через сессию (cookie) после логина.
+- Права проверяются на сервере для каждого endpoint (zero-trust).
 
-## РЎРёСЃС‚РµРјРЅС‹Рµ endpoints
+## Системные endpoints
 
-- `GET /healthz` вЂ” liveness.
-- `GET /api/setup/status` вЂ” СЃС‚Р°С‚СѓСЃ РїРµСЂРІРёС‡РЅРѕР№ РЅР°СЃС‚СЂРѕР№РєРё.
-- `GET /api/app/meta` вЂ” РІРµСЂСЃРёСЏ Рё РјРµС‚Р°РґР°РЅРЅС‹Рµ РїСЂРёР»РѕР¶РµРЅРёСЏ.
+- `GET /healthz` — liveness.
+- `GET /api/setup/status` — статус первичной настройки.
+- `GET /api/app/meta` — версия и метаданные приложения.
 
-## РќР°СЃС‚СЂРѕР№РєРё
+## Настройки
 
 - `GET /api/settings/runtime`
 - `PUT /api/settings/runtime`
@@ -50,12 +50,12 @@
   - `PUT /api/auth/passkeys/{id}/rename`
   - `DELETE /api/auth/passkeys/{id}`
 
-## РљРѕРЅС„РёРіСѓСЂР°С†РёСЏ (РѕСЃРЅРѕРІРЅС‹Рµ СЂРµСЃСѓСЂСЃС‹)
+## Конфигурация (основные ресурсы)
 
-- Sites: `/api/sites` Рё `/api/sites/{id}`
-- Upstreams: `/api/upstreams` Рё `/api/upstreams/{id}`
-- Certificates: `/api/certificates` Рё `/api/certificates/{id}`
-- TLS configs: `/api/tls-configs` Рё `/api/tls-configs/{id}`
+- Sites: `/api/sites` и `/api/sites/{id}`
+- Upstreams: `/api/upstreams` и `/api/upstreams/{id}`
+- Certificates: `/api/certificates` и `/api/certificates/{id}`
+- TLS configs: `/api/tls-configs` и `/api/tls-configs/{id}`
 - Upload material: `POST /api/certificate-materials/upload`
 - ACME:
   - `POST /api/certificates/acme/issue`
@@ -63,9 +63,9 @@
 
 ## Policies
 
-- WAF policies: `/api/waf-policies` Рё `/api/waf-policies/{id}`
-- Access policies: `/api/access-policies` Рё `/api/access-policies/{id}`
-- Rate-limit policies: `/api/rate-limit-policies` Рё `/api/rate-limit-policies/{id}`
+- WAF policies: `/api/waf-policies` и `/api/waf-policies/{id}`
+- Access policies: `/api/access-policies` и `/api/access-policies/{id}`
+- Rate-limit policies: `/api/rate-limit-policies` и `/api/rate-limit-policies/{id}`
 - Easy site profiles: `/api/easy-site-profiles/{siteID}`
 - Catalog: `GET /api/easy-site-profiles/catalog/countries`
 - Anti-DDoS: `/api/anti-ddos/settings`

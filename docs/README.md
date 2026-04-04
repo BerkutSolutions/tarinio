@@ -1,6 +1,6 @@
-﻿# Documentation
+# Documentation
 
-Version baseline: `1.0.3`
+Version baseline: `1.0.4`
 
 This directory contains the release-synced technical documentation for TARINIO.
 

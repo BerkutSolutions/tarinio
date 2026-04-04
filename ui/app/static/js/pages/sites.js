@@ -1519,53 +1519,112 @@ async function upsertSiteResources(draft, ctx, existingSite, existingUpstream, e
     port: draft.upstream_port,
     scheme: draft.upstream_scheme
   };
-
-  if (existingSite) {
-    try {
-      await ctx.api.put(`/api/sites/${encodeURIComponent(sitePayload.id)}`, sitePayload);
-    } catch (error) {
-      if (error?.status !== 404) {
-        throw error;
-      }
-      await ctx.api.post("/api/sites", sitePayload);
-    }
-  } else {
-    await ctx.api.post("/api/sites", sitePayload);
-  }
-
-  if (existingUpstream) {
-    try {
-      await ctx.api.put(`/api/upstreams/${encodeURIComponent(upstreamPayload.id)}`, upstreamPayload);
-    } catch (error) {
-      if (error?.status !== 404) {
-        throw error;
-      }
-      await ctx.api.post("/api/upstreams", upstreamPayload);
-    }
-  } else {
-    await ctx.api.post("/api/upstreams", upstreamPayload);
-  }
-
-  if (draft.tls_enabled) {
-    const certificateID = (draft.certificate_id.trim() || `${sitePayload.id}-tls`).toLowerCase();
-    await ctx.api.post("/api/certificates/acme/issue", {
-      certificate_id: certificateID,
-      common_name: sitePayload.primary_host,
-      san_list: []
-    });
-    const tlsPayload = { site_id: sitePayload.id, certificate_id: certificateID };
-    if (existingTLSConfig) {
+  const cleanupActions = [];
+  const runCleanup = async () => {
+    for (let index = cleanupActions.length - 1; index >= 0; index -= 1) {
       try {
-        await ctx.api.put(`/api/tls-configs/${encodeURIComponent(sitePayload.id)}`, tlsPayload);
+        await cleanupActions[index]();
+      } catch (_error) {
+        // best-effort cleanup; keep original save error
+      }
+    }
+  };
+  const rollbackable = (fn) => cleanupActions.push(fn);
+  const isDefaultUpstreamRequiredError = (error) => {
+    const message = String(error?.message || "").toLowerCase();
+    return message.includes("default upstream is required");
+  };
+  const isNotFound = (error) => error?.status === 404;
+  const deleteIgnoreNotFound = async (path) => {
+    try {
+      await ctx.api.delete(path);
+    } catch (error) {
+      if (!isNotFound(error)) {
+        throw error;
+      }
+    }
+  };
+  const siteExists = async (siteID) => {
+    const sites = await ctx.api.get("/api/sites");
+    return Array.isArray(sites) && sites.some((site) => String(site?.id || "").toLowerCase() === String(siteID || "").toLowerCase());
+  };
+  const certificateExists = async (certificateID) => {
+    const certificates = await ctx.api.get("/api/certificates");
+    return Array.isArray(certificates) && certificates.some((certificate) => String(certificate?.id || "").toLowerCase() === String(certificateID || "").toLowerCase());
+  };
+
+  try {
+    if (existingSite) {
+      try {
+        await ctx.api.put(`/api/sites/${encodeURIComponent(sitePayload.id)}`, sitePayload);
       } catch (error) {
         if (error?.status !== 404) {
           throw error;
         }
-        await ctx.api.post("/api/tls-configs", tlsPayload);
+        await ctx.api.post("/api/sites", sitePayload);
       }
     } else {
-      await ctx.api.post("/api/tls-configs", tlsPayload);
+      let createdSite = false;
+      try {
+        await ctx.api.post("/api/sites", sitePayload);
+        createdSite = true;
+      } catch (error) {
+        if (!isDefaultUpstreamRequiredError(error)) {
+          throw error;
+        }
+        createdSite = await siteExists(sitePayload.id);
+        if (!createdSite) {
+          throw error;
+        }
+      }
+      if (createdSite) {
+        rollbackable(async () => deleteIgnoreNotFound(`/api/sites/${encodeURIComponent(sitePayload.id)}`));
+      }
     }
+
+    if (existingUpstream) {
+      try {
+        await ctx.api.put(`/api/upstreams/${encodeURIComponent(upstreamPayload.id)}`, upstreamPayload);
+      } catch (error) {
+        if (error?.status !== 404) {
+          throw error;
+        }
+        await ctx.api.post("/api/upstreams", upstreamPayload);
+      }
+    } else {
+      await ctx.api.post("/api/upstreams", upstreamPayload);
+      rollbackable(async () => deleteIgnoreNotFound(`/api/upstreams/${encodeURIComponent(upstreamPayload.id)}`));
+    }
+
+    if (draft.tls_enabled) {
+      const certificateID = (draft.certificate_id.trim() || `${sitePayload.id}-tls`).toLowerCase();
+      const hadCertificateBefore = await certificateExists(certificateID);
+      await ctx.api.post("/api/certificates/acme/issue", {
+        certificate_id: certificateID,
+        common_name: sitePayload.primary_host,
+        san_list: []
+      });
+      if (!hadCertificateBefore) {
+        rollbackable(async () => deleteIgnoreNotFound(`/api/certificates/${encodeURIComponent(certificateID)}`));
+      }
+      const tlsPayload = { site_id: sitePayload.id, certificate_id: certificateID };
+      if (existingTLSConfig) {
+        try {
+          await ctx.api.put(`/api/tls-configs/${encodeURIComponent(sitePayload.id)}`, tlsPayload);
+        } catch (error) {
+          if (error?.status !== 404) {
+            throw error;
+          }
+          await ctx.api.post("/api/tls-configs", tlsPayload);
+        }
+      } else {
+        await ctx.api.post("/api/tls-configs", tlsPayload);
+        rollbackable(async () => deleteIgnoreNotFound(`/api/tls-configs/${encodeURIComponent(sitePayload.id)}`));
+      }
+    }
+  } catch (error) {
+    await runCleanup();
+    throw error;
   }
 
 }

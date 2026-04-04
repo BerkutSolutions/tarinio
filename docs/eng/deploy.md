@@ -1,6 +1,6 @@
-﻿# Deploy (EN)
+# Deploy (EN)
 
-Documentation baseline: `1.0.3`
+Documentation baseline: `1.0.4`
 
 ## AIO Quick Start (one command)
 

@@ -1,6 +1,6 @@
-﻿# Runtime filesystem contract (EN)
+# Runtime filesystem contract (EN)
 
-Documentation baseline: `1.0.3`
+Documentation baseline: `1.0.4`
 
 This document mirrors: `docs/operators/runtime-filesystem-contract.md`.
 

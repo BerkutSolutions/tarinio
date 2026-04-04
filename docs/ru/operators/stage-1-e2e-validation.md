@@ -1,7 +1,7 @@
-﻿# Stage 1 E2E validation (RU)
+# Stage 1 E2E validation (RU)
 
-Р‘Р°Р·РѕРІР°СЏ РІРµСЂСЃРёСЏ РґРѕРєСѓРјРµРЅС‚Р°С†РёРё: `1.0.3`
+Базовая версия документации: `1.0.4`
 
-Р­С‚РѕС‚ РґРѕРєСѓРјРµРЅС‚ СЃРѕРѕС‚РІРµС‚СЃС‚РІСѓРµС‚: `docs/operators/stage-1-e2e-validation.md`.
+Этот документ соответствует: `docs/operators/stage-1-e2e-validation.md`.
 
 

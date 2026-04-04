@@ -1,6 +1,6 @@
-﻿# TARINIO Architecture (overview)
+# TARINIO Architecture (overview)
 
-Documentation baseline: `1.0.3`
+Documentation baseline: `1.0.4`
 
 TARINIO is a standalone self-hosted WAF built around NGINX + ModSecurity + OWASP CRS.
 
@@ -8,7 +8,7 @@ TARINIO is a standalone self-hosted WAF built around NGINX + ModSecurity + OWASP
 
 - The source of truth for operator intent is the control-plane (storage + revisions).
 - Runtime is not edited manually; it consumes only the active compiled bundle.
-- All changes go through revisions: compile в†’ validate в†’ apply в†’ rollback.
+- All changes go through revisions: compile → validate → apply → rollback.
 
 ## Stage 0 source of truth
 

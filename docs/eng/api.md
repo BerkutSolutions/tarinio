@@ -1,10 +1,10 @@
-﻿# API (EN)
+# API (EN)
 
-Documentation baseline: `1.0.3`
+Documentation baseline: `1.0.4`
 
 ## Release notes
 
-### 1.0.3 (2026-04-03)
+### 1.0.4 (2026-04-03)
 
 - TARINIO branding and a single version source via `meta.go`.
 - Extended `/api/app/meta` (version/name/links).
@@ -17,9 +17,9 @@ Documentation baseline: `1.0.3`
 
 ## System endpoints
 
-- `GET /healthz` вЂ” liveness.
-- `GET /api/setup/status` вЂ” first-run setup status.
-- `GET /api/app/meta` вЂ” application version and metadata.
+- `GET /healthz` — liveness.
+- `GET /api/setup/status` — first-run setup status.
+- `GET /api/app/meta` — application version and metadata.
 
 ## Settings
 
