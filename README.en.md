@@ -1,14 +1,14 @@
-# Berkut Solutions - TARINIO
+п»ї# Berkut Solutions - TARINIO
 
 <p align="center">
   <img src="ui/app/static/logo500x300.png" alt="Berkut TARINIO logo" width="240">
 </p>
 
-[Русская версия](README.md)
+[пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ](README.md)
 
 Berkut Solutions - TARINIO is a self-hosted web traffic protection and control platform (WAF/CRS + L4/L7 Anti-DDoS) with centralized change management through revisions.
 
-Current version: `1.0.6`
+Current version: `1.0.7`
 
 ## Product Overview
 
@@ -78,6 +78,7 @@ This provides reproducible changes, auditable operations, and one control loop f
 ![Screenshot 2](ui/app/static/screen2.png)
 
 ![Screenshot 3](ui/app/static/screen3.png)
+
 
 
 

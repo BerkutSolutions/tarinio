@@ -21,11 +21,11 @@ func NewDevelopmentLetsEncryptClient() *DevelopmentLetsEncryptClient {
 	return &DevelopmentLetsEncryptClient{}
 }
 
-func (c *DevelopmentLetsEncryptClient) Issue(commonName string, sanList []string) (IssuedMaterial, error) {
+func (c *DevelopmentLetsEncryptClient) Issue(commonName string, sanList []string, _ *ACMEIssueOptions) (IssuedMaterial, error) {
 	return c.issueMaterial(commonName, sanList, 90*24*time.Hour)
 }
 
-func (c *DevelopmentLetsEncryptClient) Renew(commonName string, sanList []string) (IssuedMaterial, error) {
+func (c *DevelopmentLetsEncryptClient) Renew(commonName string, sanList []string, _ *ACMEIssueOptions) (IssuedMaterial, error) {
 	return c.issueMaterial(commonName, sanList, 90*24*time.Hour)
 }
 
@@ -93,4 +93,3 @@ func (c *DevelopmentLetsEncryptClient) issueMaterial(commonName string, sanList 
 		NotAfter:       template.NotAfter.Format(time.RFC3339),
 	}, nil
 }
-

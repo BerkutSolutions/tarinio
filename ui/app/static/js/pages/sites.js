@@ -1599,7 +1599,8 @@ async function upsertSiteResources(draft, ctx, existingSite, existingUpstream, e
     if (draft.tls_enabled) {
       const certificateID = (draft.certificate_id.trim() || `${sitePayload.id}-tls`).toLowerCase();
       const hadCertificateBefore = await certificateExists(certificateID);
-      await ctx.api.post("/api/certificates/acme/issue", {
+      const issueEndpoint = draft.tls_self_signed ? "/api/certificates/self-signed/issue" : "/api/certificates/acme/issue";
+      await ctx.api.post(issueEndpoint, {
         certificate_id: certificateID,
         common_name: sitePayload.primary_host,
         san_list: []

@@ -11,7 +11,7 @@ import (
 
 type fakeLetsEncryptClient struct{}
 
-func (f *fakeLetsEncryptClient) Issue(commonName string, sanList []string) (IssuedMaterial, error) {
+func (f *fakeLetsEncryptClient) Issue(commonName string, sanList []string, options *ACMEIssueOptions) (IssuedMaterial, error) {
 	return IssuedMaterial{
 		CertificatePEM: []byte("CERT"),
 		PrivateKeyPEM:  []byte("KEY"),
@@ -20,7 +20,7 @@ func (f *fakeLetsEncryptClient) Issue(commonName string, sanList []string) (Issu
 	}, nil
 }
 
-func (f *fakeLetsEncryptClient) Renew(commonName string, sanList []string) (IssuedMaterial, error) {
+func (f *fakeLetsEncryptClient) Renew(commonName string, sanList []string, options *ACMEIssueOptions) (IssuedMaterial, error) {
 	return IssuedMaterial{
 		CertificatePEM: []byte("CERT-RENEW"),
 		PrivateKeyPEM:  []byte("KEY-RENEW"),
@@ -78,7 +78,7 @@ func TestLetsEncryptService_IssueCreatesJobAndCertificate(t *testing.T) {
 	materialStore := &fakeLEMaterialStore{}
 	service := NewLetsEncryptService(&fakeLetsEncryptClient{}, jobStore, certStore, materialStore, nil)
 
-	job, err := service.Issue(context.Background(), "cert-a", "example.com", []string{"www.example.com"})
+	job, err := service.Issue(context.Background(), "cert-a", "example.com", []string{"www.example.com"}, nil)
 	if err != nil {
 		t.Fatalf("issue failed: %v", err)
 	}
@@ -109,7 +109,7 @@ func TestLetsEncryptService_RenewUpdatesExistingCertificate(t *testing.T) {
 	materialStore := &fakeLEMaterialStore{}
 	service := NewLetsEncryptService(&fakeLetsEncryptClient{}, jobStore, certStore, materialStore, nil)
 
-	job, err := service.Renew(context.Background(), "cert-a")
+	job, err := service.Renew(context.Background(), "cert-a", nil)
 	if err != nil {
 		t.Fatalf("renew failed: %v", err)
 	}

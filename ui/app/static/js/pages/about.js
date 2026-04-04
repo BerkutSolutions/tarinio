@@ -20,8 +20,8 @@ export async function renderAbout(container, ctx) {
               <p class="about-description">${escapeHtml(ctx.t("about.projectDescription"))}</p>
               <p class="muted">${escapeHtml(ctx.t("about.version"))}: <strong id="about-version-value">${escapeHtml(ctx.t("about.versionFallback"))}</strong></p>
               <div class="about-links">
-                <a class="btn primary btn-sm" id="about-project-link" href="https://github.com/BerkutSolutions/" target="_blank" rel="noopener noreferrer">${escapeHtml(ctx.t("about.links.project"))}</a>
-                <a class="btn ghost btn-sm" href="https://github.com/BerkutSolutions/" target="_blank" rel="noopener noreferrer">${escapeHtml(ctx.t("about.links.profile"))}</a>
+                <a class="btn primary btn-sm" id="about-project-link" href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener noreferrer">${escapeHtml(ctx.t("about.links.project"))}</a>
+                <a class="btn ghost btn-sm" href="https://github.com/BerkutSolutions" target="_blank" rel="noopener noreferrer">${escapeHtml(ctx.t("about.links.profile"))}</a>
               </div>
             </div>
           </div>
@@ -37,12 +37,12 @@ export async function renderAbout(container, ctx) {
     versionNode.textContent = String(meta?.app_version || ctx.t("about.versionFallback"));
     if (projectLink) {
       const repo = String(meta?.repository_url || "").trim();
-      projectLink.href = repo || "https://github.com/BerkutSolutions/";
+      projectLink.href = repo || "https://github.com/BerkutSolutions/tarinio";
     }
   } catch {
     versionNode.textContent = ctx.t("about.versionFallback");
     if (projectLink) {
-      projectLink.href = "https://github.com/BerkutSolutions/";
+      projectLink.href = "https://github.com/BerkutSolutions/tarinio";
     }
   }
 }

@@ -165,8 +165,8 @@ export async function renderSettings(container, ctx) {
                 <p class="about-description">${escapeHtml(ctx.t("about.projectDescription"))}</p>
                 <p class="muted">${escapeHtml(ctx.t("about.version"))}: <strong id="settings-about-version">${escapeHtml(ctx.t("about.versionFallback"))}</strong></p>
                 <div class="about-links">
-                  <a class="btn primary btn-sm" id="settings-about-project-link" href="https://github.com/BerkutSolutions/" target="_blank" rel="noopener noreferrer">${escapeHtml(ctx.t("about.links.project"))}</a>
-                  <a class="btn ghost btn-sm" href="https://github.com/BerkutSolutions/" target="_blank" rel="noopener noreferrer">${escapeHtml(ctx.t("about.links.profile"))}</a>
+                  <a class="btn primary btn-sm" id="settings-about-project-link" href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener noreferrer">${escapeHtml(ctx.t("about.links.project"))}</a>
+                  <a class="btn ghost btn-sm" href="https://github.com/BerkutSolutions" target="_blank" rel="noopener noreferrer">${escapeHtml(ctx.t("about.links.profile"))}</a>
                 </div>
               </div>
             </div>
@@ -228,7 +228,7 @@ export async function renderSettings(container, ctx) {
           } catch {
             // keep last known status silently
           }
-        }, 5 * 60 * 1000);
+        }, 60 * 60 * 1000);
       } else {
         clearRuntimeAutoCheckTimer();
       }
@@ -285,12 +285,12 @@ export async function renderSettings(container, ctx) {
     aboutVersionInline.textContent = `${ctx.t("about.version")}: ${version}`;
     if (aboutProjectLink) {
       const repo = String(meta?.repository_url || "").trim();
-      aboutProjectLink.href = repo || "https://github.com/BerkutSolutions/";
+      aboutProjectLink.href = repo || "https://github.com/BerkutSolutions/tarinio";
     }
   } catch {
     aboutVersion.textContent = ctx.t("about.versionFallback");
     if (aboutProjectLink) {
-      aboutProjectLink.href = "https://github.com/BerkutSolutions/";
+      aboutProjectLink.href = "https://github.com/BerkutSolutions/tarinio";
     }
   }
 

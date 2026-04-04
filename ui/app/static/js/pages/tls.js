@@ -11,6 +11,28 @@ function parseLineList(value) {
     .filter(Boolean);
 }
 
+function parseKeyValueLines(value) {
+  const map = {};
+  const lines = String(value || "").split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) {
+      continue;
+    }
+    const delimiterIndex = trimmed.indexOf("=");
+    if (delimiterIndex <= 0) {
+      continue;
+    }
+    const key = trimmed.slice(0, delimiterIndex).trim().toUpperCase();
+    const rawValue = trimmed.slice(delimiterIndex + 1).trim();
+    if (!key || !rawValue) {
+      continue;
+    }
+    map[key] = rawValue;
+  }
+  return map;
+}
+
 function unwrapList(payload, keys = []) {
   if (Array.isArray(payload)) {
     return payload;
@@ -197,7 +219,45 @@ export async function renderTLS(container, ctx) {
                 <div class="waf-field"><label for="le-site-id">${escapeHtml(ctx.t("tls.field.siteIdOptional"))}</label><input id="le-site-id" placeholder="${escapeHtml(ctx.t("tls.placeholder.siteId"))}"></div>
                 <div class="waf-field"><label for="le-certificate-id">${escapeHtml(ctx.t("tls.field.certificateId"))}</label><input id="le-certificate-id" required></div>
                 <div class="waf-field"><label for="le-common-name">${escapeHtml(ctx.t("tls.field.commonName"))}</label><input id="le-common-name" required></div>
+                <div class="waf-field"><label for="le-account-email">${escapeHtml(ctx.t("tls.field.accountEmail"))}</label><input id="le-account-email" type="email" placeholder="admin@example.com"></div>
                 <div class="waf-field"><label for="le-ca-server">${escapeHtml(ctx.t("tls.field.caServer"))}</label><select id="le-ca-server"><option value="letsencrypt">letsencrypt</option><option value="zerossl">zerossl</option><option value="custom">custom</option></select></div>
+                <div class="waf-field full" data-acme-visible-for="custom">
+                  <label for="le-custom-directory-url">${escapeHtml(ctx.t("tls.field.customDirectoryUrl"))}</label>
+                  <input id="le-custom-directory-url" placeholder="https://acme.example.com/directory">
+                </div>
+                <div class="waf-field" data-acme-visible-for="zerossl">
+                  <label for="le-zerossl-eab-kid">${escapeHtml(ctx.t("tls.field.zerosslEabKid"))}</label>
+                  <input id="le-zerossl-eab-kid">
+                </div>
+                <div class="waf-field" data-acme-visible-for="zerossl">
+                  <label for="le-zerossl-eab-hmac">${escapeHtml(ctx.t("tls.field.zerosslEabHmac"))}</label>
+                  <input id="le-zerossl-eab-hmac" type="password">
+                </div>
+                <div class="waf-field">
+                  <label for="le-challenge-type">${escapeHtml(ctx.t("tls.field.challengeType"))}</label>
+                  <select id="le-challenge-type">
+                    <option value="http-01">http-01</option>
+                    <option value="dns-01">dns-01</option>
+                  </select>
+                </div>
+                <div class="waf-field" data-acme-visible-for-challenge="dns-01">
+                  <label for="le-dns-provider">${escapeHtml(ctx.t("tls.field.dnsProvider"))}</label>
+                  <select id="le-dns-provider">
+                    <option value="cloudflare">cloudflare</option>
+                  </select>
+                </div>
+                <div class="waf-field" data-acme-visible-for-challenge="dns-01">
+                  <label for="le-dns-propagation-seconds">${escapeHtml(ctx.t("tls.field.dnsPropagationSeconds"))}</label>
+                  <input id="le-dns-propagation-seconds" type="number" min="0" step="1" value="120">
+                </div>
+                <div class="waf-field full" data-acme-visible-for-challenge="dns-01">
+                  <label for="le-dns-provider-env">${escapeHtml(ctx.t("tls.field.dnsProviderEnv"))}</label>
+                  <textarea id="le-dns-provider-env" placeholder="CLOUDFLARE_API_TOKEN=..."></textarea>
+                </div>
+                <div class="waf-field full" data-acme-visible-for-challenge="dns-01">
+                  <label for="le-dns-resolvers">${escapeHtml(ctx.t("tls.field.dnsResolvers"))}</label>
+                  <textarea id="le-dns-resolvers" placeholder="1.1.1.1:53&#10;8.8.8.8:53"></textarea>
+                </div>
                 <label class="waf-checkbox">
                   <input id="le-use-staging" type="checkbox">
                   <span>${escapeHtml(ctx.t("tls.field.useLetsEncryptStaging"))}</span>
@@ -308,17 +368,71 @@ export async function renderTLS(container, ctx) {
     await load();
   });
 
+  const toggleACMEConditionalFields = () => {
+    const caServer = container.querySelector("#le-ca-server").value;
+    const challengeType = container.querySelector("#le-challenge-type").value;
+    container.querySelectorAll("[data-acme-visible-for]").forEach((node) => {
+      const targets = String(node.getAttribute("data-acme-visible-for") || "").split(",").map((item) => item.trim()).filter(Boolean);
+      node.style.display = targets.includes(caServer) ? "" : "none";
+    });
+    container.querySelectorAll("[data-acme-visible-for-challenge]").forEach((node) => {
+      const targets = String(node.getAttribute("data-acme-visible-for-challenge") || "").split(",").map((item) => item.trim()).filter(Boolean);
+      node.style.display = targets.includes(challengeType) ? "" : "none";
+    });
+    const stagingCheckbox = container.querySelector("#le-use-staging");
+    if (stagingCheckbox) {
+      if (caServer === "letsencrypt") {
+        stagingCheckbox.disabled = false;
+      } else {
+        stagingCheckbox.checked = false;
+        stagingCheckbox.disabled = true;
+      }
+    }
+  };
+  container.querySelector("#le-ca-server")?.addEventListener("change", toggleACMEConditionalFields);
+  container.querySelector("#le-challenge-type")?.addEventListener("change", toggleACMEConditionalFields);
+  toggleACMEConditionalFields();
+
   const issueLetsEncrypt = async (bindSite) => {
     const certificateID = container.querySelector("#le-certificate-id").value.trim();
     const commonName = container.querySelector("#le-common-name").value.trim();
     const siteID = container.querySelector("#le-site-id").value.trim().toLowerCase();
+    const caServer = container.querySelector("#le-ca-server").value;
+    const challengeType = container.querySelector("#le-challenge-type").value;
+    const zeroSSLEABKID = container.querySelector("#le-zerossl-eab-kid").value.trim();
+    const zeroSSLEABHMAC = container.querySelector("#le-zerossl-eab-hmac").value.trim();
+    const dnsProvider = container.querySelector("#le-dns-provider").value.trim();
+    const dnsProviderEnv = parseKeyValueLines(container.querySelector("#le-dns-provider-env").value);
     if (!certificateID || !commonName) {
+      return;
+    }
+    if (caServer === "zerossl" && (!zeroSSLEABKID || !zeroSSLEABHMAC)) {
+      ctx.notify(ctx.t("tls.toast.zerosslEabRequired"), "error");
+      return;
+    }
+    if (challengeType === "dns-01" && !dnsProvider) {
+      ctx.notify(ctx.t("tls.toast.dnsProviderRequired"), "error");
+      return;
+    }
+    if (challengeType === "dns-01" && dnsProvider === "cloudflare" && !dnsProviderEnv.CLOUDFLARE_API_TOKEN && !dnsProviderEnv.CF_API_TOKEN) {
+      ctx.notify(ctx.t("tls.toast.cloudflareTokenRequired"), "error");
       return;
     }
     await ctx.api.post("/api/certificates/acme/issue", {
       certificate_id: certificateID,
       common_name: commonName,
       san_list: parseLineList(container.querySelector("#le-san-list").value),
+      certificate_authority_server: caServer,
+      custom_directory_url: container.querySelector("#le-custom-directory-url").value.trim(),
+      use_lets_encrypt_staging: container.querySelector("#le-use-staging").checked,
+      account_email: container.querySelector("#le-account-email").value.trim(),
+      challenge_type: challengeType,
+      dns_provider: dnsProvider,
+      dns_provider_env: dnsProviderEnv,
+      dns_resolvers: parseLineList(container.querySelector("#le-dns-resolvers").value),
+      dns_propagation_seconds: Number(container.querySelector("#le-dns-propagation-seconds").value || 0) || 0,
+      zerossl_eab_kid: zeroSSLEABKID,
+      zerossl_eab_hmac_key: zeroSSLEABHMAC
     });
     await syncLetsEncryptProfileOptions(ctx, siteID, {
       certificateAuthorityServer: container.querySelector("#le-ca-server").value,

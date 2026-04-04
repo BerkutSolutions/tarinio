@@ -19,7 +19,14 @@ const state = {
   },
   siteDraft: {
     host: "",
-    tlsMode: "letsencrypt"
+    tlsMode: "letsencrypt",
+    accountEmail: "",
+    challengeType: "http-01",
+    dnsProvider: "cloudflare",
+    dnsProviderEnv: "",
+    dnsPropagationSeconds: 120,
+    zeroSSLEABKID: "",
+    zeroSSLEABHMAC: ""
   }
 };
 
@@ -120,6 +127,28 @@ function buildCertificateID(siteID) {
   return `${siteID}-tls`;
 }
 
+function parseKeyValueLines(value) {
+  const map = {};
+  const lines = String(value || "").split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) {
+      continue;
+    }
+    const delimiterIndex = trimmed.indexOf("=");
+    if (delimiterIndex <= 0) {
+      continue;
+    }
+    const key = trimmed.slice(0, delimiterIndex).trim().toUpperCase();
+    const rawValue = trimmed.slice(delimiterIndex + 1).trim();
+    if (!key || !rawValue) {
+      continue;
+    }
+    map[key] = rawValue;
+  }
+  return map;
+}
+
 function buildUpstreamHostURL(upstream) {
   const scheme = String(upstream?.scheme || "http").toLowerCase() === "https" ? "https" : "http";
   const host = String(upstream?.host || "upstream-server").trim() || "upstream-server";
@@ -135,6 +164,7 @@ async function ensureFirstInitEasyProfileTemplate(site, upstream, tlsMode) {
   const current = await api.get(endpoint);
   const selectedTLSMode = String(tlsMode || "letsencrypt").toLowerCase();
   const isSelfSigned = selectedTLSMode === "self-signed";
+  const selectedCA = selectedTLSMode === "zerossl" ? "zerossl" : "letsencrypt";
   const next = {
     ...current,
     site_id: site.id,
@@ -142,7 +172,7 @@ async function ensureFirstInitEasyProfileTemplate(site, upstream, tlsMode) {
       ...(current?.front_service || {}),
       server_name: site.primary_host,
       auto_lets_encrypt: !isSelfSigned,
-      certificate_authority_server: "letsencrypt"
+      certificate_authority_server: selectedCA
     },
     upstream_routing: {
       ...(current?.upstream_routing || {}),
@@ -157,11 +187,32 @@ async function ensureFirstInitEasyProfileTemplate(site, upstream, tlsMode) {
 }
 
 function currentTLSMode() {
+  const zeroSSL = document.getElementById("tls-zerossl");
   const selfSigned = document.getElementById("tls-self-signed");
   if (!selfSigned) {
     return state.siteDraft.tlsMode || "letsencrypt";
   }
+  if (zeroSSL?.checked) {
+    return "zerossl";
+  }
   return selfSigned.checked ? "self-signed" : "letsencrypt";
+}
+
+function syncStage2ACMEFields() {
+  const tlsMode = currentTLSMode();
+  const challengeType = String(document.getElementById("onboarding-acme-challenge")?.value || state.siteDraft.challengeType || "http-01");
+  const acmeOptions = document.getElementById("onboarding-acme-options");
+  if (acmeOptions) {
+    acmeOptions.classList.toggle("waf-hidden", tlsMode === "self-signed");
+  }
+  document.querySelectorAll("[data-onboarding-visible-tls]").forEach((node) => {
+    const targets = String(node.getAttribute("data-onboarding-visible-tls") || "").split(",").map((item) => item.trim()).filter(Boolean);
+    node.classList.toggle("waf-hidden", !targets.includes(tlsMode));
+  });
+  document.querySelectorAll("[data-onboarding-visible-challenge]").forEach((node) => {
+    const targets = String(node.getAttribute("data-onboarding-visible-challenge") || "").split(",").map((item) => item.trim()).filter(Boolean);
+    node.classList.toggle("waf-hidden", !targets.includes(challengeType) || tlsMode === "self-signed");
+  });
 }
 
 function setApplyBusy(busy) {
@@ -228,8 +279,18 @@ function configureStage1() {
 
 function configureStage2() {
   document.getElementById("site-host").value = state.siteDraft.host || state.site?.primary_host || detectSiteHost();
-  document.getElementById("tls-self-signed").checked = (state.siteDraft.tlsMode || state.tlsMode) === "self-signed";
-  document.getElementById("tls-letsencrypt").checked = !document.getElementById("tls-self-signed").checked;
+  const tlsMode = state.siteDraft.tlsMode || state.tlsMode || "letsencrypt";
+  document.getElementById("tls-self-signed").checked = tlsMode === "self-signed";
+  document.getElementById("tls-zerossl").checked = tlsMode === "zerossl";
+  document.getElementById("tls-letsencrypt").checked = tlsMode !== "self-signed" && tlsMode !== "zerossl";
+  document.getElementById("onboarding-acme-email").value = state.siteDraft.accountEmail || "";
+  document.getElementById("onboarding-acme-challenge").value = state.siteDraft.challengeType || "http-01";
+  document.getElementById("onboarding-dns-provider").value = state.siteDraft.dnsProvider || "cloudflare";
+  document.getElementById("onboarding-dns-provider-env").value = state.siteDraft.dnsProviderEnv || "";
+  document.getElementById("onboarding-dns-propagation").value = String(state.siteDraft.dnsPropagationSeconds || 120);
+  document.getElementById("onboarding-zerossl-eab-kid").value = state.siteDraft.zeroSSLEABKID || "";
+  document.getElementById("onboarding-zerossl-eab-hmac").value = state.siteDraft.zeroSSLEABHMAC || "";
+  syncStage2ACMEFields();
 }
 
 function syncPasswordToggle(button, visible) {
@@ -317,7 +378,7 @@ function renderSummary() {
       <div class="waf-summary-grid">
         <div>
           <div class="waf-note">${escapeHtml(t("onboarding.confirm.certificateMode"))}</div>
-          <div>${escapeHtml(t(state.tlsMode === "self-signed" ? "onboarding.confirm.tlsSelfSignedMode" : "onboarding.confirm.tlsManagedMode"))}</div>
+          <div>${escapeHtml(t(state.tlsMode === "self-signed" ? "onboarding.confirm.tlsSelfSignedMode" : state.tlsMode === "zerossl" ? "onboarding.confirm.tlsZeroSSLMode" : "onboarding.confirm.tlsManagedMode"))}</div>
         </div>
         <div>
           <div class="waf-note">${escapeHtml(t("onboarding.confirm.certificateId"))}</div>
@@ -420,6 +481,29 @@ async function ensureSiteAndTLS() {
   const upstream = buildUpstreamPayload(site.id);
   const certificateID = buildCertificateID(site.id);
   const tlsMode = currentTLSMode();
+  const acmeEmail = String(document.getElementById("onboarding-acme-email")?.value || state.siteDraft.accountEmail || "").trim();
+  const challengeType = String(document.getElementById("onboarding-acme-challenge")?.value || state.siteDraft.challengeType || "http-01").trim();
+  const dnsProvider = String(document.getElementById("onboarding-dns-provider")?.value || state.siteDraft.dnsProvider || "cloudflare").trim();
+  const dnsProviderEnvRaw = String(document.getElementById("onboarding-dns-provider-env")?.value || state.siteDraft.dnsProviderEnv || "");
+  const dnsPropagationSeconds = Number(document.getElementById("onboarding-dns-propagation")?.value || state.siteDraft.dnsPropagationSeconds || 120) || 0;
+  const zeroSSLEABKID = String(document.getElementById("onboarding-zerossl-eab-kid")?.value || state.siteDraft.zeroSSLEABKID || "").trim();
+  const zeroSSLEABHMAC = String(document.getElementById("onboarding-zerossl-eab-hmac")?.value || state.siteDraft.zeroSSLEABHMAC || "").trim();
+
+  if (tlsMode !== "self-signed" && !acmeEmail) {
+    throw new Error(t("onboarding.validation.acmeEmailRequired"));
+  }
+  if (tlsMode === "zerossl" && (!zeroSSLEABKID || !zeroSSLEABHMAC)) {
+    throw new Error(t("onboarding.validation.zerosslEabRequired"));
+  }
+  if (tlsMode !== "self-signed" && challengeType === "dns-01") {
+    if (!dnsProvider) {
+      throw new Error(t("onboarding.validation.dnsProviderRequired"));
+    }
+    const env = parseKeyValueLines(dnsProviderEnvRaw);
+    if (dnsProvider === "cloudflare" && !env.CLOUDFLARE_API_TOKEN && !env.CF_API_TOKEN) {
+      throw new Error(t("onboarding.validation.cloudflareTokenRequired"));
+    }
+  }
 
   const [sitesResponse, upstreamsResponse, certificatesResponse, tlsConfigsResponse] = await Promise.all([
     api.get("/api/sites"),
@@ -459,11 +543,28 @@ async function ensureSiteAndTLS() {
       await api.put(`/api/upstreams/${encodeURIComponent(upstream.id)}`, upstream);
     }
   }
-  await api.post("/api/certificates/acme/issue", {
-    certificate_id: certificateID,
-    common_name: site.primary_host,
-    san_list: []
-  });
+  if (tlsMode === "self-signed") {
+    await api.post("/api/certificates/self-signed/issue", {
+      certificate_id: certificateID,
+      common_name: site.primary_host,
+      san_list: []
+    });
+  } else {
+    await api.post("/api/certificates/acme/issue", {
+      certificate_id: certificateID,
+      common_name: site.primary_host,
+      san_list: [],
+      certificate_authority_server: tlsMode === "zerossl" ? "zerossl" : "letsencrypt",
+      account_email: acmeEmail,
+      challenge_type: challengeType,
+      dns_provider: challengeType === "dns-01" ? dnsProvider : "",
+      dns_provider_env: challengeType === "dns-01" ? parseKeyValueLines(dnsProviderEnvRaw) : {},
+      dns_resolvers: [],
+      dns_propagation_seconds: challengeType === "dns-01" ? dnsPropagationSeconds : 0,
+      zerossl_eab_kid: tlsMode === "zerossl" ? zeroSSLEABKID : "",
+      zerossl_eab_hmac_key: tlsMode === "zerossl" ? zeroSSLEABHMAC : ""
+    });
+  }
 
   if (!tlsConfigs.some((item) => item.site_id === site.id)) {
     const tlsPayload = {
@@ -486,6 +587,14 @@ async function ensureSiteAndTLS() {
   state.upstream = upstreams.find((item) => item.id === upstream.id) || upstream;
   state.certificateID = certificates.find((item) => item.id === certificateID)?.id || certificateID;
   state.tlsMode = tlsMode;
+  state.siteDraft.accountEmail = acmeEmail;
+  state.siteDraft.challengeType = challengeType;
+  state.siteDraft.dnsProvider = dnsProvider;
+  state.siteDraft.dnsProviderEnv = dnsProviderEnvRaw;
+  state.siteDraft.dnsPropagationSeconds = dnsPropagationSeconds;
+  state.siteDraft.zeroSSLEABKID = zeroSSLEABKID;
+  state.siteDraft.zeroSSLEABHMAC = zeroSSLEABHMAC;
+  persistDraft();
 }
 
 async function runApply() {
@@ -598,8 +707,38 @@ async function bootstrap() {
   document.querySelectorAll('input[name="tls-mode"]').forEach((node) => {
     node.addEventListener("change", () => {
       state.siteDraft.tlsMode = currentTLSMode();
+      syncStage2ACMEFields();
       persistDraft();
     });
+  });
+  document.getElementById("onboarding-acme-email")?.addEventListener("input", (event) => {
+    state.siteDraft.accountEmail = event.target.value.trim();
+    persistDraft();
+  });
+  document.getElementById("onboarding-acme-challenge")?.addEventListener("change", (event) => {
+    state.siteDraft.challengeType = event.target.value;
+    syncStage2ACMEFields();
+    persistDraft();
+  });
+  document.getElementById("onboarding-dns-provider")?.addEventListener("change", (event) => {
+    state.siteDraft.dnsProvider = event.target.value;
+    persistDraft();
+  });
+  document.getElementById("onboarding-dns-provider-env")?.addEventListener("input", (event) => {
+    state.siteDraft.dnsProviderEnv = event.target.value;
+    persistDraft();
+  });
+  document.getElementById("onboarding-dns-propagation")?.addEventListener("input", (event) => {
+    state.siteDraft.dnsPropagationSeconds = Number(event.target.value || 0) || 0;
+    persistDraft();
+  });
+  document.getElementById("onboarding-zerossl-eab-kid")?.addEventListener("input", (event) => {
+    state.siteDraft.zeroSSLEABKID = event.target.value.trim();
+    persistDraft();
+  });
+  document.getElementById("onboarding-zerossl-eab-hmac")?.addEventListener("input", (event) => {
+    state.siteDraft.zeroSSLEABHMAC = event.target.value.trim();
+    persistDraft();
   });
 
   window.addEventListener("popstate", () => {
@@ -634,6 +773,28 @@ async function bootstrap() {
       try {
         state.siteDraft.host = document.getElementById("site-host").value.trim().toLowerCase() || detectSiteHost();
         state.siteDraft.tlsMode = currentTLSMode();
+        state.siteDraft.accountEmail = document.getElementById("onboarding-acme-email")?.value.trim() || "";
+        state.siteDraft.challengeType = document.getElementById("onboarding-acme-challenge")?.value || "http-01";
+        state.siteDraft.dnsProvider = document.getElementById("onboarding-dns-provider")?.value || "cloudflare";
+        state.siteDraft.dnsProviderEnv = document.getElementById("onboarding-dns-provider-env")?.value || "";
+        state.siteDraft.dnsPropagationSeconds = Number(document.getElementById("onboarding-dns-propagation")?.value || 0) || 0;
+        state.siteDraft.zeroSSLEABKID = document.getElementById("onboarding-zerossl-eab-kid")?.value.trim() || "";
+        state.siteDraft.zeroSSLEABHMAC = document.getElementById("onboarding-zerossl-eab-hmac")?.value.trim() || "";
+        if (state.siteDraft.tlsMode !== "self-signed" && !state.siteDraft.accountEmail) {
+          throw new Error(t("onboarding.validation.acmeEmailRequired"));
+        }
+        if (state.siteDraft.tlsMode === "zerossl" && (!state.siteDraft.zeroSSLEABKID || !state.siteDraft.zeroSSLEABHMAC)) {
+          throw new Error(t("onboarding.validation.zerosslEabRequired"));
+        }
+        if (state.siteDraft.tlsMode !== "self-signed" && state.siteDraft.challengeType === "dns-01") {
+          if (!state.siteDraft.dnsProvider) {
+            throw new Error(t("onboarding.validation.dnsProviderRequired"));
+          }
+          const env = parseKeyValueLines(state.siteDraft.dnsProviderEnv);
+          if (state.siteDraft.dnsProvider === "cloudflare" && !env.CLOUDFLARE_API_TOKEN && !env.CF_API_TOKEN) {
+            throw new Error(t("onboarding.validation.cloudflareTokenRequired"));
+          }
+        }
         state.tlsMode = state.siteDraft.tlsMode;
         state.site = buildSitePayload();
         state.upstream = buildUpstreamPayload(state.site.id);

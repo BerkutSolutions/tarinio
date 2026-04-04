@@ -148,7 +148,7 @@ type fakeDevFastStartIssuer struct {
 	calls int
 }
 
-func (f *fakeDevFastStartIssuer) Issue(ctx context.Context, certificateID string, commonName string, sanList []string) (jobs.Job, error) {
+func (f *fakeDevFastStartIssuer) Issue(ctx context.Context, certificateID string, commonName string, sanList []string, options *ACMEIssueOptions) (jobs.Job, error) {
 	f.calls++
 	return jobs.Job{ID: "issue-" + certificateID, Status: jobs.StatusSucceeded, Result: "certificate issued"}, nil
 }

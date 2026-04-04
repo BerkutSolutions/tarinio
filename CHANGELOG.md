@@ -2,6 +2,20 @@
 
 Все значимые изменения проекта фиксируются в этом файле.
 
+## [1.0.7] - 2026-04-04
+
+### Исправлено
+- Добавлен полноценный выбор ACME-центра сертификации в onboarding (этап 2): `Let's Encrypt` / `ZeroSSL`.
+- Для `ZeroSSL` добавлены обязательные поля EAB (`kid` и `hmac`) с динамическим отображением в UI.
+- Добавлен `Let's Encrypt DNS-01` через `Cloudflare` (нативная интеграция через API, без скриптовых обходов).
+- На вкладке сертификатов добавлены связанные поля DNS-валидации и валидация обязательных параметров.
+- Добавлена защита от спама проверок обновлений: автоматическая проверка выполняется не чаще одного раза в час и только при включенной опции авто-проверки.
+- Система обновлений и метаданные репозитория синхронизированы с `https://github.com/BerkutSolutions/tarinio`.
+
+### Версия
+- Версия приложения обновлена до `1.0.7` (`control-plane/internal/appmeta/meta.go`).
+- Версия документации и корневых README синхронизирована на `1.0.7`.
+
 ## [1.0.6] - 2026-04-04
 
 ### Исправлено
@@ -26,6 +40,10 @@
   - `limit_conn` минимум `300/500/500` для HTTP/1.1, HTTP/2, HTTP/3;
   - `bad_behavior_threshold` минимум `100`, `bad_behavior_count_time_seconds` минимум `60`;
   - `bad_behavior_status_codes` для management-site: `400,401,405,444` (без `403/404/429`).
+- Исправлен onboarding/Services-flow для TLS self-signed fallback:
+  - добавлен backend endpoint `POST /api/certificates/self-signed/issue` (выпуск self-signed сертификата с сохранением материалов);
+  - в UI (`sites.js`) при выборе `tls_self_signed` используется self-signed issue, а не ACME issue;
+  - устранен сценарий `certificate <id> not found` при сохранении сервиса с self-signed режимом.
 
 ### Версия
 - Версия приложения обновлена до `1.0.6` (`control-plane/internal/appmeta/meta.go`).

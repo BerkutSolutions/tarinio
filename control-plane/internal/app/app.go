@@ -205,6 +205,7 @@ func New(cfg config.Config) (*App, error) {
 		letsEncryptClient = services.NewDevelopmentLetsEncryptClient()
 	}
 	letsEncryptService := services.NewLetsEncryptService(letsEncryptClient, jobStore, certificateStore, certificateMaterialStore, auditService)
+	selfSignedCertificateService := services.NewLetsEncryptService(services.NewDevelopmentLetsEncryptClient(), jobStore, certificateStore, certificateMaterialStore, auditService)
 	tlsConfigService := services.NewTLSConfigService(tlsConfigStore, siteStore, certificateStore, auditService)
 	wafPolicyService := services.NewWAFPolicyService(wafPolicyStore, siteStore, auditService)
 	accessPolicyService := services.NewAccessPolicyService(accessPolicyStore, siteStore, auditService)
@@ -227,7 +228,7 @@ func New(cfg config.Config) (*App, error) {
 	runtimeRequestCollector := services.NewHTTPRuntimeRequestCollector(cfg.RuntimeHealthURL)
 	dashboardService := services.NewDashboardService(eventService, runtimeRequestCollector, cfg.RuntimeHealthURL)
 	containerRuntimeService := services.NewContainerRuntimeService()
-	httpServer := httpserver.New(cfg.HTTPAddr, setupService, revisionService, authService, siteService, manualBanService, upstreamService, certificateService, tlsConfigService, certificateUploadService, letsEncryptService, wafPolicyService, accessPolicyService, rateLimitPolicyService, easySiteProfileService, antiDDoSService, eventService, revisionCompileService, applyService, auditService, reportService, dashboardService, containerRuntimeService, runtimeRequestCollector)
+	httpServer := httpserver.New(cfg.HTTPAddr, setupService, revisionService, authService, siteService, manualBanService, upstreamService, certificateService, tlsConfigService, certificateUploadService, letsEncryptService, selfSignedCertificateService, wafPolicyService, accessPolicyService, rateLimitPolicyService, easySiteProfileService, antiDDoSService, eventService, revisionCompileService, applyService, auditService, reportService, dashboardService, containerRuntimeService, runtimeRequestCollector)
 	var devFastStartBootstrapper *services.DevFastStartBootstrapper
 	if cfg.DevFastStart.Enabled {
 		devFastStartBootstrapper = services.NewDevFastStartBootstrapper(

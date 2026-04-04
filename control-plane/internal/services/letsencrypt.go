@@ -13,8 +13,8 @@ import (
 )
 
 type LetsEncryptClient interface {
-	Issue(commonName string, sanList []string) (IssuedMaterial, error)
-	Renew(commonName string, sanList []string) (IssuedMaterial, error)
+	Issue(commonName string, sanList []string, options *ACMEIssueOptions) (IssuedMaterial, error)
+	Renew(commonName string, sanList []string, options *ACMEIssueOptions) (IssuedMaterial, error)
 }
 
 type IssuedMaterial struct {
@@ -22,6 +22,20 @@ type IssuedMaterial struct {
 	PrivateKeyPEM  []byte
 	NotBefore      string
 	NotAfter       string
+}
+
+type ACMEIssueOptions struct {
+	CertificateAuthorityServer string
+	CustomDirectoryURL         string
+	UseLetsEncryptStaging      bool
+	AccountEmail               string
+	ChallengeType              string
+	DNSProvider                string
+	DNSProviderEnv             map[string]string
+	DNSResolvers               []string
+	DNSPropagationSeconds      int
+	ZeroSSLEABKID              string
+	ZeroSSLEABHMACKey          string
 }
 
 type LetsEncryptService struct {
@@ -42,7 +56,7 @@ func NewLetsEncryptService(client LetsEncryptClient, jobs JobStore, certificates
 	}
 }
 
-func (s *LetsEncryptService) Issue(ctx context.Context, certificateID string, commonName string, sanList []string) (job jobs.Job, err error) {
+func (s *LetsEncryptService) Issue(ctx context.Context, certificateID string, commonName string, sanList []string, options *ACMEIssueOptions) (job jobs.Job, err error) {
 	defer func() {
 		recordAudit(ctx, s.audits, audits.AuditEvent{
 			Action:       "certificate.acme_issue",
@@ -67,7 +81,7 @@ func (s *LetsEncryptService) Issue(ctx context.Context, certificateID string, co
 		return jobs.Job{}, err
 	}
 
-	issued, err := s.client.Issue(strings.TrimSpace(commonName), sanList)
+	issued, err := s.client.Issue(strings.TrimSpace(commonName), sanList, options)
 	if err != nil {
 		return s.jobs.MarkFailed(job.ID, err.Error())
 	}
@@ -91,7 +105,7 @@ func (s *LetsEncryptService) Issue(ctx context.Context, certificateID string, co
 	return s.jobs.MarkSucceeded(job.ID, "certificate issued")
 }
 
-func (s *LetsEncryptService) Renew(ctx context.Context, certificateID string) (job jobs.Job, err error) {
+func (s *LetsEncryptService) Renew(ctx context.Context, certificateID string, options *ACMEIssueOptions) (job jobs.Job, err error) {
 	defer func() {
 		recordAudit(ctx, s.audits, audits.AuditEvent{
 			Action:       "certificate.acme_renew",
@@ -121,7 +135,7 @@ func (s *LetsEncryptService) Renew(ctx context.Context, certificateID string) (j
 		return s.jobs.MarkFailed(job.ID, err.Error())
 	}
 
-	issued, err := s.client.Renew(certificate.CommonName, certificate.SANList)
+	issued, err := s.client.Renew(certificate.CommonName, certificate.SANList, options)
 	if err != nil {
 		return s.jobs.MarkFailed(job.ID, err.Error())
 	}

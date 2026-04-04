@@ -103,7 +103,43 @@
             </div>
             <div class="waf-form-grid">
               <label class="waf-checkbox"><input id="tls-letsencrypt" type="radio" name="tls-mode" checked><span data-i18n="onboarding.site.tlsManaged">Generate certificate from WAF (Let's Encrypt flow)</span></label>
+              <label class="waf-checkbox"><input id="tls-zerossl" type="radio" name="tls-mode"><span data-i18n="onboarding.site.tlsZeroSSL">Generate certificate from WAF (ZeroSSL flow)</span></label>
               <label class="waf-checkbox"><input id="tls-self-signed" type="radio" name="tls-mode"><span data-i18n="onboarding.site.tlsSelfSigned">Self-signed development fallback</span></label>
+            </div>
+            <div id="onboarding-acme-options" class="waf-form-grid">
+              <div class="waf-field">
+                <label for="onboarding-acme-email" data-i18n="onboarding.site.accountEmail">ACME account email</label>
+                <input id="onboarding-acme-email" type="email" placeholder="admin@example.com">
+              </div>
+              <div class="waf-field">
+                <label for="onboarding-acme-challenge" data-i18n="onboarding.site.challengeType">Challenge type</label>
+                <select id="onboarding-acme-challenge">
+                  <option value="http-01">http-01</option>
+                  <option value="dns-01">dns-01</option>
+                </select>
+              </div>
+              <div class="waf-field waf-hidden" data-onboarding-visible-tls="zerossl">
+                <label for="onboarding-zerossl-eab-kid" data-i18n="onboarding.site.zerosslEabKid">ZeroSSL EAB KID</label>
+                <input id="onboarding-zerossl-eab-kid">
+              </div>
+              <div class="waf-field waf-hidden" data-onboarding-visible-tls="zerossl">
+                <label for="onboarding-zerossl-eab-hmac" data-i18n="onboarding.site.zerosslEabHmac">ZeroSSL EAB HMAC key</label>
+                <input id="onboarding-zerossl-eab-hmac" type="password">
+              </div>
+              <div class="waf-field waf-hidden" data-onboarding-visible-challenge="dns-01">
+                <label for="onboarding-dns-provider" data-i18n="onboarding.site.dnsProvider">DNS provider</label>
+                <select id="onboarding-dns-provider">
+                  <option value="cloudflare">cloudflare</option>
+                </select>
+              </div>
+              <div class="waf-field waf-hidden" data-onboarding-visible-challenge="dns-01">
+                <label for="onboarding-dns-propagation" data-i18n="onboarding.site.dnsPropagation">DNS propagation wait (seconds)</label>
+                <input id="onboarding-dns-propagation" type="number" min="0" step="1" value="120">
+              </div>
+              <div class="waf-field full waf-hidden" data-onboarding-visible-challenge="dns-01">
+                <label for="onboarding-dns-provider-env" data-i18n="onboarding.site.dnsProviderEnv">DNS provider credentials</label>
+                <textarea id="onboarding-dns-provider-env" placeholder="CLOUDFLARE_API_TOKEN=..."></textarea>
+              </div>
             </div>
             <div class="waf-note" data-i18n="onboarding.site.note">The WAF control plane issues and stores certificate material for this site. In local development, the existing issuance flow uses the built-in development certificate generator.</div>
           </form>

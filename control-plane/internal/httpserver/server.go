@@ -29,8 +29,11 @@ func New(
 	tlsConfigService *services.TLSConfigService,
 	certificateUploadService *services.CertificateUploadService,
 	certificateACMEService interface {
-		Issue(ctx context.Context, certificateID string, commonName string, sanList []string) (jobs.Job, error)
-		Renew(ctx context.Context, certificateID string) (jobs.Job, error)
+		Issue(ctx context.Context, certificateID string, commonName string, sanList []string, options *services.ACMEIssueOptions) (jobs.Job, error)
+		Renew(ctx context.Context, certificateID string, options *services.ACMEIssueOptions) (jobs.Job, error)
+	},
+	certificateSelfSignedService interface {
+		Issue(ctx context.Context, certificateID string, commonName string, sanList []string, options *services.ACMEIssueOptions) (jobs.Job, error)
 	},
 	wafPolicyService *services.WAFPolicyService,
 	accessPolicyService *services.AccessPolicyService,
@@ -107,9 +110,11 @@ func New(
 		http.MethodPut:    rbac.PermissionTLSWrite,
 		http.MethodDelete: rbac.PermissionTLSWrite,
 	}, handlers.NewTLSConfigsHandler(tlsConfigService)))
+	certificateACMEHandler := handlers.NewCertificateACMEHandler(certificateACMEService, certificateSelfSignedService)
 	mux.Handle("/api/certificate-materials/upload", withAuth(authService, rbac.PermissionCertificatesWrite, handlers.NewCertificateUploadHandler(certificateUploadService)))
-	mux.Handle("/api/certificates/acme/issue", withAuth(authService, rbac.PermissionCertificatesWrite, handlers.NewCertificateACMEHandler(certificateACMEService)))
-	mux.Handle("/api/certificates/acme/renew/", withAuth(authService, rbac.PermissionCertificatesWrite, handlers.NewCertificateACMEHandler(certificateACMEService)))
+	mux.Handle("/api/certificates/acme/issue", withAuth(authService, rbac.PermissionCertificatesWrite, certificateACMEHandler))
+	mux.Handle("/api/certificates/acme/renew/", withAuth(authService, rbac.PermissionCertificatesWrite, certificateACMEHandler))
+	mux.Handle("/api/certificates/self-signed/issue", withAuth(authService, rbac.PermissionCertificatesWrite, certificateACMEHandler))
 	mux.Handle("/api/waf-policies", withMethodPermissions(authService, map[string]rbac.Permission{
 		http.MethodGet:  rbac.PermissionPoliciesRead,
 		http.MethodPost: rbac.PermissionPoliciesWrite,

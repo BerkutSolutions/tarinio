@@ -58,7 +58,7 @@ type devFastStartApplyService interface {
 }
 
 type devFastStartCertificateIssuer interface {
-	Issue(ctx context.Context, certificateID string, commonName string, sanList []string) (jobs.Job, error)
+	Issue(ctx context.Context, certificateID string, commonName string, sanList []string, options *ACMEIssueOptions) (jobs.Job, error)
 }
 
 type devFastStartEasySiteProfileStore interface {
@@ -267,7 +267,7 @@ func (b *DevFastStartBootstrapper) ensureManagementResources(ctx context.Context
 		needsCertificateIssue = true
 	}
 	if needsCertificateIssue {
-		job, err := b.issuer.Issue(ctx, certificateID, host, nil)
+		job, err := b.issuer.Issue(ctx, certificateID, host, nil, nil)
 		if err != nil {
 			return false, err
 		}
