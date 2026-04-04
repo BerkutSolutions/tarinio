@@ -89,8 +89,8 @@ function syncStepRoute(replaceHistory = false) {
   window.history.pushState({}, "", target);
 }
 
-function httpsUrl(path = "/") {
-  const host = window.location.hostname || "localhost";
+function httpsUrl(path = "/", hostOverride = "") {
+  const host = String(hostOverride || window.location.hostname || "localhost").trim().toLowerCase() || "localhost";
   return `https://${host}${path}`;
 }
 
@@ -158,7 +158,7 @@ function buildUpstreamHostURL(upstream) {
   return `${scheme}://${host}`;
 }
 
-async function ensureFirstInitEasyProfileTemplate(site, upstream, tlsMode) {
+async function ensureFirstInitEasyProfileTemplate(site, upstream, tlsMode, acmeAccountEmail = "") {
   const endpoint = `/api/easy-site-profiles/${encodeURIComponent(site.id)}`;
   const current = await api.get(endpoint);
   const selectedTLSMode = String(tlsMode || "letsencrypt").toLowerCase();
@@ -171,7 +171,8 @@ async function ensureFirstInitEasyProfileTemplate(site, upstream, tlsMode) {
       ...(current?.front_service || {}),
       server_name: site.primary_host,
       auto_lets_encrypt: !isSelfSigned,
-      certificate_authority_server: selectedCA
+      certificate_authority_server: selectedCA,
+      acme_account_email: String(acmeAccountEmail || current?.front_service?.acme_account_email || "").trim().toLowerCase()
     },
     upstream_routing: {
       ...(current?.upstream_routing || {}),
@@ -580,7 +581,7 @@ async function ensureSiteAndTLS() {
       await api.put(`/api/tls-configs/${encodeURIComponent(site.id)}`, tlsPayload);
     }
   }
-  await ensureFirstInitEasyProfileTemplate(site, upstream, tlsMode);
+  await ensureFirstInitEasyProfileTemplate(site, upstream, tlsMode, acmeEmail);
 
   state.site = sites.find((item) => item.id === site.id) || site;
   state.upstream = upstreams.find((item) => item.id === upstream.id) || upstream;
@@ -639,7 +640,7 @@ async function runApply() {
     await api.post("/api/auth/logout", {});
     setLoading(document.getElementById("onboarding-feedback"), t("onboarding.apply.redirecting"));
     window.setTimeout(() => {
-      window.location.replace(httpsUrl("/login"));
+      window.location.replace(httpsUrl("/login", state.site?.primary_host || ""));
     }, 1200);
   } catch (error) {
     throw error;

@@ -24,6 +24,7 @@ func normalizeProfile(profile EasySiteProfile) EasySiteProfile {
 	profile.FrontService.ServerName = strings.ToLower(strings.TrimSpace(profile.FrontService.ServerName))
 	profile.FrontService.SecurityMode = strings.ToLower(strings.TrimSpace(profile.FrontService.SecurityMode))
 	profile.FrontService.CertificateAuthorityServer = strings.ToLower(strings.TrimSpace(profile.FrontService.CertificateAuthorityServer))
+	profile.FrontService.ACMEAccountEmail = strings.ToLower(strings.TrimSpace(profile.FrontService.ACMEAccountEmail))
 
 	profile.UpstreamRouting.ReverseProxyHost = strings.TrimSpace(profile.UpstreamRouting.ReverseProxyHost)
 	profile.UpstreamRouting.ReverseProxyURL = strings.TrimSpace(profile.UpstreamRouting.ReverseProxyURL)

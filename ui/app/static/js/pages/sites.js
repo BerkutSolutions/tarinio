@@ -107,6 +107,18 @@ function normalizeHost(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function isValidEmail(value) {
+  const normalized = normalizeEmail(value);
+  if (!normalized) {
+    return false;
+  }
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized);
+}
+
 function resolvePublicServiceURL(site, tlsState) {
   const host = String(site?.primary_host || site?.id || "").trim();
   if (!host) {
@@ -350,6 +362,7 @@ function defaultSiteDraft() {
     use_lets_encrypt_staging: false,
     use_lets_encrypt_wildcard: false,
     certificate_authority_server: "letsencrypt",
+    acme_account_email: "",
     use_reverse_proxy: true,
     reverse_proxy_host: "http://upstream-server:8080",
     reverse_proxy_url: "/",
@@ -460,6 +473,7 @@ function applyEasyProfileToDraft(draft, profile) {
     use_lets_encrypt_staging: Boolean(front.use_lets_encrypt_staging ?? draft.use_lets_encrypt_staging),
     use_lets_encrypt_wildcard: Boolean(front.use_lets_encrypt_wildcard ?? draft.use_lets_encrypt_wildcard),
     certificate_authority_server: front.certificate_authority_server || draft.certificate_authority_server,
+    acme_account_email: normalizeEmail(front.acme_account_email || draft.acme_account_email),
     use_reverse_proxy: Boolean(upstream.use_reverse_proxy ?? draft.use_reverse_proxy),
     reverse_proxy_host: upstream.reverse_proxy_host || draft.reverse_proxy_host,
     reverse_proxy_url: upstream.reverse_proxy_url || draft.reverse_proxy_url,
@@ -551,7 +565,8 @@ function draftToEasyProfile(draft) {
       auto_lets_encrypt: draft.auto_lets_encrypt,
       use_lets_encrypt_staging: draft.use_lets_encrypt_staging,
       use_lets_encrypt_wildcard: draft.use_lets_encrypt_wildcard,
-      certificate_authority_server: draft.certificate_authority_server
+      certificate_authority_server: draft.certificate_authority_server,
+      acme_account_email: normalizeEmail(draft.acme_account_email)
     },
     upstream_routing: {
       use_reverse_proxy: draft.use_reverse_proxy,
@@ -1506,6 +1521,63 @@ async function upsertAccessPolicy(draft, ctx, existingAccessPolicy) {
   await ctx.api.post("/api/access-policies", payload);
 }
 
+async function resolveACMEAccountEmail(draft, ctx) {
+  const fromDraft = normalizeEmail(draft?.acme_account_email);
+  if (isValidEmail(fromDraft)) {
+    return fromDraft;
+  }
+
+  const siteID = String(draft?.id || "").trim().toLowerCase();
+  if (siteID) {
+    try {
+      const ownProfile = await ctx.api.get(`/api/easy-site-profiles/${encodeURIComponent(siteID)}`);
+      const ownEmail = normalizeEmail(ownProfile?.front_service?.acme_account_email);
+      if (isValidEmail(ownEmail)) {
+        return ownEmail;
+      }
+    } catch (error) {
+      if (error?.status !== 404) {
+        console.warn("failed to read own easy profile for acme email", error);
+      }
+    }
+  }
+
+  try {
+    const sites = await ctx.api.get("/api/sites");
+    for (const site of normalizeArray(sites)) {
+      const candidateSiteID = String(site?.id || "").trim().toLowerCase();
+      if (!candidateSiteID || candidateSiteID === siteID) {
+        continue;
+      }
+      try {
+        const profile = await ctx.api.get(`/api/easy-site-profiles/${encodeURIComponent(candidateSiteID)}`);
+        const email = normalizeEmail(profile?.front_service?.acme_account_email);
+        if (isValidEmail(email)) {
+          return email;
+        }
+      } catch (error) {
+        if (error?.status !== 404) {
+          console.warn("failed to read easy profile for acme email", error);
+        }
+      }
+    }
+  } catch (error) {
+    console.warn("failed to list sites for acme email fallback", error);
+  }
+
+  try {
+    const session = await ctx.api.get("/api/auth/session");
+    const sessionEmail = normalizeEmail(session?.user?.email || session?.session?.user?.email);
+    if (isValidEmail(sessionEmail)) {
+      return sessionEmail;
+    }
+  } catch (error) {
+    console.warn("failed to resolve session email fallback", error);
+  }
+
+  return "";
+}
+
 async function upsertSiteResources(draft, ctx, existingSite, existingUpstream, existingTLSConfig) {
   const sitePayload = {
     id: draft.id.trim().toLowerCase(),
@@ -1600,10 +1672,17 @@ async function upsertSiteResources(draft, ctx, existingSite, existingUpstream, e
       const certificateID = (draft.certificate_id.trim() || `${sitePayload.id}-tls`).toLowerCase();
       const hadCertificateBefore = await certificateExists(certificateID);
       const issueEndpoint = draft.tls_self_signed ? "/api/certificates/self-signed/issue" : "/api/certificates/acme/issue";
+      const acmeAccountEmail = draft.tls_self_signed ? "" : await resolveACMEAccountEmail(draft, ctx);
+      if (!draft.tls_self_signed && acmeAccountEmail) {
+        draft.acme_account_email = acmeAccountEmail;
+      }
       await ctx.api.post(issueEndpoint, {
         certificate_id: certificateID,
         common_name: sitePayload.primary_host,
-        san_list: []
+        san_list: [],
+        certificate_authority_server: draft.certificate_authority_server,
+        use_lets_encrypt_staging: Boolean(draft.use_lets_encrypt_staging),
+        account_email: acmeAccountEmail
       });
       if (!hadCertificateBefore) {
         rollbackable(async () => deleteIgnoreNotFound(`/api/certificates/${encodeURIComponent(certificateID)}`));
@@ -2096,6 +2175,7 @@ export async function renderSites(container, ctx) {
       use_lets_encrypt_staging: container.querySelector("#service-lets-encrypt-staging").checked,
       use_lets_encrypt_wildcard: container.querySelector("#service-lets-encrypt-wildcard").checked,
       certificate_authority_server: container.querySelector("#service-ca-server").value,
+      acme_account_email: normalizeEmail(state.draft.acme_account_email),
       use_reverse_proxy: container.querySelector("#service-use-reverse-proxy").checked,
       reverse_proxy_host: container.querySelector("#service-reverse-proxy-host").value.trim(),
       reverse_proxy_url: container.querySelector("#service-reverse-proxy-url").value.trim(),

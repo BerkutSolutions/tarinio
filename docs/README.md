@@ -1,6 +1,6 @@
 ﻿# Documentation
 
-Version baseline: `1.0.9`
+Version baseline: `1.0.10`
 
 This directory contains the release-synced technical documentation for TARINIO.
 
@@ -35,6 +35,7 @@ OSS policy docs (i18n):
 Root product overview:
 - `README.md`
 - `README.en.md`
+
 
 
 

@@ -1,6 +1,6 @@
 ﻿# Backups (EN)
 
-Documentation baseline: `1.0.9`
+Documentation baseline: `1.0.10`
 
 ## Goal
 
@@ -15,6 +15,7 @@ Define a minimal safe backup path for single-node deployments.
 ## Important
 
 Backups are required before upgrades (see `docs/eng/upgrade.md`).
+
 
 
 

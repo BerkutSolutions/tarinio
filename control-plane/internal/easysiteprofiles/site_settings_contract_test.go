@@ -14,6 +14,7 @@ func TestSiteSettings_FieldContract(t *testing.T) {
 	got := collectJSONFieldPaths(reflect.TypeOf(EasySiteProfile{}), "")
 	want := []string{
 		"created_at",
+		"front_service.acme_account_email",
 		"front_service.auto_lets_encrypt",
 		"front_service.certificate_authority_server",
 		"front_service.security_mode",
@@ -181,6 +182,7 @@ func allFieldsProfile(siteID string) EasySiteProfile {
 	profile.FrontService.UseLetsEncryptStaging = true
 	profile.FrontService.UseLetsEncryptWildcard = true
 	profile.FrontService.CertificateAuthorityServer = "zerossl"
+	profile.FrontService.ACMEAccountEmail = "acme@example.test"
 
 	profile.UpstreamRouting.UseReverseProxy = true
 	profile.UpstreamRouting.ReverseProxyHost = "http://backend.internal:8080"

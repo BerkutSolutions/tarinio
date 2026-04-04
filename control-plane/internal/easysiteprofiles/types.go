@@ -31,6 +31,7 @@ type FrontServiceSettings struct {
 	UseLetsEncryptStaging      bool   `json:"use_lets_encrypt_staging"`
 	UseLetsEncryptWildcard     bool   `json:"use_lets_encrypt_wildcard"`
 	CertificateAuthorityServer string `json:"certificate_authority_server"`
+	ACMEAccountEmail           string `json:"acme_account_email"`
 }
 
 type UpstreamRoutingSettings struct {
@@ -196,6 +197,7 @@ func DefaultProfile(siteID string) EasySiteProfile {
 			UseLetsEncryptStaging:      false,
 			UseLetsEncryptWildcard:     false,
 			CertificateAuthorityServer: "letsencrypt",
+			ACMEAccountEmail:           "",
 		},
 		UpstreamRouting: UpstreamRoutingSettings{
 			UseReverseProxy:        true,
