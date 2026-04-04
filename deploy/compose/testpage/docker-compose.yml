@@ -13,6 +13,7 @@ services:
       CONTROL_PLANE_HTTP_ADDR: 0.0.0.0:8080
       WAF_RUNTIME_ROOT: /var/lib/waf
       CONTROL_PLANE_REDIS_ADDR: redis-mgmt:6379
+      CONTROL_PLANE_ACME_USE_DEVELOPMENT_CLIENT: "true"
       WAF_RUNTIME_HEALTH_URL: http://runtime:8081/readyz
       WAF_RUNTIME_RELOAD_URL: http://runtime:8081/reload
       POSTGRES_DSN: ${MGMT_POSTGRES_DSN:-postgres://waf:waf@postgres-mgmt:5432/waf?sslmode=disable}
@@ -71,6 +72,7 @@ services:
       - NET_RAW
     volumes:
       - waf-test-mgmt-runtime-data:/var/lib/waf:ro
+      - waf-test-mgmt-control-plane-data:/var/lib/waf/control-plane:ro
       - waf-test-mgmt-nginx-logs:/var/log/nginx
       - waf-test-mgmt-l4-adaptive:/etc/waf/l4guard-adaptive:ro
     ports:
@@ -144,6 +146,7 @@ services:
       CONTROL_PLANE_HTTP_ADDR: 0.0.0.0:8080
       WAF_RUNTIME_ROOT: /var/lib/waf
       CONTROL_PLANE_REDIS_ADDR: redis-mgmt:6379
+      CONTROL_PLANE_ACME_USE_DEVELOPMENT_CLIENT: "true"
       WAF_RUNTIME_HEALTH_URL: http://runtime-test:8081/readyz
       WAF_RUNTIME_RELOAD_URL: http://runtime-test:8081/reload
       POSTGRES_DSN: ${TEST_POSTGRES_DSN:-postgres://waf:waf@postgres-app:5432/waf?sslmode=disable}
@@ -204,6 +207,7 @@ services:
       - NET_RAW
     volumes:
       - waf-test-app-runtime-data:/var/lib/waf:ro
+      - waf-test-app-control-plane-data:/var/lib/waf/control-plane:ro
       - waf-test-app-nginx-logs:/var/log/nginx
       - waf-test-app-l4-adaptive:/etc/waf/l4guard-adaptive:ro
     ports:

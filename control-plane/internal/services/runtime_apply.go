@@ -339,19 +339,21 @@ func applyAntiDDoSDefaultEasyProfiles(siteInputs []pipeline.SiteInput, items []p
 			continue
 		}
 		bySite[site.ID] = pipeline.EasyProfileInput{
-			SiteID:                site.ID,
-			AllowedMethods:        []string{"GET", "POST", "HEAD", "OPTIONS", "PUT", "PATCH", "DELETE"},
-			MaxClientSize:         "100m",
-			UseModSecurity:        true,
-			UseLimitConn:          true,
-			LimitConnMaxHTTP1:     80,
-			UseLimitReq:           true,
-			LimitReqRate:          "30r/s",
-			AuthBasicText:         "Restricted area",
-			AntibotChallenge:      "no",
-			AntibotURI:            "/challenge",
-			ModSecurityCRSVersion: "4",
-			ModSecurityCustomPath: "modsec/anomaly_score.conf",
+			SiteID:                   site.ID,
+			SecurityMode:             easysiteprofiles.SecurityModeBlock,
+			AllowedMethods:           []string{"GET", "POST", "HEAD", "OPTIONS", "PUT", "PATCH", "DELETE"},
+			MaxClientSize:            "100m",
+			UseModSecurity:           true,
+			UseModSecurityCRSPlugins: true,
+			UseLimitConn:             true,
+			LimitConnMaxHTTP1:        200,
+			UseLimitReq:              true,
+			LimitReqRate:             "120r/s",
+			AuthBasicText:            "Restricted area",
+			AntibotChallenge:         "no",
+			AntibotURI:               "/challenge",
+			ModSecurityCRSVersion:    "4",
+			ModSecurityCustomPath:    "modsec/anomaly_score.conf",
 		}
 	}
 	out := make([]pipeline.EasyProfileInput, 0, len(bySite))
@@ -372,6 +374,10 @@ func applyAntiDDoSRateOverrides(siteInputs []pipeline.SiteInput, items []pipelin
 	}
 	for _, site := range siteInputs {
 		if !site.Enabled {
+			continue
+		}
+		if strings.EqualFold(strings.TrimSpace(site.ID), "control-plane-access") {
+			// Never enforce global anti-ddos L7 override on the management UI site.
 			continue
 		}
 		bySite[site.ID] = pipeline.RateLimitPolicyInput{
@@ -640,7 +646,8 @@ func mapEasyInputs(items []easysiteprofiles.EasySiteProfile) []pipeline.EasyProf
 	out := make([]pipeline.EasyProfileInput, 0, len(sorted))
 	for _, item := range sorted {
 		out = append(out, pipeline.EasyProfileInput{
-			SiteID: item.SiteID,
+			SiteID:       item.SiteID,
+			SecurityMode: item.FrontService.SecurityMode,
 
 			AllowedMethods: item.HTTPBehavior.AllowedMethods,
 			MaxClientSize:  item.HTTPBehavior.MaxClientSize,
@@ -686,12 +693,13 @@ func mapEasyInputs(items []easysiteprofiles.EasySiteProfile) []pipeline.EasyProf
 			BlacklistCountry: item.SecurityCountryPolicy.BlacklistCountry,
 			WhitelistCountry: item.SecurityCountryPolicy.WhitelistCountry,
 
-			UseModSecurity:           item.SecurityModSecurity.UseModSecurity,
-			UseModSecurityCRSPlugins: item.SecurityModSecurity.UseModSecurityCRSPlugins,
-			ModSecurityCRSVersion:    item.SecurityModSecurity.ModSecurityCRSVersion,
-			ModSecurityCRSPlugins:    item.SecurityModSecurity.ModSecurityCRSPlugins,
-			ModSecurityCustomPath:    item.SecurityModSecurity.CustomConfiguration.Path,
-			ModSecurityCustomContent: item.SecurityModSecurity.CustomConfiguration.Content,
+			UseModSecurity:                    item.SecurityModSecurity.UseModSecurity,
+			UseModSecurityCRSPlugins:          item.SecurityModSecurity.UseModSecurityCRSPlugins,
+			UseModSecurityCustomConfiguration: item.SecurityModSecurity.UseCustomConfiguration,
+			ModSecurityCRSVersion:             item.SecurityModSecurity.ModSecurityCRSVersion,
+			ModSecurityCRSPlugins:             item.SecurityModSecurity.ModSecurityCRSPlugins,
+			ModSecurityCustomPath:             item.SecurityModSecurity.CustomConfiguration.Path,
+			ModSecurityCustomContent:          item.SecurityModSecurity.CustomConfiguration.Content,
 		})
 	}
 	return out

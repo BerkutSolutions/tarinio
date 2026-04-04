@@ -71,6 +71,7 @@ type App struct {
 	EasySiteProfileService   *services.EasySiteProfileService
 	AntiDDoSStore            *antiddos.Store
 	AntiDDoSService          *services.AntiDDoSService
+	RuntimeCRSService        *services.RuntimeCRSService
 	UserStore                *users.Store
 	AuthService              *services.AuthService
 	PasskeyStore             *passkeys.Store
@@ -227,8 +228,9 @@ func New(cfg config.Config) (*App, error) {
 	reportService := services.NewReportService(eventStore, jobStore, revisionStore)
 	runtimeRequestCollector := services.NewHTTPRuntimeRequestCollector(cfg.RuntimeHealthURL)
 	dashboardService := services.NewDashboardService(eventService, runtimeRequestCollector, cfg.RuntimeHealthURL)
+	runtimeCRSService := services.NewRuntimeCRSService(services.RuntimeBaseURLFromHealthURL(cfg.RuntimeHealthURL))
 	containerRuntimeService := services.NewContainerRuntimeService()
-	httpServer := httpserver.New(cfg.HTTPAddr, setupService, revisionService, authService, siteService, manualBanService, upstreamService, certificateService, tlsConfigService, certificateUploadService, letsEncryptService, selfSignedCertificateService, wafPolicyService, accessPolicyService, rateLimitPolicyService, easySiteProfileService, antiDDoSService, eventService, revisionCompileService, applyService, auditService, reportService, dashboardService, containerRuntimeService, runtimeRequestCollector)
+	httpServer := httpserver.New(cfg.HTTPAddr, setupService, revisionService, authService, siteService, manualBanService, upstreamService, certificateService, tlsConfigService, certificateUploadService, letsEncryptService, selfSignedCertificateService, wafPolicyService, accessPolicyService, rateLimitPolicyService, easySiteProfileService, antiDDoSService, eventService, revisionCompileService, applyService, auditService, reportService, dashboardService, containerRuntimeService, runtimeCRSService, runtimeRequestCollector)
 	var devFastStartBootstrapper *services.DevFastStartBootstrapper
 	if cfg.DevFastStart.Enabled {
 		devFastStartBootstrapper = services.NewDevFastStartBootstrapper(
@@ -290,6 +292,7 @@ func New(cfg config.Config) (*App, error) {
 		EasySiteProfileService:   easySiteProfileService,
 		AntiDDoSStore:            antiDDoSStore,
 		AntiDDoSService:          antiDDoSService,
+		RuntimeCRSService:        runtimeCRSService,
 		UserStore:                userStore,
 		AuthService:              authService,
 		PasskeyStore:             passkeyStore,

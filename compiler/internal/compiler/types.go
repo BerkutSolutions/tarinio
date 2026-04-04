@@ -100,7 +100,8 @@ type ArtifactOutput struct {
 
 // EasyProfileInput is the compiler input slice for Easy-mode site settings.
 type EasyProfileInput struct {
-	SiteID string
+	SiteID       string
+	SecurityMode string
 
 	AllowedMethods []string
 	MaxClientSize  string
@@ -146,10 +147,11 @@ type EasyProfileInput struct {
 	BlacklistCountry []string
 	WhitelistCountry []string
 
-	UseModSecurity           bool
-	UseModSecurityCRSPlugins bool
-	ModSecurityCRSVersion    string
-	ModSecurityCRSPlugins    []string
-	ModSecurityCustomPath    string
-	ModSecurityCustomContent string
+	UseModSecurity                    bool
+	UseModSecurityCRSPlugins          bool
+	UseModSecurityCustomConfiguration bool
+	ModSecurityCRSVersion             string
+	ModSecurityCRSPlugins             []string
+	ModSecurityCustomPath             string
+	ModSecurityCustomContent          string
 }

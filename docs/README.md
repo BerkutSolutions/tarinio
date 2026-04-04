@@ -1,6 +1,6 @@
-﻿# Documentation
+# Documentation
 
-Version baseline: `1.0.10`
+Version baseline: `1.0.11`
 
 This directory contains the release-synced technical documentation for TARINIO.
 
@@ -25,6 +25,8 @@ Primary entry points:
 - CLI commands: `docs/CLI_COMMANDS.md`
 - Operator docs RU: `docs/ru/operators/`
 - Operator docs EN: `docs/eng/operators/`
+- OWASP CRS operator guide: `docs/operators/owasp-crs.md`
+- Let's Encrypt DNS-01 operator guide: `docs/operators/letsencrypt-dns.md`
 - Compose profiles: `deploy/compose/README.md`
 - Stage 0 architecture source: `docs/architecture/`
 
@@ -35,6 +37,7 @@ OSS policy docs (i18n):
 Root product overview:
 - `README.md`
 - `README.en.md`
+
 
 
 

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"unicode"
 
 	"waf/control-plane/internal/accesspolicies"
 	"waf/control-plane/internal/audits"
@@ -38,9 +39,11 @@ func (s *ManualBanService) Ban(ctx context.Context, siteID string, address strin
 	}()
 	siteID = strings.ToLower(strings.TrimSpace(siteID))
 	address = strings.TrimSpace(address)
-	if err := s.ensureSiteExists(siteID); err != nil {
+	canonicalSiteID, err := s.resolveSiteID(siteID)
+	if err != nil {
 		return accesspolicies.AccessPolicy{}, err
 	}
+	siteID = canonicalSiteID
 
 	policy, found, err := s.findBySite(siteID)
 	if err != nil {
@@ -92,9 +95,11 @@ func (s *ManualBanService) Unban(ctx context.Context, siteID string, address str
 	}()
 	siteID = strings.ToLower(strings.TrimSpace(siteID))
 	address = strings.TrimSpace(address)
-	if err := s.ensureSiteExists(siteID); err != nil {
+	canonicalSiteID, err := s.resolveSiteID(siteID)
+	if err != nil {
 		return accesspolicies.AccessPolicy{}, err
 	}
+	siteID = canonicalSiteID
 
 	policy, found, err := s.findBySite(siteID)
 	if err != nil {
@@ -145,17 +150,48 @@ func (s *ManualBanService) findBySite(siteID string) (accesspolicies.AccessPolic
 	return accesspolicies.AccessPolicy{}, false, nil
 }
 
-func (s *ManualBanService) ensureSiteExists(siteID string) error {
+func (s *ManualBanService) resolveSiteID(siteID string) (string, error) {
+	siteID = strings.ToLower(strings.TrimSpace(siteID))
+	if siteID == "" {
+		return "", fmt.Errorf("site %s not found", siteID)
+	}
 	items, err := s.sites.List()
 	if err != nil {
-		return err
+		return "", err
 	}
+	aliasToken := normalizeSiteAliasToken(siteID)
 	for _, item := range items {
-		if item.ID == siteID {
-			return nil
+		id := strings.ToLower(strings.TrimSpace(item.ID))
+		if id == siteID {
+			return item.ID, nil
+		}
+		if normalizeSiteAliasToken(id) == aliasToken {
+			return item.ID, nil
 		}
 	}
-	return fmt.Errorf("site %s not found", siteID)
+	return "", fmt.Errorf("site %s not found", siteID)
+}
+
+func normalizeSiteAliasToken(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" {
+		return ""
+	}
+	var b strings.Builder
+	lastDash := false
+	for _, r := range value {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			b.WriteRune(r)
+			lastDash = false
+			continue
+		}
+		if !lastDash {
+			b.WriteByte('-')
+			lastDash = true
+		}
+	}
+	normalized := strings.Trim(b.String(), "-")
+	return normalized
 }
 
 func defaultAccessPolicyID(siteID string) string {

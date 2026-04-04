@@ -93,10 +93,12 @@ func (s *requestStreamSource) latest() ([]map[string]any, error) {
 				"timestamp":     item.when.UTC().Format(time.RFC3339Nano),
 				"request_id":    item.requestID,
 				"client_ip":     item.ip,
+				"country":       item.country,
 				"method":        item.method,
 				"uri":           item.path,
 				"status":        item.status,
 				"site":          item.siteID,
+				"host":          item.host,
 				"upstream_addr": item.upstreamAddr,
 				"referer":       item.referer,
 				"user_agent":    item.userAgent,
@@ -166,6 +168,8 @@ func (s *securityEventSource) next() ([]securityEvent, error) {
 				"ip":      item.ip,
 				"ts":      second,
 				"site_id": item.siteID,
+				"host":    item.host,
+				"country": item.country,
 			}
 		}
 		if _, exists := burstMeta[burstPathKey]; !exists {
@@ -174,6 +178,8 @@ func (s *securityEventSource) next() ([]securityEvent, error) {
 				"path":    item.path,
 				"ts":      second,
 				"site_id": item.siteID,
+				"host":    item.host,
+				"country": item.country,
 			}
 		}
 
@@ -191,6 +197,8 @@ func (s *securityEventSource) next() ([]securityEvent, error) {
 					"method":     item.method,
 					"path":       item.path,
 					"client_ip":  item.ip,
+					"country":    item.country,
+					"host":       item.host,
 					"referer":    item.referer,
 					"user_agent": item.userAgent,
 				},
@@ -208,6 +216,8 @@ func (s *securityEventSource) next() ([]securityEvent, error) {
 					"method":     item.method,
 					"path":       item.path,
 					"client_ip":  item.ip,
+					"country":    item.country,
+					"host":       item.host,
 					"referer":    item.referer,
 					"user_agent": item.userAgent,
 				},
@@ -236,6 +246,8 @@ func (s *securityEventSource) next() ([]securityEvent, error) {
 			Details: map[string]any{
 				"client_ip":       meta["ip"],
 				"requests_second": count,
+				"host":            meta["host"],
+				"country":         meta["country"],
 				"blocked":         false,
 			},
 		})
@@ -256,6 +268,8 @@ func (s *securityEventSource) next() ([]securityEvent, error) {
 				"client_ip":         meta["ip"],
 				"path":              meta["path"],
 				"path_requests_sec": count,
+				"host":              meta["host"],
+				"country":           meta["country"],
 				"blocked":           false,
 			},
 		})
@@ -268,6 +282,8 @@ type parsedAccess struct {
 	requestID    string
 	ip           string
 	siteID       string
+	host         string
+	country      string
 	method       string
 	path         string
 	status       int
@@ -283,12 +299,14 @@ func parseAccessLine(line string) (parsedAccess, bool) {
 			Timestamp    string `json:"timestamp"`
 			RequestID    string `json:"request_id"`
 			ClientIP     string `json:"client_ip"`
+			Country      string `json:"country"`
 			Method       string `json:"method"`
 			URI          string `json:"uri"`
 			Status       int    `json:"status"`
 			Referer      string `json:"referer"`
 			UserAgent    string `json:"user_agent"`
 			Site         string `json:"site"`
+			Host         string `json:"host"`
 			UpstreamAddr string `json:"upstream_addr"`
 		}
 		if err := json.Unmarshal([]byte(line), &item); err == nil {
@@ -307,6 +325,8 @@ func parseAccessLine(line string) (parsedAccess, bool) {
 				requestID:    strings.TrimSpace(item.RequestID),
 				ip:           ip,
 				siteID:       sanitizeSiteID(item.Site),
+				host:         strings.ToLower(strings.TrimSpace(item.Host)),
+				country:      strings.ToUpper(strings.TrimSpace(item.Country)),
 				method:       strings.TrimSpace(item.Method),
 				path:         strings.TrimSpace(item.URI),
 				status:       item.Status,
@@ -333,6 +353,8 @@ func parseAccessLine(line string) (parsedAccess, bool) {
 	return parsedAccess{
 		ip:           matches[1],
 		siteID:       sanitizeSiteID(matches[9]),
+		host:         "",
+		country:      "",
 		method:       matches[3],
 		path:         matches[4],
 		status:       status,

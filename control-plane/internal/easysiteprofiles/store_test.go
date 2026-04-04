@@ -16,8 +16,11 @@ func TestDefaultProfile_HasExpectedDefaults(t *testing.T) {
 	if profile.SecurityAntibot.AntibotChallenge != AntibotChallengeNo {
 		t.Fatalf("unexpected antibot default: %s", profile.SecurityAntibot.AntibotChallenge)
 	}
-	if got := len(profile.SecurityBehaviorAndLimits.BadBehaviorStatusCodes); got != 7 {
-		t.Fatalf("expected 7 default bad behavior codes, got %d", got)
+	if !profile.SecurityModSecurity.UseModSecurityCRSPlugins {
+		t.Fatal("expected CRS to be enabled by default for easy profiles")
+	}
+	if got := len(profile.SecurityBehaviorAndLimits.BadBehaviorStatusCodes); got != 4 {
+		t.Fatalf("expected 4 default bad behavior codes, got %d", got)
 	}
 }
 
@@ -197,6 +200,7 @@ func TestStore_CreateRejectsInvalidModSecurityCustomPath(t *testing.T) {
 		t.Fatalf("new store: %v", err)
 	}
 	profile := DefaultProfile("site-a")
+	profile.SecurityModSecurity.UseCustomConfiguration = true
 	profile.SecurityModSecurity.CustomConfiguration.Path = "../modsec/bad.conf"
 	if _, err := store.Create(profile); err == nil {
 		t.Fatal("expected validation error for invalid modsecurity custom path")

@@ -1,10 +1,87 @@
 import { confirmAction, escapeHtml, formatDate, setError, setLoading } from "../ui.js";
 
 const AUTO_BAN_EVENT_TYPES = new Set(["security_rate_limit", "security_access", "security_waf"]);
-const AUTO_BAN_FALLBACK_SECONDS = 10;
+const AUTO_BAN_FALLBACK_SECONDS = 300;
+const DAY_BAN_SECONDS = 24 * 60 * 60;
+const ESCALATION_STORAGE_KEY = "waf_ban_escalation_v1";
 
 const ICON_PLUS = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M11 5h2v14h-2zM5 11h14v2H5z"/></svg>';
 const ICON_UNLOCK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a5 5 0 0 1 5 5v2h-2V7a3 3 0 1 0-6 0v2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h2V7a5 5 0 0 1 5-5Z"/></svg>';
+
+function loadEscalationState() {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(ESCALATION_STORAGE_KEY) || "{}");
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch (_error) {
+    return {};
+  }
+}
+
+function saveEscalationState(state) {
+  window.localStorage.setItem(ESCALATION_STORAGE_KEY, JSON.stringify(state || {}));
+}
+
+function getEscalationRecord(state, ip) {
+  const key = String(ip || "").trim();
+  if (!key) {
+    return null;
+  }
+  if (!state[key] || typeof state[key] !== "object") {
+    state[key] = {
+      level: 0,
+      last_unban_ms: 0,
+      last_promoted_token: "",
+      last_enforced_level: 0
+    };
+  }
+  return state[key];
+}
+
+function normalizeIP(value) {
+  return String(value || "").trim();
+}
+
+function normalizeBanStages(values) {
+  const out = [];
+  for (const raw of normalizeList(values)) {
+    const value = Number.parseInt(String(raw), 10);
+    if (!Number.isFinite(value) || value < 0) {
+      continue;
+    }
+    out.push(value);
+    if (value === 0) {
+      break;
+    }
+  }
+  return out;
+}
+
+function buildBanPolicy(profile) {
+  const sec = profile?.security_behavior_and_limits || {};
+  const base = Number.parseInt(String(sec?.bad_behavior_ban_time_seconds ?? AUTO_BAN_FALLBACK_SECONDS), 10);
+  const baseSeconds = Number.isFinite(base) ? Math.max(0, base) : AUTO_BAN_FALLBACK_SECONDS;
+  const enabled = Boolean(sec?.ban_escalation_enabled);
+  const scopeRaw = String(sec?.ban_escalation_scope || "").trim().toLowerCase();
+  const scope = enabled && scopeRaw === "current_site" ? "current_site" : "all_sites";
+  const customStages = normalizeBanStages(sec?.ban_escalation_stages_seconds);
+  const stages = enabled && customStages.length
+    ? customStages
+    : [baseSeconds, DAY_BAN_SECONDS, 0];
+  return {
+    enabled,
+    scope,
+    stages,
+    baseSeconds
+  };
+}
+
+function getPolicyForSite(siteID, policyBySite) {
+  const key = String(siteID || "").trim();
+  if (!key) {
+    return { enabled: false, scope: "all_sites", stages: [AUTO_BAN_FALLBACK_SECONDS, DAY_BAN_SECONDS, 0], baseSeconds: AUTO_BAN_FALLBACK_SECONDS };
+  }
+  return policyBySite.get(key) || { enabled: false, scope: "all_sites", stages: [AUTO_BAN_FALLBACK_SECONDS, DAY_BAN_SECONDS, 0], baseSeconds: AUTO_BAN_FALLBACK_SECONDS };
+}
 
 function normalizeList(value) {
   return Array.isArray(value) ? value : [];
@@ -63,6 +140,68 @@ function asDate(value) {
   return Number.isNaN(stamp) ? null : new Date(stamp);
 }
 
+function normalizeSiteToken(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+/, "")
+    .replace(/-+$/, "");
+}
+
+function buildSiteAliasMap(sites) {
+  const map = new Map();
+  for (const site of normalizeList(sites)) {
+    const canonical = String(site?.id || "").trim();
+    if (!canonical) {
+      continue;
+    }
+    const lower = canonical.toLowerCase();
+    const token = normalizeSiteToken(canonical);
+    map.set(lower, canonical);
+    if (token) {
+      map.set(token, canonical);
+      map.set(token.replace(/-/g, "_"), canonical);
+    }
+  }
+  return map;
+}
+
+function buildHostSiteMap(sites) {
+  const map = new Map();
+  for (const site of normalizeList(sites)) {
+    const id = String(site?.id || "").trim();
+    const host = String(site?.primary_host || "").trim().toLowerCase();
+    if (!id) {
+      continue;
+    }
+    map.set(id.toLowerCase(), id);
+    if (host) {
+      map.set(host, id);
+    }
+  }
+  return map;
+}
+
+function resolveCanonicalSiteID(siteID, aliasMap, hostMap, hostHint = "") {
+  const raw = String(siteID || "").trim();
+  if (raw) {
+    const lower = raw.toLowerCase();
+    const direct = aliasMap.get(lower) || aliasMap.get(normalizeSiteToken(raw)) || hostMap.get(lower);
+    if (direct) {
+      return direct;
+    }
+    if (raw !== "-" && raw !== "unknown") {
+      return raw;
+    }
+  }
+  const host = String(hostHint || "").trim().toLowerCase();
+  if (host) {
+    return hostMap.get(host) || "";
+  }
+  return "";
+}
+
 function siteCookieName(siteID) {
   const slug = String(siteID || "")
     .toLowerCase()
@@ -88,7 +227,26 @@ function parseCountry(details) {
   if (!details || typeof details !== "object") {
     return "-";
   }
-  return String(details.country || details.geo_country || details.country_code || "").trim() || "-";
+  return String(details.country || details.client_country || details.geo_country || details.country_code || "").trim() || "-";
+}
+
+function buildIPSetBySite(accessPolicies, fieldName, resolveSiteID) {
+  const out = new Map();
+  for (const policy of normalizeList(accessPolicies)) {
+    const siteID = resolveSiteID(String(policy?.site_id || "").trim());
+    if (!siteID) {
+      continue;
+    }
+    const set = out.get(siteID) || new Set();
+    for (const value of normalizeList(policy?.[fieldName])) {
+      const ip = normalizeIP(value);
+      if (ip) {
+        set.add(ip);
+      }
+    }
+    out.set(siteID, set);
+  }
+  return out;
 }
 
 function moduleByEvent(item) {
@@ -133,7 +291,7 @@ function formatRemaining(expiresAt, now, t) {
   return `${seconds}s`;
 }
 
-function buildAutoBanRows(events, banSecondsBySite) {
+function buildAutoBanRows(events, policyBySite, resolveSiteID, allowlistBySite, escalationState) {
   const now = new Date();
   const byKey = new Map();
   for (const item of normalizeList(events)) {
@@ -141,12 +299,16 @@ function buildAutoBanRows(events, banSecondsBySite) {
     if (!AUTO_BAN_EVENT_TYPES.has(type)) {
       continue;
     }
-    const siteID = String(item?.site_id || "").trim();
+    const details = item?.details && typeof item.details === "object" ? item.details : {};
+    const siteID = resolveSiteID(String(item?.site_id || "").trim(), String(details.host || "").trim());
     if (!siteID) {
       continue;
     }
-    const ip = parseIP(item?.details);
+    const ip = parseIP(details);
     if (!ip) {
+      continue;
+    }
+    if ((allowlistBySite.get(siteID) || new Set()).has(ip)) {
       continue;
     }
     const occurredAt = asDate(item?.occurred_at);
@@ -155,8 +317,10 @@ function buildAutoBanRows(events, banSecondsBySite) {
     }
     const key = `${siteID}|${ip}`;
     const moduleID = moduleByEvent(item);
-    const banSecondsRaw = Number.parseInt(String(banSecondsBySite.get(siteID) ?? AUTO_BAN_FALLBACK_SECONDS), 10);
-    const banSeconds = Number.isFinite(banSecondsRaw) ? Math.max(0, banSecondsRaw) : AUTO_BAN_FALLBACK_SECONDS;
+    const policy = getPolicyForSite(siteID, policyBySite);
+    const rec = getEscalationRecord(escalationState, ip);
+    const level = Math.max(0, Math.min(Number(rec?.level || 0), Math.max(0, policy.stages.length - 1)));
+    const banSeconds = Number(policy.stages[level] ?? policy.baseSeconds ?? AUTO_BAN_FALLBACK_SECONDS);
     const expiresAt = banSeconds === 0 ? null : new Date(occurredAt.getTime() + banSeconds * 1000);
 
     if (expiresAt && expiresAt.getTime() <= now.getTime()) {
@@ -168,10 +332,12 @@ function buildAutoBanRows(events, banSecondsBySite) {
       byKey.set(key, {
         siteID,
         ip,
-        country: parseCountry(item?.details),
+        country: parseCountry(details),
         source: "auto",
         occurredAt,
         expiresAt,
+        policyScope: policy.scope,
+        banStages: policy.stages,
         modules: new Set([moduleID]),
         origin: item?._origin || "primary"
       });
@@ -182,10 +348,10 @@ function buildAutoBanRows(events, banSecondsBySite) {
   return Array.from(byKey.values());
 }
 
-function buildManualBanRows(accessPolicies) {
+function buildManualBanRows(accessPolicies, resolveSiteID) {
   const rows = [];
   for (const policy of normalizeList(accessPolicies)) {
-    const siteID = String(policy?.site_id || "").trim();
+    const siteID = resolveSiteID(String(policy?.site_id || "").trim());
     if (!siteID) {
       continue;
     }
@@ -242,15 +408,52 @@ function renderModules(modules, t) {
     .join(", ");
 }
 
-async function callBanAction(row, action, payload) {
-  const base = row.origin === "secondary" ? "/api-app/sites/" : "/api/sites/";
-  const path = `${base}${encodeURIComponent(row.siteID)}/${action}`;
-  if (row.origin === "secondary") {
+function applyEscalationLevel(rows, escalationState, policyBySite) {
+  let changed = false;
+  for (const row of rows) {
+    if (row.source !== "auto" || !row.ip) {
+      continue;
+    }
+    const rec = getEscalationRecord(escalationState, row.ip);
+    if (!rec) {
+      continue;
+    }
+    const occurredMs = Number(row?.occurredAt?.getTime?.() || 0);
+    const lastUnban = Number(rec.last_unban_ms || 0);
+    if (occurredMs > 0 && lastUnban > 0 && occurredMs > lastUnban) {
+      const promoteToken = `${row.siteID}|${occurredMs}`;
+      if (rec.last_promoted_token !== promoteToken) {
+        const policy = getPolicyForSite(row.siteID, policyBySite);
+        rec.level = Math.min(Math.max(0, policy.stages.length - 1), Number(rec.level || 0) + 1);
+        rec.last_promoted_token = promoteToken;
+        changed = true;
+      }
+    }
+    row.escalationLevel = Number(rec.level || 0);
+    const policy = getPolicyForSite(row.siteID, policyBySite);
+    const cappedLevel = Math.max(0, Math.min(row.escalationLevel, Math.max(0, policy.stages.length - 1)));
+    row.escalationLevel = cappedLevel;
+    const stageSeconds = Number(policy.stages[cappedLevel] ?? policy.baseSeconds ?? AUTO_BAN_FALLBACK_SECONDS);
+    if (stageSeconds === 0) {
+      row.expiresAt = null;
+      row.modules.add("manual");
+    } else {
+      const startMs = occurredMs || Date.now();
+      row.expiresAt = new Date(startMs + stageSeconds * 1000);
+    }
+  }
+  return changed;
+}
+
+async function postBanAction(ctx, siteID, origin, action, ip) {
+  const base = origin === "secondary" ? "/api-app/sites/" : "/api/sites/";
+  const path = `${base}${encodeURIComponent(siteID)}/${action}`;
+  if (origin === "secondary") {
     const response = await fetch(path, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({ ip })
     });
     if (!response.ok) {
       const text = await response.text();
@@ -258,7 +461,65 @@ async function callBanAction(row, action, payload) {
     }
     return;
   }
-  await payload.ctx.api.post(path, { ip: payload.ip });
+  await ctx.api.post(path, { ip });
+}
+
+async function applyBanAllSites(ctx, sites, ip, action, allowlistBySite) {
+  for (const site of normalizeList(sites)) {
+    const siteID = String(site?.id || "").trim();
+    if (!siteID) {
+      continue;
+    }
+    if ((allowlistBySite.get(siteID) || new Set()).has(ip)) {
+      continue;
+    }
+    await postBanAction(ctx, siteID, String(site?._origin || "primary"), action, ip);
+  }
+}
+
+async function enforceEscalation(rows, sites, escalationState, ctx, allowlistBySite, denylistBySite, policyBySite) {
+  let applied = false;
+  for (const row of rows) {
+    if (row.source !== "auto") {
+      continue;
+    }
+    const ip = normalizeIP(row.ip);
+    if (!ip) {
+      continue;
+    }
+    if ((allowlistBySite.get(row.siteID) || new Set()).has(ip)) {
+      continue;
+    }
+    if ((denylistBySite.get(row.siteID) || new Set()).has(ip)) {
+      continue;
+    }
+    const rec = getEscalationRecord(escalationState, ip);
+    if (!rec) {
+      continue;
+    }
+    const policy = getPolicyForSite(row.siteID, policyBySite);
+    const level = Number(rec.level || 0);
+    if (level <= Number(rec.last_enforced_level || 0)) {
+      continue;
+    }
+    const stageSeconds = Number(policy.stages[Math.max(0, Math.min(level, policy.stages.length - 1))] ?? policy.baseSeconds ?? AUTO_BAN_FALLBACK_SECONDS);
+    if (stageSeconds !== 0) {
+      // Finite stages are represented in ban timers; hard denylist ban is only for permanent stage.
+      rec.last_enforced_level = level;
+      applied = true;
+      continue;
+    }
+    if (policy.scope === "all_sites") {
+      await applyBanAllSites(ctx, sites, ip, "ban", allowlistBySite);
+      rec.last_enforced_level = level;
+      applied = true;
+      continue;
+    }
+    await postBanAction(ctx, row.siteID, row.origin, "ban", ip);
+    rec.last_enforced_level = level;
+    applied = true;
+  }
+  return applied;
 }
 
 export async function renderBans(container, ctx) {
@@ -281,7 +542,7 @@ export async function renderBans(container, ctx) {
   const statusNode = container.querySelector("#bans-status");
   const listNode = container.querySelector("#bans-list");
 
-  const loadBanSecondsBySite = async (siteIDs) => {
+  const loadBanPoliciesBySite = async (siteIDs) => {
     const out = new Map();
     const secondaryProfileDump = await tryGetJSON("/api-app/easy-site-profiles");
     const secondaryProfiles = unwrapList(secondaryProfileDump, ["easy_site_profiles"]);
@@ -289,18 +550,16 @@ export async function renderBans(container, ctx) {
     await Promise.all(siteIDs.map(async (siteID) => {
       try {
         const profile = await ctx.api.get(`/api/easy-site-profiles/${encodeURIComponent(siteID)}`);
-        const value = Number.parseInt(String(profile?.security_behavior_and_limits?.bad_behavior_ban_time_seconds ?? AUTO_BAN_FALLBACK_SECONDS), 10);
-        out.set(siteID, Number.isFinite(value) ? Math.max(0, value) : AUTO_BAN_FALLBACK_SECONDS);
+        out.set(siteID, buildBanPolicy(profile));
       } catch (error) {
         const secondary = secondaryBySite.get(siteID);
-        const value = Number.parseInt(String(secondary?.security_behavior_and_limits?.bad_behavior_ban_time_seconds ?? AUTO_BAN_FALLBACK_SECONDS), 10);
-        out.set(siteID, Number.isFinite(value) ? Math.max(0, value) : AUTO_BAN_FALLBACK_SECONDS);
+        out.set(siteID, buildBanPolicy(secondary || null));
       }
     }));
     return out;
   };
 
-  const renderRows = async () => {
+  const renderRows = async (skipAutoEnforce = false) => {
     setLoading(statusNode, ctx.t("bans.loading"));
     try {
       const [sitesResponse, accessResponse, eventsResponse, sitesSecondary, accessSecondary, eventsSecondary] = await Promise.all([
@@ -320,15 +579,36 @@ export async function renderBans(container, ctx) {
       ];
 
       const siteByID = new Map(sites.map((site) => [String(site?.id || ""), site]));
-      const banSecondsBySite = await loadBanSecondsBySite(
+      const siteAliasMap = buildSiteAliasMap(sites);
+      const hostSiteMap = buildHostSiteMap(sites);
+      const canonicalSiteID = (value, hostHint = "") => resolveCanonicalSiteID(value, siteAliasMap, hostSiteMap, hostHint);
+      const allowlistBySite = buildIPSetBySite(accessPolicies, "allowlist", canonicalSiteID);
+      const denylistBySite = buildIPSetBySite(accessPolicies, "denylist", canonicalSiteID);
+      const policyBySite = await loadBanPoliciesBySite(
         Array.from(new Set([
-          ...sites.map((site) => String(site?.id || "").trim()).filter(Boolean),
-          ...events.map((item) => String(item?.site_id || "").trim()).filter(Boolean),
-          ...accessPolicies.map((item) => String(item?.site_id || "").trim()).filter(Boolean)
+          ...sites.map((site) => canonicalSiteID(site?.id)).filter(Boolean),
+          ...events.map((item) => canonicalSiteID(item?.site_id, item?.details?.host)).filter(Boolean),
+          ...accessPolicies.map((item) => canonicalSiteID(item?.site_id)).filter(Boolean)
         ]))
       );
 
-      const rows = mergeRows(buildAutoBanRows(events, banSecondsBySite), buildManualBanRows(accessPolicies));
+      const escalationState = loadEscalationState();
+      const rows = mergeRows(
+        buildAutoBanRows(events, policyBySite, canonicalSiteID, allowlistBySite, escalationState),
+        buildManualBanRows(accessPolicies, canonicalSiteID)
+      );
+      const escalationChanged = applyEscalationLevel(rows, escalationState, policyBySite);
+      if (escalationChanged) {
+        saveEscalationState(escalationState);
+      }
+      if (!skipAutoEnforce) {
+        const enforced = await enforceEscalation(rows, sites, escalationState, ctx, allowlistBySite, denylistBySite, policyBySite);
+        if (enforced) {
+          saveEscalationState(escalationState);
+          await renderRows(true);
+          return;
+        }
+      }
       if (rows.length === 0) {
         statusNode.innerHTML = `<div class="waf-empty">${escapeHtml(ctx.t("bans.empty"))}</div>`;
         listNode.innerHTML = "";
@@ -356,14 +636,20 @@ export async function renderBans(container, ctx) {
               ${rows.map((row, index) => {
                 const site = siteByID.get(row.siteID);
                 const siteLabel = site?.primary_host || row.siteID;
+                const stageSeconds = Number((row.banStages || [])[Math.max(0, Number(row.escalationLevel || 0))] ?? -1);
+                const escalationLabel = stageSeconds === 0
+                  ? (row.policyScope === "all_sites" ? " [GLOBAL PERM]" : " [SITE PERM]")
+                  : Number(row.escalationLevel || 0) > 0
+                    ? ` [L${Number(row.escalationLevel || 0) + 1}]`
+                    : "";
                 return `
                   <tr>
                     <td>${escapeHtml(row.ip)}</td>
                     <td>${escapeHtml(row.country)}</td>
                     <td>${escapeHtml(row.occurredAt ? formatDate(row.occurredAt.toISOString()) : "-")}</td>
                     <td>${escapeHtml(formatRemaining(row.expiresAt, now, ctx.t))}</td>
-                    <td>${escapeHtml(siteLabel)}</td>
-                    <td>${escapeHtml(renderModules(row.modules, ctx.t))}</td>
+                    <td>${escapeHtml(`${siteLabel}${escalationLabel}`)}</td>
+                    <td>${escapeHtml(renderModules(row.modules, ctx.t))}${(allowlistBySite.get(row.siteID) || new Set()).has(row.ip) ? " (allowlist)" : ""}</td>
                     <td>
                       <div class="waf-ban-actions">
                         <button type="button" class="btn success btn-sm waf-ban-btn" data-action="extend" data-row="${index}" title="${escapeHtml(ctx.t("bans.action.extend"))}">
@@ -392,6 +678,17 @@ export async function renderBans(container, ctx) {
           if (!row || !row.siteID || !row.ip) {
             return;
           }
+          const ip = normalizeIP(row.ip);
+          const escalationState = loadEscalationState();
+          const rec = getEscalationRecord(escalationState, ip);
+          const policy = getPolicyForSite(row.siteID, policyBySite);
+          const currentLevel = Math.max(0, Math.min(Number(rec?.level || 0), Math.max(0, policy.stages.length - 1)));
+          const currentStageSeconds = Number(policy.stages[currentLevel] ?? policy.baseSeconds ?? AUTO_BAN_FALLBACK_SECONDS);
+          const isAllowlisted = (allowlistBySite.get(row.siteID) || new Set()).has(ip);
+          if (isAllowlisted) {
+            ctx.notify("IP is in allowlist for this site; no ban actions applied.");
+            return;
+          }
 
           if (action === "unban") {
             if (!confirmAction(ctx.t("bans.confirm.unban", { ip: row.ip, site: row.siteID }))) {
@@ -399,19 +696,14 @@ export async function renderBans(container, ctx) {
             }
             try {
               button.disabled = true;
-              if (row.origin === "secondary") {
-                const response = await fetch(`/api-app/sites/${encodeURIComponent(row.siteID)}/unban`, {
-                  method: "POST",
-                  credentials: "include",
-                  headers: { "Content-Type": "application/json", Accept: "application/json" },
-                  body: JSON.stringify({ ip: row.ip })
-                });
-                if (!response.ok) {
-                  throw new Error(`HTTP ${response.status}`);
-                }
+              if (currentStageSeconds === 0 && policy.scope === "all_sites") {
+                await applyBanAllSites(ctx, sites, ip, "unban", allowlistBySite);
               } else {
-                await ctx.api.post(`/api/sites/${encodeURIComponent(row.siteID)}/unban`, { ip: row.ip });
+                await postBanAction(ctx, row.siteID, row.origin, "unban", ip);
               }
+              rec.last_unban_ms = Date.now();
+              rec.last_enforced_level = 0;
+              saveEscalationState(escalationState);
               clearRateLimitCookie(row.siteID);
               ctx.notify(ctx.t("toast.ipUnbanned"));
               await renderRows();
@@ -428,19 +720,17 @@ export async function renderBans(container, ctx) {
           }
           try {
             button.disabled = true;
-            if (row.origin === "secondary") {
-              const response = await fetch(`/api-app/sites/${encodeURIComponent(row.siteID)}/ban`, {
-                method: "POST",
-                credentials: "include",
-                headers: { "Content-Type": "application/json", Accept: "application/json" },
-                body: JSON.stringify({ ip: row.ip })
-              });
-              if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-              }
+            const level = currentLevel;
+            if (currentStageSeconds === 0 && policy.scope === "all_sites") {
+              await applyBanAllSites(ctx, sites, ip, "ban", allowlistBySite);
+              rec.last_enforced_level = level;
             } else {
-              await ctx.api.post(`/api/sites/${encodeURIComponent(row.siteID)}/ban`, { ip: row.ip });
+              if (currentStageSeconds === 0) {
+                await postBanAction(ctx, row.siteID, row.origin, "ban", ip);
+              }
+              rec.last_enforced_level = level;
             }
+            saveEscalationState(escalationState);
             ctx.notify(ctx.t("toast.ipBanned"));
             await renderRows();
           } catch (error) {

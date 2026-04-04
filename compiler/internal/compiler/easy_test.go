@@ -14,27 +14,29 @@ func TestRenderEasyArtifacts_GeneratesSiteAndAuthBasicFiles(t *testing.T) {
 			ListenHTTP:  true,
 		}},
 		[]EasyProfileInput{{
-			SiteID:              "site-a",
-			AllowedMethods:      []string{"GET", "POST"},
-			MaxClientSize:       "50m",
-			UseAuthBasic:        true,
-			AuthBasicUser:       "admin",
-			AuthBasicPassword:   "secret",
-			AuthBasicText:       "Restricted area",
-			AntibotChallenge:    "recaptcha",
-			AntibotURI:          "/challenge",
-			AntibotRecaptchaKey: "site-key",
-			UseModSecurity:      true,
-			UseModSecurityCRSPlugins: true,
-			ModSecurityCRSVersion:    "4",
-			ModSecurityCRSPlugins:    []string{"plugin-a"},
-			ModSecurityCustomPath:    "modsec/anomaly_score.conf",
-			ModSecurityCustomContent: "SecRuleEngine On",
-			UseLimitConn:             true,
-			LimitConnMaxHTTP1:        200,
-			UseLimitReq:              true,
-			LimitReqRate:             "100r/s",
-			CORSAllowedOrigins:       []string{"*"},
+			SiteID:                            "site-a",
+			SecurityMode:                      "block",
+			AllowedMethods:                    []string{"GET", "POST"},
+			MaxClientSize:                     "50m",
+			UseAuthBasic:                      true,
+			AuthBasicUser:                     "admin",
+			AuthBasicPassword:                 "secret",
+			AuthBasicText:                     "Restricted area",
+			AntibotChallenge:                  "recaptcha",
+			AntibotURI:                        "/challenge",
+			AntibotRecaptchaKey:               "site-key",
+			UseModSecurity:                    true,
+			UseModSecurityCRSPlugins:          true,
+			UseModSecurityCustomConfiguration: true,
+			ModSecurityCRSVersion:             "4",
+			ModSecurityCRSPlugins:             []string{"plugin-a"},
+			ModSecurityCustomPath:             "modsec/anomaly_score.conf",
+			ModSecurityCustomContent:          "SecRuleEngine On",
+			UseLimitConn:                      true,
+			LimitConnMaxHTTP1:                 200,
+			UseLimitReq:                       true,
+			LimitReqRate:                      "100r/s",
+			CORSAllowedOrigins:                []string{"*"},
 		}},
 	)
 	if err != nil {
@@ -83,14 +85,65 @@ func TestRenderEasyArtifacts_GeneratesSiteAndAuthBasicFiles(t *testing.T) {
 	if htpasswd != "admin:{SHA}5en6G6MezRroT3XKqkdPOmY/BfQ=\n" {
 		t.Fatalf("unexpected htpasswd content: %q", htpasswd)
 	}
-	if !strings.Contains(modsecEasy, "crs_version: 4") || !strings.Contains(modsecEasy, "Include /etc/waf/modsecurity/crs-overrides/plugin-a.conf") {
-		t.Fatalf("unexpected modsecurity easy artifact: %s", modsecEasy)
+	if !strings.Contains(modsecEasy, "# custom_path: modsec/anomaly_score.conf") {
+		t.Fatalf("expected custom path marker in easy artifact, got: %s", modsecEasy)
+	}
+	if !strings.Contains(modsecEasy, "Include /etc/waf/modsecurity/coreruleset/rules/*.conf") {
+		t.Fatalf("expected CRS include in easy modsecurity content, got: %s", modsecEasy)
+	}
+	if !strings.Contains(modsecEasy, "Include /etc/waf/modsecurity/crs-overrides/plugin-a.conf") {
+		t.Fatalf("expected CRS plugin include in easy modsecurity content, got: %s", modsecEasy)
 	}
 	if !strings.Contains(modsecEasy, "SecRuleEngine On") {
 		t.Fatalf("expected custom modsecurity content, got: %s", modsecEasy)
 	}
 	if !strings.Contains(l4guardConfig, "\"conn_limit\": 200") || !strings.Contains(l4guardConfig, "\"rate_per_second\": 100") {
 		t.Fatalf("expected high default l4guard limits, got: %s", l4guardConfig)
+	}
+}
+
+func TestRenderEasyArtifacts_ModSecurityEasyFileWithoutCustomConfig(t *testing.T) {
+	artifacts, err := RenderEasyArtifacts(
+		[]SiteInput{
+			{ID: "site-a", Enabled: true, PrimaryHost: "a.example.com", ListenHTTP: true},
+		},
+		[]EasyProfileInput{
+			{
+				SiteID:                            "site-a",
+				SecurityMode:                      "block",
+				UseModSecurity:                    true,
+				UseModSecurityCRSPlugins:          true,
+				UseModSecurityCustomConfiguration: false,
+				ModSecurityCRSVersion:             "4",
+				AllowedMethods:                    []string{"GET"},
+				MaxClientSize:                     "100m",
+				UseLimitConn:                      true,
+				LimitConnMaxHTTP1:                 200,
+				UseLimitReq:                       true,
+				LimitReqRate:                      "100r/s",
+			},
+		},
+	)
+	if err != nil {
+		t.Fatalf("render easy artifacts: %v", err)
+	}
+	byPath := map[string]string{}
+	for _, item := range artifacts {
+		byPath[item.Path] = string(item.Content)
+	}
+	nginxEasy := byPath["nginx/easy/site-a.conf"]
+	if !strings.Contains(nginxEasy, "modsecurity_rules_file /etc/waf/modsecurity/easy/site-a.conf;") {
+		t.Fatalf("expected easy modsecurity file include: %s", nginxEasy)
+	}
+	modsecEasy, ok := byPath["modsecurity/easy/site-a.conf"]
+	if !ok {
+		t.Fatalf("expected modsecurity easy artifact without custom configuration")
+	}
+	if !strings.Contains(modsecEasy, "Include /etc/waf/modsecurity/coreruleset/rules/*.conf") {
+		t.Fatalf("expected CRS include in easy modsecurity content, got: %s", modsecEasy)
+	}
+	if strings.Contains(modsecEasy, "# custom_path:") {
+		t.Fatalf("did not expect custom path marker without custom configuration: %s", modsecEasy)
 	}
 }
 

@@ -1,7 +1,7 @@
 proxy_http_version 1.1;
 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
 proxy_set_header X-Forwarded-Proto $scheme;
-log_format waf_security_json escape=json '{"timestamp":"$time_iso8601","request_id":"$request_id","client_ip":"$remote_addr","host":"$host","method":"$request_method","uri":"$request_uri","status":$status,"bytes_sent":$body_bytes_sent,"referer":"$http_referer","user_agent":"$http_user_agent","site":"$waf_site_id","upstream_addr":"$upstream_addr","request_time":$request_time}';
+log_format waf_security_json escape=json '{"timestamp":"$time_iso8601","request_id":"$request_id","client_ip":"$remote_addr","country":"$http_cf_ipcountry","host":"$host","method":"$request_method","uri":"$request_uri","status":$status,"bytes_sent":$body_bytes_sent,"referer":"$http_referer","user_agent":"$http_user_agent","site":"$waf_site_id","upstream_addr":"$upstream_addr","request_time":$request_time}';
 access_log /var/log/nginx/access.log waf_security_json;
 
 server {

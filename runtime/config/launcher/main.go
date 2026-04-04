@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -72,16 +73,18 @@ type runtimeProcess struct {
 	runtimeRoot string
 	crsPath     string
 	modulePath  string
+	crsManager  *crsManager
 	status      *runtimeStatus
 	cmd         *exec.Cmd
 	exitCh      chan error
 }
 
-func newRuntimeProcess(runtimeRoot, crsPath, modulePath string, status *runtimeStatus) *runtimeProcess {
+func newRuntimeProcess(runtimeRoot, crsPath, modulePath string, status *runtimeStatus, manager *crsManager) *runtimeProcess {
 	return &runtimeProcess{
 		runtimeRoot: runtimeRoot,
 		crsPath:     crsPath,
 		modulePath:  modulePath,
+		crsManager:  manager,
 		status:      status,
 		exitCh:      make(chan error, 1),
 	}
@@ -112,6 +115,12 @@ func (p *runtimeProcess) reloadCurrent() error {
 	}
 	p.status.setActiveBundle(pointer, candidatePath)
 	return p.startOrReloadLocked()
+}
+
+func (p *runtimeProcess) setCRSPath(path string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.crsPath = strings.TrimSpace(path)
 }
 
 func (p *runtimeProcess) loadCurrentBundle() (*activePointer, string, error) {
@@ -243,6 +252,78 @@ func (s *runtimeStatus) handlers(process *runtimeProcess, securitySource *securi
 		}
 		writeJSON(w, http.StatusOK, items)
 	})
+	mux.HandleFunc("/crs/status", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if process.crsManager == nil {
+			http.Error(w, "crs manager not configured", http.StatusServiceUnavailable)
+			return
+		}
+		writeJSON(w, http.StatusOK, process.crsManager.Status())
+	})
+	mux.HandleFunc("/crs/check-updates", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if process.crsManager == nil {
+			http.Error(w, "crs manager not configured", http.StatusServiceUnavailable)
+			return
+		}
+		dryRun := false
+		if body, err := decodeJSONBody(r); err == nil && body != nil {
+			if raw, ok := body["dry_run"].(bool); ok {
+				dryRun = raw
+			}
+		}
+		status, err := process.crsManager.CheckForUpdates(dryRun)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		writeJSON(w, http.StatusOK, status)
+	})
+	mux.HandleFunc("/crs/update", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if process.crsManager == nil {
+			http.Error(w, "crs manager not configured", http.StatusServiceUnavailable)
+			return
+		}
+		body, err := decodeJSONBody(r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		update := false
+		if body != nil {
+			if raw, ok := body["enable_hourly_auto_update"].(bool); ok {
+				update = true
+				process.crsManager.SetHourlyAutoUpdate(raw)
+			}
+		}
+		if update {
+			writeJSON(w, http.StatusOK, process.crsManager.Status())
+			return
+		}
+		status, changed, err := process.crsManager.UpdateToLatest(false)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		if changed {
+			process.setCRSPath(status.ActivePath)
+			if err := process.reloadCurrent(); err != nil && !errors.Is(err, errActivePointerMissing) {
+				http.Error(w, fmt.Sprintf("updated but reload failed: %v", err), http.StatusBadGateway)
+				return
+			}
+		}
+		writeJSON(w, http.StatusOK, status)
+	})
 	return mux
 }
 
@@ -264,13 +345,29 @@ func run() error {
 	}
 	status := &runtimeStatus{}
 
-	crsPath, err := selectFirstExisting(
+	systemCRSPath, err := selectFirstExisting(
 		"/usr/share/modsecurity-crs",
 		"/etc/modsecurity/crs",
 	)
 	if err != nil {
 		return err
 	}
+	crsStateRoot := strings.TrimSpace(os.Getenv("WAF_CRS_STATE_ROOT"))
+	if crsStateRoot == "" {
+		crsStateRoot = "/etc/waf/modsecurity/crs-state"
+	}
+	manager := newCRSManager(crsStateRoot, systemCRSPath)
+	if initErr := manager.Init(); initErr != nil {
+		fmt.Fprintf(os.Stderr, "waf-runtime-launcher crs init warning: %v\n", initErr)
+	}
+	if manager.IsFirstStart() {
+		if status, changed, updateErr := manager.UpdateToLatest(false); updateErr != nil {
+			fmt.Fprintf(os.Stderr, "waf-runtime-launcher crs first-start update warning: %v\n", updateErr)
+		} else if changed {
+			fmt.Fprintf(os.Stdout, "waf-runtime-launcher: CRS first-start update applied (%s)\n", status.ActiveVersion)
+		}
+	}
+	crsPath := manager.ActivePath()
 
 	modulePath, err := selectFirstExisting(
 		"/usr/lib/nginx/modules/ngx_http_modsecurity_module.so",
@@ -280,18 +377,45 @@ func run() error {
 		return err
 	}
 
-	process := newRuntimeProcess(runtimeRoot, crsPath, modulePath, status)
+	process := newRuntimeProcess(runtimeRoot, crsPath, modulePath, status, manager)
 	securitySource := newSecurityEventSource("/var/log/nginx/access.log")
 	requestSource := newRequestStreamSource("/var/log/nginx/access.log", 50000)
 	if err := startHealthServer(healthAddr, status, process, securitySource, requestSource); err != nil {
 		return err
 	}
 	startPeriodicL4GuardRefresh()
+	startPeriodicCRSUpdate(manager, process)
 	if err := process.bootCurrent(); err != nil && !errors.Is(err, errActivePointerMissing) {
 		return err
 	}
 
 	return <-process.exitCh
+}
+
+func startPeriodicCRSUpdate(manager *crsManager, process *runtimeProcess) {
+	if manager == nil || process == nil {
+		return
+	}
+	ticker := time.NewTicker(time.Hour)
+	go func() {
+		for range ticker.C {
+			if !manager.HourlyAutoUpdateEnabled() {
+				continue
+			}
+			status, changed, err := manager.UpdateToLatest(false)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "waf-runtime-launcher periodic crs update failed: %v\n", err)
+				continue
+			}
+			if !changed {
+				continue
+			}
+			process.setCRSPath(status.ActivePath)
+			if err := process.reloadCurrent(); err != nil && !errors.Is(err, errActivePointerMissing) {
+				fmt.Fprintf(os.Stderr, "waf-runtime-launcher periodic crs reload failed: %v\n", err)
+			}
+		}
+	}()
 }
 
 func startPeriodicL4GuardRefresh() {
@@ -332,6 +456,26 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(payload)
+}
+
+func decodeJSONBody(r *http.Request) (map[string]any, error) {
+	if r.Body == nil {
+		return nil, nil
+	}
+	defer r.Body.Close()
+	raw, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		return nil, err
+	}
+	trimmed := strings.TrimSpace(string(raw))
+	if trimmed == "" {
+		return nil, nil
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return nil, err
+	}
+	return payload, nil
 }
 
 func loadActivePointer(runtimeRoot string) (*activePointer, error) {

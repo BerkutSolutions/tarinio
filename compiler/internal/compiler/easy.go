@@ -50,6 +50,7 @@ type easySiteData struct {
 	WhitelistCountry []string
 
 	UseModSecurity         bool
+	UseModSecurityEasyFile bool
 	ModSecurityEasyRules   string
 	ModSecurityEasyRulesOn bool
 }
@@ -102,6 +103,12 @@ func RenderEasyArtifacts(sites []SiteInput, profiles []EasyProfileInput) ([]Arti
 			profile.AuthBasicText = "Restricted area"
 		}
 		profile.AntibotChallenge = strings.ToLower(strings.TrimSpace(profile.AntibotChallenge))
+		profile.SecurityMode = strings.ToLower(strings.TrimSpace(profile.SecurityMode))
+		switch profile.SecurityMode {
+		case "block", "monitor", "transparent":
+		default:
+			profile.SecurityMode = "block"
+		}
 		profile.AntibotURI = strings.TrimSpace(profile.AntibotURI)
 		if profile.AntibotChallenge == "" {
 			profile.AntibotChallenge = "no"
@@ -141,9 +148,11 @@ func RenderEasyArtifacts(sites []SiteInput, profiles []EasyProfileInput) ([]Arti
 		if !ok {
 			profile = EasyProfileInput{
 				SiteID:                    site.ID,
+				SecurityMode:              "block",
 				AllowedMethods:            []string{"GET", "POST", "HEAD", "OPTIONS", "PUT", "PATCH", "DELETE"},
 				MaxClientSize:             "100m",
 				UseModSecurity:            true,
+				UseModSecurityCRSPlugins:  true,
 				UseLimitConn:              true,
 				LimitConnMaxHTTP1:         200,
 				UseLimitReq:               true,
@@ -203,12 +212,15 @@ func RenderEasyArtifacts(sites []SiteInput, profiles []EasyProfileInput) ([]Arti
 			BlacklistCountry:             profile.BlacklistCountry,
 			WhitelistCountry:             profile.WhitelistCountry,
 			UseModSecurity:               profile.UseModSecurity,
+			UseModSecurityEasyFile:       profile.UseModSecurity,
 			ModSecurityEasyRulesOn:       profile.UseModSecurity,
 			ModSecurityEasyRules: buildEasyModSecurityRules(
 				site.ID,
+				profile.SecurityMode,
 				profile.UseModSecurityCRSPlugins,
 				profile.ModSecurityCRSVersion,
 				profile.ModSecurityCRSPlugins,
+				profile.UseModSecurityCustomConfiguration,
 				profile.ModSecurityCustomPath,
 				profile.ModSecurityCustomContent,
 			),
@@ -345,11 +357,28 @@ func buildSHA1HTPasswdLine(user, password string) string {
 	return user + ":{SHA}" + hash + "\n"
 }
 
-func buildEasyModSecurityRules(siteID string, useCRSPlugins bool, crsVersion string, plugins []string, customPath, customContent string) string {
+func buildEasyModSecurityRules(siteID, securityMode string, useCRSPlugins bool, crsVersion string, plugins []string, useCustomConfiguration bool, customPath, customContent string) string {
+	engineDirective := "SecRuleEngine On"
+	switch strings.ToLower(strings.TrimSpace(securityMode)) {
+	case "monitor":
+		engineDirective = "SecRuleEngine DetectionOnly"
+	case "transparent":
+		engineDirective = "SecRuleEngine Off"
+	default:
+		engineDirective = "SecRuleEngine On"
+	}
 	lines := []string{
 		"# Easy ModSecurity directives",
 		"# site: " + siteID,
+		"# security_mode: " + strings.TrimSpace(securityMode),
 		"# crs_version: " + strings.TrimSpace(crsVersion),
+		engineDirective,
+	}
+	if engineDirective != "SecRuleEngine Off" {
+		lines = append(lines,
+			"Include /etc/waf/modsecurity/crs-setup.conf",
+			"Include /etc/waf/modsecurity/coreruleset/rules/*.conf",
+		)
 	}
 	if useCRSPlugins && len(plugins) > 0 {
 		lines = append(lines, "# crs_plugins: "+strings.Join(plugins, " "))
@@ -357,10 +386,10 @@ func buildEasyModSecurityRules(siteID string, useCRSPlugins bool, crsVersion str
 			lines = append(lines, fmt.Sprintf("Include /etc/waf/modsecurity/crs-overrides/%s.conf", strings.TrimSpace(plugin)))
 		}
 	}
-	if strings.TrimSpace(customPath) != "" {
+	if useCustomConfiguration && strings.TrimSpace(customPath) != "" {
 		lines = append(lines, "# custom_path: "+strings.TrimSpace(customPath))
 	}
-	if strings.TrimSpace(customContent) != "" {
+	if useCustomConfiguration && strings.TrimSpace(customContent) != "" {
 		lines = append(lines, customContent)
 	}
 	return strings.Join(lines, "\n") + "\n"

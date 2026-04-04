@@ -16,6 +16,111 @@ var (
 	reEnglishWordQuality       = regexp.MustCompile(`\b[A-Za-z][A-Za-z0-9_-]*\b`)
 )
 
+// Technical terms allowed in RU localization values.
+var englishWordExceptionsQuality = map[string]struct{}{
+	"acme":          {},
+	"api":           {},
+	"auth":          {},
+	"autostart":     {},
+	"accesspolicy":  {},
+	"admin":         {},
+	"and":           {},
+	"app":           {},
+	"available":     {},
+	"behavior":      {},
+	"berkut":        {},
+	"blacklist":     {},
+	"botnet":        {},
+	"burst":         {},
+	"cdn":           {},
+	"challenge":     {},
+	"check":         {},
+	"cidr":          {},
+	"codes":         {},
+	"cloudflare":    {},
+	"compile":       {},
+	"content":       {},
+	"control-plane": {},
+	"cors":          {},
+	"core":          {},
+	"crs":           {},
+	"created":       {},
+	"ddos":          {},
+	"denylist":      {},
+	"dns":           {},
+	"drop":          {},
+	"eab":           {},
+	"easy":          {},
+	"encrypt":       {},
+	"example":       {},
+	"failed":        {},
+	"geoip":         {},
+	"github":        {},
+	"headers":       {},
+	"http":          {},
+	"https":         {},
+	"id":            {},
+	"ip":            {},
+	"ips":           {},
+	"is":            {},
+	"job":           {},
+	"jwt":           {},
+	"l4":            {},
+	"l7":            {},
+	"let":           {},
+	"letsencrypt":   {},
+	"localhost":     {},
+	"manual":        {},
+	"material":      {},
+	"metadata":      {},
+	"mode":          {},
+	"modsec":        {},
+	"modsecurity":   {},
+	"nginx":         {},
+	"no":            {},
+	"owasp":         {},
+	"policy":        {},
+	"proxy":         {},
+	"rate":          {},
+	"reject":        {},
+	"required":      {},
+	"revision":      {},
+	"rule":          {},
+	"rps":           {},
+	"runtime":       {},
+	"s":             {},
+	"saved":         {},
+	"security":      {},
+	"site":          {},
+	"sni":           {},
+	"spa":           {},
+	"sql":           {},
+	"set":           {},
+	"ssl":           {},
+	"solutions":     {},
+	"snapshot":      {},
+	"status":        {},
+	"succeeded":     {},
+	"tcp":           {},
+	"tarinio":       {},
+	"throttle":      {},
+	"tls":           {},
+	"total":         {},
+	"ui":            {},
+	"unavailable":   {},
+	"update":        {},
+	"updates":       {},
+	"upload":        {},
+	"uploaded":      {},
+	"upstream":      {},
+	"username":      {},
+	"url":           {},
+	"version":       {},
+	"waf":           {},
+	"xss":           {},
+	"zerossl":       {},
+}
+
 func TestI18NNoArtifacts(t *testing.T) {
 	ru := mustLoadLang(t, filepath.Join("..", "app", "static", "i18n", "ru.json"))
 	en := mustLoadLang(t, filepath.Join("..", "app", "static", "i18n", "en.json"))
@@ -34,8 +139,8 @@ func TestI18NNoArtifacts(t *testing.T) {
 		if lang == "ru" && containsForbiddenRuCyrillicQuality(value) {
 			issues = append(issues, lang+":"+key+": contains suspicious Cyrillic letters (likely mojibake)")
 		}
-		if lang == "ru" && countEnglishWordsQuality(value) > 3 {
-			issues = append(issues, lang+":"+key+": contains more than 3 english words")
+		if lang == "ru" && countEnglishWordsQuality(value) > 2 {
+			issues = append(issues, lang+":"+key+": contains more than 2 english words")
 		}
 		if reMojibakeMarkersQuality.MatchString(value) {
 			issues = append(issues, lang+":"+key+": contains mojibake marker sequence")
@@ -99,5 +204,13 @@ func containsForbiddenRuCyrillicQuality(s string) bool {
 
 func countEnglishWordsQuality(s string) int {
 	matches := reEnglishWordQuality.FindAllString(s, -1)
-	return len(matches)
+	count := 0
+	for _, match := range matches {
+		word := strings.ToLower(strings.Trim(match, "-_"))
+		if _, ok := englishWordExceptionsQuality[word]; ok {
+			continue
+		}
+		count++
+	}
+	return count
 }

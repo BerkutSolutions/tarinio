@@ -51,6 +51,9 @@ func TestSiteSettings_FieldContract(t *testing.T) {
 		"security_behavior_and_limits.bad_behavior_count_time_seconds",
 		"security_behavior_and_limits.bad_behavior_status_codes",
 		"security_behavior_and_limits.bad_behavior_threshold",
+		"security_behavior_and_limits.ban_escalation_enabled",
+		"security_behavior_and_limits.ban_escalation_scope",
+		"security_behavior_and_limits.ban_escalation_stages_seconds",
 		"security_behavior_and_limits.blacklist_asn",
 		"security_behavior_and_limits.blacklist_asn_urls",
 		"security_behavior_and_limits.blacklist_ip",
@@ -77,6 +80,7 @@ func TestSiteSettings_FieldContract(t *testing.T) {
 		"security_modsecurity.custom_configuration.path",
 		"security_modsecurity.modsecurity_crs_plugins",
 		"security_modsecurity.modsecurity_crs_version",
+		"security_modsecurity.use_modsecurity_custom_configuration",
 		"security_modsecurity.use_modsecurity",
 		"security_modsecurity.use_modsecurity_crs_plugins",
 		"site_id",
@@ -146,6 +150,7 @@ func TestSiteSettings_CreateAndSave_AllFieldsRoundTrip(t *testing.T) {
 	updatedProfile.SecurityCountryPolicy.BlacklistCountry = []string{"DE", "EU"}
 	updatedProfile.SecurityCountryPolicy.WhitelistCountry = []string{"GB", "NA"}
 	updatedProfile.SecurityModSecurity.ModSecurityCRSPlugins = []string{"plugin-z", "plugin-a"}
+	updatedProfile.SecurityModSecurity.UseCustomConfiguration = true
 	updatedProfile.SecurityModSecurity.CustomConfiguration.Content = "SecAction \"id:1003,phase:1,pass\""
 
 	expectedUpdate := normalizeProfile(updatedProfile)
@@ -253,6 +258,7 @@ func allFieldsProfile(siteID string) EasySiteProfile {
 
 	profile.SecurityModSecurity.UseModSecurity = true
 	profile.SecurityModSecurity.UseModSecurityCRSPlugins = true
+	profile.SecurityModSecurity.UseCustomConfiguration = true
 	profile.SecurityModSecurity.ModSecurityCRSVersion = "4.1"
 	profile.SecurityModSecurity.ModSecurityCRSPlugins = []string{"plugin-z", "plugin-a"}
 	profile.SecurityModSecurity.CustomConfiguration.Path = "modsec/custom-rules.conf"

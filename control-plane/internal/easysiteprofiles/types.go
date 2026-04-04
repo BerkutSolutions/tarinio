@@ -64,11 +64,14 @@ type HTTPHeadersSettings struct {
 }
 
 type SecurityBehaviorAndLimitsSettings struct {
-	UseBadBehavior              bool  `json:"use_bad_behavior"`
-	BadBehaviorStatusCodes      []int `json:"bad_behavior_status_codes"`
-	BadBehaviorBanTimeSeconds   int   `json:"bad_behavior_ban_time_seconds"`
-	BadBehaviorThreshold        int   `json:"bad_behavior_threshold"`
-	BadBehaviorCountTimeSeconds int   `json:"bad_behavior_count_time_seconds"`
+	UseBadBehavior              bool   `json:"use_bad_behavior"`
+	BadBehaviorStatusCodes      []int  `json:"bad_behavior_status_codes"`
+	BadBehaviorBanTimeSeconds   int    `json:"bad_behavior_ban_time_seconds"`
+	BadBehaviorThreshold        int    `json:"bad_behavior_threshold"`
+	BadBehaviorCountTimeSeconds int    `json:"bad_behavior_count_time_seconds"`
+	BanEscalationEnabled        bool   `json:"ban_escalation_enabled"`
+	BanEscalationScope          string `json:"ban_escalation_scope"`
+	BanEscalationStagesSeconds  []int  `json:"ban_escalation_stages_seconds"`
 
 	UseBlacklist           bool     `json:"use_blacklist"`
 	UseDNSBL               bool     `json:"use_dnsbl"`
@@ -125,6 +128,7 @@ type ModSecurityCustomConfiguration struct {
 type SecurityModSecuritySettings struct {
 	UseModSecurity           bool                           `json:"use_modsecurity"`
 	UseModSecurityCRSPlugins bool                           `json:"use_modsecurity_crs_plugins"`
+	UseCustomConfiguration   bool                           `json:"use_modsecurity_custom_configuration"`
 	ModSecurityCRSVersion    string                         `json:"modsecurity_crs_version"`
 	ModSecurityCRSPlugins    []string                       `json:"modsecurity_crs_plugins"`
 	CustomConfiguration      ModSecurityCustomConfiguration `json:"custom_configuration"`
@@ -154,13 +158,13 @@ func DefaultProfile(siteID string) EasySiteProfile {
 		allowedMethods = []string{"GET", "POST", "HEAD", "OPTIONS", "PUT", "PATCH", "DELETE"}
 	}
 	badBehaviorBanSeconds := envIntOrDefault("WAF_DEFAULT_BAD_BEHAVIOR_BAN_TIME_SECONDS", 300)
-	badBehaviorThreshold := envIntOrDefault("WAF_DEFAULT_BAD_BEHAVIOR_THRESHOLD", 20)
-	badBehaviorPeriodSeconds := envIntOrDefault("WAF_DEFAULT_BAD_BEHAVIOR_COUNT_TIME_SECONDS", 30)
-	limitConnHTTP1 := envIntOrDefault("WAF_DEFAULT_LIMIT_CONN_MAX_HTTP1", 80)
-	limitConnHTTP2 := envIntOrDefault("WAF_DEFAULT_LIMIT_CONN_MAX_HTTP2", 160)
-	limitConnHTTP3 := envIntOrDefault("WAF_DEFAULT_LIMIT_CONN_MAX_HTTP3", 160)
-	limitReqRate := envStringOrDefault("WAF_DEFAULT_LIMIT_REQ_RATE", "30r/s")
-	badBehaviorStatusCodes := []int{400, 401, 403, 404, 405, 429, 444}
+	badBehaviorThreshold := envIntOrDefault("WAF_DEFAULT_BAD_BEHAVIOR_THRESHOLD", 120)
+	badBehaviorPeriodSeconds := envIntOrDefault("WAF_DEFAULT_BAD_BEHAVIOR_COUNT_TIME_SECONDS", 120)
+	limitConnHTTP1 := envIntOrDefault("WAF_DEFAULT_LIMIT_CONN_MAX_HTTP1", 200)
+	limitConnHTTP2 := envIntOrDefault("WAF_DEFAULT_LIMIT_CONN_MAX_HTTP2", 400)
+	limitConnHTTP3 := envIntOrDefault("WAF_DEFAULT_LIMIT_CONN_MAX_HTTP3", 400)
+	limitReqRate := envStringOrDefault("WAF_DEFAULT_LIMIT_REQ_RATE", "120r/s")
+	badBehaviorStatusCodes := []int{400, 401, 405, 444}
 
 	if isManagementSite {
 		if limitConnHTTP1 < 300 {
@@ -231,6 +235,9 @@ func DefaultProfile(siteID string) EasySiteProfile {
 			BadBehaviorBanTimeSeconds:   badBehaviorBanSeconds,
 			BadBehaviorThreshold:        badBehaviorThreshold,
 			BadBehaviorCountTimeSeconds: badBehaviorPeriodSeconds,
+			BanEscalationEnabled:        false,
+			BanEscalationScope:          "all_sites",
+			BanEscalationStagesSeconds:  []int{300, 86400, 0},
 			UseBlacklist:                false,
 			UseDNSBL:                    false,
 			BlacklistIP:                 []string{},
@@ -275,7 +282,8 @@ func DefaultProfile(siteID string) EasySiteProfile {
 		},
 		SecurityModSecurity: SecurityModSecuritySettings{
 			UseModSecurity:           true,
-			UseModSecurityCRSPlugins: false,
+			UseModSecurityCRSPlugins: true,
+			UseCustomConfiguration:   false,
 			ModSecurityCRSVersion:    "4",
 			ModSecurityCRSPlugins:    []string{},
 			CustomConfiguration: ModSecurityCustomConfiguration{

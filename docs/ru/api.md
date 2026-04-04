@@ -1,8 +1,13 @@
 ﻿# API (RU)
 
-Базовая версия документации: `1.0.10`
+Базовая версия документации: `1.0.11`
 
 ## Release notes
+
+### 1.0.11 (2026-04-04)
+
+- Исправлено сохранение Easy site profile для reverse proxy: если `upstream_routing.reverse_proxy_host` не заполнен в UI, он теперь вычисляется из `scheme/host/port` апстрима.
+- Устранен ложный `400 Bad Request` при сохранении сервиса с включенным reverse proxy и заполненной upstream-целью.
 
 ### 1.0.10 (2026-04-03)
 
@@ -26,6 +31,10 @@
 - `GET /api/settings/runtime`
 - `PUT /api/settings/runtime`
 - `POST /api/settings/runtime/check-updates`
+- OWASP CRS:
+  - `GET /api/owasp-crs/status`
+  - `POST /api/owasp-crs/check-updates`
+  - `POST /api/owasp-crs/update`
 
 ## Auth
 

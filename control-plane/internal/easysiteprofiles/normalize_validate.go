@@ -44,6 +44,14 @@ func normalizeProfile(profile EasySiteProfile) EasySiteProfile {
 	profile.HTTPHeaders.CORSAllowedOrigins = normalizeTrimmedList(profile.HTTPHeaders.CORSAllowedOrigins)
 
 	profile.SecurityBehaviorAndLimits.BadBehaviorStatusCodes = normalizeStatusCodes(profile.SecurityBehaviorAndLimits.BadBehaviorStatusCodes)
+	profile.SecurityBehaviorAndLimits.BanEscalationScope = strings.ToLower(strings.TrimSpace(profile.SecurityBehaviorAndLimits.BanEscalationScope))
+	if profile.SecurityBehaviorAndLimits.BanEscalationScope == "" {
+		profile.SecurityBehaviorAndLimits.BanEscalationScope = "all_sites"
+	}
+	profile.SecurityBehaviorAndLimits.BanEscalationStagesSeconds = normalizeBanEscalationStages(profile.SecurityBehaviorAndLimits.BanEscalationStagesSeconds)
+	if len(profile.SecurityBehaviorAndLimits.BanEscalationStagesSeconds) == 0 {
+		profile.SecurityBehaviorAndLimits.BanEscalationStagesSeconds = []int{300, 86400, 0}
+	}
 	profile.SecurityBehaviorAndLimits.BlacklistIP = normalizeTrimmedList(profile.SecurityBehaviorAndLimits.BlacklistIP)
 	profile.SecurityBehaviorAndLimits.BlacklistRDNS = normalizeTrimmedList(profile.SecurityBehaviorAndLimits.BlacklistRDNS)
 	profile.SecurityBehaviorAndLimits.BlacklistASN = normalizeTrimmedList(profile.SecurityBehaviorAndLimits.BlacklistASN)
@@ -156,6 +164,33 @@ func validateProfile(profile EasySiteProfile) error {
 	if profile.SecurityBehaviorAndLimits.BadBehaviorCountTimeSeconds <= 0 {
 		return errors.New("easy site profile security_behavior_and_limits.bad_behavior_count_time_seconds must be positive")
 	}
+	if profile.SecurityBehaviorAndLimits.BanEscalationScope != "current_site" && profile.SecurityBehaviorAndLimits.BanEscalationScope != "all_sites" {
+		return errors.New("easy site profile security_behavior_and_limits.ban_escalation_scope must be current_site or all_sites")
+	}
+	if profile.SecurityBehaviorAndLimits.BanEscalationEnabled {
+		if len(profile.SecurityBehaviorAndLimits.BanEscalationStagesSeconds) == 0 {
+			return errors.New("easy site profile security_behavior_and_limits.ban_escalation_stages_seconds must not be empty when escalation is enabled")
+		}
+		if len(profile.SecurityBehaviorAndLimits.BanEscalationStagesSeconds) > 12 {
+			return errors.New("easy site profile security_behavior_and_limits.ban_escalation_stages_seconds must not exceed 12 stages")
+		}
+		seenPermanent := false
+		for idx, seconds := range profile.SecurityBehaviorAndLimits.BanEscalationStagesSeconds {
+			if seconds < 0 {
+				return errors.New("easy site profile security_behavior_and_limits.ban_escalation_stages_seconds must contain zero or positive values")
+			}
+			if seconds == 0 {
+				seenPermanent = true
+				if idx != len(profile.SecurityBehaviorAndLimits.BanEscalationStagesSeconds)-1 {
+					return errors.New("easy site profile security_behavior_and_limits.ban_escalation_stages_seconds permanent stage must be last")
+				}
+				break
+			}
+		}
+		if !seenPermanent && len(profile.SecurityBehaviorAndLimits.BanEscalationStagesSeconds) == 1 {
+			// A single finite stage is allowed.
+		}
+	}
 	if profile.SecurityBehaviorAndLimits.LimitConnMaxHTTP1 <= 0 ||
 		profile.SecurityBehaviorAndLimits.LimitConnMaxHTTP2 <= 0 ||
 		profile.SecurityBehaviorAndLimits.LimitConnMaxHTTP3 <= 0 {
@@ -235,13 +270,15 @@ func validateProfile(profile EasySiteProfile) error {
 	if profile.SecurityModSecurity.ModSecurityCRSVersion == "" {
 		return errors.New("easy site profile security_modsecurity.modsecurity_crs_version is required")
 	}
-	if profile.SecurityModSecurity.CustomConfiguration.Path == "" {
-		return errors.New("easy site profile security_modsecurity.custom_configuration.path is required")
-	}
-	if strings.Contains(profile.SecurityModSecurity.CustomConfiguration.Path, "..") ||
-		strings.Contains(profile.SecurityModSecurity.CustomConfiguration.Path, `\`) ||
-		!strings.HasPrefix(profile.SecurityModSecurity.CustomConfiguration.Path, "modsec/") {
-		return errors.New("easy site profile security_modsecurity.custom_configuration.path must stay under modsec/")
+	if profile.SecurityModSecurity.UseCustomConfiguration {
+		if profile.SecurityModSecurity.CustomConfiguration.Path == "" {
+			return errors.New("easy site profile security_modsecurity.custom_configuration.path is required when custom configuration is enabled")
+		}
+		if strings.Contains(profile.SecurityModSecurity.CustomConfiguration.Path, "..") ||
+			strings.Contains(profile.SecurityModSecurity.CustomConfiguration.Path, `\`) ||
+			!strings.HasPrefix(profile.SecurityModSecurity.CustomConfiguration.Path, "modsec/") {
+			return errors.New("easy site profile security_modsecurity.custom_configuration.path must stay under modsec/")
+		}
 	}
 	if !crsVersionRegexp.MatchString(profile.SecurityModSecurity.ModSecurityCRSVersion) {
 		return errors.New("easy site profile security_modsecurity.modsecurity_crs_version must be numeric")
@@ -312,6 +349,24 @@ func normalizeLimitReqRate(value string) string {
 		return fmt.Sprintf("%dr/s", num)
 	}
 	return value
+}
+
+func normalizeBanEscalationStages(values []int) []int {
+	if len(values) == 0 {
+		return nil
+	}
+	out := make([]int, 0, len(values))
+	for _, value := range values {
+		if value < 0 {
+			continue
+		}
+		out = append(out, value)
+		if value == 0 {
+			// Permanent stage is terminal.
+			break
+		}
+	}
+	return out
 }
 
 func isValidCountrySelector(value string) bool {

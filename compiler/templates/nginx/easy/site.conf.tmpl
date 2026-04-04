@@ -65,7 +65,7 @@ auth_basic "{{ .AuthBasicRealm }}";
 auth_basic_user_file {{ .AuthBasicUserFile }};
 {{- end }}
 
-{{- if .UseModSecurity }}
+{{- if .UseModSecurityEasyFile }}
 modsecurity_rules_file /etc/waf/modsecurity/easy/{{ .SiteID }}.conf;
 {{- end }}
 

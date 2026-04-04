@@ -263,6 +263,7 @@ func TestApplyService_CompilesEasyProfileArtifacts(t *testing.T) {
 	easy.SecurityAntibot.AntibotRecaptchaSecret = "secret-key"
 	easy.SecurityModSecurity.UseModSecurity = true
 	easy.SecurityModSecurity.UseModSecurityCRSPlugins = true
+	easy.SecurityModSecurity.UseCustomConfiguration = true
 	easy.SecurityModSecurity.ModSecurityCRSVersion = "4"
 	easy.SecurityModSecurity.ModSecurityCRSPlugins = []string{"plugin-a"}
 	easy.SecurityModSecurity.CustomConfiguration.Path = "modsec/anomaly_score.conf"
@@ -357,11 +358,11 @@ func TestApplyService_CompilesEasyProfileArtifacts(t *testing.T) {
 		t.Fatalf("read modsecurity easy conf: %v", err)
 	}
 	modsecConf := string(modsecConfContent)
-	if !strings.Contains(modsecConf, "Include /etc/waf/modsecurity/crs-overrides/plugin-a.conf") {
-		t.Fatalf("expected crs plugin include in modsecurity conf, got: %s", modsecConf)
-	}
 	if !strings.Contains(modsecConf, "SecRuleEngine On") {
 		t.Fatalf("expected custom modsecurity content, got: %s", modsecConf)
+	}
+	if !strings.Contains(modsecConf, "Include /etc/waf/modsecurity/crs-overrides/plugin-a.conf") {
+		t.Fatalf("expected crs plugin include in modsecurity conf, got: %s", modsecConf)
 	}
 
 	l4GuardPath := filepath.Join(root, "candidates", "rev-easy", "l4guard", "config.json")
@@ -403,7 +404,7 @@ func TestMapRateLimitInputs_KeepsManagementSiteEnabled(t *testing.T) {
 	}
 }
 
-func TestApplyAntiDDoSRateOverrides_IncludesManagementSite(t *testing.T) {
+func TestApplyAntiDDoSRateOverrides_SkipsManagementSite(t *testing.T) {
 	siteInputs := []pipeline.SiteInput{
 		{ID: "control-plane-access", Enabled: true},
 		{ID: "site-a", Enabled: true},
@@ -420,11 +421,11 @@ func TestApplyAntiDDoSRateOverrides_IncludesManagementSite(t *testing.T) {
 
 	got := applyAntiDDoSRateOverrides(siteInputs, items, settings)
 	if len(got) != 2 {
-		t.Fatalf("expected 2 entries (management override + site-a override), got %d", len(got))
+		t.Fatalf("expected 2 entries (legacy management + site-a override), got %d", len(got))
 	}
 	for _, item := range got {
-		if item.SiteID == "control-plane-access" && item.ID != "antiddos-global-control-plane-access" {
-			t.Fatalf("expected anti-ddos override for management site, got %+v", item)
+		if item.SiteID == "control-plane-access" && item.ID != "legacy-management" {
+			t.Fatalf("expected management policy to stay unchanged, got %+v", item)
 		}
 		if item.SiteID == "site-a" && item.ID != "antiddos-global-site-a" {
 			t.Fatalf("expected anti-ddos override for site-a, got %+v", item)

@@ -363,6 +363,53 @@ label,
   overflow: hidden;
 }
 
+.waf-crs-status-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.waf-crs-release-link {
+  width: auto;
+  max-width: fit-content;
+  white-space: nowrap;
+}
+
+.waf-crs-console-wrap {
+  display: grid;
+  gap: 8px;
+}
+
+.waf-crs-console {
+  border: 1px solid rgba(125, 155, 255, 0.2);
+  border-radius: 10px;
+  background: rgba(6, 9, 15, 0.9);
+  padding: 10px;
+  max-height: 240px;
+  overflow: auto;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.waf-crs-console-line {
+  color: rgba(242, 246, 255, 0.9);
+  overflow-wrap: anywhere;
+}
+
+.waf-crs-console-line.is-success {
+  color: #9fe6c0;
+}
+
+.waf-crs-console-line.is-error {
+  color: #ffb5b5;
+}
+
+.waf-crs-console-line.is-muted {
+  color: rgba(255, 255, 255, 0.6);
+}
+
 .waf-page-stack,
 .waf-dashboard-stack {
   display: grid;

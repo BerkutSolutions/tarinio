@@ -214,6 +214,10 @@ func (s *EasySiteProfileService) applyLegacyToEasy(siteID string, out *easysitep
 			if item.SiteID != siteID {
 				continue
 			}
+			easyPrefix := "easy-" + siteID + "-"
+			if strings.HasPrefix(item.ID, easyPrefix) {
+				continue
+			}
 			out.SecurityModSecurity.UseModSecurity = item.Enabled
 			out.SecurityModSecurity.UseModSecurityCRSPlugins = item.CRSEnabled
 			out.SecurityModSecurity.ModSecurityCRSPlugins = append([]string(nil), item.CustomRuleIncludes...)
@@ -260,32 +264,44 @@ func (s *EasySiteProfileService) syncEasyToLegacy(profile easysiteprofiles.EasyS
 		}
 		wafID := "easy-" + profile.SiteID + "-waf"
 		wafExists := false
+		updatedAny := false
 		for _, item := range policies {
-			if item.SiteID == profile.SiteID {
-				wafID = item.ID
-				wafExists = true
-				break
+			if item.SiteID != profile.SiteID {
+				continue
 			}
-		}
-		mode := wafpolicies.ModeDetection
-		if profile.FrontService.SecurityMode == easysiteprofiles.SecurityModeBlock {
-			mode = wafpolicies.ModePrevention
-		}
-		target := wafpolicies.WAFPolicy{
-			ID:                 wafID,
-			SiteID:             profile.SiteID,
-			Enabled:            profile.SecurityModSecurity.UseModSecurity,
-			Mode:               mode,
-			CRSEnabled:         profile.SecurityModSecurity.UseModSecurityCRSPlugins,
-			CustomRuleIncludes: append([]string(nil), profile.SecurityModSecurity.ModSecurityCRSPlugins...),
-		}
-		if !wafExists {
-			if _, err := s.wafPolicies.Create(target); err != nil {
-				return err
+			target := wafpolicies.WAFPolicy{
+				ID:                 item.ID,
+				SiteID:             profile.SiteID,
+				Enabled:            false,
+				Mode:               wafpolicies.ModeDetection,
+				CRSEnabled:         false,
+				CustomRuleIncludes: nil,
 			}
-		} else {
 			if _, err := s.wafPolicies.Update(target); err != nil {
 				return err
+			}
+			updatedAny = true
+			if item.ID == wafID {
+				wafExists = true
+			}
+		}
+		if !updatedAny {
+			target := wafpolicies.WAFPolicy{
+				ID:                 wafID,
+				SiteID:             profile.SiteID,
+				Enabled:            false,
+				Mode:               wafpolicies.ModeDetection,
+				CRSEnabled:         false,
+				CustomRuleIncludes: nil,
+			}
+			if !wafExists {
+				if _, err := s.wafPolicies.Create(target); err != nil {
+					return err
+				}
+			} else {
+				if _, err := s.wafPolicies.Update(target); err != nil {
+					return err
+				}
 			}
 		}
 	}

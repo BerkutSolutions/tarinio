@@ -1,6 +1,6 @@
-﻿# Berkut Solutions - TARINIO Documentation (EN)
+# Berkut Solutions - TARINIO Documentation (EN)
 
-Documentation baseline: `1.0.10`
+Documentation baseline: `1.0.11`
 
 ## Sections
 
@@ -17,6 +17,8 @@ Documentation baseline: `1.0.10`
    - L4 guard: `docs/eng/operators/runtime-l4-guard.md`
    - Runtime filesystem: `docs/eng/operators/runtime-filesystem-contract.md`
    - WAF tuning: `docs/eng/operators/waf-tuning-guide.md`
+   - OWASP CRS: `docs/eng/operators/owasp-crs.md`
+   - Let's Encrypt DNS-01: `docs/eng/operators/letsencrypt-dns.md`
    - E2E validation: `docs/eng/operators/stage-1-e2e-validation.md`
 10. Stage 0 architecture documents: `docs/architecture/`
 11. OSS docs (EN):
@@ -25,7 +27,7 @@ Documentation baseline: `1.0.10`
    - `docs/eng/oss/CODE_OF_CONDUCT.md`
    - `docs/eng/oss/SUPPORT.md`
 
-## Release context for 1.0.10
+## Release context for 1.0.11
 
 - Product branding unified as `Berkut Solutions - TARINIO`.
 - Application version source centralized via `control-plane/internal/appmeta/meta.go`.
@@ -37,6 +39,7 @@ Documentation baseline: `1.0.10`
 
 Stage 0 architecture decisions are frozen and are the source of truth:
 - `docs/architecture/`
+
 
 
 

@@ -2,6 +2,77 @@
 
 Все значимые изменения проекта фиксируются в этом файле.
 
+## [1.0.11] - 2026-04-04
+
+### Ядро (Runtime / Compiler / Policies)
+- Добавлен runtime CRS manager:
+  - одноразовое авто-подтягивание latest CRS при первом старте;
+  - хранение active/latest версии и state;
+  - ручной update и опциональный hourly auto-update.
+- Для Easy-профилей CRS включен по умолчанию (не только в `auto-start`).
+- Логика ModSecurity привязана к `front_service.security_mode`:
+  - `block` -> `SecRuleEngine On`;
+  - `monitor` -> `SecRuleEngine DetectionOnly`;
+  - `transparent` -> `SecRuleEngine Off`.
+- Устранено дублирование CRS include (ошибка `Rule id: 901001 is duplicated`) при запуске runtime.
+- В Easy `ModSecurity` добавлен флаг `use_modsecurity_custom_configuration`:
+  - `custom path/content` используются только при включенном чекбоксе;
+  - базовый CRS flow остается автоматическим.
+- В Easy site profile (UI `services`) исправлено сохранение upstream routing: если поле `Reverse proxy host` пустое, значение теперь автоматически собирается из `Схема + Хост + Порт` upstream.
+- Устранен сценарий ложного `400 Bad Request` при включенном reverse proxy и заполненных upstream-полях (`easy site profile upstream_routing.reverse_proxy_host is required when reverse proxy is enabled`).
+- Добавлена совместимость с легаси-шаблоном `http://upstream-server:8080`: это значение теперь не считается валидным целевым host и автоматически заменяется на фактический upstream target.
+- Подняты дефолтные anti-abuse лимиты для новых Easy profile (меньше ложных autoban): `limit_req_rate` по умолчанию `120r/s`, `limit_conn` `200/400/400`, `bad_behavior_threshold` `120`, окно `120s`, коды bad behavior по умолчанию `400,401,405,444`.
+- Глобальный Anti-DDoS L7 override больше не навязывается для management-site `control-plane-access`, чтобы UI/админ-поток не попадали под анти-DDoS профиль как обычный публичный сайт.
+- Исправлено определение стран/IP-контекста в runtime security events: в лог-пайплайн и события добавлены поля `country` и `host`.
+
+### API
+- Добавлены backend/runtime endpoints для управления CRS:
+  - `GET /api/owasp-crs/status`;
+  - `POST /api/owasp-crs/check-updates`;
+  - `POST /api/owasp-crs/update`.
+
+### UI
+- Добавлена отдельная вкладка `OWASP CRS` в боковом меню:
+  - статус active/latest;
+  - ручной dry-run check;
+  - ручной update;
+  - чекбокс hourly auto-update.
+- Вкладка `OWASP CRS` доработана:
+  - исправлен баг с `true/false` и перерисовкой страницы при dry-run/update;
+  - добавлена явная кнопка сохранения для чекбокса hourly auto-update;
+  - добавлен встроенный журнал операций (запросы/обновления/ошибки);
+  - кнопка открытия релиза перенесена в правый верхний угол карточки и сделана компактной;
+  - обновлены i18n-ключи (RU/EN) для статусов и уведомлений CRS.
+- Исправлен flow действий в `Баны` (`Продлить`/`Разбанить`) для событий, где runtime отдает алиас site id (например `sentry_hantico_ru`): backend теперь резолвит алиас в канонический id сайта.
+- В UI страницы `Баны` добавлена каноникализация site id из событий/access-policy перед действиями, чтобы исключить ложные `site ... not found`.
+- Исправлен fallback времени автобана в UI `Баны`: вместо жестких `10s` используется `300s`, если per-site профиль не удалось прочитать.
+- Добавлена эскалация банов по IP в UI `Баны` (с persisted state): повтор после разбанивания повышает уровень до `24h`, затем до `GLOBAL PERM` (бан по всем сайтам).
+- Добавлены правила allow/deny для банов: IP из `allowlist` не эскалируются и не банятся автоматически; IP из `denylist` считаются немедленно забаненными для соответствующего сайта.
+- В Easy profile добавлена вкладка `Блокировки` с гибкой эскалацией банов по этапам (`+`/удаление этапов, формат `s/m/h/d`, `0` = перманентно) и выбором scope (`текущий сервис` или `все сервисы`).
+- Базовый этап банов для anti-DDoS теперь берется из `security_behavior_and_limits.bad_behavior_ban_time_seconds` конкретного сервиса (вместо жесткого общего значения).
+
+### Compose Profiles
+- Синхронизирован `auto-start` профиль для локальной проверки (`CONTROL_PLANE_ACME_USE_DEVELOPMENT_CLIENT=true`).
+- Актуализирован `testpage` профиль:
+  - runtime-контейнеры получают read-only mount соответствующего `control-plane-data`;
+  - для fast-start включен development ACME client;
+  - обновлены `.env` и `.env.example` под актуальные переменные management/app стеков.
+
+### Тестирование
+- Обновлен smoke-тест XSS: `deploy/compose/default/test-xss.ps1`:
+  - поддержка запуска через runtime container (без Windows `schannel` проблем);
+  - проверка факта загрузки CRS (`rules loaded ... local > 0`);
+  - настраиваемый порог blocked-запросов.
+- Добавлен отдельный `go test` на защитные режимы и изоляцию по сервисам:
+  - `compiler/internal/compiler/easy_protection_test.go`.
+
+### Документация
+- Обновлены API docs под CRS endpoints.
+- Разделены операторские документы:
+  - `docs/operators/owasp-crs.md`;
+  - `docs/operators/letsencrypt-dns.md`.
+- Добавлены/обновлены зеркала EN/RU и ссылки в индексах документации.
+
 ## [1.0.10] - 2026-04-04
 
 ### Исправлено

@@ -96,3 +96,42 @@ func TestManualBanService_UnbanRemovesEntry(t *testing.T) {
 		t.Fatalf("expected filtered denylist, got %+v", policy.DenyList)
 	}
 }
+
+func TestManualBanService_BanResolvesSanitizedSiteAlias(t *testing.T) {
+	store := &fakeAccessPolicyStore{}
+	service := NewManualBanService(store, &fakeSiteReader{items: []sites.Site{{ID: "sentry.hantico.ru"}}}, nil)
+
+	policy, err := service.Ban(context.Background(), "sentry_hantico_ru", "10.0.0.1")
+	if err != nil {
+		t.Fatalf("ban failed: %v", err)
+	}
+	if policy.SiteID != "sentry.hantico.ru" {
+		t.Fatalf("expected canonical site id, got %+v", policy)
+	}
+	if len(policy.DenyList) != 1 || policy.DenyList[0] != "10.0.0.1" {
+		t.Fatalf("unexpected policy denylist: %+v", policy.DenyList)
+	}
+}
+
+func TestManualBanService_UnbanResolvesSanitizedSiteAlias(t *testing.T) {
+	store := &fakeAccessPolicyStore{
+		items: []accesspolicies.AccessPolicy{{
+			ID:       "sentry.hantico.ru-access",
+			SiteID:   "sentry.hantico.ru",
+			Enabled:  true,
+			DenyList: []string{"10.0.0.1"},
+		}},
+	}
+	service := NewManualBanService(store, &fakeSiteReader{items: []sites.Site{{ID: "sentry.hantico.ru"}}}, nil)
+
+	policy, err := service.Unban(context.Background(), "sentry_hantico_ru", "10.0.0.1")
+	if err != nil {
+		t.Fatalf("unban failed: %v", err)
+	}
+	if policy.SiteID != "sentry.hantico.ru" {
+		t.Fatalf("expected canonical site id, got %+v", policy)
+	}
+	if len(policy.DenyList) != 0 {
+		t.Fatalf("expected empty denylist after unban, got %+v", policy.DenyList)
+	}
+}

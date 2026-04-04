@@ -1,8 +1,13 @@
 ﻿# API (EN)
 
-Documentation baseline: `1.0.10`
+Documentation baseline: `1.0.11`
 
 ## Release notes
+
+### 1.0.11 (2026-04-04)
+
+- Fixed Easy site profile save flow for reverse proxy: when `upstream_routing.reverse_proxy_host` is empty in UI, it is now derived from upstream scheme/host/port.
+- Eliminated false `400 Bad Request` on service save when reverse proxy is enabled and upstream target fields are already filled.
 
 ### 1.0.10 (2026-04-03)
 
@@ -26,6 +31,10 @@ Documentation baseline: `1.0.10`
 - `GET /api/settings/runtime`
 - `PUT /api/settings/runtime`
 - `POST /api/settings/runtime/check-updates`
+- OWASP CRS:
+  - `GET /api/owasp-crs/status`
+  - `POST /api/owasp-crs/check-updates`
+  - `POST /api/owasp-crs/update`
 
 ## Auth
 

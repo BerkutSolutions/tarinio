@@ -201,6 +201,18 @@ function shouldSkipInternalRequest(uri, siteID) {
     path.startsWith("/login");
 }
 
+function resolveSiteLabel(siteID, host) {
+  const site = String(siteID || "").trim();
+  if (site && site !== "-") {
+    return site;
+  }
+  const hostLabel = String(host || "").trim().toLowerCase();
+  if (hostLabel) {
+    return hostLabel;
+  }
+  return "-";
+}
+
 function addToMap(map, key, delta = 1) {
   const token = String(key || "").trim();
   if (!token) {
@@ -476,7 +488,7 @@ function buildDetailModel(stats, requestRows, eventRows) {
     if (!when || when < cutoff) {
       return;
     }
-    const site = String(entry.site || "-").trim() || "-";
+    const site = resolveSiteLabel(entry.site, entry.host);
     const uri = String(entry.uri || "-").trim() || "-";
     if (shouldSkipInternalRequest(uri, site)) {
       return;
@@ -484,6 +496,7 @@ function buildDetailModel(stats, requestRows, eventRows) {
     const method = String(entry.method || "-").trim() || "-";
     const ip = String(entry.client_ip || "").trim();
     const status = parseStatus(entry.status);
+    const requestCountry = normalizeCountryCode(entry.country || entry.client_country || entry.country_code);
 
     addToMap(requestsBySite, site, 1);
     addToMap(requestsByURL, uri, 1);
@@ -497,6 +510,9 @@ function buildDetailModel(stats, requestRows, eventRows) {
         addToMap(detail.pages, uri, 1);
         addToMap(detail.methods, method, 1);
         addToMap(detail.sites, site, 1);
+        if (requestCountry !== "UNK") {
+          addToMap(detail.countryCounts, requestCountry, 1);
+        }
       }
     }
 
@@ -520,12 +536,11 @@ function buildDetailModel(stats, requestRows, eventRows) {
     if (!when || when < cutoff) {
       return;
     }
-    const site = String(item?.site_id || "-").trim() || "-";
+    const details = item?.details && typeof item.details === "object" ? item.details : {};
+    const site = resolveSiteLabel(item?.site_id, details?.host);
     if (shouldSkipInternalSite(site)) {
       return;
     }
-
-    const details = item?.details && typeof item.details === "object" ? item.details : {};
     const rawBlocked = details.blocked;
     if (typeof rawBlocked === "boolean" && !rawBlocked) {
       return;

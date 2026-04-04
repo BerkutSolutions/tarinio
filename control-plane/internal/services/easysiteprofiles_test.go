@@ -246,14 +246,46 @@ func TestEasySiteProfileService_UpsertSyncsLegacyPolicies(t *testing.T) {
 		t.Fatalf("upsert failed: %v", err)
 	}
 
-	if len(wafStore.items) != 1 || wafStore.items[0].SiteID != "site-a" || wafStore.items[0].Mode != wafpolicies.ModePrevention {
+	if len(wafStore.items) != 1 || wafStore.items[0].SiteID != "site-a" || wafStore.items[0].Mode != wafpolicies.ModeDetection {
 		t.Fatalf("unexpected synced waf policy: %+v", wafStore.items)
+	}
+	if wafStore.items[0].Enabled || wafStore.items[0].CRSEnabled {
+		t.Fatalf("expected easy bridge waf policy to stay disabled to avoid duplicate CRS loading: %+v", wafStore.items[0])
 	}
 	if len(accessStore.items) != 1 || len(accessStore.items[0].DenyList) != 1 || accessStore.items[0].DenyList[0] != "203.0.113.20" {
 		t.Fatalf("unexpected synced access policy: %+v", accessStore.items)
 	}
 	if len(rateStore.items) != 1 || rateStore.items[0].Limits.RequestsPerSecond != 15 {
 		t.Fatalf("unexpected synced rate policy: %+v", rateStore.items)
+	}
+}
+
+func TestEasySiteProfileService_UpsertTransparentDisablesLegacyWAF(t *testing.T) {
+	wafStore := &fakeEasyWAFStore{}
+	service := NewEasySiteProfileService(
+		&fakeEasySiteProfileStore{items: map[string]easysiteprofiles.EasySiteProfile{}},
+		&fakeSiteReader{items: []sites.Site{{ID: "site-a", PrimaryHost: "www.example.com"}}},
+		wafStore,
+		&fakeEasyAccessStore{},
+		&fakeEasyRateStore{},
+		nil,
+		nil,
+		nil,
+	)
+	item := easysiteprofiles.DefaultProfile("site-a")
+	item.FrontService.SecurityMode = easysiteprofiles.SecurityModeTransparent
+	item.SecurityModSecurity.UseModSecurity = true
+	if _, err := service.Upsert(context.Background(), item); err != nil {
+		t.Fatalf("upsert failed: %v", err)
+	}
+	if len(wafStore.items) != 1 {
+		t.Fatalf("expected single waf policy, got %+v", wafStore.items)
+	}
+	if wafStore.items[0].Enabled {
+		t.Fatalf("expected transparent mode to disable legacy waf policy, got %+v", wafStore.items[0])
+	}
+	if wafStore.items[0].Mode != wafpolicies.ModeDetection {
+		t.Fatalf("expected detection mode for transparent fallback, got %+v", wafStore.items[0])
 	}
 }
 

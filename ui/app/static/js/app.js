@@ -12,6 +12,7 @@ const icons = {
   dashboard: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 13h6V4H4v9Zm0 7h6v-5H4v5Zm8 0h8v-9h-8v9Zm0-18v7h8V2h-8Z"/></svg>',
   sites: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 10.5 12 3l9 7.5V21h-7v-6H10v6H3v-10.5Z"/></svg>',
   antiddos: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 1 4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5l-8-4Zm0 3.2L17 6.7v4.2c0 3.8-2.2 7.2-5 8.5-2.8-1.3-5-4.7-5-8.5V6.7l5-2.5Zm-1.2 3.3v3H8.8v2h2V15h2.4v-2.5h2v-2h-2v-3h-2.4Z"/></svg>',
+  owaspcrs: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 1 4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5l-8-4Zm0 3.2L17 6.7v4.2c0 3.8-2.2 7.2-5 8.5-2.8-1.3-5-4.7-5-8.5V6.7l5-2.5Zm-3 4.8h6v2H9v-2Zm0 4h6v2H9v-2Z"/></svg>',
   tls: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 1 4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5l-8-4Zm0 10.2a2.3 2.3 0 1 1 0 4.6 2.3 2.3 0 0 1 0-4.6Zm4 6.8H8v-1.2c0-1.8 1.8-2.8 4-2.8s4 1 4 2.8V18Z"/></svg>',
   requests: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2H3V5Zm0 4h18v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Zm4 3v2h4v-2H7Zm6 0v2h4v-2h-4Z"/></svg>',
   events: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg>',
@@ -31,6 +32,7 @@ const sections = [
   { id: "sites", pathBase: "/services", labelKey: "app.sites", descriptionKey: "app.section.sites.desc", load: () => import("./pages/sites.js").then((m) => m.renderSites) },
   // contract marker: render: renderAntiDDoS
   { id: "antiddos", pathBase: "/anti-ddos", labelKey: "app.antiddos", descriptionKey: "app.section.antiddos.desc", load: () => import("./pages/antiddos.js").then((m) => m.renderAntiDDoS) },
+  { id: "owaspcrs", pathBase: "/owasp-crs", labelKey: "app.owaspcrs", descriptionKey: "app.section.owaspcrs.desc", load: () => import("./pages/owasp-crs.js").then((m) => m.renderOWASPCRS) },
   // contract marker: render: renderTLS
   { id: "tls", labelKey: "app.tls", descriptionKey: "app.section.tls.desc", load: () => import("./pages/tls.js").then((m) => m.renderTLS) },
   // contract marker: render: renderRequests
@@ -407,14 +409,14 @@ async function loadMeta() {
     }
     renderUpdateBadge(meta);
   } catch {
-    setVersion("v1.0.0");
+    setVersion("v1.0.11");
     renderUpdateBadge(null);
   }
 }
 
 async function bootstrap() {
   await applyTranslations(getLanguage());
-  setVersion("v1.0.0");
+  setVersion("v1.0.11");
 
   const access = await checkEntryAccess("app");
   if (!access.allowed) {

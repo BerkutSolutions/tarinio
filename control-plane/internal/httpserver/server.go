@@ -47,6 +47,7 @@ func New(
 	reportService *services.ReportService,
 	dashboardService *services.DashboardService,
 	containerRuntimeService *services.ContainerRuntimeService,
+	runtimeCRSService *services.RuntimeCRSService,
 	requestCollector services.RuntimeRequestCollector,
 ) *Server {
 	mux := http.NewServeMux()
@@ -55,6 +56,15 @@ func New(
 	mux.Handle("/api/app/meta", withAuth(authService, "", handlers.NewAppMetaHandler()))
 	mux.Handle("/api/settings/runtime", withAuth(authService, rbac.PermissionAuthSelf, handlers.NewSettingsRuntimeHandler()))
 	mux.Handle("/api/settings/runtime/check-updates", withAuth(authService, rbac.PermissionAuthSelf, handlers.NewSettingsRuntimeHandler()))
+	mux.Handle("/api/owasp-crs/status", withMethodPermissions(authService, map[string]rbac.Permission{
+		http.MethodGet: rbac.PermissionPoliciesRead,
+	}, handlers.NewOWASPCRSHandler(runtimeCRSService)))
+	mux.Handle("/api/owasp-crs/check-updates", withMethodPermissions(authService, map[string]rbac.Permission{
+		http.MethodPost: rbac.PermissionPoliciesRead,
+	}, handlers.NewOWASPCRSHandler(runtimeCRSService)))
+	mux.Handle("/api/owasp-crs/update", withMethodPermissions(authService, map[string]rbac.Permission{
+		http.MethodPost: rbac.PermissionPoliciesWrite,
+	}, handlers.NewOWASPCRSHandler(runtimeCRSService)))
 	mux.Handle("/api/auth/bootstrap", handlers.NewAuthHandler(authService))
 	mux.Handle("/api/auth/login", handlers.NewAuthHandler(authService))
 	mux.Handle("/api/auth/login/2fa", handlers.NewAuthHandler(authService))

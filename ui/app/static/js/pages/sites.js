@@ -111,6 +111,115 @@ function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+const BAN_SCOPE_VALUES = ["current_site", "all_sites"];
+
+function parseBanDurationSeconds(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  if (!raw) {
+    return null;
+  }
+  if (/^\d+$/.test(raw)) {
+    const seconds = Number.parseInt(raw, 10);
+    return Number.isFinite(seconds) && seconds >= 0 ? seconds : null;
+  }
+  const match = raw.match(/^(\d+)\s*(s|m|h|d)$/);
+  if (!match) {
+    return null;
+  }
+  const num = Number.parseInt(match[1], 10);
+  if (!Number.isFinite(num) || num < 0) {
+    return null;
+  }
+  const unit = match[2];
+  if (unit === "s") {
+    return num;
+  }
+  if (unit === "m") {
+    return num * 60;
+  }
+  if (unit === "h") {
+    return num * 3600;
+  }
+  if (unit === "d") {
+    return num * 86400;
+  }
+  return null;
+}
+
+function formatBanDurationSeconds(seconds) {
+  const value = Number.parseInt(String(seconds), 10);
+  if (!Number.isFinite(value) || value < 0) {
+    return "-";
+  }
+  if (value === 0) {
+    return "0";
+  }
+  if (value % 86400 === 0) {
+    return `${value / 86400}d`;
+  }
+  if (value % 3600 === 0) {
+    return `${value / 3600}h`;
+  }
+  if (value % 60 === 0) {
+    return `${value / 60}m`;
+  }
+  return `${value}s`;
+}
+
+function normalizeBanEscalationStages(values, fallbackBase = 300) {
+  const out = [];
+  for (const raw of normalizeArray(values)) {
+    const value = Number.parseInt(String(raw), 10);
+    if (!Number.isFinite(value) || value < 0) {
+      continue;
+    }
+    out.push(value);
+    if (value === 0) {
+      break;
+    }
+  }
+  if (!out.length) {
+    const base = Number.parseInt(String(fallbackBase), 10);
+    const normalizedBase = Number.isFinite(base) && base >= 0 ? base : 300;
+    return [normalizedBase, 86400, 0];
+  }
+  return out;
+}
+
+function normalizeReverseProxyHost(value) {
+  const normalized = String(value || "").trim();
+  const lower = normalized.toLowerCase();
+  if (!lower) {
+    return "";
+  }
+  // Legacy placeholder from default easy profile template.
+  if (lower === "http://upstream-server:8080") {
+    return "";
+  }
+  return normalized;
+}
+
+function buildReverseProxyHostFromUpstream(upstreamScheme, upstreamHost, upstreamPort) {
+  const host = String(upstreamHost || "").trim();
+  if (!host) {
+    return "";
+  }
+  const scheme = String(upstreamScheme || "http").trim().toLowerCase() === "https" ? "https" : "http";
+  const port = Number(upstreamPort);
+  if (Number.isInteger(port) && port > 0) {
+    return `${scheme}://${host}:${port}`;
+  }
+  return `${scheme}://${host}`;
+}
+
+function resolveReverseProxyHost(draft, explicitValue = "") {
+  const manual = normalizeReverseProxyHost(explicitValue || draft?.reverse_proxy_host);
+  if (manual) {
+    return manual;
+  }
+  return buildReverseProxyHostFromUpstream(draft?.upstream_scheme, draft?.upstream_host, draft?.upstream_port);
+}
+
 function isValidEmail(value) {
   const normalized = normalizeEmail(value);
   if (!normalized) {
@@ -259,6 +368,8 @@ const SETTINGS_SEARCH_INDEX = [
   { id: "access_denylist", tab: "traffic", selector: "#list-input-access_denylist", labelKey: "sites.lists.denylist" },
   { id: "use_blacklist", tab: "traffic", selector: "#service-use-blacklist", labelKey: "sites.easy.traffic.activateBlacklisting" },
   { id: "use_limit_req", tab: "traffic", selector: "#service-use-limit-req", labelKey: "sites.easy.traffic.activateLimitRequests" },
+  { id: "ban_escalation_enabled", tab: "blocking", selector: "#service-ban-escalation-enabled", labelKey: "sites.easy.blocking.enabled" },
+  { id: "ban_escalation_scope", tab: "blocking", selector: "#service-ban-escalation-scope", labelKey: "sites.easy.blocking.scope" },
   { id: "antibot_challenge", tab: "antibot", selector: "#service-antibot-challenge", labelKey: "sites.easy.antibot.challenge" },
   { id: "blacklist_country", tab: "geo", selector: "#country-select-blacklist_country", labelKey: "sites.easy.geo.countryBlacklist" },
   { id: "whitelist_country", tab: "geo", selector: "#country-select-whitelist_country", labelKey: "sites.easy.geo.countryWhitelist" },
@@ -387,10 +498,13 @@ function defaultSiteDraft() {
     access_allowlist: [],
     access_denylist: [],
     use_bad_behavior: true,
-    bad_behavior_status_codes: [400, 401, 403, 404, 405, 429, 444],
+    bad_behavior_status_codes: [400, 401, 405, 444],
     bad_behavior_ban_time_seconds: 300,
-    bad_behavior_threshold: 20,
-    bad_behavior_count_time_seconds: 30,
+    bad_behavior_threshold: 120,
+    bad_behavior_count_time_seconds: 120,
+    ban_escalation_enabled: false,
+    ban_escalation_scope: "all_sites",
+    ban_escalation_stages_seconds: [300, 86400, 0],
     use_blacklist: false,
     use_dnsbl: false,
     blacklist_ip: [],
@@ -409,7 +523,7 @@ function defaultSiteDraft() {
     limit_conn_max_http3: 400,
     use_limit_req: true,
     limit_req_url: "/",
-    limit_req_rate: "30r/s",
+    limit_req_rate: "120r/s",
     antibot_challenge: "no",
     antibot_uri: "/challenge",
     antibot_recaptcha_score: 0.7,
@@ -427,7 +541,8 @@ function defaultSiteDraft() {
     blacklist_country: [],
     whitelist_country: [],
     use_modsecurity: true,
-    use_modsecurity_crs_plugins: false,
+    use_modsecurity_crs_plugins: true,
+    use_modsecurity_custom_configuration: false,
     modsecurity_crs_version: "4",
     modsecurity_crs_plugins: [],
     modsecurity_custom_path: "modsec/anomaly_score.conf",
@@ -475,7 +590,7 @@ function applyEasyProfileToDraft(draft, profile) {
     certificate_authority_server: front.certificate_authority_server || draft.certificate_authority_server,
     acme_account_email: normalizeEmail(front.acme_account_email || draft.acme_account_email),
     use_reverse_proxy: Boolean(upstream.use_reverse_proxy ?? draft.use_reverse_proxy),
-    reverse_proxy_host: upstream.reverse_proxy_host || draft.reverse_proxy_host,
+    reverse_proxy_host: resolveReverseProxyHost(draft, upstream.reverse_proxy_host) || draft.reverse_proxy_host,
     reverse_proxy_url: upstream.reverse_proxy_url || draft.reverse_proxy_url,
     reverse_proxy_custom_host: upstream.reverse_proxy_custom_host || draft.reverse_proxy_custom_host,
     reverse_proxy_ssl_sni: Boolean(upstream.reverse_proxy_ssl_sni ?? draft.reverse_proxy_ssl_sni),
@@ -499,6 +614,14 @@ function applyEasyProfileToDraft(draft, profile) {
     bad_behavior_ban_time_seconds: Number(security.bad_behavior_ban_time_seconds ?? draft.bad_behavior_ban_time_seconds),
     bad_behavior_threshold: Number(security.bad_behavior_threshold ?? draft.bad_behavior_threshold),
     bad_behavior_count_time_seconds: Number(security.bad_behavior_count_time_seconds ?? draft.bad_behavior_count_time_seconds),
+    ban_escalation_enabled: Boolean(security.ban_escalation_enabled ?? draft.ban_escalation_enabled),
+    ban_escalation_scope: BAN_SCOPE_VALUES.includes(String(security.ban_escalation_scope || "").trim().toLowerCase())
+      ? String(security.ban_escalation_scope || "").trim().toLowerCase()
+      : draft.ban_escalation_scope,
+    ban_escalation_stages_seconds: normalizeBanEscalationStages(
+      security.ban_escalation_stages_seconds,
+      Number(security.bad_behavior_ban_time_seconds ?? draft.bad_behavior_ban_time_seconds)
+    ),
     use_blacklist: Boolean(security.use_blacklist ?? draft.use_blacklist),
     use_dnsbl: Boolean(security.use_dnsbl ?? draft.use_dnsbl),
     blacklist_ip: normalizeStringArray(security.blacklist_ip),
@@ -536,6 +659,7 @@ function applyEasyProfileToDraft(draft, profile) {
     whitelist_country: normalizeStringArray(country.whitelist_country),
     use_modsecurity: Boolean(modsecurity.use_modsecurity ?? draft.use_modsecurity),
     use_modsecurity_crs_plugins: Boolean(modsecurity.use_modsecurity_crs_plugins ?? draft.use_modsecurity_crs_plugins),
+    use_modsecurity_custom_configuration: Boolean(modsecurity.use_modsecurity_custom_configuration ?? draft.use_modsecurity_custom_configuration),
     modsecurity_crs_version: String(modsecurity.modsecurity_crs_version || draft.modsecurity_crs_version),
     modsecurity_crs_plugins: normalizeStringArray(modsecurity.modsecurity_crs_plugins),
     modsecurity_custom_path: modsecurity.custom_configuration?.path || draft.modsecurity_custom_path,
@@ -546,6 +670,7 @@ function applyEasyProfileToDraft(draft, profile) {
 function draftToEasyProfile(draft) {
   const siteID = String(draft.id || "").trim().toLowerCase();
   const primaryHost = String(draft.primary_host || "").trim().toLowerCase();
+  const reverseProxyHost = resolveReverseProxyHost(draft, draft.reverse_proxy_host);
   const reverseProxyURL = String(draft.reverse_proxy_url || "").trim();
   const limitReqURL = String(draft.limit_req_url || "").trim();
   const limitReqRateRaw = String(draft.limit_req_rate || "").trim().toLowerCase().replace(/\s+/g, "");
@@ -556,6 +681,13 @@ function draftToEasyProfile(draft) {
   const securityMode = ["transparent", "monitor", "block"].includes(String(draft.security_mode || "").trim().toLowerCase())
     ? String(draft.security_mode || "").trim().toLowerCase()
     : "block";
+  const banEscalationScope = BAN_SCOPE_VALUES.includes(String(draft.ban_escalation_scope || "").trim().toLowerCase())
+    ? String(draft.ban_escalation_scope || "").trim().toLowerCase()
+    : "all_sites";
+  const banEscalationStages = normalizeBanEscalationStages(
+    draft.ban_escalation_stages_seconds,
+    draft.bad_behavior_ban_time_seconds
+  );
 
   return {
     site_id: siteID,
@@ -570,7 +702,7 @@ function draftToEasyProfile(draft) {
     },
     upstream_routing: {
       use_reverse_proxy: draft.use_reverse_proxy,
-      reverse_proxy_host: draft.reverse_proxy_host,
+      reverse_proxy_host: reverseProxyHost,
       reverse_proxy_url: reverseProxyURL.startsWith("/") ? reverseProxyURL : "/",
       reverse_proxy_custom_host: draft.reverse_proxy_custom_host,
       reverse_proxy_ssl_sni: draft.reverse_proxy_ssl_sni,
@@ -600,6 +732,9 @@ function draftToEasyProfile(draft) {
       bad_behavior_ban_time_seconds: draft.bad_behavior_ban_time_seconds,
       bad_behavior_threshold: draft.bad_behavior_threshold,
       bad_behavior_count_time_seconds: draft.bad_behavior_count_time_seconds,
+      ban_escalation_enabled: draft.ban_escalation_enabled,
+      ban_escalation_scope: banEscalationScope,
+      ban_escalation_stages_seconds: banEscalationStages,
       use_blacklist: draft.use_blacklist,
       use_dnsbl: draft.use_dnsbl,
       blacklist_ip: draft.blacklist_ip,
@@ -645,6 +780,7 @@ function draftToEasyProfile(draft) {
     security_modsecurity: {
       use_modsecurity: draft.use_modsecurity,
       use_modsecurity_crs_plugins: draft.use_modsecurity_crs_plugins,
+      use_modsecurity_custom_configuration: draft.use_modsecurity_custom_configuration,
       modsecurity_crs_version: draft.modsecurity_crs_version,
       modsecurity_crs_plugins: draft.modsecurity_crs_plugins,
       custom_configuration: {
@@ -677,6 +813,30 @@ function validateDraft(draft, ctx) {
   if (draft.use_bad_behavior && !normalizeArray(draft.bad_behavior_status_codes).length) {
     return ctx.t("sites.validation.badBehaviorStatusCodesRequired");
   }
+  if (draft.use_bad_behavior && (!Number.isFinite(draft.bad_behavior_ban_time_seconds) || draft.bad_behavior_ban_time_seconds < 0)) {
+    return ctx.t("sites.validation.badBehaviorBanDuration");
+  }
+  if (draft.ban_escalation_enabled) {
+    if (!BAN_SCOPE_VALUES.includes(String(draft.ban_escalation_scope || "").trim().toLowerCase())) {
+      return ctx.t("sites.validation.banEscalationScope");
+    }
+    const stages = normalizeBanEscalationStages(draft.ban_escalation_stages_seconds, draft.bad_behavior_ban_time_seconds);
+    if (!stages.length) {
+      return ctx.t("sites.validation.banEscalationStagesRequired");
+    }
+    if (stages.length > 12) {
+      return ctx.t("sites.validation.banEscalationStagesLimit");
+    }
+    for (let i = 0; i < stages.length; i += 1) {
+      const value = stages[i];
+      if (!Number.isFinite(value) || value < 0) {
+        return ctx.t("sites.validation.banEscalationStageValue");
+      }
+      if (value === 0 && i !== stages.length - 1) {
+        return ctx.t("sites.validation.banEscalationPermanentLast");
+      }
+    }
+  }
   if (draft.use_limit_req && !String(draft.limit_req_rate || "").trim()) {
     return ctx.t("sites.validation.limitReqRateRequired");
   }
@@ -685,6 +845,9 @@ function validateDraft(draft, ctx) {
   }
   if (draft.use_auth_basic && !String(draft.auth_basic_user || "").trim()) {
     return ctx.t("sites.validation.authBasicUserRequired");
+  }
+  if (draft.use_modsecurity_custom_configuration && !String(draft.modsecurity_custom_path || "").trim()) {
+    return ctx.t("sites.validation.modsecCustomPathRequired");
   }
   return "";
 }
@@ -1040,6 +1203,7 @@ function renderWizardNav(activeTab, ctx) {
     { id: "http", title: ctx.t("sites.easy.tab.http.title"), subtitle: ctx.t("sites.easy.tab.http.subtitle") },
     { id: "headers", title: ctx.t("sites.easy.tab.headers.title"), subtitle: ctx.t("sites.easy.tab.headers.subtitle") },
     { id: "traffic", title: ctx.t("sites.easy.tab.traffic.title"), subtitle: ctx.t("sites.easy.tab.traffic.subtitle") },
+    { id: "blocking", title: ctx.t("sites.easy.tab.blocking.title"), subtitle: ctx.t("sites.easy.tab.blocking.subtitle") },
     { id: "antibot", title: ctx.t("sites.easy.tab.antibot.title"), subtitle: ctx.t("sites.easy.tab.antibot.subtitle") },
     { id: "geo", title: ctx.t("sites.easy.tab.geo.title"), subtitle: ctx.t("sites.easy.tab.geo.subtitle") },
     { id: "modsec", title: ctx.t("sites.easy.tab.modsec.title"), subtitle: ctx.t("sites.easy.tab.modsec.subtitle") }
@@ -1375,6 +1539,43 @@ function renderDetailView(state, ctx) {
                 </div>
               </section>
 
+              <section class="waf-subcard waf-stack waf-service-compact-section${state.activeTab === "blocking" ? "" : " waf-hidden"}" data-tab-panel="blocking">
+                <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.blocking.title"))}</div>
+                <div class="waf-note">${escapeHtml(ctx.t("sites.easy.blocking.baseHint"))}</div>
+                <div class="waf-form-grid">
+                  <label class="waf-checkbox waf-field full">
+                    <input id="service-ban-escalation-enabled" type="checkbox"${draft.ban_escalation_enabled ? " checked" : ""}>
+                    <span>${escapeHtml(ctx.t("sites.easy.blocking.enabled"))}</span>
+                  </label>
+                  <div class="waf-field">
+                    <label for="service-ban-escalation-scope">${escapeHtml(ctx.t("sites.easy.blocking.scope"))}</label>
+                    <select id="service-ban-escalation-scope">
+                      <option value="all_sites"${draft.ban_escalation_scope === "all_sites" ? " selected" : ""}>${escapeHtml(ctx.t("sites.easy.blocking.scope.allSites"))}</option>
+                      <option value="current_site"${draft.ban_escalation_scope === "current_site" ? " selected" : ""}>${escapeHtml(ctx.t("sites.easy.blocking.scope.currentSite"))}</option>
+                    </select>
+                  </div>
+                  <div class="waf-field full">
+                    <label for="service-ban-stage-input">${escapeHtml(ctx.t("sites.easy.blocking.stageInput"))}</label>
+                    <div class="waf-inline">
+                      <input id="service-ban-stage-input" placeholder="${escapeHtml(ctx.t("sites.easy.blocking.stagePlaceholder"))}">
+                      <button class="btn ghost btn-sm" type="button" data-ban-stage-add>${escapeHtml(ctx.t("sites.easy.blocking.addStage"))}</button>
+                    </div>
+                    <div class="waf-note">${escapeHtml(ctx.t("sites.easy.blocking.help"))}</div>
+                    <div class="waf-inline">
+                      ${normalizeBanEscalationStages(draft.ban_escalation_stages_seconds, draft.bad_behavior_ban_time_seconds).map((seconds, index) => `
+                        <span class="badge badge-neutral">
+                          ${escapeHtml(`${ctx.t("sites.easy.blocking.stage")} ${index + 1}: ${seconds === 0 ? ctx.t("sites.easy.blocking.permanent") : formatBanDurationSeconds(seconds)}`)}
+                          <button
+                            class="waf-list-remove"
+                            type="button"
+                            data-ban-stage-remove="${index}">x</button>
+                        </span>
+                      `).join("")}
+                    </div>
+                  </div>
+                </div>
+              </section>
+
               <section class="waf-subcard waf-stack waf-service-compact-section${state.activeTab === "antibot" ? "" : " waf-hidden"}" data-tab-panel="antibot">
                 <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.antibot.title"))}</div>
                 <div class="waf-form-grid">
@@ -1458,16 +1659,20 @@ function renderDetailView(state, ctx) {
                     <input id="service-use-modsecurity-crs-plugins" type="checkbox"${draft.use_modsecurity_crs_plugins ? " checked" : ""}>
                     <span>${escapeHtml(ctx.t("sites.easy.modsec.useCrsPlugins"))}</span>
                   </label>
+                  <label class="waf-checkbox">
+                    <input id="service-use-modsecurity-custom-configuration" type="checkbox"${draft.use_modsecurity_custom_configuration ? " checked" : ""}>
+                    <span>${escapeHtml(ctx.t("sites.easy.modsec.useCustomConfiguration"))}</span>
+                  </label>
                   <div class="waf-field">
                     <label for="service-modsecurity-crs-version">${escapeHtml(ctx.t("sites.easy.modsec.crsVersion"))}</label>
                     <input id="service-modsecurity-crs-version" value="${escapeHtml(draft.modsecurity_crs_version)}">
                   </div>
                   ${renderListEditor("modsecurity_crs_plugins", ctx.t("sites.easy.modsec.crsPlugins"), draft.modsecurity_crs_plugins, "plugin-id", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
-                  <div class="waf-field">
+                  <div class="waf-field${draft.use_modsecurity_custom_configuration ? "" : " waf-hidden"}">
                     <label for="service-modsecurity-custom-path">${escapeHtml(ctx.t("sites.easy.modsec.customPath"))}</label>
                     <input id="service-modsecurity-custom-path" value="${escapeHtml(draft.modsecurity_custom_path)}">
                   </div>
-                  <div class="waf-field full">
+                  <div class="waf-field full${draft.use_modsecurity_custom_configuration ? "" : " waf-hidden"}">
                     <label for="service-modsecurity-custom-content">${escapeHtml(ctx.t("sites.easy.modsec.customContent"))}</label>
                     <textarea id="service-modsecurity-custom-content" rows="6">${escapeHtml(draft.modsecurity_custom_content)}</textarea>
                   </div>
@@ -2204,6 +2409,9 @@ export async function renderSites(container, ctx) {
       bad_behavior_ban_time_seconds: Number(container.querySelector("#service-bad-behavior-ban-time").value || "300"),
       bad_behavior_threshold: Number(container.querySelector("#service-bad-behavior-threshold").value || "20"),
       bad_behavior_count_time_seconds: Number(container.querySelector("#service-bad-behavior-count-time").value || "30"),
+      ban_escalation_enabled: container.querySelector("#service-ban-escalation-enabled")?.checked || false,
+      ban_escalation_scope: container.querySelector("#service-ban-escalation-scope")?.value || "all_sites",
+      ban_escalation_stages_seconds: normalizeBanEscalationStages(state.draft.ban_escalation_stages_seconds, Number(container.querySelector("#service-bad-behavior-ban-time").value || "300")),
       use_blacklist: container.querySelector("#service-use-blacklist").checked,
       use_dnsbl: container.querySelector("#service-use-dnsbl").checked,
       blacklist_ip: normalizeStringArray(state.draft.blacklist_ip),
@@ -2241,6 +2449,7 @@ export async function renderSites(container, ctx) {
       whitelist_country: normalizeStringArray(state.draft.whitelist_country),
       use_modsecurity: container.querySelector("#service-use-modsecurity").checked,
       use_modsecurity_crs_plugins: container.querySelector("#service-use-modsecurity-crs-plugins").checked,
+      use_modsecurity_custom_configuration: container.querySelector("#service-use-modsecurity-custom-configuration").checked,
       modsecurity_crs_version: container.querySelector("#service-modsecurity-crs-version").value.trim(),
       modsecurity_crs_plugins: normalizeStringArray(state.draft.modsecurity_crs_plugins),
       modsecurity_custom_path: container.querySelector("#service-modsecurity-custom-path").value.trim(),
@@ -2253,6 +2462,13 @@ export async function renderSites(container, ctx) {
         .map((item) => Number(item))
         .filter((item) => Number.isInteger(item))
         .sort((a, b) => a - b);
+      state.draft.ban_escalation_scope = BAN_SCOPE_VALUES.includes(String(state.draft.ban_escalation_scope || "").trim().toLowerCase())
+        ? String(state.draft.ban_escalation_scope || "").trim().toLowerCase()
+        : "all_sites";
+      state.draft.ban_escalation_stages_seconds = normalizeBanEscalationStages(
+        state.draft.ban_escalation_stages_seconds,
+        state.draft.bad_behavior_ban_time_seconds
+      );
     };
 
     const back = () => go(routeBase());
@@ -2276,6 +2492,10 @@ export async function renderSites(container, ctx) {
     });
     container.querySelector("#service-certificate-id")?.addEventListener("input", (event) => {
       event.target.dataset.dirty = event.target.value.trim() ? "true" : "";
+    });
+    container.querySelector("#service-use-modsecurity-custom-configuration")?.addEventListener("change", () => {
+      syncStateDraftFromForm();
+      render();
     });
 
     const highlightSelector = (selector) => {
@@ -2404,6 +2624,40 @@ export async function renderSites(container, ctx) {
           selected.delete(code);
         }
         state.draft.bad_behavior_status_codes = Array.from(selected).sort((a, b) => a - b);
+      });
+    });
+
+    container.querySelector("[data-ban-stage-add]")?.addEventListener("click", () => {
+      const input = container.querySelector("#service-ban-stage-input");
+      if (!input) {
+        return;
+      }
+      const parsed = parseBanDurationSeconds(input.value);
+      if (parsed === null) {
+        setError(feedback, ctx.t("sites.validation.banStageFormat"));
+        return;
+      }
+      syncStateDraftFromForm();
+      const current = normalizeBanEscalationStages(state.draft.ban_escalation_stages_seconds, state.draft.bad_behavior_ban_time_seconds);
+      current.push(parsed);
+      state.draft.ban_escalation_stages_seconds = normalizeBanEscalationStages(current, state.draft.bad_behavior_ban_time_seconds);
+      render();
+    });
+
+    container.querySelectorAll("[data-ban-stage-remove]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const index = Number.parseInt(String(button.dataset.banStageRemove || "-1"), 10);
+        if (!Number.isInteger(index) || index < 0) {
+          return;
+        }
+        syncStateDraftFromForm();
+        const current = normalizeBanEscalationStages(state.draft.ban_escalation_stages_seconds, state.draft.bad_behavior_ban_time_seconds);
+        if (index >= current.length) {
+          return;
+        }
+        current.splice(index, 1);
+        state.draft.ban_escalation_stages_seconds = normalizeBanEscalationStages(current, state.draft.bad_behavior_ban_time_seconds);
+        render();
       });
     });
 
