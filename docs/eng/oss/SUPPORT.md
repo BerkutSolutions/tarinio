@@ -16,3 +16,4 @@ Product: **Berkut Solutions - TARINIO**
 - UI: `Settings -> About` (version)
 - validate and re-apply the last stable revision
 
+

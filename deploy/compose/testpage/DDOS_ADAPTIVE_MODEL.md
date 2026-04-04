@@ -156,3 +156,4 @@ docker compose exec ddos-model-app sh -lc "cat /out/adaptive.json"
 - If runtime cannot apply adaptive rules:
   - error is logged, next periodic cycle retries.
 
+

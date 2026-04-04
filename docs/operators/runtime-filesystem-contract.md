@@ -121,3 +121,4 @@ For single-node MVP:
 - bundle-relative paths stay stable from compiler through runtime
 - identical artifacts must keep identical relative paths at every stage
 
+

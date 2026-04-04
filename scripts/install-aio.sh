@@ -4,7 +4,7 @@ set -eu
 REPO_URL="${REPO_URL:-https://github.com/BerkutSolutions/tarinio.git}"
 INSTALL_DIR="${INSTALL_DIR:-/opt/tarinio}"
 BRANCH="${BRANCH:-main}"
-PROFILE="${PROFILE:-auto-start}"
+PROFILE="${PROFILE:-default}"
 
 if command -v docker >/dev/null 2>&1; then
   :

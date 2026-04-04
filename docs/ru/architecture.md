@@ -1,6 +1,6 @@
 ﻿# РђСЂС…РёС‚РµРєС‚СѓСЂР° TARINIO (РѕР±Р·РѕСЂ)
 
-Р‘Р°Р·РѕРІР°СЏ РІРµСЂСЃРёСЏ РґРѕРєСѓРјРµРЅС‚Р°С†РёРё: `1.0.2`
+Р‘Р°Р·РѕРІР°СЏ РІРµСЂСЃРёСЏ РґРѕРєСѓРјРµРЅС‚Р°С†РёРё: `1.0.3`
 
 TARINIO вЂ” standalone self-hosted WAF РЅР° Р±Р°Р·Рµ NGINX + ModSecurity + OWASP CRS.
 
@@ -19,4 +19,5 @@ TARINIO вЂ” standalone self-hosted WAF РЅР° Р±Р°Р·Рµ NGINX + Mod
 - `docs/architecture/core-domain-model.md`
 - `docs/architecture/mvp-deployment-topology.md`
 - `docs/architecture/mvp-ui-information-architecture.md`
+
 

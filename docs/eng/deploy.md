@@ -1,6 +1,6 @@
 ﻿# Deploy (EN)
 
-Documentation baseline: `1.0.2`
+Documentation baseline: `1.0.3`
 
 ## AIO Quick Start (one command)
 
@@ -33,3 +33,4 @@ docker compose -f deploy/compose/default/docker-compose.yml up -d --build
 - Use `auto-start` for quick local bootstrap.
 - Use `default` for a production-oriented local run (`ui` on `80`, `runtime` on `443`).
 - For production, use non-default secrets and HTTPS.
+

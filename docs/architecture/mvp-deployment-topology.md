@@ -423,3 +423,4 @@ For single-node MVP:
 - Redis stores ephemeral coordination only
 - externally exposed surface is minimized to runtime and, when needed, restricted admin API access
 
+

@@ -366,3 +366,4 @@ For MVP:
 - UI reads control-plane data only
 - no SIEM, no external log pipeline, and no full-text runtime log platform are introduced
 
+

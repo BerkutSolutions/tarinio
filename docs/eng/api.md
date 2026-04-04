@@ -1,10 +1,10 @@
 ﻿# API (EN)
 
-Documentation baseline: `1.0.2`
+Documentation baseline: `1.0.3`
 
 ## Release notes
 
-### 1.0.2 (2026-04-03)
+### 1.0.3 (2026-04-03)
 
 - TARINIO branding and a single version source via `meta.go`.
 - Extended `/api/app/meta` (version/name/links).
@@ -82,4 +82,5 @@ Documentation baseline: `1.0.2`
 
 - Compile: `POST /api/revisions/compile`
 - Apply: `POST /api/revisions/{revisionID}/apply`
+
 

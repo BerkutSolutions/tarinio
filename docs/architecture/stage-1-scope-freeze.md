@@ -259,3 +259,4 @@ If a proposed Stage 1 feature is not clearly inside `In Scope`, it is out of sco
 
 If a proposed change pushes the product toward enterprise management, plugin systems, advanced analytics, or non-MVP complexity, it must be rejected during Stage 1 execution.
 
+

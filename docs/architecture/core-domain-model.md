@@ -548,3 +548,4 @@ Concrete mapping in MVP:
 - `Revision` -> versioned compiled bundle used for validation, apply, activation, and rollback
 - `Job`, `Event`, `User`, `Role`, `AuditEvent` -> no direct runtime config, but govern and trace the lifecycle of changes
 
+

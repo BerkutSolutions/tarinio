@@ -1,6 +1,6 @@
 ﻿# Upgrade / rollback (EN)
 
-Documentation baseline: `1.0.2`
+Documentation baseline: `1.0.3`
 
 Minimum supported upgrade path: `latest-1 -> latest`.
 
@@ -13,4 +13,5 @@ Minimum supported upgrade path: `latest-1 -> latest`.
 5. Rollback decision.
 
 Use your team release playbook and the standard preflight/backup/migrate/smoke process.
+
 
