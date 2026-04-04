@@ -189,7 +189,22 @@ func New(cfg config.Config) (*App, error) {
 	upstreamService := services.NewUpstreamService(upstreamStore, siteStore, auditService)
 	certificateService := services.NewCertificateService(certificateStore, auditService)
 	certificateUploadService := services.NewCertificateUploadService(certificateStore, certificateMaterialStore, auditService)
-	letsEncryptService := services.NewLetsEncryptService(services.NewDevelopmentLetsEncryptClient(), jobStore, certificateStore, certificateMaterialStore, auditService)
+	var letsEncryptClient services.LetsEncryptClient
+	if cfg.ACME.Enabled && !cfg.ACME.UseDevelopmentClient {
+		client, err := services.NewACMELetsEncryptClient(services.ACMEClientConfig{
+			Email:        cfg.ACME.Email,
+			DirectoryURL: cfg.ACME.DirectoryURL,
+			StateDir:     cfg.ACME.StateDir,
+			ChallengeDir: cfg.ACME.ChallengeDir,
+		})
+		if err != nil {
+			return nil, err
+		}
+		letsEncryptClient = client
+	} else {
+		letsEncryptClient = services.NewDevelopmentLetsEncryptClient()
+	}
+	letsEncryptService := services.NewLetsEncryptService(letsEncryptClient, jobStore, certificateStore, certificateMaterialStore, auditService)
 	tlsConfigService := services.NewTLSConfigService(tlsConfigStore, siteStore, certificateStore, auditService)
 	wafPolicyService := services.NewWAFPolicyService(wafPolicyStore, siteStore, auditService)
 	accessPolicyService := services.NewAccessPolicyService(accessPolicyStore, siteStore, auditService)

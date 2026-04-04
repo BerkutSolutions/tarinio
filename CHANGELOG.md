@@ -2,6 +2,35 @@
 
 Все значимые изменения проекта фиксируются в этом файле.
 
+## [1.0.6] - 2026-04-04
+
+### Исправлено
+- Включен реальный Let's Encrypt ACME HTTP-01 (вместо development self-signed заглушки):
+  - подключен ACME-клиент `lego` и включен по умолчанию;
+  - добавлен сервисный клиент `control-plane/internal/services/letsencrypt_client_acme.go`;
+  - wiring обновлен в `control-plane/internal/app/app.go`;
+  - ACME-конфигурация и env-переменные добавлены в `control-plane/internal/config/config.go`.
+- Добавлена раздача challenge `/.well-known/acme-challenge/` в runtime nginx:
+  - `compiler/templates/nginx/conf.d/base.conf.tmpl`;
+  - `compiler/templates/nginx/sites/site.conf.tmpl`.
+- Добавлены ACME env-переменные:
+  - `deploy/compose/default/.env`;
+  - `deploy/compose/default/.env.example`.
+- Обновлены зависимость `lego` в `go.mod/go.sum`.
+- Обновлен one-command installer `scripts/install-aio.sh` (admin UI на `:8080`, WAF ingress на `:80/:443`).
+- Локальная проверка после изменений:
+  - `go test ./control-plane/internal/services ./control-plane/internal/app ./compiler/internal/compiler ./ui/tests` — `OK`.
+- Смягчены дефолтные лимиты для management-site (`control-plane-access`, либо ID из `CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID`), чтобы вебморда не ловила ложные autoban при штатной работе SPA:
+  - `limit_req_rate` минимум `300r/s`;
+  - `limit_req_url` по умолчанию `/api/`;
+  - `limit_conn` минимум `300/500/500` для HTTP/1.1, HTTP/2, HTTP/3;
+  - `bad_behavior_threshold` минимум `100`, `bad_behavior_count_time_seconds` минимум `60`;
+  - `bad_behavior_status_codes` для management-site: `400,401,405,444` (без `403/404/429`).
+
+### Версия
+- Версия приложения обновлена до `1.0.6` (`control-plane/internal/appmeta/meta.go`).
+- Версия документации и корневых README синхронизирована на `1.0.6`.
+
 ## [1.0.5] - 2026-04-04
 
 ### Исправлено

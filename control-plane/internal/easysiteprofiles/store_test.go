@@ -41,17 +41,32 @@ func TestDefaultProfile_ControlPlaneAccessIncludesAPIMethods(t *testing.T) {
 func TestDefaultProfile_ControlPlaneAccessUsesHigherRateLimitsWithout429Escalation(t *testing.T) {
 	profile := DefaultProfile("control-plane-access")
 
-	if profile.SecurityBehaviorAndLimits.LimitConnMaxHTTP1 < 200 {
+	if profile.SecurityBehaviorAndLimits.LimitConnMaxHTTP1 < 300 {
 		t.Fatalf("expected higher http/1 conn limit for control-plane-access, got %d", profile.SecurityBehaviorAndLimits.LimitConnMaxHTTP1)
 	}
-	if profile.SecurityBehaviorAndLimits.LimitConnMaxHTTP2 < 400 {
+	if profile.SecurityBehaviorAndLimits.LimitConnMaxHTTP2 < 500 {
 		t.Fatalf("expected higher http/2 conn limit for control-plane-access, got %d", profile.SecurityBehaviorAndLimits.LimitConnMaxHTTP2)
 	}
-	if profile.SecurityBehaviorAndLimits.LimitConnMaxHTTP3 < 400 {
+	if profile.SecurityBehaviorAndLimits.LimitConnMaxHTTP3 < 500 {
 		t.Fatalf("expected higher http/3 conn limit for control-plane-access, got %d", profile.SecurityBehaviorAndLimits.LimitConnMaxHTTP3)
 	}
-	if profile.SecurityBehaviorAndLimits.LimitReqRate != "80r/s" {
+	if profile.SecurityBehaviorAndLimits.LimitReqRate != "300r/s" {
 		t.Fatalf("expected higher request rate for control-plane-access, got %s", profile.SecurityBehaviorAndLimits.LimitReqRate)
+	}
+	if profile.SecurityBehaviorAndLimits.LimitReqURL != "/api/" {
+		t.Fatalf("expected management site request limiting on /api/, got %s", profile.SecurityBehaviorAndLimits.LimitReqURL)
+	}
+	if profile.SecurityBehaviorAndLimits.BadBehaviorThreshold < 100 {
+		t.Fatalf("expected higher bad behavior threshold for control-plane-access, got %d", profile.SecurityBehaviorAndLimits.BadBehaviorThreshold)
+	}
+	if profile.SecurityBehaviorAndLimits.BadBehaviorCountTimeSeconds < 60 {
+		t.Fatalf("expected higher bad behavior period for control-plane-access, got %d", profile.SecurityBehaviorAndLimits.BadBehaviorCountTimeSeconds)
+	}
+	if slices.Contains(profile.SecurityBehaviorAndLimits.BadBehaviorStatusCodes, 403) {
+		t.Fatalf("expected control-plane-access bad behavior codes to exclude 403, got %+v", profile.SecurityBehaviorAndLimits.BadBehaviorStatusCodes)
+	}
+	if slices.Contains(profile.SecurityBehaviorAndLimits.BadBehaviorStatusCodes, 404) {
+		t.Fatalf("expected control-plane-access bad behavior codes to exclude 404, got %+v", profile.SecurityBehaviorAndLimits.BadBehaviorStatusCodes)
 	}
 	if slices.Contains(profile.SecurityBehaviorAndLimits.BadBehaviorStatusCodes, 429) {
 		t.Fatalf("expected control-plane-access bad behavior codes to exclude 429, got %+v", profile.SecurityBehaviorAndLimits.BadBehaviorStatusCodes)

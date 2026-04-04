@@ -1,6 +1,6 @@
 # Berkut Solutions - TARINIO - Документация (RU)
 
-Базовая версия документации: `1.0.4`
+Базовая версия документации: `1.0.6`
 
 ## Разделы
 
@@ -25,7 +25,7 @@
    - `docs/ru/oss/CODE_OF_CONDUCT.md`
    - `docs/ru/oss/SUPPORT.md`
 
-## Контекст релиза 1.0.4
+## Контекст релиза 1.0.6
 
 - Брендинг продукта приведен к `Berkut Solutions - TARINIO`.
 - Версия приложения централизована через `control-plane/internal/appmeta/meta.go`.

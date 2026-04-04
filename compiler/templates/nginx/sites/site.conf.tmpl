@@ -98,6 +98,13 @@ server {
         alias /etc/waf/errors/{{ .SiteID }}/504.html;
     }
 
+    location ^~ /.well-known/acme-challenge/ {
+        proxy_intercept_errors off;
+        modsecurity off;
+        default_type text/plain;
+        alias /var/lib/waf/control-plane/acme-challenges/;
+    }
+
     location ^~ /api/ {
         proxy_intercept_errors off;
         modsecurity on;

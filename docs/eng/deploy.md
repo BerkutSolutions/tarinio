@@ -1,6 +1,6 @@
 # Deploy (EN)
 
-Documentation baseline: `1.0.4`
+Documentation baseline: `1.0.6`
 
 ## AIO Quick Start (one command)
 
@@ -13,11 +13,12 @@ curl -fsSL https://raw.githubusercontent.com/BerkutSolutions/tarinio/main/script
 By default, the script:
 - clones/updates the repo into `/opt/tarinio`
 - uses branch `main`
-- starts `deploy/compose/auto-start`
+- starts `deploy/compose/default`
 
 After startup:
-- `http://<server-ip>/login`
-- `https://<server-ip>/login`
+- `http://<server-ip>:8080/login` (Admin UI)
+- `http://<server-ip>/` (WAF HTTP ingress)
+- `https://<server-ip>/` (WAF ingress)
 
 ## Manual Docker Compose run
 
@@ -31,6 +32,6 @@ docker compose -f deploy/compose/default/docker-compose.yml up -d --build
 ## Notes
 
 - Use `auto-start` for quick local bootstrap.
-- Use `default` for a production-oriented local run (`ui` on `80`, `runtime` on `443`).
+- Use `default` for a no-switch setup (`ui` on `8080`, `runtime` on `80/443`).
 - For production, use non-default secrets and HTTPS.
 

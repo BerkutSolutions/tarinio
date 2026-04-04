@@ -431,12 +431,33 @@ async function ensureSiteAndTLS() {
   const upstreams = Array.isArray(upstreamsResponse) ? upstreamsResponse : [];
   const certificates = Array.isArray(certificatesResponse) ? certificatesResponse : [];
   const tlsConfigs = Array.isArray(tlsConfigsResponse) ? tlsConfigsResponse : [];
+  const isDefaultUpstreamRequiredError = (error) =>
+    String(error?.message || "").toLowerCase().includes("default upstream is required");
 
   if (!sites.some((item) => item.id === site.id)) {
-    await api.post("/api/sites", site);
+    try {
+      await api.post("/api/sites", site);
+    } catch (error) {
+      if (!isDefaultUpstreamRequiredError(error)) {
+        throw error;
+      }
+      const refreshedSites = await api.get("/api/sites");
+      const siteExists = Array.isArray(refreshedSites) && refreshedSites.some((item) => item.id === site.id);
+      if (!siteExists) {
+        throw error;
+      }
+    }
   }
   if (!upstreams.some((item) => item.id === upstream.id)) {
-    await api.post("/api/upstreams", upstream);
+    try {
+      await api.post("/api/upstreams", upstream);
+    } catch (error) {
+      const conflict = error?.status === 409 || String(error?.message || "").toLowerCase().includes("already exists");
+      if (!conflict) {
+        throw error;
+      }
+      await api.put(`/api/upstreams/${encodeURIComponent(upstream.id)}`, upstream);
+    }
   }
   await api.post("/api/certificates/acme/issue", {
     certificate_id: certificateID,
@@ -445,10 +466,19 @@ async function ensureSiteAndTLS() {
   });
 
   if (!tlsConfigs.some((item) => item.site_id === site.id)) {
-    await api.post("/api/tls-configs", {
+    const tlsPayload = {
       site_id: site.id,
       certificate_id: certificateID
-    });
+    };
+    try {
+      await api.post("/api/tls-configs", tlsPayload);
+    } catch (error) {
+      const conflict = error?.status === 409 || String(error?.message || "").toLowerCase().includes("already exists");
+      if (!conflict) {
+        throw error;
+      }
+      await api.put(`/api/tls-configs/${encodeURIComponent(site.id)}`, tlsPayload);
+    }
   }
   await ensureFirstInitEasyProfileTemplate(site, upstream, tlsMode);
 

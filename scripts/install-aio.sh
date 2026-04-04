@@ -41,8 +41,9 @@ $COMPOSE_CMD -f docker-compose.yml up -d --build
 
 echo
 echo "TARINIO is starting."
-echo "HTTP:  http://<server-ip>/login"
-echo "HTTPS: https://<server-ip>/login"
+echo "Admin UI: http://<server-ip>:8080/login"
+echo "WAF HTTP:  http://<server-ip>/"
+echo "WAF HTTPS: https://<server-ip>/"
 echo
 echo "Follow logs with:"
 echo "  cd $INSTALL_DIR/deploy/compose/$PROFILE"

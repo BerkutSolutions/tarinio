@@ -147,7 +147,8 @@ type EasySiteProfile struct {
 
 func DefaultProfile(siteID string) EasySiteProfile {
 	allowedMethods := []string{"GET", "POST", "HEAD", "OPTIONS", "PUT", "PATCH", "DELETE"}
-	isManagementSite := normalizeID(siteID) == "control-plane-access"
+	managementSiteID := normalizeID(envStringOrDefault("CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID", "control-plane-access"))
+	isManagementSite := normalizeID(siteID) == "control-plane-access" || (managementSiteID != "" && normalizeID(siteID) == managementSiteID)
 	if isManagementSite {
 		allowedMethods = []string{"GET", "POST", "HEAD", "OPTIONS", "PUT", "PATCH", "DELETE"}
 	}
@@ -161,23 +162,29 @@ func DefaultProfile(siteID string) EasySiteProfile {
 	badBehaviorStatusCodes := []int{400, 401, 403, 404, 405, 429, 444}
 
 	if isManagementSite {
-		if limitConnHTTP1 < 200 {
-			limitConnHTTP1 = 200
+		if limitConnHTTP1 < 300 {
+			limitConnHTTP1 = 300
 		}
-		if limitConnHTTP2 < 400 {
-			limitConnHTTP2 = 400
+		if limitConnHTTP2 < 500 {
+			limitConnHTTP2 = 500
 		}
-		if limitConnHTTP3 < 400 {
-			limitConnHTTP3 = 400
+		if limitConnHTTP3 < 500 {
+			limitConnHTTP3 = 500
 		}
-		if rate := normalizeLimitReqRate(limitReqRate); parseRatePerSecond(rate) < 80 {
-			limitReqRate = "80r/s"
+		if rate := normalizeLimitReqRate(limitReqRate); parseRatePerSecond(rate) < 300 {
+			limitReqRate = "300r/s"
 		} else {
 			limitReqRate = rate
 		}
-		// Management UI can legitimately burst after login and during page bootstrap.
-		// Keep 429 responses available, but do not turn them into sticky 403 escalation.
-		badBehaviorStatusCodes = []int{400, 401, 403, 404, 405, 444}
+		if badBehaviorThreshold < 100 {
+			badBehaviorThreshold = 100
+		}
+		if badBehaviorPeriodSeconds < 60 {
+			badBehaviorPeriodSeconds = 60
+		}
+		// Management UI and SPA frontends can legitimately burst static/API requests.
+		// Keep local bad-behavior focused on clear abuse signals and avoid 429/403/404 escalation loops.
+		badBehaviorStatusCodes = []int{400, 401, 405, 444}
 	}
 
 	return EasySiteProfile{
@@ -239,7 +246,7 @@ func DefaultProfile(siteID string) EasySiteProfile {
 			LimitConnMaxHTTP2:           limitConnHTTP2,
 			LimitConnMaxHTTP3:           limitConnHTTP3,
 			UseLimitReq:                 true,
-			LimitReqURL:                 "/",
+			LimitReqURL:                 map[bool]string{true: "/api/", false: "/"}[isManagementSite],
 			LimitReqRate:                limitReqRate,
 		},
 		SecurityAntibot: SecurityAntibotSettings{

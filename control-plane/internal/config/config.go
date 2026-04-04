@@ -26,11 +26,21 @@ type Config struct {
 	RevisionStoreDir string
 	AuthIssuer       string
 	Security         SecurityConfig
+	ACME             ACMEConfig
 	RuntimeHealthURL string
 	RuntimeReloadURL string
 	BootstrapAdmin   BootstrapAdminConfig
 	DevFastStart     DevFastStartConfig
 	Redis            redis.Config
+}
+
+type ACMEConfig struct {
+	Enabled              bool
+	UseDevelopmentClient bool
+	Email                string
+	DirectoryURL         string
+	StateDir             string
+	ChallengeDir         string
 }
 
 type SecurityConfig struct {
@@ -77,6 +87,14 @@ func LoadFromEnv() (Config, error) {
 				RPName:  "TARINIO",
 			},
 		},
+		ACME: ACMEConfig{
+			Enabled:              true,
+			UseDevelopmentClient: false,
+			Email:                "admin@example.com",
+			DirectoryURL:         "https://acme-v02.api.letsencrypt.org/directory",
+			StateDir:             filepath.Join(defaultRuntimeRoot, defaultRevisionsDir, "acme-state"),
+			ChallengeDir:         filepath.Join(defaultRuntimeRoot, defaultRevisionsDir, "acme-challenges"),
+		},
 		RuntimeHealthURL: defaultRuntimeHealthURL,
 		RuntimeReloadURL: defaultRuntimeReloadURL,
 		BootstrapAdmin: BootstrapAdminConfig{
@@ -105,6 +123,8 @@ func LoadFromEnv() (Config, error) {
 	if value := strings.TrimSpace(os.Getenv("WAF_RUNTIME_ROOT")); value != "" {
 		cfg.RuntimeRoot = value
 		cfg.RevisionStoreDir = filepath.Join(value, defaultRevisionsDir)
+		cfg.ACME.StateDir = filepath.Join(value, defaultRevisionsDir, "acme-state")
+		cfg.ACME.ChallengeDir = filepath.Join(value, defaultRevisionsDir, "acme-challenges")
 	}
 	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_REVISION_STORE_DIR")); value != "" {
 		cfg.RevisionStoreDir = value
@@ -114,6 +134,24 @@ func LoadFromEnv() (Config, error) {
 	}
 	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_SECURITY_PEPPER")); value != "" {
 		cfg.Security.Pepper = value
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_ACME_ENABLED")); value != "" {
+		cfg.ACME.Enabled = !strings.EqualFold(value, "false") && value != "0"
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_ACME_USE_DEVELOPMENT_CLIENT")); value != "" {
+		cfg.ACME.UseDevelopmentClient = !strings.EqualFold(value, "false") && value != "0"
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_ACME_EMAIL")); value != "" {
+		cfg.ACME.Email = value
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_ACME_DIRECTORY_URL")); value != "" {
+		cfg.ACME.DirectoryURL = value
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_ACME_STATE_DIR")); value != "" {
+		cfg.ACME.StateDir = value
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_ACME_CHALLENGE_DIR")); value != "" {
+		cfg.ACME.ChallengeDir = value
 	}
 	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_WEBAUTHN_ENABLED")); value != "" {
 		cfg.Security.WebAuthn.Enabled = !strings.EqualFold(value, "false") && value != "0"
@@ -245,6 +283,20 @@ func validate(cfg Config) error {
 	}
 	if strings.TrimSpace(cfg.Security.Pepper) == "" {
 		return fmt.Errorf("security pepper is required")
+	}
+	if cfg.ACME.Enabled && !cfg.ACME.UseDevelopmentClient {
+		if strings.TrimSpace(cfg.ACME.Email) == "" {
+			return fmt.Errorf("acme email is required")
+		}
+		if strings.TrimSpace(cfg.ACME.DirectoryURL) == "" {
+			return fmt.Errorf("acme directory url is required")
+		}
+		if strings.TrimSpace(cfg.ACME.StateDir) == "" {
+			return fmt.Errorf("acme state dir is required")
+		}
+		if strings.TrimSpace(cfg.ACME.ChallengeDir) == "" {
+			return fmt.Errorf("acme challenge dir is required")
+		}
 	}
 	if cfg.Security.WebAuthn.Enabled && strings.TrimSpace(cfg.Security.WebAuthn.RPName) == "" {
 		return fmt.Errorf("webauthn rp name is required when enabled")

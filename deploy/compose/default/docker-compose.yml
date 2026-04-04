@@ -143,6 +143,8 @@ services:
     depends_on:
       control-plane:
         condition: service_healthy
+    ports:
+      - "8080:80"
     expose:
       - "80"
     healthcheck:
