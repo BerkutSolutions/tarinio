@@ -934,6 +934,29 @@ function parseArrayEnv(value) {
     .filter(Boolean);
 }
 
+
+function userPermissionsSet(ctx) {
+  const items = Array.isArray(ctx?.currentUser?.permissions) ? ctx.currentUser.permissions : [];
+  return new Set(items.map((item) => String(item || "").trim().toLowerCase()).filter(Boolean));
+}
+
+function requirePermissions(ctx, requiredPermissions, errorKey) {
+  const required = Array.isArray(requiredPermissions) ? requiredPermissions : [];
+  if (!required.length) {
+    return;
+  }
+  const granted = userPermissionsSet(ctx);
+  const missing = required
+    .map((item) => String(item || "").trim().toLowerCase())
+    .filter((item) => item && !granted.has(item));
+  if (!missing.length) {
+    return;
+  }
+  const permissions = missing.join(", ");
+  throw new Error(ctx.t(errorKey, { permissions }));
+}
+
+
 function envToDraft(text) {
   const baseDraft = defaultSiteDraft();
   const knownFields = new Set(Object.keys(baseDraft));
@@ -1057,6 +1080,7 @@ async function applyImportPayload(ctx, payload) {
 }
 
 async function importServicesJSON(file, ctx) {
+  requirePermissions(ctx, ["sites.write", "upstreams.write"], "sites.error.importJsonPermissions");
   const payload = JSON.parse(await file.text());
   const sites = normalizeArray(payload.sites);
   const upstreams = normalizeArray(payload.upstreams);
@@ -2039,6 +2063,7 @@ async function importServicesFiles(files, ctx) {
       continue;
     }
     if (name.endsWith(".env")) {
+      requirePermissions(ctx, ["certificates.write", "tls.write"], "sites.error.importEnvPermissions");
       const text = await file.text();
       const { draft, missingFields } = envToDraft(text);
       const validationError = validateDraft(draft, ctx);

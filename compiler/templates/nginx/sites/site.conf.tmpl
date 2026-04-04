@@ -36,41 +36,49 @@ server {
 
     location = /__waf_errors/{{ .SiteID }}/400.html {
         internal;
+        allow all;
         alias /etc/waf/errors/{{ .SiteID }}/400.html;
     }
 
     location = /__waf_errors/{{ .SiteID }}/401.html {
         internal;
+        allow all;
         alias /etc/waf/errors/{{ .SiteID }}/401.html;
     }
 
     location = /__waf_errors/{{ .SiteID }}/403.html {
         internal;
+        allow all;
         alias /etc/waf/errors/{{ .SiteID }}/403.html;
     }
 
     location = /__waf_errors/{{ .SiteID }}/404.html {
         internal;
+        allow all;
         alias /etc/waf/errors/{{ .SiteID }}/404.html;
     }
 
     location = /__waf_errors/{{ .SiteID }}/405.html {
         internal;
+        allow all;
         alias /etc/waf/errors/{{ .SiteID }}/405.html;
     }
 
     location = /__waf_errors/{{ .SiteID }}/408.html {
         internal;
+        allow all;
         alias /etc/waf/errors/{{ .SiteID }}/408.html;
     }
 
     location = /__waf_errors/{{ .SiteID }}/421.html {
         internal;
+        allow all;
         alias /etc/waf/errors/{{ .SiteID }}/421.html;
     }
 
     location = /__waf_errors/{{ .SiteID }}/429.html {
         internal;
+        allow all;
         if ($cookie_{{ .RateLimitCookie }} = "1") {
             add_header Set-Cookie "{{ .RateLimitEscalationCookie }}=1; Max-Age=$waf_rate_limited_max_age; Path=/; SameSite=Lax; Secure" always;
         }
@@ -80,21 +88,25 @@ server {
 
     location = /__waf_errors/{{ .SiteID }}/500.html {
         internal;
+        allow all;
         alias /etc/waf/errors/{{ .SiteID }}/500.html;
     }
 
     location = /__waf_errors/{{ .SiteID }}/502.html {
         internal;
+        allow all;
         alias /etc/waf/errors/{{ .SiteID }}/502.html;
     }
 
     location = /__waf_errors/{{ .SiteID }}/503.html {
         internal;
+        allow all;
         alias /etc/waf/errors/{{ .SiteID }}/503.html;
     }
 
     location = /__waf_errors/{{ .SiteID }}/504.html {
         internal;
+        allow all;
         alias /etc/waf/errors/{{ .SiteID }}/504.html;
     }
 

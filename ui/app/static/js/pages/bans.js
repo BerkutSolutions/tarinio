@@ -211,9 +211,20 @@ function siteCookieName(siteID) {
   return `waf_rate_limited_${slug || "site"}`;
 }
 
-function clearRateLimitCookie(siteID) {
-  const cookie = siteCookieName(siteID);
-  document.cookie = `${cookie}=; Path=/; Max-Age=0; SameSite=Lax`;
+function siteEscalationCookieName(siteID) {
+  const slug = String(siteID || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+/, "")
+    .replace(/_+$/, "");
+  return `waf_rate_limited_escalation_${slug || "site"}`;
+}
+
+function clearRateLimitCookies(siteID) {
+  const rateCookie = siteCookieName(siteID);
+  const escalationCookie = siteEscalationCookieName(siteID);
+  document.cookie = `${rateCookie}=; Path=/; Max-Age=0; SameSite=Lax`;
+  document.cookie = `${escalationCookie}=; Path=/; Max-Age=0; SameSite=Lax`;
 }
 
 function parseIP(details) {
@@ -698,13 +709,19 @@ export async function renderBans(container, ctx) {
               button.disabled = true;
               if (currentStageSeconds === 0 && policy.scope === "all_sites") {
                 await applyBanAllSites(ctx, sites, ip, "unban", allowlistBySite);
+                for (const site of normalizeList(sites)) {
+                  const siteID = String(site?.id || "").trim();
+                  if (!siteID) {
+                    continue;
+                  }
+                  clearRateLimitCookies(siteID);
+                }
               } else {
                 await postBanAction(ctx, row.siteID, row.origin, "unban", ip);
+                clearRateLimitCookies(row.siteID);
               }
-              rec.last_unban_ms = Date.now();
-              rec.last_enforced_level = 0;
+              delete escalationState[ip];
               saveEscalationState(escalationState);
-              clearRateLimitCookie(row.siteID);
               ctx.notify(ctx.t("toast.ipUnbanned"));
               await renderRows();
             } catch (error) {
