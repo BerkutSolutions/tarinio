@@ -1,18 +1,18 @@
-# РђСЂС…РёС‚РµРєС‚СѓСЂР° TARINIO (РѕР±Р·РѕСЂ)
+# Архитектура TARINIO (обзор)
 
-Р‘Р°Р·РѕРІР°СЏ РІРµСЂСЃРёСЏ РґРѕРєСѓРјРµРЅС‚Р°С†РёРё: `1.0.15`
+Базовая версия документации: `1.0.16`
 
-TARINIO вЂ” standalone self-hosted WAF РЅР° Р±Р°Р·Рµ NGINX + ModSecurity + OWASP CRS.
+TARINIO — standalone self-hosted WAF на базе NGINX + ModSecurity + OWASP CRS.
 
-## РљР»СЋС‡РµРІС‹Рµ РїСЂРёРЅС†РёРїС‹
+## Ключевые принципы
 
-- Source of truth РґР»СЏ РЅР°РјРµСЂРµРЅРёР№ РѕРїРµСЂР°С‚РѕСЂР° вЂ” control-plane (С…СЂР°РЅРёР»РёС‰Рµ + СЂРµРІРёР·РёРё).
-- Runtime РЅРµ СЂРµРґР°РєС‚РёСЂСѓРµС‚СЃСЏ РІСЂСѓС‡РЅСѓСЋ: РѕРЅ РїРѕС‚СЂРµР±Р»СЏРµС‚ С‚РѕР»СЊРєРѕ Р°РєС‚РёРІРЅС‹Р№ compiled bundle.
-- Р›СЋР±С‹Рµ РёР·РјРµРЅРµРЅРёСЏ РїСЂРѕС…РѕРґСЏС‚ С‡РµСЂРµР· СЂРµРІРёР·РёРё: compile > validate > apply > rollback.
+- Source of truth для намерений оператора — control-plane (хранилище + ревизии).
+- Runtime не редактируется вручную: он потребляет только активный compiled bundle.
+- Любые изменения проходят через ревизии: compile > validate > apply > rollback.
 
-## РСЃС‚РѕС‡РЅРёРє РёСЃС‚РёРЅС‹ (Stage 0)
+## Источник истины (Stage 0)
 
-РџРѕР»РЅС‹Р№ РЅР°Р±РѕСЂ Р°СЂС…РёС‚РµРєС‚СѓСЂРЅС‹С… РґРѕРєСѓРјРµРЅС‚РѕРІ (РѕР±СЏР·Р°С‚РµР»СЊРЅР°СЏ РѕСЃРЅРѕРІР°):
+Полный набор архитектурных документов (обязательная основа):
 - `docs/architecture/adr-001-runtime-control-plane-split.md`
 - `docs/architecture/adr-002-config-compilation-model.md`
 - `docs/architecture/adr-003-config-rollout-and-rollback.md`

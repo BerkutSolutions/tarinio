@@ -1,4 +1,4 @@
-﻿import { api } from "./api.js";
+import { api } from "./api.js";
 import { applyTranslations, getLanguage, setLanguage, t } from "./i18n.js";
 import { checkEntryAccess, onboardingUrl, secureAppUrl } from "./guard.js";
 import { BerkutWebAuthn } from "./webauthn.js";

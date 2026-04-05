@@ -1,4 +1,4 @@
-﻿import { escapeHtml } from "../ui.js";
+import { escapeHtml } from "../ui.js";
 
 export async function renderAbout(container, ctx) {
   container.innerHTML = `

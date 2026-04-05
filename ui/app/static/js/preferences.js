@@ -1,4 +1,4 @@
-﻿import { getLanguage } from "./i18n.js";
+import { getLanguage } from "./i18n.js";
 
 const key = "waf_ui_prefs";
 

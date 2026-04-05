@@ -1,4 +1,4 @@
-﻿import { api } from "./api.js";
+import { api } from "./api.js";
 import { applyTranslations, getLanguage, t } from "./i18n.js";
 import { checkEntryAccess, markOnboardingRedirecting } from "./guard.js";
 import { escapeHtml, notify, setError, setLoading } from "./ui.js";

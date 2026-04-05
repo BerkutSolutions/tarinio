@@ -1,4 +1,4 @@
-﻿const enc = new TextEncoder();
+const enc = new TextEncoder();
 
 function normalizeB64Url(input) {
   return String(input || "").replace(/-/g, "+").replace(/_/g, "/");

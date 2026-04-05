@@ -1,4 +1,4 @@
-﻿const POLL_MS = 20000;
+const POLL_MS = 20000;
 
 function normalizeList(value) {
   return Array.isArray(value) ? value : [];
