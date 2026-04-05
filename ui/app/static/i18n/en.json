@@ -181,7 +181,7 @@
   "app.sites": "Services",
   "app.tls": "TLS / Certificates",
   "app.user.noRoles": "No roles",
-  "app.version": "v1.0.17",
+  "app.version": "v1.0.18",
   "auth.2fa.challengeMissing": "2FA challenge is missing. Please sign in again.",
   "auth.2fa.code": "2FA code",
   "auth.2fa.codeRequired": "2FA code is required",
