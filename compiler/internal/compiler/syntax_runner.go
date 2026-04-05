@@ -55,11 +55,21 @@ func (r RuntimeSyntaxRunner) Validate(bundle *RevisionBundle) error {
 
 	nginxRoot := filepath.Join(bundleRoot, "nginx")
 	args := []string{"-t", "-p", nginxRoot, "-c", "nginx.conf"}
+	moduleDirectives := make([]string, 0, 2)
 	if modulePath, ok := firstExistingPath(
 		"/usr/lib/nginx/modules/ngx_http_modsecurity_module.so",
 		"/usr/lib/nginx/modules/ngx_http_modsecurity.so",
 	); ok {
-		args = append(args, "-g", fmt.Sprintf("load_module %s;", modulePath))
+		moduleDirectives = append(moduleDirectives, fmt.Sprintf("load_module %s;", modulePath))
+	}
+	if modulePath, ok := firstExistingPath(
+		"/usr/lib/nginx/modules/ngx_http_geoip_module.so",
+		"/usr/lib/nginx/modules/ngx_http_geoip_module-debug.so",
+	); ok {
+		moduleDirectives = append(moduleDirectives, fmt.Sprintf("load_module %s;", modulePath))
+	}
+	if len(moduleDirectives) > 0 {
+		args = append(args, "-g", strings.Join(moduleDirectives, " "))
 	}
 
 	run := func() error {

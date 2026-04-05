@@ -161,7 +161,7 @@ export async function renderRequests(container, ctx) {
     };
 
     container.innerHTML = `
-      <section class="waf-card">
+      <section class="waf-card no-page-card-head">
         <div class="waf-card-head">
           <div>
             <h3>${escapeHtml(ctx.t("app.requests"))}</h3>
@@ -208,7 +208,7 @@ export async function renderRequests(container, ctx) {
           <div class="waf-pager">
             <div class="waf-inline">
               <label for="requests-page-size">${escapeHtml(ctx.t("activity.filter.pageSize"))}</label>
-              <select id="requests-page-size">
+              <select id="requests-page-size" class="select select-compact">
                 <option value="10"${state.pageSize === 10 ? " selected" : ""}>10</option>
                 <option value="25"${state.pageSize === 25 ? " selected" : ""}>25</option>
                 <option value="50"${state.pageSize === 50 ? " selected" : ""}>50</option>
@@ -372,3 +372,4 @@ export async function renderRequests(container, ctx) {
 
   await load();
 }
+

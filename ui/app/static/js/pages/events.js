@@ -86,7 +86,7 @@ function buildPageButtons(totalPages, currentPage, dataAttr) {
 
 export async function renderEvents(container, ctx) {
   container.innerHTML = `
-    <section class="waf-card">
+    <section class="waf-card no-page-card-head">
       <div class="waf-card-head">
         <div>
           <h3>${escapeHtml(ctx.t("app.events"))}</h3>
@@ -198,7 +198,7 @@ export async function renderEvents(container, ctx) {
       <div class="waf-pager">
         <div class="waf-inline">
           <label for="events-page-size">${escapeHtml(ctx.t("activity.filter.pageSize"))}</label>
-          <select id="events-page-size">
+          <select id="events-page-size" class="select select-compact">
             <option value="10"${pagingState.pageSize === 10 ? " selected" : ""}>10</option>
             <option value="25"${pagingState.pageSize === 25 ? " selected" : ""}>25</option>
             <option value="50"${pagingState.pageSize === 50 ? " selected" : ""}>50</option>
@@ -381,3 +381,4 @@ export async function renderEvents(container, ctx) {
     renderRows([], new Map());
   }
 }
+

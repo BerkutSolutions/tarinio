@@ -89,7 +89,7 @@ function applyPreset(container, preset) {
 
 export async function renderActivity(container, ctx) {
   container.innerHTML = `
-    <section class="waf-card">
+    <section class="waf-card no-page-card-head">
       <div class="waf-card-head">
         <div>
           <h3>${escapeHtml(ctx.t("activity.title"))}</h3>
@@ -106,7 +106,7 @@ export async function renderActivity(container, ctx) {
           <div class="waf-form-grid three">
             <div class="waf-field">
               <label for="audit-category">${escapeHtml(ctx.t("activity.filter.actionType"))}</label>
-              <select id="audit-category">
+              <select id="audit-category" class="select">
                 <option value="">${escapeHtml(ctx.t("common.all"))}</option>
                 <option value="auth">${escapeHtml(ctx.t("activity.category.auth"))}</option>
                 <option value="config">${escapeHtml(ctx.t("activity.category.config"))}</option>
@@ -123,7 +123,7 @@ export async function renderActivity(container, ctx) {
             </div>
             <div class="waf-field">
               <label for="audit-status">${escapeHtml(ctx.t("activity.filter.status"))}</label>
-              <select id="audit-status">
+              <select id="audit-status" class="select">
                 <option value="">${escapeHtml(ctx.t("common.all"))}</option>
                 <option value="succeeded">${escapeHtml(ctx.t("status.succeeded"))}</option>
                 <option value="failed">${escapeHtml(ctx.t("status.failed"))}</option>
@@ -139,7 +139,7 @@ export async function renderActivity(container, ctx) {
             </div>
             <div class="waf-field">
               <label for="audit-limit">${escapeHtml(ctx.t("activity.filter.pageSize"))}</label>
-              <select id="audit-limit">
+              <select id="audit-limit" class="select select-compact">
                 <option value="25">25</option>
                 <option value="50" selected>50</option>
                 <option value="100">100</option>
@@ -310,3 +310,4 @@ export async function renderActivity(container, ctx) {
 
   await load();
 }
+

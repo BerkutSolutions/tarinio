@@ -71,7 +71,7 @@ func TestRuntimeStatusHealthHandlers(t *testing.T) {
 	status := &runtimeStatus{}
 	logPath := filepath.Join(t.TempDir(), "access.log")
 	server := httptest.NewServer(status.handlers(
-		newRuntimeProcess(t.TempDir(), "/tmp/crs", "/tmp/module.so", status, nil),
+		newRuntimeProcess(t.TempDir(), "/tmp/crs", status, nil, "/tmp/module.so"),
 		newSecurityEventSource(logPath),
 		newRequestStreamSource(logPath, 100),
 	))
@@ -129,7 +129,7 @@ func TestRuntimeStatusReadinessRequiresRunningNginx(t *testing.T) {
 
 	logPath := filepath.Join(t.TempDir(), "access.log")
 	server := httptest.NewServer(status.handlers(
-		newRuntimeProcess(t.TempDir(), "/tmp/crs", "/tmp/module.so", status, nil),
+		newRuntimeProcess(t.TempDir(), "/tmp/crs", status, nil, "/tmp/module.so"),
 		newSecurityEventSource(logPath),
 		newRequestStreamSource(logPath, 100),
 	))

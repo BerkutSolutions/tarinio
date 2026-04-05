@@ -104,6 +104,9 @@ func normalizeCompilerCustomLimitRules(values []CustomRateLimitRuleInput) []Cust
 		if path == "" || rate == "" {
 			continue
 		}
+		if isReservedBaseLocationPath(path) {
+			continue
+		}
 		key := strings.ToLower(path) + "\x00" + rate
 		if _, ok := seen[key]; ok {
 			continue
@@ -164,4 +167,9 @@ func customLimitBurst(rate string) int {
 
 func easyCustomReqZoneName(siteID string, index int) string {
 	return fmt.Sprintf("easy_%s_req_%d", slugSiteID(siteID), index)
+}
+
+func isReservedBaseLocationPath(path string) bool {
+	canonical := customLimitLocationPath(path)
+	return canonical == "/" || canonical == "/api/"
 }

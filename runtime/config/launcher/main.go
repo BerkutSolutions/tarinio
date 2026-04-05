@@ -72,18 +72,18 @@ type runtimeProcess struct {
 	mu          sync.Mutex
 	runtimeRoot string
 	crsPath     string
-	modulePath  string
+	modulePaths []string
 	crsManager  *crsManager
 	status      *runtimeStatus
 	cmd         *exec.Cmd
 	exitCh      chan error
 }
 
-func newRuntimeProcess(runtimeRoot, crsPath, modulePath string, status *runtimeStatus, manager *crsManager) *runtimeProcess {
+func newRuntimeProcess(runtimeRoot, crsPath string, status *runtimeStatus, manager *crsManager, modulePaths ...string) *runtimeProcess {
 	return &runtimeProcess{
 		runtimeRoot: runtimeRoot,
 		crsPath:     crsPath,
-		modulePath:  modulePath,
+		modulePaths: modulePaths,
 		crsManager:  manager,
 		status:      status,
 		exitCh:      make(chan error, 1),
@@ -175,10 +175,22 @@ func (p *runtimeProcess) startOrReloadLocked() error {
 }
 
 func (p *runtimeProcess) nginxGlobalDirective(configPath string, daemonOff bool) string {
-	directives := make([]string, 0, 2)
+	directives := make([]string, 0, len(p.modulePaths)+1)
 	content, err := os.ReadFile(configPath)
-	if err != nil || !strings.Contains(string(content), "load_module") {
-		directives = append(directives, fmt.Sprintf("load_module %s;", p.modulePath))
+	configText := ""
+	if err == nil {
+		configText = string(content)
+	}
+	for _, modulePath := range p.modulePaths {
+		modulePath = strings.TrimSpace(modulePath)
+		if modulePath == "" {
+			continue
+		}
+		moduleBase := filepath.Base(modulePath)
+		if strings.Contains(configText, modulePath) || (moduleBase != "" && strings.Contains(configText, moduleBase)) {
+			continue
+		}
+		directives = append(directives, fmt.Sprintf("load_module %s;", modulePath))
 	}
 	if daemonOff {
 		directives = append(directives, "daemon off;")
@@ -369,15 +381,22 @@ func run() error {
 	}
 	crsPath := manager.ActivePath()
 
-	modulePath, err := selectFirstExisting(
+	modsecurityModulePath, err := selectFirstExisting(
 		"/usr/lib/nginx/modules/ngx_http_modsecurity_module.so",
 		"/usr/lib/nginx/modules/ngx_http_modsecurity.so",
 	)
 	if err != nil {
 		return err
 	}
+	geoIPModulePath, err := selectFirstExisting(
+		"/usr/lib/nginx/modules/ngx_http_geoip_module.so",
+		"/usr/lib/nginx/modules/ngx_http_geoip_module-debug.so",
+	)
+	if err != nil {
+		return err
+	}
 
-	process := newRuntimeProcess(runtimeRoot, crsPath, modulePath, status, manager)
+	process := newRuntimeProcess(runtimeRoot, crsPath, status, manager, modsecurityModulePath, geoIPModulePath)
 	securitySource := newSecurityEventSource("/var/log/nginx/access.log")
 	requestSource := newRequestStreamSource("/var/log/nginx/access.log", 50000)
 	if err := startHealthServer(healthAddr, status, process, securitySource, requestSource); err != nil {
@@ -554,6 +573,9 @@ func prepareRuntimeLayout(candidatePath, crsPath string) error {
 		return err
 	}
 	if err := relink(filepath.Join(candidatePath, "nginx", "ratelimits"), "/etc/waf/nginx/ratelimits"); err != nil {
+		return err
+	}
+	if err := relink(filepath.Join(candidatePath, "nginx", "easy-locations"), "/etc/waf/nginx/easy-locations"); err != nil {
 		return err
 	}
 	if err := relink(filepath.Join(candidatePath, "nginx", "easy"), "/etc/waf/nginx/easy"); err != nil && !os.IsNotExist(err) {

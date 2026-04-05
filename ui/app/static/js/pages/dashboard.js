@@ -762,7 +762,7 @@ function renderIPTopList(items, emptyText, widgetAction = "") {
   return renderTopList(items, emptyText, {
     containerAction: widgetAction,
     renderLabel: (item) => `<span class="dashboard-ip-main">${escapeHtml(String(item?.key || "-"))}</span>`,
-    renderMetaRight: (item) => renderCountryBadge(item?.countryCode),
+    renderLabel: (item) => renderCountryBadge(item?.countryCode || item?.key),
     rowAttrs: (item) => {
       const ip = String(item?.key || "").trim();
       if (!ip) {
@@ -939,7 +939,7 @@ function mergeWidgetData(stats, detailModel, containersOverview, ctx) {
     "top-ips": renderIPTopList(topIPItems, ctx.t("dashboard.empty.topIPs"), "top-ips"),
     "top-countries": renderTopList((stats?.top_attacker_countries || []).map((item) => ({ key: item?.key, count: item?.count, countryCode: item?.key })), ctx.t("dashboard.empty.topCountries"), {
       containerAction: "top-countries",
-      renderMetaRight: (item) => renderCountryBadge(item?.countryCode),
+      renderLabel: (item) => renderCountryBadge(item?.countryCode || item?.key),
       rowAttrs: (item) => `data-widget-action="country-detail" data-country-code="${escapeHtml(normalizeCountryCode(item?.countryCode || item?.key))}"`
     }),
     "top-urls": renderTopList(stats?.most_attacked_urls || [], ctx.t("dashboard.empty.topURLs"), {
@@ -1894,3 +1894,4 @@ export async function renderDashboard(container, ctx) {
 
   await load(false);
 }
+

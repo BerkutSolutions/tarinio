@@ -12169,3 +12169,24 @@ body.auth-locked #main-screen {
   overflow-wrap: anywhere;
   word-break: break-word;
 }
+
+.no-page-card-head > .waf-card-head {
+  display: none;
+}
+
+.waf-pager .select,
+.waf-pager select {
+  min-width: 86px;
+  background: rgba(8, 12, 20, 0.92);
+  border: 1px solid rgba(96, 121, 187, 0.45);
+  border-radius: 10px;
+  color: #f5f7ff;
+  padding: 7px 28px 7px 10px;
+}
+
+.waf-pager .select:focus,
+.waf-pager select:focus {
+  border-color: rgba(125, 155, 255, 0.92);
+  box-shadow: 0 0 0 3px rgba(125, 155, 255, 0.2);
+  outline: none;
+}

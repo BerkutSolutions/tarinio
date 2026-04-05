@@ -5,22 +5,22 @@ geoip_country /usr/share/GeoIP/GeoIP.dat;
 
 map $http_cf_ipcountry $waf_country_from_cf {
     default "";
-    ~(?i)^[A-Z]{2}$ $http_cf_ipcountry;
+    ~(?i)^[A-Z][A-Z]$ $http_cf_ipcountry;
 }
 
 map $http_x_country_code $waf_country_from_x_country_code {
     default "";
-    ~(?i)^[A-Z]{2}$ $http_x_country_code;
+    ~(?i)^[A-Z][A-Z]$ $http_x_country_code;
 }
 
 map $http_x_geo_country $waf_country_from_x_geo_country {
     default "";
-    ~(?i)^[A-Z]{2}$ $http_x_geo_country;
+    ~(?i)^[A-Z][A-Z]$ $http_x_geo_country;
 }
 
 map $http_x_country $waf_country_from_x_country {
     default "";
-    ~(?i)^[A-Z]{2}$ $http_x_country;
+    ~(?i)^[A-Z][A-Z]$ $http_x_country;
 }
 
 map $waf_country_from_cf $waf_country_header_step_1 {
@@ -59,3 +59,4 @@ server {
         return 421;
     }
 }
+

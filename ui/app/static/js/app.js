@@ -169,8 +169,8 @@ async function renderPage() {
   const section = currentSection();
   const container = document.getElementById("content-area");
   document.title = `Tarinio | ${t(section.labelKey)}`;
-  document.getElementById("page-title").textContent = t(section.labelKey);
-  document.getElementById("page-desc").textContent = t(section.descriptionKey);
+  const pageTitleNode = document.getElementById("page-title");`r`n  if (pageTitleNode) pageTitleNode.textContent = "";
+  const pageDescNode = document.getElementById("page-desc");`r`n  if (pageDescNode) pageDescNode.textContent = "";`r`n  const pageHeaderNode = document.querySelector(".app-header");`r`n  if (pageHeaderNode) pageHeaderNode.style.display = "none";
   renderMenu();
   container.innerHTML = `<div class="waf-empty">${escapeHtml(t("app.loading"))}</div>`;
   try {
@@ -409,14 +409,14 @@ async function loadMeta() {
     }
     renderUpdateBadge(meta);
   } catch {
-    setVersion("v1.0.16");
+    setVersion("v1.0.17");
     renderUpdateBadge(null);
   }
 }
 
 async function bootstrap() {
   await applyTranslations(getLanguage());
-  setVersion("v1.0.16");
+  setVersion("v1.0.17");
 
   const access = await checkEntryAccess("app");
   if (!access.allowed) {
@@ -449,4 +449,5 @@ async function bootstrap() {
 }
 
 bootstrap();
+
 

@@ -1,7 +1,9 @@
 package app
 
 import (
+	"net"
 	"path/filepath"
+	"strings"
 
 	"waf/control-plane/internal/accesspolicies"
 	"waf/control-plane/internal/antiddos"
@@ -233,6 +235,10 @@ func New(cfg config.Config) (*App, error) {
 	httpServer := httpserver.New(cfg.HTTPAddr, setupService, revisionService, authService, siteService, manualBanService, upstreamService, certificateService, tlsConfigService, certificateUploadService, letsEncryptService, selfSignedCertificateService, wafPolicyService, accessPolicyService, rateLimitPolicyService, easySiteProfileService, antiDDoSService, eventService, revisionCompileService, applyService, auditService, reportService, dashboardService, containerRuntimeService, runtimeCRSService, runtimeRequestCollector)
 	var devFastStartBootstrapper *services.DevFastStartBootstrapper
 	if cfg.DevFastStart.Enabled {
+		devFastStartCertificateIssuer := letsEncryptService
+		if shouldUseSelfSignedForDevFastStartHost(cfg.DevFastStart.Host) {
+			devFastStartCertificateIssuer = selfSignedCertificateService
+		}
 		devFastStartBootstrapper = services.NewDevFastStartBootstrapper(
 			cfg.DevFastStart,
 			siteService,
@@ -243,7 +249,7 @@ func New(cfg config.Config) (*App, error) {
 			revisionStore,
 			revisionCompileService,
 			applyService,
-			letsEncryptService,
+			devFastStartCertificateIssuer,
 			easySiteProfileStore,
 			easySiteProfileService,
 			rateLimitPolicyStore,
@@ -299,4 +305,28 @@ func New(cfg config.Config) (*App, error) {
 		DevFastStartBootstrapper: devFastStartBootstrapper,
 		HTTPServer:               httpServer,
 	}, nil
+}
+
+func shouldUseSelfSignedForDevFastStartHost(host string) bool {
+	value := strings.ToLower(strings.TrimSpace(host))
+	if value == "" {
+		return false
+	}
+	if strings.HasPrefix(value, "[") && strings.HasSuffix(value, "]") {
+		value = strings.Trim(value, "[]")
+	}
+	if ip := net.ParseIP(value); ip != nil {
+		return ip.IsLoopback()
+	}
+	if strings.Contains(value, ":") {
+		parsedHost, _, err := net.SplitHostPort(value)
+		if err == nil {
+			parsedHost = strings.Trim(strings.ToLower(strings.TrimSpace(parsedHost)), "[]")
+			if ip := net.ParseIP(parsedHost); ip != nil {
+				return ip.IsLoopback()
+			}
+			value = parsedHost
+		}
+	}
+	return value == "localhost" || strings.HasSuffix(value, ".localhost")
 }
