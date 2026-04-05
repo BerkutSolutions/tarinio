@@ -409,14 +409,14 @@ async function loadMeta() {
     }
     renderUpdateBadge(meta);
   } catch {
-    setVersion("v1.0.13");
+    setVersion("v1.0.14");
     renderUpdateBadge(null);
   }
 }
 
 async function bootstrap() {
   await applyTranslations(getLanguage());
-  setVersion("v1.0.13");
+  setVersion("v1.0.14");
 
   const access = await checkEntryAccess("app");
   if (!access.allowed) {

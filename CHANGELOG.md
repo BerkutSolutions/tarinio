@@ -2,39 +2,53 @@
 
 Все значимые изменения проекта фиксируются в этом файле.
 
+## [1.0.14] - 2026-04-05
+
+### Сборка / Тесты
+- Исправлен `ui/tests` в Docker build-контексте: markdown-проверка кодировки больше не падает, если в образ не попали `docs/`, `README.md`, `README.en.md`, `CHANGELOG.md` (тест корректно пропускается).
+
+### Версионирование
+- Версия приложения и документации поднята до `1.0.14`.
+
+### Документация
+- Заполнены ранее placeholder-разделы операторской документации в локалях EN/RU: `docs/eng/operators/*` и `docs/ru/operators/*` синхронизированы с актуальными runbook-материалами (`anti-ddos`, `letsencrypt-dns`, `owasp-crs`, `runtime-l4-guard`, `runtime-filesystem-contract`, `stage-1-e2e-validation`, `waf-tuning-guide`).
+- Существенно расширены базовые операционные документы EN/RU:
+  - `docs/eng/backups.md`, `docs/eng/upgrade.md`, `docs/eng/runbook.md`, `docs/eng/security.md`;
+  - `docs/ru/backups.md`, `docs/ru/upgrade.md`, `docs/ru/runbook.md`, `docs/ru/security.md`.
+
 ## [1.0.13] - 2026-04-05
 
-### Runtime / GeoIP / Country Policy
+### Рантайм / GeoIP / Политики по странам
 - Добавлена country policy на уровне runtime: правила по странам теперь опираются на `$waf_country_code` с fallback на GeoIP в защитном пайплайне.
 - В runtime-контур включена автоматическая проверка GeoIP database и корректная инициализация nginx GeoIP-модуля для whitelist/blacklist стран.
 - В Easy site profile расширена гео-настройка: отдельные списки `blacklist_country` и `whitelist_country` с нормализацией кодов стран.
 
-### Limits / Anti-Scan
+### Лимиты / Anti-Scan
 - В Easy-профиле добавлены route-specific лимиты по URL: настраиваемые правила вида `path + rate` собираются в отдельные nginx `location`/`limit_req` блоки.
 - Для management-site усилены per-route ограничения на `/login`, `/api/auth/`, `/api/setup/`, `/api/events`, `/api/requests`, `/api/reports/` и общий `/api/`.
 - Добавлены quick templates для blacklist User-Agent и probe/scanner URI.
 
-### UI
+### Интерфейс
 - Добавлен searchable country picker для выбора стран в `blacklist_country` и `whitelist_country`.
 - Для стран в формате кода в скобках добавлены флаги: например `Germany (DE 🇩🇪)`.
 - Вкладки `События`, `Баны`, `Запросы` переведены на ограниченную пагинацию: выбор `10/25/50/100` строк, пересчет страниц и навигация `1..10 ... last`.
 - Исправлен визуальный баг модалки деталей события/запроса: длинные значения больше не ломают левый столбец по одной букве.
 - Укреплен flow `Разбан`: синхронизация с backend-состоянием и очистка локального state/cookies после manual unban.
 
-### Runtime / Anti-DDoS Defaults
-- Глобальный Anti-DDoS параметр enforce_l7_rate_limit теперь включен по умолчанию (true) для новых настроек.
+### Рантайм / Anti-DDoS по умолчанию
+- Глобальный Anti-DDoS параметр `enforce_l7_rate_limit` теперь включен по умолчанию (`true`) для новых настроек.
 
 ### Документация / Кодировка
-- Восстановлена корректная UTF-8 кодировка в русскоязычных markdown-документах (docs/ru/**), устранены поврежденные символы.
-- Синхронизирована базовая версия RU-документации: 1.0.13.
+- Восстановлена корректная UTF-8 кодировка в русскоязычных markdown-документах (`docs/ru/**`), устранены поврежденные символы.
+- Синхронизирована базовая версия RU-документации: `1.0.13`.
 
 ## [1.0.12] - 2026-04-04
 
-### Runtime / NGINX
+### Рантайм / NGINX
 - Исправлена выдача кастомной 403-заглушки для заблокированных IP: внутренние __waf_errors location теперь отдаются корректно даже при deny на уровне сервера.
 - Устранен сценарий, когда при перманентном бане nginx показывал дефолтный белый 403 Forbidden вместо брендированной WAF-страницы.
 
-### UI
+### Интерфейс
 - Исправлен Разбан в Баны: при ручном unban теперь полностью сбрасывается локальное состояние эскалации по IP (WAF «забывает» пользователя), чтобы повторный F5 не поднимал уровень сразу до L2/24h.
 - При manual unban очищаются оба anti-flood cookie: waf_rate_limited_* и waf_rate_limited_escalation_* (включая all-sites сценарий).
 
@@ -70,7 +84,7 @@
   - `POST /api/owasp-crs/check-updates`;
   - `POST /api/owasp-crs/update`.
 
-### UI
+### Интерфейс
 - Добавлена отдельная вкладка `OWASP CRS` в боковом меню:
   - статус active/latest;
   - ручной dry-run check;
@@ -90,7 +104,7 @@
 - В Easy profile добавлена вкладка `Блокировки` с гибкой эскалацией банов по этапам (`+`/удаление этапов, формат `s/m/h/d`, `0` = перманентно) и выбором scope (`текущий сервис` или `все сервисы`).
 - Базовый этап банов для anti-DDoS теперь берется из `security_behavior_and_limits.bad_behavior_ban_time_seconds` конкретного сервиса (вместо жесткого общего значения).
 
-### Compose Profiles
+### Профили Compose
 - Синхронизирован `auto-start` профиль для локальной проверки (`CONTROL_PLANE_ACME_USE_DEVELOPMENT_CLIENT=true`).
 - Актуализирован `testpage` профиль:
   - runtime-контейнеры получают read-only mount соответствующего `control-plane-data`;
