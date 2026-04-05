@@ -25,11 +25,11 @@
         if (window.__wafBlockedRendered) return;
         window.__wafBlockedRendered = true;
         var code = toCode(opts && opts.code);
-        var title = code === 403 ? "403 Доступ ограничен" : "429 Слишком много запросов";
+        var title = code === 403 ? "403 Р”РѕСЃС‚СѓРї РѕРіСЂР°РЅРёС‡РµРЅ" : "429 РЎР»РёС€РєРѕРј РјРЅРѕРіРѕ Р·Р°РїСЂРѕСЃРѕРІ";
         var text = code === 403
-          ? "Доступ временно ограничен защитой WAF/Anti-DDoS."
-          : "Сработала защита от флуда. Подождите, пока завершится окно блокировки.";
-        document.body.innerHTML = '<div class="waf-fallback-wrap"><article class="waf-fallback-card"><h1 class="waf-fallback-title">' + title + '</h1><p class="waf-fallback-sub">' + text + '</p><span class="waf-fallback-badge">Защита активна</span><p class="waf-fallback-hint">Пока блокировка активна, основной интерфейс не отображается.</p></article></div>';
+          ? "Р”РѕСЃС‚СѓРї РІСЂРµРјРµРЅРЅРѕ РѕРіСЂР°РЅРёС‡РµРЅ Р·Р°С‰РёС‚РѕР№ WAF/Anti-DDoS."
+          : "РЎСЂР°Р±РѕС‚Р°Р»Р° Р·Р°С‰РёС‚Р° РѕС‚ С„Р»СѓРґР°. РџРѕРґРѕР¶РґРёС‚Рµ, РїРѕРєР° Р·Р°РІРµСЂС€РёС‚СЃСЏ РѕРєРЅРѕ Р±Р»РѕРєРёСЂРѕРІРєРё.";
+        document.body.innerHTML = '<div class="waf-fallback-wrap"><article class="waf-fallback-card"><h1 class="waf-fallback-title">' + title + '</h1><p class="waf-fallback-sub">' + text + '</p><span class="waf-fallback-badge">Р—Р°С‰РёС‚Р° Р°РєС‚РёРІРЅР°</span><p class="waf-fallback-hint">РџРѕРєР° Р±Р»РѕРєРёСЂРѕРІРєР° Р°РєС‚РёРІРЅР°, РѕСЃРЅРѕРІРЅРѕР№ РёРЅС‚РµСЂС„РµР№СЃ РЅРµ РѕС‚РѕР±СЂР°Р¶Р°РµС‚СЃСЏ.</p></article></div>';
       }
       window.__wafRenderBlocked = renderBlocked;
       window.__wafMarkBoot = function () { window.__wafBootOk = true; };
@@ -106,7 +106,7 @@
           </button>
         </div>
         <a id="app-update-badge" class="btn btn-sm primary app-update-link" hidden></a>
-        <div id="app-version" class="muted app-version" data-i18n="app.version">v1.0.14</div>
+        <div id="app-version" class="muted app-version" data-i18n="app.version">v1.0.15</div>
       </div>
     </aside>
     <main id="content">

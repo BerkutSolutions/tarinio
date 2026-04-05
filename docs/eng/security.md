@@ -1,6 +1,6 @@
-﻿# Security (EN)
+# Security (EN)
 
-Documentation baseline: `1.0.14`
+Documentation baseline: `1.0.15`
 
 ## Production baseline
 

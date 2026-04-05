@@ -196,7 +196,7 @@ async function renderPage() {
           <div class="waf-card-head"><h3>${escapeHtml(tooManyRequests ? "429 Too Many Requests" : "403 Forbidden")}</h3></div>
           <div class="waf-card-body">
             <p>${escapeHtml(t("app.error"))}</p>
-            <p class="muted">${escapeHtml(tooManyRequests ? "Слишком много запросов. Подождите несколько секунд и обновите страницу." : "Доступ запрещён текущими правилами защиты.")}</p>
+            <p class="muted">${escapeHtml(tooManyRequests ? "РЎР»РёС€РєРѕРј РјРЅРѕРіРѕ Р·Р°РїСЂРѕСЃРѕРІ. РџРѕРґРѕР¶РґРёС‚Рµ РЅРµСЃРєРѕР»СЊРєРѕ СЃРµРєСѓРЅРґ Рё РѕР±РЅРѕРІРёС‚Рµ СЃС‚СЂР°РЅРёС†Сѓ." : "Р”РѕСЃС‚СѓРї Р·Р°РїСЂРµС‰С‘РЅ С‚РµРєСѓС‰РёРјРё РїСЂР°РІРёР»Р°РјРё Р·Р°С‰РёС‚С‹.")}</p>
           </div>
         </div>
       `;
@@ -409,14 +409,14 @@ async function loadMeta() {
     }
     renderUpdateBadge(meta);
   } catch {
-    setVersion("v1.0.14");
+    setVersion("v1.0.15");
     renderUpdateBadge(null);
   }
 }
 
 async function bootstrap() {
   await applyTranslations(getLanguage());
-  setVersion("v1.0.14");
+  setVersion("v1.0.15");
 
   const access = await checkEntryAccess("app");
   if (!access.allowed) {

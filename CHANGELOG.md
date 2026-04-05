@@ -1,6 +1,11 @@
-# Журнал изменений
+﻿# Журнал изменений
 
 Все значимые изменения проекта фиксируются в этом файле.
+
+## [1.0.15] - 2026-04-05
+
+### Рантайм / NGINX
+- Исправлен краш `runtime` при старте из-за UTF-8 BOM в nginx-шаблонах (`compiler/templates/nginx/conf.d/base.conf.tmpl`, `compiler/templates/nginx/easy/site.conf.tmpl`), который приводил к ошибке `unknown directive "proxy_http_version"` и недоступности портов `80/443`.
 
 ## [1.0.14] - 2026-04-05
 

@@ -1,6 +1,6 @@
-﻿# Runbook (EN)
+# Runbook (EN)
 
-Documentation baseline: `1.0.14`
+Documentation baseline: `1.0.15`
 
 ## Fast health checks
 
