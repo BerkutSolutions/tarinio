@@ -1,4 +1,4 @@
-﻿# Anti-DDoS Runbook
+# Anti-DDoS Runbook
 
 This runbook describes safe tuning and rollback for the `Anti-DDoS` section (`/anti-ddos`).
 
@@ -21,7 +21,7 @@ Default profile is conservative-high to avoid false bans on first rollout:
 - `rate_burst`: `200`
 - `ports`: `80,443`
 - `target`: `DROP`
-- `enforce_l7_rate_limit`: `false`
+- `enforce_l7_rate_limit`: `true`
 - `l7_requests_per_second`: `100`
 - `l7_burst`: `200`
 - `l7_status_code`: `429`

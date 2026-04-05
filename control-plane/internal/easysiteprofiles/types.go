@@ -63,6 +63,11 @@ type HTTPHeadersSettings struct {
 	CORSAllowedOrigins    []string `json:"cors_allowed_origins"`
 }
 
+type CustomLimitRule struct {
+	Path string `json:"path"`
+	Rate string `json:"rate"`
+}
+
 type SecurityBehaviorAndLimitsSettings struct {
 	UseBadBehavior              bool   `json:"use_bad_behavior"`
 	BadBehaviorStatusCodes      []int  `json:"bad_behavior_status_codes"`
@@ -86,13 +91,14 @@ type SecurityBehaviorAndLimitsSettings struct {
 	BlacklistUserAgentURLs []string `json:"blacklist_user_agent_urls"`
 	BlacklistURIURLs       []string `json:"blacklist_uri_urls"`
 
-	UseLimitConn      bool   `json:"use_limit_conn"`
-	LimitConnMaxHTTP1 int    `json:"limit_conn_max_http1"`
-	LimitConnMaxHTTP2 int    `json:"limit_conn_max_http2"`
-	LimitConnMaxHTTP3 int    `json:"limit_conn_max_http3"`
-	UseLimitReq       bool   `json:"use_limit_req"`
-	LimitReqURL       string `json:"limit_req_url"`
-	LimitReqRate      string `json:"limit_req_rate"`
+	UseLimitConn      bool              `json:"use_limit_conn"`
+	LimitConnMaxHTTP1 int               `json:"limit_conn_max_http1"`
+	LimitConnMaxHTTP2 int               `json:"limit_conn_max_http2"`
+	LimitConnMaxHTTP3 int               `json:"limit_conn_max_http3"`
+	UseLimitReq       bool              `json:"use_limit_req"`
+	LimitReqURL       string            `json:"limit_req_url"`
+	LimitReqRate      string            `json:"limit_req_rate"`
+	CustomLimitRules  []CustomLimitRule `json:"custom_limit_rules"`
 }
 
 type SecurityAntibotSettings struct {
@@ -165,6 +171,7 @@ func DefaultProfile(siteID string) EasySiteProfile {
 	limitConnHTTP3 := envIntOrDefault("WAF_DEFAULT_LIMIT_CONN_MAX_HTTP3", 400)
 	limitReqRate := envStringOrDefault("WAF_DEFAULT_LIMIT_REQ_RATE", "120r/s")
 	badBehaviorStatusCodes := []int{400, 401, 405, 444}
+	customLimitRules := []CustomLimitRule{}
 
 	if isManagementSite {
 		if limitConnHTTP1 < 300 {
@@ -190,6 +197,15 @@ func DefaultProfile(siteID string) EasySiteProfile {
 		// Management UI and SPA frontends can legitimately burst static/API requests.
 		// Keep local bad-behavior focused on clear abuse signals and avoid 429/403/404 escalation loops.
 		badBehaviorStatusCodes = []int{400, 401, 405, 444}
+		customLimitRules = []CustomLimitRule{
+			{Path: "/login", Rate: "6r/s"},
+			{Path: "/api/auth/", Rate: "12r/s"},
+			{Path: "/api/setup/", Rate: "8r/s"},
+			{Path: "/api/events", Rate: "8r/s"},
+			{Path: "/api/requests", Rate: "8r/s"},
+			{Path: "/api/reports/", Rate: "10r/s"},
+			{Path: "/api/", Rate: "30r/s"},
+		}
 	}
 
 	return EasySiteProfile{
@@ -257,6 +273,7 @@ func DefaultProfile(siteID string) EasySiteProfile {
 			UseLimitReq:                 true,
 			LimitReqURL:                 map[bool]string{true: "/api/", false: "/"}[isManagementSite],
 			LimitReqRate:                limitReqRate,
+			CustomLimitRules:            append([]CustomLimitRule(nil), customLimitRules...),
 		},
 		SecurityAntibot: SecurityAntibotSettings{
 			AntibotChallenge:        AntibotChallengeNo,

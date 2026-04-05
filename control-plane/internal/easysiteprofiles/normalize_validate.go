@@ -64,6 +64,7 @@ func normalizeProfile(profile EasySiteProfile) EasySiteProfile {
 	profile.SecurityBehaviorAndLimits.BlacklistURIURLs = normalizeTrimmedList(profile.SecurityBehaviorAndLimits.BlacklistURIURLs)
 	profile.SecurityBehaviorAndLimits.LimitReqURL = strings.TrimSpace(profile.SecurityBehaviorAndLimits.LimitReqURL)
 	profile.SecurityBehaviorAndLimits.LimitReqRate = normalizeLimitReqRate(profile.SecurityBehaviorAndLimits.LimitReqRate)
+	profile.SecurityBehaviorAndLimits.CustomLimitRules = normalizeCustomLimitRules(profile.SecurityBehaviorAndLimits.CustomLimitRules)
 
 	profile.SecurityAntibot.AntibotChallenge = strings.ToLower(strings.TrimSpace(profile.SecurityAntibot.AntibotChallenge))
 	profile.SecurityAntibot.AntibotURI = strings.TrimSpace(profile.SecurityAntibot.AntibotURI)
@@ -202,6 +203,17 @@ func validateProfile(profile EasySiteProfile) error {
 	if !rateRegexp.MatchString(profile.SecurityBehaviorAndLimits.LimitReqRate) {
 		return errors.New("easy site profile security_behavior_and_limits.limit_req_rate must match Nr/s")
 	}
+	if len(profile.SecurityBehaviorAndLimits.CustomLimitRules) > 32 {
+		return errors.New("easy site profile security_behavior_and_limits.custom_limit_rules must not exceed 32 entries")
+	}
+	for _, rule := range profile.SecurityBehaviorAndLimits.CustomLimitRules {
+		if rule.Path == "" || !strings.HasPrefix(rule.Path, "/") {
+			return errors.New("easy site profile security_behavior_and_limits.custom_limit_rules.path must start with /")
+		}
+		if !rateRegexp.MatchString(rule.Rate) {
+			return errors.New("easy site profile security_behavior_and_limits.custom_limit_rules.rate must match Nr/s")
+		}
+	}
 
 	antibotModes := []string{
 		AntibotChallengeNo, AntibotChallengeCookie, AntibotChallengeJavascript, AntibotChallengeCaptcha,
@@ -334,6 +346,34 @@ func normalizeStatusCodes(values []int) []int {
 	items := append([]int(nil), values...)
 	sort.Ints(items)
 	return slices.Compact(items)
+}
+
+func normalizeCustomLimitRules(values []CustomLimitRule) []CustomLimitRule {
+	if len(values) == 0 {
+		return nil
+	}
+	items := make([]CustomLimitRule, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		path := strings.TrimSpace(value.Path)
+		rate := normalizeLimitReqRate(value.Rate)
+		if path == "" || rate == "" {
+			continue
+		}
+		key := strings.ToLower(path) + "\x00" + rate
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		items = append(items, CustomLimitRule{Path: path, Rate: rate})
+	}
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].Path == items[j].Path {
+			return items[i].Rate < items[j].Rate
+		}
+		return items[i].Path < items[j].Path
+	})
+	return items
 }
 
 func normalizeLimitReqRate(value string) string {

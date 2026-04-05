@@ -1,4 +1,4 @@
-FROM golang:1.24-bookworm AS builder
+﻿FROM golang:1.24-bookworm AS builder
 
 WORKDIR /src
 COPY runtime/config/launcher /src/runtime/config/launcher
@@ -12,11 +12,13 @@ FROM debian:12-slim
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
+        geoip-database \
         iproute2 \
         iptables \
-        nginx \
+        libnginx-mod-http-geoip \
         libnginx-mod-http-modsecurity \
         modsecurity-crs \
+        nginx \
         wget \
     && rm -rf /var/lib/apt/lists/*
 

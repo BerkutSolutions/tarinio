@@ -90,6 +90,11 @@ type RateLimitPolicyInput struct {
 	StatusCode    int
 }
 
+type CustomRateLimitRuleInput struct {
+	Path string
+	Rate string
+}
+
 // ArtifactOutput is a rendered compiler artifact ready to be placed into a bundle.
 type ArtifactOutput struct {
 	Path     string
@@ -136,6 +141,7 @@ type EasyProfileInput struct {
 	LimitConnMaxHTTP3         int
 	UseLimitReq               bool
 	LimitReqRate              string
+	CustomLimitRules          []CustomRateLimitRuleInput
 	UseBadBehavior            bool
 	BadBehaviorStatusCodes    []int
 	BadBehaviorBanTimeSeconds int

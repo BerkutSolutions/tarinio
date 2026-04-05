@@ -62,7 +62,7 @@ func DefaultSettings() Settings {
 		ports = []int{80, 443}
 	}
 	destinationIP := strings.TrimSpace(os.Getenv("WAF_DEFAULT_ANTIDDOS_DESTINATION_IP"))
-	enforceL7 := envBoolOrDefault("WAF_DEFAULT_ANTIDDOS_ENFORCE_L7_RATE_LIMIT", false)
+	enforceL7 := envBoolOrDefault("WAF_DEFAULT_ANTIDDOS_ENFORCE_L7_RATE_LIMIT", true)
 	l7RequestsPS := envIntOrDefault("WAF_DEFAULT_ANTIDDOS_L7_REQUESTS_PER_SECOND", 100)
 	l7Burst := envIntOrDefault("WAF_DEFAULT_ANTIDDOS_L7_BURST", 200)
 	l7StatusCode := envIntOrDefault("WAF_DEFAULT_ANTIDDOS_L7_STATUS_CODE", 429)
@@ -342,3 +342,4 @@ func envFloatOrDefault(key string, fallback float64) float64 {
 	}
 	return value
 }
+

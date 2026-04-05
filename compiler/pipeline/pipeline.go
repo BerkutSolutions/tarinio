@@ -16,6 +16,7 @@ type WAFPolicyInput = internal.WAFPolicyInput
 type WAFMode = internal.WAFMode
 type AccessPolicyInput = internal.AccessPolicyInput
 type RateLimitPolicyInput = internal.RateLimitPolicyInput
+type CustomRateLimitRuleInput = internal.CustomRateLimitRuleInput
 type EasyProfileInput = internal.EasyProfileInput
 type ArtifactKind = internal.ArtifactKind
 type ArtifactOutput = internal.ArtifactOutput
@@ -59,6 +60,10 @@ func RenderAccessRateLimitArtifacts(sites []SiteInput, accessPolicies []AccessPo
 
 func RenderEasyArtifacts(sites []SiteInput, profiles []EasyProfileInput) ([]ArtifactOutput, error) {
 	return internal.RenderEasyArtifacts(sites, profiles)
+}
+
+func RenderEasyRateLimitArtifacts(sites []SiteInput, upstreams []UpstreamInput, profiles []EasyProfileInput) ([]ArtifactOutput, error) {
+	return internal.RenderEasyRateLimitArtifacts(sites, upstreams, profiles)
 }
 
 func AssembleRevisionBundle(revision RevisionInput, artifacts ...[]ArtifactOutput) (*RevisionBundle, error) {

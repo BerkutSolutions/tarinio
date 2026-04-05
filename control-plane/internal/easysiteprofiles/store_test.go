@@ -85,6 +85,7 @@ func TestStore_CreateUpdateGetDelete(t *testing.T) {
 	profile := DefaultProfile("site-a")
 	profile.FrontService.ServerName = "WWW.Example.COM"
 	profile.SecurityBehaviorAndLimits.LimitReqRate = "100 r/s"
+	profile.SecurityBehaviorAndLimits.CustomLimitRules = []CustomLimitRule{{Path: "/login", Rate: " 6 r/s "}, {Path: "/login", Rate: "6r/s"}}
 
 	created, err := store.Create(profile)
 	if err != nil {
@@ -95,6 +96,12 @@ func TestStore_CreateUpdateGetDelete(t *testing.T) {
 	}
 	if created.SecurityBehaviorAndLimits.LimitReqRate != "100r/s" {
 		t.Fatalf("expected normalized rate, got %s", created.SecurityBehaviorAndLimits.LimitReqRate)
+	}
+	if len(created.SecurityBehaviorAndLimits.CustomLimitRules) != 1 {
+		t.Fatalf("expected duplicate custom limits to collapse, got %+v", created.SecurityBehaviorAndLimits.CustomLimitRules)
+	}
+	if created.SecurityBehaviorAndLimits.CustomLimitRules[0].Rate != "6r/s" {
+		t.Fatalf("expected normalized custom limit rate, got %+v", created.SecurityBehaviorAndLimits.CustomLimitRules)
 	}
 
 	got, ok, err := store.Get("site-a")
@@ -240,5 +247,15 @@ func TestStore_UpdateAutoRepairsControlPlaneAccessAPIMethods(t *testing.T) {
 		if !slices.Contains(updated.HTTPBehavior.AllowedMethods, method) {
 			t.Fatalf("expected method %s after auto repair, got %+v", method, updated.HTTPBehavior.AllowedMethods)
 		}
+	}
+}
+
+func TestDefaultProfile_ControlPlaneAccessAddsCustomRouteLimits(t *testing.T) {
+	profile := DefaultProfile("control-plane-access")
+	if len(profile.SecurityBehaviorAndLimits.CustomLimitRules) == 0 {
+		t.Fatal("expected management profile to include custom route limits")
+	}
+	if profile.SecurityBehaviorAndLimits.CustomLimitRules[0].Path == "" || profile.SecurityBehaviorAndLimits.CustomLimitRules[0].Rate == "" {
+		t.Fatalf("expected non-empty custom route limit entries, got %+v", profile.SecurityBehaviorAndLimits.CustomLimitRules)
 	}
 }

@@ -1,6 +1,6 @@
 # Runbook (EN)
 
-Documentation baseline: `1.0.12`
+Documentation baseline: `1.0.13`
 
 ## Basic checks
 

@@ -181,7 +181,7 @@
   "app.sites": "Сервисы",
   "app.tls": "TLS / Сертификаты",
   "app.user.noRoles": "Нет ролей",
-  "app.version": "Версия 1.0.12",
+  "app.version": "Версия 1.0.13",
   "auth.2fa.challengeMissing": "Запрос 2FA отсутствует. Пожалуйста, войдите снова.",
   "auth.2fa.code": "Код 2FA",
   "auth.2fa.codeRequired": "Нужен код 2FA",
@@ -1084,5 +1084,10 @@
   "sites.validation.banEscalationStageValue": "Значения этапов бана должны быть нулевыми или положительными",
   "sites.validation.banEscalationStagesLimit": "Количество этапов не должно превышать 12",
   "sites.validation.banEscalationStagesRequired": "Добавьте хотя бы один этап при включенной поэтапной блокировке",
-  "sites.validation.banStageFormat": "Неверный формат длительности этапа блокировки."
+  "sites.validation.banStageFormat": "Неверный формат длительности этапа блокировки.",
+  "sites.easy.traffic.customLimitRules": "Лимиты запросов по URL",
+  "sites.easy.traffic.addCustomLimit": "Добавить правило",
+  "sites.validation.customLimitPathFormat": "Путь кастомного лимита должен начинаться с /",
+  "sites.validation.customLimitRateFormat": "Ставка кастомного лимита должна быть в формате 20r/s",
+  "sites.validation.customLimitRulesLimit": "Количество кастомных правил не должно превышать 32"
 }

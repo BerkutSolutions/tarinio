@@ -126,6 +126,64 @@ func TestI18NRuValuesNoMojibake(t *testing.T) {
 	}
 }
 
+func TestMarkdownFilesNoMojibake(t *testing.T) {
+	roots := []string{
+		filepath.Join("..", "..", "docs"),
+		filepath.Join("..", "..", "README.md"),
+		filepath.Join("..", "..", "README.en.md"),
+		filepath.Join("..", "..", "CHANGELOG.md"),
+	}
+
+	var broken []string
+	checkFile := func(path string) {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			broken = append(broken, path+": read error: "+err.Error())
+			return
+		}
+		if !utf8.Valid(raw) {
+			broken = append(broken, path+": invalid utf-8")
+			return
+		}
+		content := string(raw)
+		if strings.ContainsRune(content, unicode.ReplacementChar) || hasMojibakeMarker(content) {
+			broken = append(broken, path+": contains mojibake/replacement markers")
+		}
+	}
+
+	for _, root := range roots {
+		info, err := os.Stat(root)
+		if err != nil {
+			broken = append(broken, root+": stat error: "+err.Error())
+			continue
+		}
+		if !info.IsDir() {
+			checkFile(root)
+			continue
+		}
+		err = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if info.IsDir() {
+				return nil
+			}
+			if strings.ToLower(filepath.Ext(path)) != ".md" {
+				return nil
+			}
+			checkFile(path)
+			return nil
+		})
+		if err != nil {
+			broken = append(broken, root+": walk error: "+err.Error())
+		}
+	}
+
+	if len(broken) > 0 {
+		sort.Strings(broken)
+		t.Fatalf("markdown mojibake/encoding issues: %v", sample(broken))
+	}
+}
 func mustLoadLang(t *testing.T, path string) map[string]string {
 	t.Helper()
 	raw, err := os.ReadFile(path)

@@ -298,6 +298,10 @@ func (s *ApplyService) compileBundle(revision revisions.Revision, snapshot revis
 	if err != nil {
 		return nil, err
 	}
+	easyRateLimitArtifacts, err := pipeline.RenderEasyRateLimitArtifacts(siteInputs, upstreamInputs, easyInputs)
+	if err != nil {
+		return nil, err
+	}
 	easyArtifacts, err := pipeline.RenderEasyArtifacts(siteInputs, easyInputs)
 	if err != nil {
 		return nil, err
@@ -322,6 +326,7 @@ func (s *ApplyService) compileBundle(revision revisions.Revision, snapshot revis
 		tlsMaterialArtifacts,
 		wafArtifacts,
 		accessArtifacts,
+		easyRateLimitArtifacts,
 		easyArtifacts,
 	)
 }
@@ -349,6 +354,7 @@ func applyAntiDDoSDefaultEasyProfiles(siteInputs []pipeline.SiteInput, items []p
 			LimitConnMaxHTTP1:        200,
 			UseLimitReq:              true,
 			LimitReqRate:             "120r/s",
+			CustomLimitRules:         nil,
 			AuthBasicText:            "Restricted area",
 			AntibotChallenge:         "no",
 			AntibotURI:               "/challenge",
@@ -640,6 +646,17 @@ func mapRateLimitInputs(items []ratelimitpolicies.RateLimitPolicy) []pipeline.Ra
 	return out
 }
 
+func mapCustomLimitRules(items []easysiteprofiles.CustomLimitRule) []pipeline.CustomRateLimitRuleInput {
+	out := make([]pipeline.CustomRateLimitRuleInput, 0, len(items))
+	for _, item := range items {
+		out = append(out, pipeline.CustomRateLimitRuleInput{
+			Path: item.Path,
+			Rate: item.Rate,
+		})
+	}
+	return out
+}
+
 func mapEasyInputs(items []easysiteprofiles.EasySiteProfile) []pipeline.EasyProfileInput {
 	sorted := append([]easysiteprofiles.EasySiteProfile(nil), items...)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].SiteID < sorted[j].SiteID })
@@ -682,6 +699,7 @@ func mapEasyInputs(items []easysiteprofiles.EasySiteProfile) []pipeline.EasyProf
 			LimitConnMaxHTTP3:         item.SecurityBehaviorAndLimits.LimitConnMaxHTTP3,
 			UseLimitReq:               item.SecurityBehaviorAndLimits.UseLimitReq,
 			LimitReqRate:              item.SecurityBehaviorAndLimits.LimitReqRate,
+			CustomLimitRules:          mapCustomLimitRules(item.SecurityBehaviorAndLimits.CustomLimitRules),
 			UseBadBehavior:            item.SecurityBehaviorAndLimits.UseBadBehavior,
 			BadBehaviorStatusCodes:    append([]int(nil), item.SecurityBehaviorAndLimits.BadBehaviorStatusCodes...),
 			BadBehaviorBanTimeSeconds: item.SecurityBehaviorAndLimits.BadBehaviorBanTimeSeconds,

@@ -1,6 +1,6 @@
 # Stage 1 E2E validation (EN)
 
-Documentation baseline: `1.0.12`
+Documentation baseline: `1.0.13`
 
 This document mirrors: `docs/operators/stage-1-e2e-validation.md`.
 

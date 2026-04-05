@@ -67,6 +67,8 @@ func TestSiteSettings_FieldContract(t *testing.T) {
 		"security_behavior_and_limits.limit_conn_max_http1",
 		"security_behavior_and_limits.limit_conn_max_http2",
 		"security_behavior_and_limits.limit_conn_max_http3",
+		"security_behavior_and_limits.custom_limit_rules.path",
+		"security_behavior_and_limits.custom_limit_rules.rate",
 		"security_behavior_and_limits.limit_req_rate",
 		"security_behavior_and_limits.limit_req_url",
 		"security_behavior_and_limits.use_bad_behavior",
@@ -142,6 +144,7 @@ func TestSiteSettings_CreateAndSave_AllFieldsRoundTrip(t *testing.T) {
 	updatedProfile.UpstreamRouting.ReverseProxyHost = "https://backend.changed.internal:8443"
 	updatedProfile.HTTPBehavior.AllowedMethods = []string{"DELETE", "PATCH", "GET"}
 	updatedProfile.SecurityBehaviorAndLimits.LimitReqRate = "21r/s"
+	updatedProfile.SecurityBehaviorAndLimits.CustomLimitRules = []CustomLimitRule{{Path: "/login", Rate: "5r/s"}, {Path: "/api/", Rate: "20r/s"}}
 	updatedProfile.SecurityBehaviorAndLimits.BadBehaviorThreshold = 4
 	updatedProfile.SecurityAntibot.AntibotChallenge = AntibotChallengeTurnstile
 	updatedProfile.SecurityAntibot.AntibotTurnstileSitekey = "turnstile-key-2"
@@ -236,6 +239,7 @@ func allFieldsProfile(siteID string) EasySiteProfile {
 	profile.SecurityBehaviorAndLimits.UseLimitReq = true
 	profile.SecurityBehaviorAndLimits.LimitReqURL = "/gateway"
 	profile.SecurityBehaviorAndLimits.LimitReqRate = "19r/s"
+	profile.SecurityBehaviorAndLimits.CustomLimitRules = []CustomLimitRule{{Path: "/login", Rate: "6r/s"}, {Path: "/api/auth/", Rate: "10r/s"}}
 
 	profile.SecurityAntibot.AntibotChallenge = AntibotChallengeRecaptcha
 	profile.SecurityAntibot.AntibotURI = "/challenge"
@@ -297,6 +301,16 @@ func collectJSONFieldPaths(t reflect.Type, prefix string) []string {
 		if fieldType.Kind() == reflect.Struct {
 			paths = append(paths, collectJSONFieldPaths(fieldType, path)...)
 			continue
+		}
+		if fieldType.Kind() == reflect.Slice {
+			elemType := fieldType.Elem()
+			if elemType.Kind() == reflect.Pointer {
+				elemType = elemType.Elem()
+			}
+			if elemType.Kind() == reflect.Struct {
+				paths = append(paths, collectJSONFieldPaths(elemType, path)...)
+				continue
+			}
 		}
 		paths = append(paths, path)
 	}

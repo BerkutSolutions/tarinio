@@ -1,0 +1,15 @@
+{{- range .Rules }}
+location {{ .LocationModifier }} {{ .LocationPath }} {
+{{- if .DisableProxyInterceptErrors }}
+    proxy_intercept_errors off;
+{{- end }}
+    modsecurity on;
+    modsecurity_rules_file /etc/waf/modsecurity/sites/{{ $.SiteID }}.conf;
+    include /etc/waf/nginx/easy/{{ $.SiteID }}.conf;
+    limit_req zone={{ .ZoneName }} burst={{ .Burst }} nodelay;
+{{- if .PassHostHeader }}
+    proxy_set_header Host $http_host;
+{{- end }}
+    proxy_pass {{ .ProxyPassTarget }};
+}
+{{- end }}

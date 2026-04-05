@@ -1,4 +1,4 @@
-# Easy-mode compiler directives for this site.
+﻿# Easy-mode compiler directives for this site.
 
 client_max_body_size {{ .MaxClientSize }};
 set $waf_rate_limited_max_age {{ .RateLimitBanSeconds }};
@@ -101,19 +101,19 @@ if ($request_uri ~* "{{ . }}") { return 403; }
 {{- end }}
 
 {{- if .WhitelistCountry }}
-if ($http_cf_ipcountry != "") {
+if ($waf_country_code != "") {
     set $waf_country_allowed 0;
 {{- range .WhitelistCountry }}
-    if ($http_cf_ipcountry = "{{ . }}") { set $waf_country_allowed 1; }
+    if ($waf_country_code = "{{ . }}") { set $waf_country_allowed 1; }
 {{- end }}
     if ($waf_country_allowed = 0) { return 403; }
 }
 {{- end }}
 
 {{- if .BlacklistCountry }}
-if ($http_cf_ipcountry != "") {
+if ($waf_country_code != "") {
 {{- range .BlacklistCountry }}
-    if ($http_cf_ipcountry = "{{ . }}") { return 403; }
+    if ($waf_country_code = "{{ . }}") { return 403; }
 {{- end }}
 }
 {{- end }}

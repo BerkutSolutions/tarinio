@@ -72,6 +72,18 @@ function shouldSkipInternalSite(siteID) {
   return token === "control-plane-access" || token === "control-plane" || token === "ui";
 }
 
+function buildPageButtons(totalPages, currentPage, dataAttr) {
+  const pages = [];
+  for (let page = 1; page <= Math.min(10, totalPages); page += 1) {
+    pages.push(`<button type="button" class="btn ghost btn-sm${page === currentPage ? " active" : ""}" ${dataAttr}="${page}">${page}</button>`);
+  }
+  if (totalPages > 10) {
+    pages.push(`<span class="muted">...</span>`);
+    pages.push(`<button type="button" class="btn ghost btn-sm${totalPages === currentPage ? " active" : ""}" ${dataAttr}="${totalPages}">${totalPages}</button>`);
+  }
+  return pages.join("");
+}
+
 export async function renderEvents(container, ctx) {
   container.innerHTML = `
     <section class="waf-card">
@@ -133,11 +145,31 @@ export async function renderEvents(container, ctx) {
 
   let currentFiltered = [];
   let currentSiteNamesByID = new Map();
+  const pagingState = {
+    pageSize: 10,
+    page: 1
+  };
+
+  const getPaginationMeta = (total) => {
+    const totalPages = Math.max(1, Math.ceil(total / pagingState.pageSize));
+    if (pagingState.page > totalPages) {
+      pagingState.page = totalPages;
+    }
+    if (pagingState.page < 1) {
+      pagingState.page = 1;
+    }
+    const start = total === 0 ? 0 : (pagingState.page - 1) * pagingState.pageSize;
+    const end = Math.min(start + pagingState.pageSize, total);
+    return { totalPages, start, end };
+  };
+
   const renderRows = (items, siteNamesByID) => {
     if (!Array.isArray(items) || items.length === 0) {
       list.innerHTML = `<div class="waf-empty">${escapeHtml(ctx.t("events.empty"))}</div>`;
       return;
     }
+    const meta = getPaginationMeta(items.length);
+    const pageItems = items.slice(meta.start, meta.end);
     list.innerHTML = `
       <div class="waf-table-wrap">
         <table class="waf-table">
@@ -151,8 +183,8 @@ export async function renderEvents(container, ctx) {
             </tr>
           </thead>
           <tbody>
-            ${items.map((item, index) => `
-              <tr class="waf-table-row-clickable" data-event-row="${index}" tabindex="0" role="button">
+            ${pageItems.map((item, index) => `
+              <tr class="waf-table-row-clickable" data-event-row="${meta.start + index}" tabindex="0" role="button">
                 <td>${escapeHtml(String(item.occurred_at || ""))}</td>
                 <td>${escapeHtml(translateEventType(item.type, ctx))}</td>
                 <td>${escapeHtml(translateEventSeverity(item.severity, ctx))}</td>
@@ -163,7 +195,43 @@ export async function renderEvents(container, ctx) {
           </tbody>
         </table>
       </div>
+      <div class="waf-pager">
+        <div class="waf-inline">
+          <label for="events-page-size">${escapeHtml(ctx.t("activity.filter.pageSize"))}</label>
+          <select id="events-page-size">
+            <option value="10"${pagingState.pageSize === 10 ? " selected" : ""}>10</option>
+            <option value="25"${pagingState.pageSize === 25 ? " selected" : ""}>25</option>
+            <option value="50"${pagingState.pageSize === 50 ? " selected" : ""}>50</option>
+            <option value="100"${pagingState.pageSize === 100 ? " selected" : ""}>100</option>
+          </select>
+        </div>
+        <div class="waf-actions">
+          ${buildPageButtons(meta.totalPages, pagingState.page, "data-events-page")}
+        </div>
+      </div>
     `;
+
+    list.querySelector("#events-page-size")?.addEventListener("change", (event) => {
+      const nextSize = Number.parseInt(String(event.target?.value || "10"), 10);
+      if (!Number.isFinite(nextSize) || nextSize <= 0) {
+        return;
+      }
+      pagingState.pageSize = nextSize;
+      pagingState.page = 1;
+      renderRows(items, siteNamesByID);
+      status.innerHTML = `<div class="waf-empty">${escapeHtml(ctx.t("events.total"))}: ${items.length}</div>`;
+    });
+
+    list.querySelectorAll("[data-events-page]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const nextPage = Number.parseInt(String(button.dataset.eventsPage || "1"), 10);
+        if (!Number.isFinite(nextPage) || nextPage < 1) {
+          return;
+        }
+        pagingState.page = nextPage;
+        renderRows(items, siteNamesByID);
+      });
+    });
   };
 
   const renderEventDetail = (item, siteNamesByID) => {
@@ -183,7 +251,7 @@ export async function renderEvents(container, ctx) {
 
     return `
       <div class="waf-table-wrap">
-        <table class="waf-table">
+        <table class="waf-table waf-detail-table">
           <tbody>
             ${fields.map(([labelKey, value]) => `
               <tr>
@@ -200,6 +268,7 @@ export async function renderEvents(container, ctx) {
       </div>
     `;
   };
+
   const applyFilters = (items, siteNamesByID) => {
     const f = readFilters();
     const fromEpoch = toEpoch(f.from);
@@ -226,6 +295,7 @@ export async function renderEvents(container, ctx) {
       }
       return true;
     });
+    pagingState.page = 1;
     currentFiltered = filtered;
     currentSiteNamesByID = siteNamesByID;
     renderRows(filtered, siteNamesByID);

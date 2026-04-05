@@ -1,4 +1,4 @@
-﻿import { escapeHtml, formatDate, setError, setLoading } from "../ui.js";
+import { escapeHtml, formatDate, setError, setLoading } from "../ui.js";
 
 function normalizeList(value) {
   return Array.isArray(value) ? value : [];
@@ -6,6 +6,18 @@ function normalizeList(value) {
 
 function normalizeToken(value) {
   return String(value || "").trim().toLowerCase();
+}
+
+function buildPageButtons(totalPages, currentPage, dataAttr) {
+  const pages = [];
+  for (let page = 1; page <= Math.min(10, totalPages); page += 1) {
+    pages.push(`<button type="button" class="btn ghost btn-sm${page === currentPage ? " active" : ""}" ${dataAttr}="${page}">${page}</button>`);
+  }
+  if (totalPages > 10) {
+    pages.push(`<span class="muted">...</span>`);
+    pages.push(`<button type="button" class="btn ghost btn-sm${totalPages === currentPage ? " active" : ""}" ${dataAttr}="${totalPages}">${totalPages}</button>`);
+  }
+  return pages.join("");
 }
 
 function parseRequestsJSONL(text) {
@@ -52,7 +64,9 @@ export async function renderRequests(container, ctx) {
     filteredRows: [],
     search: "",
     sortBy: "timestamp",
-    sortDirection: "desc"
+    sortDirection: "desc",
+    pageSize: 10,
+    page: 1
   };
 
   const columns = [
@@ -66,6 +80,19 @@ export async function renderRequests(container, ctx) {
     { id: "upstream", labelKey: "requests.col.upstream", mode: "string", value: (row) => String(row?.entry?.upstream_addr || "") },
     { id: "stream", labelKey: "requests.col.stream", mode: "string", value: (row) => String(row?.stream || "") }
   ];
+
+  const getPaginationMeta = (total) => {
+    const totalPages = Math.max(1, Math.ceil(total / state.pageSize));
+    if (state.page > totalPages) {
+      state.page = totalPages;
+    }
+    if (state.page < 1) {
+      state.page = 1;
+    }
+    const start = total === 0 ? 0 : (state.page - 1) * state.pageSize;
+    const end = Math.min(start + state.pageSize, total);
+    return { totalPages, start, end };
+  };
 
   const applyFiltersAndSort = () => {
     const search = normalizeToken(state.search);
@@ -95,6 +122,9 @@ export async function renderRequests(container, ctx) {
 
   const render = () => {
     applyFiltersAndSort();
+    const meta = getPaginationMeta(state.filteredRows.length);
+    const pageRows = state.filteredRows.slice(meta.start, meta.end);
+
     const renderRequestDetail = (row) => {
       const entry = row?.entry && typeof row.entry === "object" ? row.entry : {};
       const fields = [
@@ -112,7 +142,7 @@ export async function renderRequests(container, ctx) {
       ];
       return `
         <div class="waf-table-wrap">
-          <table class="waf-table">
+          <table class="waf-table waf-detail-table">
             <tbody>
               ${fields.map(([labelKey, value]) => `
                 <tr>
@@ -129,6 +159,7 @@ export async function renderRequests(container, ctx) {
         </div>
       `;
     };
+
     container.innerHTML = `
       <section class="waf-card">
         <div class="waf-card-head">
@@ -156,9 +187,9 @@ export async function renderRequests(container, ctx) {
                 </tr>
               </thead>
               <tbody>
-                ${state.filteredRows.length
-                  ? state.filteredRows.map((row, index) => `
-                    <tr class="waf-table-row-clickable" data-request-row="${index}" tabindex="0" role="button">
+                ${pageRows.length
+                  ? pageRows.map((row, index) => `
+                    <tr class="waf-table-row-clickable" data-request-row="${meta.start + index}" tabindex="0" role="button">
                       <td>${escapeHtml(String(row?.entry?.site || "-"))}</td>
                       <td>${escapeHtml(formatDate(String(row?.entry?.timestamp || row?.ingested_at || "")))}</td>
                       <td><span class="waf-code">${escapeHtml(String(row?.entry?.request_id || "-"))}</span></td>
@@ -173,6 +204,20 @@ export async function renderRequests(container, ctx) {
                   : `<tr><td colspan="${columns.length}"><div class="waf-empty">${escapeHtml(ctx.t("requests.empty"))}</div></td></tr>`}
               </tbody>
             </table>
+          </div>
+          <div class="waf-pager">
+            <div class="waf-inline">
+              <label for="requests-page-size">${escapeHtml(ctx.t("activity.filter.pageSize"))}</label>
+              <select id="requests-page-size">
+                <option value="10"${state.pageSize === 10 ? " selected" : ""}>10</option>
+                <option value="25"${state.pageSize === 25 ? " selected" : ""}>25</option>
+                <option value="50"${state.pageSize === 50 ? " selected" : ""}>50</option>
+                <option value="100"${state.pageSize === 100 ? " selected" : ""}>100</option>
+              </select>
+            </div>
+            <div class="waf-actions">
+              ${buildPageButtons(meta.totalPages, state.page, "data-requests-page")}
+            </div>
           </div>
         </div>
       </section>
@@ -196,6 +241,7 @@ export async function renderRequests(container, ctx) {
     container.querySelector("#requests-refresh")?.addEventListener("click", load);
     container.querySelector("#requests-search")?.addEventListener("input", (event) => {
       state.search = event.target.value;
+      state.page = 1;
       const cursor = Number(event.target.selectionStart || state.search.length);
       render();
       const nextInput = container.querySelector("#requests-search");
@@ -204,6 +250,28 @@ export async function renderRequests(container, ctx) {
         nextInput.setSelectionRange(cursor, cursor);
       }
     });
+
+    container.querySelector("#requests-page-size")?.addEventListener("change", (event) => {
+      const nextSize = Number.parseInt(String(event.target?.value || "10"), 10);
+      if (!Number.isFinite(nextSize) || nextSize <= 0) {
+        return;
+      }
+      state.pageSize = nextSize;
+      state.page = 1;
+      render();
+    });
+
+    container.querySelectorAll("[data-requests-page]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const nextPage = Number.parseInt(String(button.dataset.requestsPage || "1"), 10);
+        if (!Number.isFinite(nextPage) || nextPage < 1) {
+          return;
+        }
+        state.page = nextPage;
+        render();
+      });
+    });
+
     container.querySelectorAll("[data-sort-col]").forEach((button) => {
       button.addEventListener("click", () => {
         const columnID = String(button.dataset.sortCol || "");
@@ -216,9 +284,11 @@ export async function renderRequests(container, ctx) {
           state.sortBy = columnID;
           state.sortDirection = columnID === "timestamp" ? "desc" : "asc";
         }
+        state.page = 1;
         render();
       });
     });
+
     const detailModalNode = container.querySelector("#requests-detail-modal");
     const detailContentNode = container.querySelector("#requests-detail-content");
     const openDetails = (row) => {
@@ -229,6 +299,7 @@ export async function renderRequests(container, ctx) {
       detailModalNode.classList.remove("waf-hidden");
       detailModalNode.focus();
     };
+
     const openRowFromTarget = (target) => {
       const rowNode = target?.closest?.("[data-request-row]");
       if (!rowNode) {
@@ -240,6 +311,7 @@ export async function renderRequests(container, ctx) {
       }
       openDetails(state.filteredRows[index]);
     };
+
     container.querySelector("tbody")?.addEventListener("click", (event) => {
       openRowFromTarget(event.target);
     });
@@ -260,6 +332,7 @@ export async function renderRequests(container, ctx) {
       event.preventDefault();
       openRowFromTarget(rowNode);
     });
+
     const closeDetails = () => detailModalNode?.classList.add("waf-hidden");
     detailModalNode?.querySelectorAll("[data-requests-detail-close='true']").forEach((node) => {
       node.addEventListener("click", closeDetails);
@@ -281,6 +354,7 @@ export async function renderRequests(container, ctx) {
       });
       if (response.status === 404) {
         state.rows = [];
+        state.page = 1;
         render();
         return;
       }
@@ -289,6 +363,7 @@ export async function renderRequests(container, ctx) {
       }
       const text = await response.text();
       state.rows = parseRequestsJSONL(text);
+      state.page = 1;
       render();
     } catch (error) {
       setError(container, ctx.t("requests.error.load"));
@@ -297,4 +372,3 @@ export async function renderRequests(container, ctx) {
 
   await load();
 }
-

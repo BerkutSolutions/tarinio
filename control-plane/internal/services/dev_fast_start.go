@@ -331,6 +331,7 @@ func (b *DevFastStartBootstrapper) ensureManagementResources(ctx context.Context
 			existingProfile.SecurityBehaviorAndLimits.LimitConnMaxHTTP3 = desiredProfile.SecurityBehaviorAndLimits.LimitConnMaxHTTP3
 			existingProfile.SecurityBehaviorAndLimits.LimitReqRate = desiredProfile.SecurityBehaviorAndLimits.LimitReqRate
 			existingProfile.SecurityBehaviorAndLimits.LimitReqURL = desiredProfile.SecurityBehaviorAndLimits.LimitReqURL
+			existingProfile.SecurityBehaviorAndLimits.CustomLimitRules = append([]easysiteprofiles.CustomLimitRule(nil), desiredProfile.SecurityBehaviorAndLimits.CustomLimitRules...)
 			if _, err := b.easyProfiles.Upsert(withAutoApplyDisabled(ctx), existingProfile); err != nil {
 				return false, err
 			}
@@ -369,6 +370,9 @@ func needsDevFastStartEasyProfileUpdate(current, desired easysiteprofiles.EasySi
 		return true
 	}
 	if current.SecurityBehaviorAndLimits.LimitReqURL != desired.SecurityBehaviorAndLimits.LimitReqURL {
+		return true
+	}
+	if !sameCustomLimitRules(current.SecurityBehaviorAndLimits.CustomLimitRules, desired.SecurityBehaviorAndLimits.CustomLimitRules) {
 		return true
 	}
 	if current.SecurityBehaviorAndLimits.LimitConnMaxHTTP1 != desired.SecurityBehaviorAndLimits.LimitConnMaxHTTP1 ||
@@ -420,6 +424,18 @@ func sameStringSet(left, right []string) bool {
 			return false
 		}
 		seen[item]--
+	}
+	return true
+}
+
+func sameCustomLimitRules(left, right []easysiteprofiles.CustomLimitRule) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for i := range left {
+		if left[i].Path != right[i].Path || left[i].Rate != right[i].Rate {
+			return false
+		}
 	}
 	return true
 }

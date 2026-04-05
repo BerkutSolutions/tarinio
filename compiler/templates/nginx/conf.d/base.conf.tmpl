@@ -1,7 +1,49 @@
-proxy_http_version 1.1;
+﻿proxy_http_version 1.1;
 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
 proxy_set_header X-Forwarded-Proto $scheme;
-log_format waf_security_json escape=json '{"timestamp":"$time_iso8601","request_id":"$request_id","client_ip":"$remote_addr","country":"$http_cf_ipcountry","host":"$host","method":"$request_method","uri":"$request_uri","status":$status,"bytes_sent":$body_bytes_sent,"referer":"$http_referer","user_agent":"$http_user_agent","site":"$waf_site_id","upstream_addr":"$upstream_addr","request_time":$request_time}';
+geoip_country /usr/share/GeoIP/GeoIP.dat;
+
+map $http_cf_ipcountry $waf_country_from_cf {
+    default "";
+    ~(?i)^[A-Z]{2}$ $http_cf_ipcountry;
+}
+
+map $http_x_country_code $waf_country_from_x_country_code {
+    default "";
+    ~(?i)^[A-Z]{2}$ $http_x_country_code;
+}
+
+map $http_x_geo_country $waf_country_from_x_geo_country {
+    default "";
+    ~(?i)^[A-Z]{2}$ $http_x_geo_country;
+}
+
+map $http_x_country $waf_country_from_x_country {
+    default "";
+    ~(?i)^[A-Z]{2}$ $http_x_country;
+}
+
+map $waf_country_from_cf $waf_country_header_step_1 {
+    "" $waf_country_from_x_country_code;
+    default $waf_country_from_cf;
+}
+
+map $waf_country_header_step_1 $waf_country_header_step_2 {
+    "" $waf_country_from_x_geo_country;
+    default $waf_country_header_step_1;
+}
+
+map $waf_country_header_step_2 $waf_country_header {
+    "" $waf_country_from_x_country;
+    default $waf_country_header_step_2;
+}
+
+map $waf_country_header $waf_country_code {
+    "" $geoip_country_code;
+    default $waf_country_header;
+}
+
+log_format waf_security_json escape=json '{"timestamp":"$time_iso8601","request_id":"$request_id","client_ip":"$remote_addr","country":"$waf_country_code","host":"$host","method":"$request_method","uri":"$request_uri","status":$status,"bytes_sent":$body_bytes_sent,"referer":"$http_referer","user_agent":"$http_user_agent","site":"$waf_site_id","upstream_addr":"$upstream_addr","request_time":$request_time}';
 access_log /var/log/nginx/access.log waf_security_json;
 
 server {

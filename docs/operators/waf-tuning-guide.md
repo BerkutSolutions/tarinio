@@ -1,4 +1,4 @@
-﻿# MVP WAF Tuning Guide
+# MVP WAF Tuning Guide
 
 This guide is for a Stage 1 operator who already:
 
@@ -142,7 +142,7 @@ Prefer narrow exceptions over broad disabling.
 Do not:
 
 - disable CRS globally just because one request path breaks
-- edit runtime files manually to вЂњquick fixвЂќ a false positive
+- edit runtime files manually to "quick fix" a false positive
 
 ### Site breaks after enabling WAF
 

@@ -261,6 +261,9 @@ func TestDevFastStartBootstrapperRunCreatesResourcesAndAppliesRevision(t *testin
 	if len(profile.HTTPBehavior.AllowedMethods) < 7 {
 		t.Fatalf("expected management easy profile to include API methods, got %+v", profile.HTTPBehavior.AllowedMethods)
 	}
+	if len(profile.SecurityBehaviorAndLimits.CustomLimitRules) == 0 {
+		t.Fatalf("expected management easy profile to include custom route limits, got %+v", profile.SecurityBehaviorAndLimits.CustomLimitRules)
+	}
 }
 
 func TestDevFastStartBootstrapperRunRetriesApplyFailures(t *testing.T) {
@@ -439,6 +442,9 @@ func TestDevFastStartBootstrapperRunUpdatesExistingManagementRateDefaults(t *tes
 	updated := easyProfiles.items["control-plane-access"]
 	if updated.SecurityBehaviorAndLimits.LimitReqRate != "300r/s" {
 		t.Fatalf("expected management rate limit update, got %s", updated.SecurityBehaviorAndLimits.LimitReqRate)
+	}
+	if len(updated.SecurityBehaviorAndLimits.CustomLimitRules) == 0 {
+		t.Fatalf("expected management custom route limits to be restored, got %+v", updated.SecurityBehaviorAndLimits.CustomLimitRules)
 	}
 	if updated.SecurityBehaviorAndLimits.LimitConnMaxHTTP1 < 200 {
 		t.Fatalf("expected http/1 conn limit bump, got %d", updated.SecurityBehaviorAndLimits.LimitConnMaxHTTP1)

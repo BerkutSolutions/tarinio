@@ -110,6 +110,8 @@ server {
         alias /etc/waf/errors/{{ .SiteID }}/504.html;
     }
 
+    include /etc/waf/nginx/easy-locations/{{ .SiteID }}.conf;
+
     location ^~ /.well-known/acme-challenge/ {
         proxy_intercept_errors off;
         modsecurity off;

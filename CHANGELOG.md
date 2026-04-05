@@ -1,6 +1,32 @@
-﻿# Журнал изменений
+# Журнал изменений
 
 Все значимые изменения проекта фиксируются в этом файле.
+
+## [1.0.13] - 2026-04-05
+
+### Runtime / GeoIP / Country Policy
+- Добавлена country policy на уровне runtime: правила по странам теперь опираются на `$waf_country_code` с fallback на GeoIP в защитном пайплайне.
+- В runtime-контур включена автоматическая проверка GeoIP database и корректная инициализация nginx GeoIP-модуля для whitelist/blacklist стран.
+- В Easy site profile расширена гео-настройка: отдельные списки `blacklist_country` и `whitelist_country` с нормализацией кодов стран.
+
+### Limits / Anti-Scan
+- В Easy-профиле добавлены route-specific лимиты по URL: настраиваемые правила вида `path + rate` собираются в отдельные nginx `location`/`limit_req` блоки.
+- Для management-site усилены per-route ограничения на `/login`, `/api/auth/`, `/api/setup/`, `/api/events`, `/api/requests`, `/api/reports/` и общий `/api/`.
+- Добавлены quick templates для blacklist User-Agent и probe/scanner URI.
+
+### UI
+- Добавлен searchable country picker для выбора стран в `blacklist_country` и `whitelist_country`.
+- Для стран в формате кода в скобках добавлены флаги: например `Germany (DE 🇩🇪)`.
+- Вкладки `События`, `Баны`, `Запросы` переведены на ограниченную пагинацию: выбор `10/25/50/100` строк, пересчет страниц и навигация `1..10 ... last`.
+- Исправлен визуальный баг модалки деталей события/запроса: длинные значения больше не ломают левый столбец по одной букве.
+- Укреплен flow `Разбан`: синхронизация с backend-состоянием и очистка локального state/cookies после manual unban.
+
+### Runtime / Anti-DDoS Defaults
+- Глобальный Anti-DDoS параметр enforce_l7_rate_limit теперь включен по умолчанию (true) для новых настроек.
+
+### Документация / Кодировка
+- Восстановлена корректная UTF-8 кодировка в русскоязычных markdown-документах (docs/ru/**), устранены поврежденные символы.
+- Синхронизирована базовая версия RU-документации: 1.0.13.
 
 ## [1.0.12] - 2026-04-04
 
