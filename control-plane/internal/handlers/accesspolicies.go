@@ -13,6 +13,7 @@ type accessPolicyService interface {
 	Create(ctx context.Context, item accesspolicies.AccessPolicy) (accesspolicies.AccessPolicy, error)
 	List() ([]accesspolicies.AccessPolicy, error)
 	Update(ctx context.Context, item accesspolicies.AccessPolicy) (accesspolicies.AccessPolicy, error)
+	Upsert(ctx context.Context, item accesspolicies.AccessPolicy) (accesspolicies.AccessPolicy, error)
 	Delete(ctx context.Context, id string) error
 }
 
@@ -30,6 +31,8 @@ func (h *AccessPoliciesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		h.list(w, r)
 	case r.URL.Path == "/api/access-policies" && r.Method == http.MethodPost:
 		h.create(w, r)
+	case r.URL.Path == "/api/access-policies/upsert" && (r.Method == http.MethodPost || r.Method == http.MethodPut):
+		h.upsert(w, r)
 	case strings.HasPrefix(r.URL.Path, "/api/access-policies/") && r.Method == http.MethodPut:
 		h.update(w, r)
 	case strings.HasPrefix(r.URL.Path, "/api/access-policies/") && r.Method == http.MethodDelete:
@@ -60,6 +63,20 @@ func (h *AccessPoliciesHandler) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, created)
+}
+
+func (h *AccessPoliciesHandler) upsert(w http.ResponseWriter, r *http.Request) {
+	var item accesspolicies.AccessPolicy
+	if err := json.NewDecoder(r.Body).Decode(&item); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
+		return
+	}
+	updated, err := h.policies.Upsert(withActorIP(r), item)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, updated)
 }
 
 func (h *AccessPoliciesHandler) update(w http.ResponseWriter, r *http.Request) {

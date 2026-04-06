@@ -25,6 +25,7 @@ type Config struct {
 	RuntimeRoot      string
 	RevisionStoreDir string
 	AuthIssuer       string
+	StartupSelfTest  bool
 	Security         SecurityConfig
 	ACME             ACMEConfig
 	RuntimeHealthURL string
@@ -80,6 +81,7 @@ func LoadFromEnv() (Config, error) {
 		RuntimeRoot:      defaultRuntimeRoot,
 		RevisionStoreDir: filepath.Join(defaultRuntimeRoot, defaultRevisionsDir),
 		AuthIssuer:       "WAF",
+		StartupSelfTest:  true,
 		Security: SecurityConfig{
 			Pepper: "waf-dev-pepper-change-me",
 			WebAuthn: WebAuthnConfig{
@@ -131,6 +133,9 @@ func LoadFromEnv() (Config, error) {
 	}
 	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_AUTH_ISSUER")); value != "" {
 		cfg.AuthIssuer = value
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_STARTUP_SELF_TEST_ENABLED")); value != "" {
+		cfg.StartupSelfTest = !strings.EqualFold(value, "false") && value != "0"
 	}
 	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_SECURITY_PEPPER")); value != "" {
 		cfg.Security.Pepper = value

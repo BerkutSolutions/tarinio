@@ -23,6 +23,10 @@ func main() {
 		fmt.Fprintf(os.Stderr, "control-plane bootstrap: %v\n", err)
 		os.Exit(1)
 	}
+	if err := application.RunStartupSelfTest(context.Background()); err != nil {
+		fmt.Fprintf(os.Stderr, "control-plane startup self-test failed: %v\n", err)
+		os.Exit(1)
+	}
 
 	if application.DevFastStartBootstrapper != nil {
 		go func() {

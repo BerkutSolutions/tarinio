@@ -101,11 +101,11 @@ if ($request_uri ~* "{{ . }}") { return 403; }
 {{- end }}
 
 {{- if .WhitelistCountryPattern }}
-if ($waf_country_code != "" && $waf_country_code !~ "{{ .WhitelistCountryPattern }}") { return 403; }
+if ($waf_country_code !~ "{{ .WhitelistCountryPattern }}") { return 403; }
 {{- end }}
 
 {{- if .BlacklistCountryPattern }}
-if ($waf_country_code != "" && $waf_country_code ~ "{{ .BlacklistCountryPattern }}") { return 403; }
+if ($waf_country_code ~ "{{ .BlacklistCountryPattern }}") { return 403; }
 {{- end }}
 
 {{- if not .UseModSecurity }}

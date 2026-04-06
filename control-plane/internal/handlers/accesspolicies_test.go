@@ -30,6 +30,14 @@ func (f *fakeAccessPolicyService) Update(ctx context.Context, item accesspolicie
 	return item, nil
 }
 
+func (f *fakeAccessPolicyService) Upsert(ctx context.Context, item accesspolicies.AccessPolicy) (accesspolicies.AccessPolicy, error) {
+	item.UpdatedAt = "2026-04-01T01:00:00Z"
+	if item.CreatedAt == "" {
+		item.CreatedAt = "2026-04-01T00:00:00Z"
+	}
+	return item, nil
+}
+
 func (f *fakeAccessPolicyService) Delete(ctx context.Context, id string) error {
 	return nil
 }
@@ -59,5 +67,15 @@ func TestAccessPoliciesHandler_Delete(t *testing.T) {
 	handler.ServeHTTP(resp, req)
 	if resp.Code != http.StatusNoContent {
 		t.Fatalf("expected 204, got %d", resp.Code)
+	}
+}
+
+func TestAccessPoliciesHandler_Upsert(t *testing.T) {
+	handler := NewAccessPoliciesHandler(&fakeAccessPolicyService{})
+	req := httptest.NewRequest(http.MethodPost, "/api/access-policies/upsert", bytes.NewBufferString(`{"id":"access-a","site_id":"site-a","enabled":true,"allowlist":["10.0.0.1"]}`))
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
 	}
 }

@@ -152,6 +152,10 @@ func New(
 		http.MethodGet:  rbac.PermissionAccessRead,
 		http.MethodPost: rbac.PermissionAccessWrite,
 	}, handlers.NewAccessPoliciesHandler(accessPolicyService)))
+	mux.Handle("/api/access-policies/upsert", withMethodPermissions(authService, map[string]rbac.Permission{
+		http.MethodPost: rbac.PermissionAccessWrite,
+		http.MethodPut:  rbac.PermissionAccessWrite,
+	}, handlers.NewAccessPoliciesHandler(accessPolicyService)))
 	mux.Handle("/api/access-policies/", withMethodPermissions(authService, map[string]rbac.Permission{
 		http.MethodGet:    rbac.PermissionAccessRead,
 		http.MethodPut:    rbac.PermissionAccessWrite,

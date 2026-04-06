@@ -210,8 +210,8 @@ func RenderEasyArtifacts(sites []SiteInput, profiles []EasyProfileInput) ([]Arti
 			BlacklistIP:                  profile.BlacklistIP,
 			BlacklistUserAgent:           profile.BlacklistUserAgent,
 			BlacklistURI:                 profile.BlacklistURI,
-			BlacklistCountryPattern:      countrySelectorPattern(profile.BlacklistCountry),
-			WhitelistCountryPattern:      countrySelectorPattern(profile.WhitelistCountry),
+			BlacklistCountryPattern:      blacklistCountrySelectorPattern(profile.BlacklistCountry),
+			WhitelistCountryPattern:      whitelistCountrySelectorPattern(profile.WhitelistCountry),
 			UseModSecurity:               profile.UseModSecurity,
 			UseModSecurityEasyFile:       profile.UseModSecurity,
 			ModSecurityEasyRulesOn:       profile.UseModSecurity,
@@ -352,7 +352,7 @@ func toQuotedList(values []string) string {
 	return strings.Join(parts, " ")
 }
 
-func countrySelectorPattern(values []string) string {
+func blacklistCountrySelectorPattern(values []string) string {
 	if len(values) == 0 {
 		return ""
 	}
@@ -368,6 +368,19 @@ func countrySelectorPattern(values []string) string {
 		return ""
 	}
 	return "^(?:" + strings.Join(parts, "|") + ")$"
+}
+
+func whitelistCountrySelectorPattern(values []string) string {
+	blacklistPattern := blacklistCountrySelectorPattern(values)
+	if blacklistPattern == "" {
+		return ""
+	}
+	// Allow empty country code (GeoIP unavailable) to preserve existing behavior.
+	if strings.HasPrefix(blacklistPattern, "^(?:") && strings.HasSuffix(blacklistPattern, ")$") {
+		core := strings.TrimSuffix(strings.TrimPrefix(blacklistPattern, "^(?:"), ")$")
+		return "^(?:" + "|" + core + ")$"
+	}
+	return blacklistPattern
 }
 
 func buildSHA1HTPasswdLine(user, password string) string {

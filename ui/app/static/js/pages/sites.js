@@ -144,6 +144,10 @@ function normalizeHost(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function normalizeSiteID(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
 function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
 }
@@ -1905,7 +1909,7 @@ function renderDetailView(state, ctx) {
 }
 
 async function upsertAccessPolicy(draft, ctx, existingAccessPolicy) {
-  const siteID = draft.id.trim().toLowerCase();
+  const siteID = normalizeSiteID(draft.id);
   if (!siteID) {
     return;
   }
@@ -1921,22 +1925,51 @@ async function upsertAccessPolicy(draft, ctx, existingAccessPolicy) {
     allowlist,
     denylist
   };
+  const resolvePolicyForSite = async () => {
+    const accessPolicies = normalizeArray(await ctx.api.get("/api/access-policies"));
+    return accessPolicies.find((item) => normalizeSiteID(item?.site_id) === siteID) || null;
+  };
   if (!allowlist.length && !denylist.length && existingAccessPolicy) {
-    await ctx.api.delete(`/api/access-policies/${encodeURIComponent(payload.id)}`);
-    return;
-  }
-  if (existingAccessPolicy) {
     try {
-      await ctx.api.put(`/api/access-policies/${encodeURIComponent(payload.id)}`, payload);
+      await ctx.api.delete(`/api/access-policies/${encodeURIComponent(payload.id)}`);
     } catch (error) {
       if (error?.status !== 404) {
         throw error;
       }
-      await ctx.api.post("/api/access-policies", payload);
     }
     return;
   }
-  await ctx.api.post("/api/access-policies", payload);
+  try {
+    await ctx.api.post("/api/access-policies/upsert", payload);
+  } catch (error) {
+    if (error?.status === 404 || error?.status === 405) {
+      // Backward compatibility with older backend versions without upsert endpoint.
+      if (existingAccessPolicy) {
+        try {
+          await ctx.api.put(`/api/access-policies/${encodeURIComponent(payload.id)}`, payload);
+          return;
+        } catch (putError) {
+          if (putError?.status !== 404) {
+            throw putError;
+          }
+        }
+      }
+      await ctx.api.post("/api/access-policies", payload);
+      return;
+    }
+    const message = String(error?.message || "").toLowerCase();
+    if (error?.status === 400 && message.includes("already exists")) {
+      const policyForSite = await resolvePolicyForSite();
+      if (policyForSite?.id) {
+        await ctx.api.put(`/api/access-policies/${encodeURIComponent(String(policyForSite.id))}`, {
+          ...payload,
+          id: String(policyForSite.id)
+        });
+        return;
+      }
+    }
+    throw error;
+  }
 }
 
 async function resolveACMEAccountEmail(draft, ctx) {
@@ -1984,13 +2017,15 @@ async function resolveACMEAccountEmail(draft, ctx) {
   }
 
   try {
-    const session = await ctx.api.get("/api/auth/session");
-    const sessionEmail = normalizeEmail(session?.user?.email || session?.session?.user?.email);
+    const me = await ctx.api.get("/api/auth/me");
+    const sessionEmail = normalizeEmail(me?.email || me?.user?.email);
     if (isValidEmail(sessionEmail)) {
       return sessionEmail;
     }
   } catch (error) {
-    console.warn("failed to resolve session email fallback", error);
+    if (error?.status !== 401 && error?.status !== 403 && error?.status !== 404) {
+      console.warn("failed to resolve auth/me email fallback", error);
+    }
   }
 
   return "";
@@ -2034,10 +2069,10 @@ async function upsertSiteResources(draft, ctx, existingSite, existingUpstream, e
       }
     }
   };
-  const siteExists = async (siteID) => {
-    const sites = await ctx.api.get("/api/sites");
-    return Array.isArray(sites) && sites.some((site) => String(site?.id || "").toLowerCase() === String(siteID || "").toLowerCase());
-  };
+    const siteExists = async (siteID) => {
+      const sites = await ctx.api.get("/api/sites");
+      return Array.isArray(sites) && sites.some((site) => normalizeSiteID(site?.id) === normalizeSiteID(siteID));
+    };
   const certificateExists = async (certificateID) => {
     const certificates = await ctx.api.get("/api/certificates");
     return Array.isArray(certificates) && certificates.some((certificate) => String(certificate?.id || "").toLowerCase() === String(certificateID || "").toLowerCase());
@@ -2059,12 +2094,17 @@ async function upsertSiteResources(draft, ctx, existingSite, existingUpstream, e
         await ctx.api.post("/api/sites", sitePayload);
         createdSite = true;
       } catch (error) {
-        if (!isDefaultUpstreamRequiredError(error)) {
+        const message = String(error?.message || "").toLowerCase();
+        if (error?.status === 400 && message.includes("already exists")) {
+          await ctx.api.put(`/api/sites/${encodeURIComponent(sitePayload.id)}`, sitePayload);
+          createdSite = false;
+        } else if (!isDefaultUpstreamRequiredError(error)) {
           throw error;
-        }
-        createdSite = await siteExists(sitePayload.id);
-        if (!createdSite) {
-          throw error;
+        } else {
+          createdSite = await siteExists(sitePayload.id);
+          if (!createdSite) {
+            throw error;
+          }
         }
       }
       if (createdSite) {
@@ -2343,7 +2383,7 @@ export async function renderSites(container, ctx) {
       }
     }
     for (const accessPolicy of state.accessPolicies) {
-      const siteID = String(accessPolicy?.site_id || "");
+      const siteID = normalizeSiteID(accessPolicy?.site_id);
       if (!siteID || state.accessBySite.has(siteID)) {
         continue;
       }
@@ -2392,7 +2432,7 @@ export async function renderSites(container, ctx) {
     const site = state.sites.find((item) => item.id === state.route.siteID);
     const upstream = state.upstreamsBySite.get(state.route.siteID)?.[0] || null;
     const tlsConfig = state.tlsBySite.get(state.route.siteID) || null;
-    const accessPolicy = state.accessBySite.get(state.route.siteID) || null;
+    const accessPolicy = state.accessBySite.get(normalizeSiteID(state.route.siteID)) || null;
     state.draft = site ? siteDraftFromData(site, upstream, tlsConfig) : defaultSiteDraft();
     if (site?.id) {
       try {
@@ -3061,10 +3101,10 @@ export async function renderSites(container, ctx) {
       }
       try {
         setLoading(feedback, ctx.t("sites.editor.saving"));
-        const existingSite = state.sites.find((item) => item.id === state.route.siteID || item.id === draft.id);
+        const existingSite = state.sites.find((item) => normalizeSiteID(item?.id) === normalizeSiteID(state.route.siteID) || normalizeSiteID(item?.id) === normalizeSiteID(draft.id));
         const existingUpstream = state.upstreams.find((item) => item.id === draft.upstream_id);
         const existingTLSConfig = state.tlsBySite.get(draft.id) || null;
-        const existingAccessPolicy = state.accessBySite.get(draft.id) || null;
+        const existingAccessPolicy = state.accessBySite.get(normalizeSiteID(draft.id)) || null;
         if (shouldUpsertBaseResources(draft, existingSite, existingUpstream, existingTLSConfig)) {
           await upsertSiteResources(draft, ctx, existingSite, existingUpstream, existingTLSConfig);
         }
