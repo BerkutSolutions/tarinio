@@ -135,3 +135,16 @@ func TestManualBanService_UnbanResolvesSanitizedSiteAlias(t *testing.T) {
 		t.Fatalf("expected empty denylist after unban, got %+v", policy.DenyList)
 	}
 }
+
+func TestManualBanService_BanResolvesPrimaryHostAlias(t *testing.T) {
+	store := &fakeAccessPolicyStore{}
+	service := NewManualBanService(store, &fakeSiteReader{items: []sites.Site{{ID: "site-sentry", PrimaryHost: "sentry.hantico.ru"}}}, nil)
+
+	policy, err := service.Ban(context.Background(), "sentry.hantico.ru", "10.0.0.1")
+	if err != nil {
+		t.Fatalf("ban failed: %v", err)
+	}
+	if policy.SiteID != "site-sentry" {
+		t.Fatalf("expected canonical site id, got %+v", policy)
+	}
+}

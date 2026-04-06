@@ -56,10 +56,6 @@ function downloadBlob(filename, blob) {
   URL.revokeObjectURL(href);
 }
 
-function downloadText(filename, content, type = "text/plain;charset=utf-8") {
-  downloadBlob(filename, new Blob([content], { type }));
-}
-
 async function tryGetJSON(path) {
   try {
     const response = await fetch(path, {
@@ -185,7 +181,7 @@ export async function renderTLS(container, ctx) {
                 <div class="waf-field full"><label for="certificate-san-list">${escapeHtml(ctx.t("tls.field.sanList"))}</label><textarea id="certificate-san-list" placeholder="${escapeHtml(ctx.t("tls.placeholder.sanList"))}"></textarea></div>
                 <div class="waf-field"><label for="certificate-not-before">${escapeHtml(ctx.t("tls.field.notBeforeRfc"))}</label><input id="certificate-not-before" placeholder="${escapeHtml(ctx.t("tls.placeholder.rfc3339"))}"></div>
                 <div class="waf-field"><label for="certificate-not-after">${escapeHtml(ctx.t("tls.field.notAfterRfc"))}</label><input id="certificate-not-after" placeholder="${escapeHtml(ctx.t("tls.placeholder.rfc3339"))}"></div>
-                <div class="waf-field"><label for="certificate-status">${escapeHtml(ctx.t("tls.field.status"))}</label><select id="certificate-status"><option value="active">active</option><option value="expired">expired</option><option value="revoked">revoked</option></select></div>
+                <div class="waf-field"><label for="certificate-status">${escapeHtml(ctx.t("tls.field.status"))}</label><select id="certificate-status"><option value="active">active</option><option value="inactive">inactive</option><option value="expired">expired</option><option value="revoked">revoked</option></select></div>
               </div>
               <div class="waf-actions">
                 <button class="btn primary btn-sm" type="submit">${escapeHtml(ctx.t("tls.action.createOrUpdate"))}</button>
@@ -197,8 +193,7 @@ export async function renderTLS(container, ctx) {
               <button class="btn ghost btn-sm" type="button" id="tls-certificate-import">${escapeHtml(ctx.t("tls.certificates.import"))}</button>
               <button class="btn ghost btn-sm" type="button" id="tls-certificate-export">${escapeHtml(ctx.t("tls.certificates.export"))}</button>
             </div>
-            <input id="tls-certificate-import-file" type="file" accept=".pem,.crt,.cer,text/plain,application/x-pem-file" class="waf-hidden">
-            <input id="tls-private-key-import-file" type="file" accept=".pem,.key,text/plain,application/x-pem-file" class="waf-hidden">
+            <input id="tls-certificate-import-archive" type="file" accept=".zip,application/zip,application/x-zip-compressed" class="waf-hidden">
             <div id="certificate-list"></div>
           </div>
         </section>
@@ -249,7 +244,7 @@ export async function renderTLS(container, ctx) {
                 <div class="waf-field full"><label for="upload-san-list">${escapeHtml(ctx.t("tls.field.sanList"))}</label><textarea id="upload-san-list"></textarea></div>
                 <div class="waf-field"><label for="upload-not-before">${escapeHtml(ctx.t("tls.field.notBefore"))}</label><input id="upload-not-before" placeholder="${escapeHtml(ctx.t("tls.placeholder.rfc3339"))}"></div>
                 <div class="waf-field"><label for="upload-not-after">${escapeHtml(ctx.t("tls.field.notAfter"))}</label><input id="upload-not-after" placeholder="${escapeHtml(ctx.t("tls.placeholder.rfc3339"))}"></div>
-                <div class="waf-field"><label for="upload-status">${escapeHtml(ctx.t("tls.field.status"))}</label><select id="upload-status"><option value="active">active</option><option value="expired">expired</option><option value="revoked">revoked</option></select></div>
+                <div class="waf-field"><label for="upload-status">${escapeHtml(ctx.t("tls.field.status"))}</label><select id="upload-status"><option value="active">active</option><option value="inactive">inactive</option><option value="expired">expired</option><option value="revoked">revoked</option></select></div>
                 <div class="waf-field"><label for="certificate-file">${escapeHtml(ctx.t("tls.field.certificatePem"))}</label><input id="certificate-file" type="file" required></div>
                 <div class="waf-field"><label for="private-key-file">${escapeHtml(ctx.t("tls.field.privateKeyPem"))}</label><input id="private-key-file" type="file" required></div>
               </div>
@@ -329,10 +324,8 @@ export async function renderTLS(container, ctx) {
     </div>
   `;
 
-  const certImportFileInput = container.querySelector("#tls-certificate-import-file");
-  const keyImportFileInput = container.querySelector("#tls-private-key-import-file");
+  const certImportArchiveInput = container.querySelector("#tls-certificate-import-archive");
   const selectedIDs = () => Array.from(selectedCertificateIDs.values());
-  const getSingleSelectedID = () => (selectedCertificateIDs.size === 1 ? selectedIDs()[0] : "");
 
   const bindCertificateSelection = (certificates) => {
     container.querySelectorAll("[data-cert-select-id]").forEach((node) => {
@@ -439,45 +432,26 @@ export async function renderTLS(container, ctx) {
   container.querySelector("#certificate-refresh").addEventListener("click", load);
 
   container.querySelector("#tls-certificate-import")?.addEventListener("click", () => {
-    if (selectedCertificateIDs.size !== 1) {
-      ctx.notify(ctx.t("tls.certificates.selectOne"), "error");
-      return;
-    }
-    certImportFileInput?.click();
+    certImportArchiveInput?.click();
   });
 
-  certImportFileInput?.addEventListener("change", () => {
-    if (certImportFileInput?.files?.[0]) {
-      keyImportFileInput?.click();
-    }
-  });
-
-  keyImportFileInput?.addEventListener("change", async () => {
-    const certFile = certImportFileInput?.files?.[0] || null;
-    const keyFile = keyImportFileInput?.files?.[0] || null;
-    const certificateID = getSingleSelectedID();
-    if (!certFile || !keyFile || !certificateID) {
+  certImportArchiveInput?.addEventListener("change", async () => {
+    const archiveFile = certImportArchiveInput?.files?.[0] || null;
+    if (!archiveFile) {
       return;
     }
-    const selectedCert = certificatesState.find((item) => String(item?.id || "") === certificateID);
     const formData = new FormData();
-    formData.set("certificate_id", certificateID);
-    formData.set("common_name", String(selectedCert?.common_name || certificateID));
-    formData.set("status", "active");
-    formData.set("certificate_file", certFile);
-    formData.set("private_key_file", keyFile);
+    formData.set("archive_file", archiveFile);
     try {
-      await ctx.api.post("/api/certificate-materials/upload", formData);
-      ctx.notify(ctx.t("tls.certificates.imported"));
+      const payload = await ctx.api.post("/api/certificate-materials/import-archive", formData);
+      const importedCount = Number(payload?.imported_count || 0);
+      ctx.notify(importedCount > 0 ? ctx.t("tls.certificates.importedArchive", { count: importedCount }) : ctx.t("tls.certificates.imported"));
       await Promise.all([load(), loadAutoRenewSettings()]);
     } catch (error) {
       ctx.notify(`${ctx.t("sites.tls.importFailed")}: ${String(error?.message || error)}`, "error");
     } finally {
-      if (certImportFileInput) {
-        certImportFileInput.value = "";
-      }
-      if (keyImportFileInput) {
-        keyImportFileInput.value = "";
+      if (certImportArchiveInput) {
+        certImportArchiveInput.value = "";
       }
     }
   });
@@ -488,24 +462,6 @@ export async function renderTLS(container, ctx) {
       ctx.notify(ctx.t("tls.certificates.selectAny"), "error");
       return;
     }
-    if (ids.length === 1) {
-      const certificateID = ids[0];
-      try {
-        const payload = await ctx.api.get(`/api/certificate-materials/export/${encodeURIComponent(certificateID)}`);
-        const certificatePEM = String(payload?.certificate_pem || "");
-        const privateKeyPEM = String(payload?.private_key_pem || "");
-        if (!certificatePEM || !privateKeyPEM) {
-          throw new Error(ctx.t("sites.tls.exportEmpty"));
-        }
-        downloadText(`${certificateID}.certificate.pem`, certificatePEM);
-        downloadText(`${certificateID}.private.key`, privateKeyPEM);
-        ctx.notify(ctx.t("tls.certificates.exported"));
-      } catch (error) {
-        ctx.notify(`${ctx.t("sites.tls.exportFailed")}: ${String(error?.message || error)}`, "error");
-      }
-      return;
-    }
-
     try {
       const response = await fetch("/api/certificate-materials/export", {
         method: "POST",
@@ -530,7 +486,7 @@ export async function renderTLS(container, ctx) {
         throw new Error(message);
       }
       const blob = await response.blob();
-      downloadBlob("certificate-materials.zip", blob);
+      downloadBlob(ids.length === 1 ? `${ids[0]}-materials.zip` : "certificate-materials.zip", blob);
       ctx.notify(ctx.t("tls.certificates.exportArchive"));
     } catch (error) {
       ctx.notify(`${ctx.t("sites.tls.exportFailed")}: ${String(error?.message || error)}`, "error");

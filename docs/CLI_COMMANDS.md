@@ -231,7 +231,7 @@ Stop and cleanup:
 
 ```powershell
 cd deploy/compose/testpage
-docker compose down -v --remove-orphans --rmi local
+docker compose down --remove-orphans
 ```
 
 Full guide:

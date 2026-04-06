@@ -81,3 +81,23 @@ func TestStore_RejectsMissingFiles(t *testing.T) {
 		t.Fatal("expected missing private key file error")
 	}
 }
+
+func TestStore_RejectsTraversalCertificateID(t *testing.T) {
+	store, err := NewStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("create store failed: %v", err)
+	}
+
+	cases := []string{
+		"../cert-a",
+		"..\\cert-a",
+		"/tmp/cert-a",
+		"cert/../../x",
+		"..",
+	}
+	for _, id := range cases {
+		if _, err := store.Put(id, []byte("CERT"), []byte("KEY")); err == nil {
+			t.Fatalf("expected invalid certificate_id error for %q", id)
+		}
+	}
+}

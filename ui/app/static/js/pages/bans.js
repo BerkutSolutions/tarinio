@@ -2,7 +2,18 @@ import { confirmAction, escapeHtml, formatDate, setError, setLoading } from "../
 
 const ICON_PLUS = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M11 5h2v14h-2zM5 11h14v2H5z"/></svg>';
 const ICON_UNLOCK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a5 5 0 0 1 5 5v2h-2V7a3 3 0 1 0-6 0v2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h2V7a5 5 0 0 1 5-5Z"/></svg>';
-const MANUAL_BAN_TIMERS_KEY = "waf_manual_ban_timers_v1";
+const MANUAL_BAN_TIMERS = new Map();
+
+const EXTEND_DURATIONS = [
+  { key: "1h", seconds: 60 * 60, labelKey: "bans.extend.duration.1h" },
+  { key: "3h", seconds: 3 * 60 * 60, labelKey: "bans.extend.duration.3h" },
+  { key: "6h", seconds: 6 * 60 * 60, labelKey: "bans.extend.duration.6h" },
+  { key: "12h", seconds: 12 * 60 * 60, labelKey: "bans.extend.duration.12h" },
+  { key: "1d", seconds: 24 * 60 * 60, labelKey: "bans.extend.duration.1d" },
+  { key: "1w", seconds: 7 * 24 * 60 * 60, labelKey: "bans.extend.duration.1w" },
+  { key: "1mo", seconds: 30 * 24 * 60 * 60, labelKey: "bans.extend.duration.1mo" },
+  { key: "forever", seconds: 0, labelKey: "bans.extend.duration.forever" }
+];
 
 function normalizeIP(value) {
   return String(value || "").trim();
@@ -209,50 +220,14 @@ function manualBanTimerRowKey(siteID, ip) {
 }
 
 function loadManualBanTimers() {
-  try {
-    const raw = localStorage.getItem(MANUAL_BAN_TIMERS_KEY);
-    if (!raw) {
-      return new Map();
-    }
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      return new Map();
-    }
-    const out = new Map();
-    for (const item of parsed) {
-      const siteID = String(item?.siteID || "").trim();
-      const ip = normalizeIP(item?.ip);
-      const unbanAt = String(item?.unbanAt || "").trim();
-      if (!siteID || !ip || !unbanAt) {
-        continue;
-      }
-      const timestamp = Date.parse(unbanAt);
-      if (Number.isNaN(timestamp)) {
-        continue;
-      }
-      out.set(manualBanTimerRowKey(siteID, ip), {
-        siteID,
-        ip,
-        unbanAt: new Date(timestamp).toISOString(),
-        createdAt: String(item?.createdAt || "").trim() || new Date().toISOString()
-      });
-    }
-    return out;
-  } catch (_error) {
-    return new Map();
-  }
+  return new Map(Array.from(MANUAL_BAN_TIMERS.entries()).map(([key, value]) => [key, { ...value }]));
 }
 
 function saveManualBanTimers(map) {
-  const payload = Array.from(map.values())
-    .map((item) => ({
-      siteID: String(item?.siteID || "").trim(),
-      ip: normalizeIP(item?.ip),
-      unbanAt: String(item?.unbanAt || "").trim(),
-      createdAt: String(item?.createdAt || "").trim()
-    }))
-    .filter((item) => item.siteID && item.ip && item.unbanAt);
-  localStorage.setItem(MANUAL_BAN_TIMERS_KEY, JSON.stringify(payload));
+  MANUAL_BAN_TIMERS.clear();
+  for (const [key, value] of map.entries()) {
+    MANUAL_BAN_TIMERS.set(key, { ...value });
+  }
 }
 
 function upsertManualBanTimer(map, siteID, ip, unbanAt, createdAt = new Date().toISOString()) {
@@ -544,6 +519,41 @@ export async function renderBans(container, ctx) {
         </div>
       </div>
     </div>
+    <div class="waf-modal waf-hidden" id="bans-extend-modal" role="dialog" aria-modal="true" aria-labelledby="bans-extend-title" tabindex="-1">
+      <button class="waf-modal-overlay" type="button" data-bans-extend-close="true" aria-label="${escapeHtml(ctx.t("ui.close"))}"></button>
+      <div class="waf-modal-card">
+        <div class="waf-card-head">
+          <div>
+            <h3 id="bans-extend-title">${escapeHtml(ctx.t("bans.extend.title"))}</h3>
+            <div class="muted">${escapeHtml(ctx.t("bans.extend.subtitle"))}</div>
+          </div>
+          <button class="btn ghost btn-sm" type="button" data-bans-extend-close="true">${escapeHtml(ctx.t("ui.close"))}</button>
+        </div>
+        <div class="waf-card-body waf-stack">
+          <div id="bans-extend-status"></div>
+          <div class="waf-form-grid three">
+            <div class="waf-field">
+              <label for="bans-extend-site">${escapeHtml(ctx.t("bans.col.site"))}</label>
+              <input id="bans-extend-site" type="text" readonly>
+            </div>
+            <div class="waf-field">
+              <label for="bans-extend-ip">${escapeHtml(ctx.t("bans.col.ip"))}</label>
+              <input id="bans-extend-ip" type="text" readonly>
+            </div>
+            <div class="waf-field">
+              <label for="bans-extend-duration">${escapeHtml(ctx.t("bans.extend.duration"))}</label>
+              <select id="bans-extend-duration">
+                ${EXTEND_DURATIONS.map((item) => `<option value="${escapeHtml(String(item.seconds))}">${escapeHtml(ctx.t(item.labelKey))}</option>`).join("")}
+              </select>
+            </div>
+          </div>
+          <div class="waf-actions">
+            <button class="btn success" id="bans-extend-submit" type="button">${escapeHtml(ctx.t("bans.action.extend"))}</button>
+            <button class="btn ghost" type="button" data-bans-extend-close="true">${escapeHtml(ctx.t("common.cancel"))}</button>
+          </div>
+        </div>
+      </div>
+    </div>
   `;
 
   const statusNode = container.querySelector("#bans-status");
@@ -556,7 +566,14 @@ export async function renderBans(container, ctx) {
   const createSubmitNode = container.querySelector("#bans-create-submit");
   const detailModalNode = container.querySelector("#bans-detail-modal");
   const detailContentNode = container.querySelector("#bans-detail-content");
+  const extendModalNode = container.querySelector("#bans-extend-modal");
+  const extendStatusNode = container.querySelector("#bans-extend-status");
+  const extendSiteNode = container.querySelector("#bans-extend-site");
+  const extendIPNode = container.querySelector("#bans-extend-ip");
+  const extendDurationNode = container.querySelector("#bans-extend-duration");
+  const extendSubmitNode = container.querySelector("#bans-extend-submit");
   let latestSiteIDs = [];
+  let extendDraft = null;
   const pagingState = {
     pageSize: 10,
     page: 1
@@ -589,6 +606,33 @@ export async function renderBans(container, ctx) {
   const closeCreateModal = () => {
     createModalNode?.classList.add("waf-hidden");
   };
+  const closeExtendModal = () => {
+    extendDraft = null;
+    if (extendStatusNode) {
+      extendStatusNode.innerHTML = "";
+    }
+    extendModalNode?.classList.add("waf-hidden");
+  };
+  const openExtendModal = (row, siteLabel) => {
+    if (!row || !extendModalNode) {
+      return;
+    }
+    extendDraft = { row };
+    if (extendSiteNode) {
+      extendSiteNode.value = String(siteLabel || row.siteID || "").trim();
+    }
+    if (extendIPNode) {
+      extendIPNode.value = String(row.ip || "").trim();
+    }
+    if (extendDurationNode) {
+      const current = row.expiresAt ? Math.max(0, Math.round((row.expiresAt.getTime() - Date.now()) / 1000)) : 0;
+      const closest = EXTEND_DURATIONS.find((item) => item.seconds === 0 ? current <= 0 : current <= item.seconds) || EXTEND_DURATIONS[0];
+      extendDurationNode.value = String(closest.seconds);
+    }
+    extendStatusNode.innerHTML = "";
+    extendModalNode.classList.remove("waf-hidden");
+    extendDurationNode?.focus();
+  };
 
   detailModalNode?.querySelectorAll("[data-bans-detail-close]").forEach((node) => {
     node.addEventListener("click", closeDetail);
@@ -604,6 +648,14 @@ export async function renderBans(container, ctx) {
   createModalNode?.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       closeCreateModal();
+    }
+  });
+  extendModalNode?.querySelectorAll("[data-bans-extend-close]").forEach((node) => {
+    node.addEventListener("click", closeExtendModal);
+  });
+  extendModalNode?.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeExtendModal();
     }
   });
 
@@ -864,7 +916,7 @@ export async function renderBans(container, ctx) {
             }
             try {
               button.disabled = true;
-              await postBanAction(ctx, row.siteID, row.origin, "unban", ip);
+              await postBanAction(ctx, row.siteID, "primary", "unban", ip);
               const timers = loadManualBanTimers();
               removeManualBanTimer(timers, row.siteID, ip);
               saveManualBanTimers(timers);
@@ -879,28 +931,8 @@ export async function renderBans(container, ctx) {
             return;
           }
 
-          if (!confirmAction(ctx.t("bans.confirm.extend", { ip: row.ip, site: row.siteID }))) {
-            return;
-          }
-          try {
-            button.disabled = true;
-            await postBanAction(ctx, row.siteID, row.origin, "ban", ip);
-            const timers = loadManualBanTimers();
-            const baseDuration = parsePositiveNumber(siteBanDurationByID.get(row.siteID), 300);
-            if (baseDuration > 0) {
-              const currentTimer = timers.get(manualBanTimerRowKey(row.siteID, ip));
-              const currentUnbanAt = Date.parse(String(currentTimer?.unbanAt || row.expiresAt?.toISOString?.() || ""));
-              const startFrom = Number.isNaN(currentUnbanAt) ? Date.now() : Math.max(Date.now(), currentUnbanAt);
-              upsertManualBanTimer(timers, row.siteID, ip, new Date(startFrom + (baseDuration * 1000)));
-              saveManualBanTimers(timers);
-            }
-            ctx.notify(ctx.t("toast.ipBanned"));
-            await renderRows();
-          } catch (error) {
-            setError(statusNode, error?.message || ctx.t("bans.error.action"));
-          } finally {
-            button.disabled = false;
-          }
+          const site = siteByID.get(row.siteID);
+          openExtendModal(row, site?.primary_host || row.siteID);
         });
       });
 
@@ -972,6 +1004,41 @@ export async function renderBans(container, ctx) {
       setError(createStatusNode, error?.message || ctx.t("bans.error.action"));
     } finally {
       createSubmitNode.disabled = false;
+    }
+  });
+
+  extendSubmitNode?.addEventListener("click", async () => {
+    const row = extendDraft?.row;
+    if (!row || !row.siteID || !row.ip) {
+      setError(extendStatusNode, ctx.t("bans.error.action"));
+      return;
+    }
+    const durationSec = Number.parseInt(String(extendDurationNode?.value || "0"), 10);
+    if (!Number.isFinite(durationSec) || durationSec < 0) {
+      setError(extendStatusNode, ctx.t("bans.error.createValidation"));
+      return;
+    }
+    const ip = normalizeIP(row.ip);
+    try {
+      extendSubmitNode.disabled = true;
+      await postBanAction(ctx, row.siteID, "primary", "ban", ip);
+      const timers = loadManualBanTimers();
+      if (durationSec > 0) {
+        const currentTimer = timers.get(manualBanTimerRowKey(row.siteID, ip));
+        const currentUnbanAt = Date.parse(String(currentTimer?.unbanAt || row.expiresAt?.toISOString?.() || ""));
+        const startFrom = Number.isNaN(currentUnbanAt) ? Date.now() : Math.max(Date.now(), currentUnbanAt);
+        upsertManualBanTimer(timers, row.siteID, ip, new Date(startFrom + (durationSec * 1000)));
+      } else {
+        removeManualBanTimer(timers, row.siteID, ip);
+      }
+      saveManualBanTimers(timers);
+      closeExtendModal();
+      ctx.notify(ctx.t("toast.ipBanned"));
+      await renderRows();
+    } catch (error) {
+      setError(extendStatusNode, error?.message || ctx.t("bans.error.action"));
+    } finally {
+      extendSubmitNode.disabled = false;
     }
   });
 

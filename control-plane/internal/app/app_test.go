@@ -77,12 +77,75 @@ func TestNew_ProtectsControlPlaneEndpointsWithAuth(t *testing.T) {
 	if len(cookies) == 0 {
 		t.Fatal("expected auth cookie after login")
 	}
+	var sessionCookie, bootCookie *http.Cookie
+	for i := range cookies {
+		switch cookies[i].Name {
+		case "waf_session":
+			sessionCookie = cookies[i]
+		case "waf_session_boot":
+			bootCookie = cookies[i]
+		}
+	}
+	if sessionCookie == nil {
+		t.Fatal("expected waf_session cookie after login")
+	}
+	if bootCookie == nil {
+		t.Fatal("expected waf_session_boot cookie after login")
+	}
 
 	authedReq := httptest.NewRequest(http.MethodGet, "/api/sites", nil)
-	authedReq.AddCookie(cookies[0])
+	authedReq.AddCookie(sessionCookie)
+	authedReq.AddCookie(bootCookie)
 	authedResp := httptest.NewRecorder()
 	application.HTTPServer.Handler().ServeHTTP(authedResp, authedReq)
 	if authedResp.Code != http.StatusOK {
 		t.Fatalf("expected 200 with session, got %d", authedResp.Code)
+	}
+}
+
+func TestNew_RejectsSessionWithoutBootCookie(t *testing.T) {
+	cfg := config.Config{
+		HTTPAddr:         "127.0.0.1:8080",
+		RuntimeRoot:      "/tmp/runtime",
+		RevisionStoreDir: t.TempDir(),
+		AuthIssuer:       "WAF",
+		BootstrapAdmin: config.BootstrapAdminConfig{
+			Enabled:  true,
+			ID:       "admin",
+			Username: "admin",
+			Email:    "admin@example.test",
+			Password: "admin",
+		},
+	}
+
+	application, err := New(cfg)
+	if err != nil {
+		t.Fatalf("app bootstrap failed: %v", err)
+	}
+
+	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"username":"admin","password":"admin"}`))
+	loginResp := httptest.NewRecorder()
+	application.HTTPServer.Handler().ServeHTTP(loginResp, loginReq)
+	if loginResp.Code != http.StatusOK {
+		t.Fatalf("expected 200 from login, got %d", loginResp.Code)
+	}
+
+	var sessionCookie *http.Cookie
+	for _, cookie := range loginResp.Result().Cookies() {
+		if cookie.Name == "waf_session" {
+			sessionCookie = cookie
+			break
+		}
+	}
+	if sessionCookie == nil {
+		t.Fatal("expected session cookie")
+	}
+
+	protectedReq := httptest.NewRequest(http.MethodGet, "/api/sites", nil)
+	protectedReq.AddCookie(sessionCookie)
+	protectedResp := httptest.NewRecorder()
+	application.HTTPServer.Handler().ServeHTTP(protectedResp, protectedReq)
+	if protectedResp.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 without boot cookie, got %d", protectedResp.Code)
 	}
 }

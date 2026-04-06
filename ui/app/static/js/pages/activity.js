@@ -75,6 +75,21 @@ function translateSummary(summary, ctx) {
   return summary || ctx.t("activity.summary.unknown");
 }
 
+function resolveSiteLabel(siteID, siteNamesByID, ctx) {
+  const raw = String(siteID || "").trim();
+  if (!raw) {
+    return "-";
+  }
+  const mapped = siteNamesByID.get(raw);
+  if (mapped) {
+    return mapped;
+  }
+  if (raw.startsWith("startup-self-test-")) {
+    return ctx.t("activity.site.system");
+  }
+  return raw;
+}
+
 function applyPreset(container, preset) {
   const now = new Date();
   let from = "";
@@ -193,8 +208,8 @@ export async function renderActivity(container, ctx) {
             </div>
             <div class="waf-inline">
               <span class="badge badge-neutral">${escapeHtml(ctx.t(`activity.category.${inferCategory(item.action || "")}`))}</span>
-              <span>${escapeHtml(item.actor_user_id || ctx.t("common.system"))}</span>
-              <span>${escapeHtml(siteNamesByID.get(String(item.site_id || "")) || item.site_id || "-")}</span>
+              <span>${escapeHtml(item.actor_user_id || ctx.t("activity.actor.system"))}</span>
+              <span>${escapeHtml(resolveSiteLabel(item.site_id, siteNamesByID, ctx))}</span>
             </div>
             <div>${escapeHtml(translateSummary(item.summary, ctx))}</div>
             <div class="waf-code">${escapeHtml(detailsText(item.details_json, ctx))}</div>

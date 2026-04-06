@@ -30,6 +30,12 @@ func withMethodPermissions(authService authenticator, permissions map[string]rba
 			handlers.WriteJSON(w, http.StatusUnauthorized, map[string]any{"error": "authentication required"})
 			return
 		}
+		bootCookie, bootErr := r.Cookie(handlers.SessionBootCookieName)
+		if bootErr != nil || bootCookie.Value == "" || bootCookie.Value != handlers.SessionBootToken() {
+			handlers.ClearSessionCookie(w)
+			handlers.WriteJSON(w, http.StatusUnauthorized, map[string]any{"error": "session expired after restart"})
+			return
+		}
 		session, err := authService.Authenticate(cookie.Value)
 		if err != nil {
 			handlers.ClearSessionCookie(w)

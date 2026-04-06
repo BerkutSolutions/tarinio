@@ -1,0 +1,59 @@
+name: smoke-e2e
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+jobs:
+  login-healthcheck-dashboard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Prepare compose env
+        shell: bash
+        run: |
+          cp deploy/compose/default/.env.example deploy/compose/default/.env
+          cat >> deploy/compose/default/.env <<'EOF'
+          POSTGRES_PASSWORD=waf
+          POSTGRES_DSN=postgres://waf:waf@postgres:5432/waf?sslmode=disable
+          CONTROL_PLANE_BOOTSTRAP_ADMIN_ENABLED=true
+          CONTROL_PLANE_BOOTSTRAP_ADMIN_ID=admin
+          CONTROL_PLANE_BOOTSTRAP_ADMIN_USERNAME=admin
+          CONTROL_PLANE_BOOTSTRAP_ADMIN_EMAIL=admin@example.test
+          CONTROL_PLANE_BOOTSTRAP_ADMIN_PASSWORD=admin
+          CONTROL_PLANE_ACME_ENABLED=false
+          CONTROL_PLANE_ACME_USE_DEVELOPMENT_CLIENT=true
+          EOF
+
+      - name: Start stack
+        shell: bash
+        run: docker compose -f deploy/compose/default/docker-compose.yml up -d --build
+
+      - name: Run e2e smoke login-healthcheck-dashboard
+        shell: bash
+        env:
+          WAF_E2E_BASE_URL: http://127.0.0.1:8080
+          WAF_E2E_USERNAME: admin
+          WAF_E2E_PASSWORD: admin
+        run: go test ./ui/tests -run TestE2ESmoke_LoginHealthcheckDashboard -count=1 -v
+
+      - name: Dump compose logs on failure
+        if: failure()
+        shell: bash
+        run: docker compose -f deploy/compose/default/docker-compose.yml logs --no-color
+
+      - name: Stop stack
+        if: always()
+        shell: bash
+        run: docker compose -f deploy/compose/default/docker-compose.yml down

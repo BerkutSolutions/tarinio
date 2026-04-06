@@ -1057,6 +1057,15 @@ function downloadText(filename, content, type = "text/plain;charset=utf-8") {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+function downloadBlob(filename, blob) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 function toEnvKey(field) {
   return `WAF_SITE_${String(field || "").toUpperCase()}`;
 }
@@ -1542,12 +1551,27 @@ function renderDetailView(state, ctx) {
                   <div class="waf-field waf-field-cert-id">
                     <label for="service-certificate-id">${escapeHtml(ctx.t("sites.tls.certificateId"))}</label>
                     <input id="service-certificate-id" value="${escapeHtml(draft.certificate_id)}" placeholder="${escapeHtml(ctx.t("sites.tls.certificatePlaceholder"))}">
+                    <div class="waf-field" id="service-certificate-picker"${draft.certificate_authority_server === "import" ? "" : " style=\"display:none\""}>
+                      <label for="service-import-certificate-search">${escapeHtml(ctx.t("sites.tls.importSelect"))}</label>
+                      <input id="service-import-certificate-search" list="service-import-certificate-list" placeholder="${escapeHtml(ctx.t("sites.tls.importSelectPlaceholder"))}">
+                      <datalist id="service-import-certificate-list">
+                        ${state.certificates.map((certificate) => {
+                          const id = String(certificate?.id || "").trim();
+                          if (!id) {
+                            return "";
+                          }
+                          const commonName = String(certificate?.common_name || "").trim();
+                          const status = String(certificate?.status || "unknown").trim();
+                          const label = commonName ? `${id} (${commonName}, ${status})` : `${id} (${status})`;
+                          return `<option value="${escapeHtml(id)}" label="${escapeHtml(label)}"></option>`;
+                        }).join("")}
+                      </datalist>
+                    </div>
                     <div class="waf-actions" id="service-certificate-import-actions"${draft.certificate_authority_server === "import" ? "" : " style=\"display:none\""}>
                       <button class="btn ghost btn-sm" type="button" id="service-certificate-import">${escapeHtml(ctx.t("sites.tls.importButton"))}</button>
                       <button class="btn ghost btn-sm" type="button" id="service-certificate-export">${escapeHtml(ctx.t("sites.tls.exportButton"))}</button>
                     </div>
-                    <input id="service-certificate-file" type="file" accept=".pem,.crt,.cer,text/plain,application/x-pem-file" class="waf-hidden">
-                    <input id="service-private-key-file" type="file" accept=".pem,.key,text/plain,application/x-pem-file" class="waf-hidden">
+                    <input id="service-certificate-archive-file" type="file" accept=".zip,application/zip,application/x-zip-compressed" class="waf-hidden">
                   </div>
                 </div>
               </section>
@@ -2774,56 +2798,57 @@ export async function renderSites(container, ctx) {
     const toggleCertificateImportActions = () => {
       const caServer = String(container.querySelector("#service-ca-server")?.value || "").trim().toLowerCase();
       const row = container.querySelector("#service-certificate-import-actions");
+      const picker = container.querySelector("#service-certificate-picker");
       if (!row) {
         return;
       }
       row.style.display = caServer === "import" ? "" : "none";
+      if (picker) {
+        picker.style.display = caServer === "import" ? "" : "none";
+      }
     };
 
     container.querySelector("#service-ca-server")?.addEventListener("change", toggleCertificateImportActions);
-    const certificateFileInput = container.querySelector("#service-certificate-file");
-    const privateKeyFileInput = container.querySelector("#service-private-key-file");
+    const certificateArchiveInput = container.querySelector("#service-certificate-archive-file");
+    container.querySelector("#service-import-certificate-search")?.addEventListener("change", (event) => {
+      const selectedID = String(event?.target?.value || "").trim().toLowerCase();
+      if (!selectedID) {
+        return;
+      }
+      const certificateInput = container.querySelector("#service-certificate-id");
+      certificateInput.value = selectedID;
+      certificateInput.dataset.dirty = "true";
+    });
 
     container.querySelector("#service-certificate-import")?.addEventListener("click", () => {
-      const certID = String(container.querySelector("#service-certificate-id")?.value || "").trim().toLowerCase();
-      if (!certID) {
-        ctx.notify(ctx.t("sites.tls.certificateIdRequired"), "error");
-        return;
-      }
-      certificateFileInput?.click();
+      certificateArchiveInput?.click();
     });
 
-    certificateFileInput?.addEventListener("change", () => {
-      if (certificateFileInput?.files?.[0]) {
-        privateKeyFileInput?.click();
-      }
-    });
-
-    privateKeyFileInput?.addEventListener("change", async () => {
-      const certFile = certificateFileInput?.files?.[0] || null;
-      const keyFile = privateKeyFileInput?.files?.[0] || null;
-      const certificateID = String(container.querySelector("#service-certificate-id")?.value || "").trim().toLowerCase();
-      if (!certFile || !keyFile || !certificateID) {
+    certificateArchiveInput?.addEventListener("change", async () => {
+      const archiveFile = certificateArchiveInput?.files?.[0] || null;
+      if (!archiveFile) {
         return;
       }
-      const commonName = String(container.querySelector("#service-host")?.value || "").trim().toLowerCase();
       const formData = new FormData();
-      formData.set("certificate_id", certificateID);
-      formData.set("common_name", commonName || certificateID);
-      formData.set("status", "active");
-      formData.set("certificate_file", certFile);
-      formData.set("private_key_file", keyFile);
+      formData.set("archive_file", archiveFile);
       try {
-        await ctx.api.post("/api/certificate-materials/upload", formData);
-        ctx.notify(ctx.t("sites.tls.imported"));
+        const result = await ctx.api.post("/api/certificate-materials/import-archive", formData);
+        const importedCount = Number(result?.imported_count || 0);
+        const firstCertificateID = String(result?.items?.[0]?.certificate?.id || "").trim();
+        if (firstCertificateID) {
+          const certificateInput = container.querySelector("#service-certificate-id");
+          if (!String(certificateInput.value || "").trim()) {
+            certificateInput.value = firstCertificateID;
+            certificateInput.dataset.dirty = "true";
+          }
+        }
+        ctx.notify(importedCount > 0 ? ctx.t("tls.certificates.importedArchive", { count: importedCount }) : ctx.t("sites.tls.imported"));
+        await load();
       } catch (error) {
         setError(feedback, `${ctx.t("sites.tls.importFailed")}: ${String(error?.message || error)}`);
       } finally {
-        if (certificateFileInput) {
-          certificateFileInput.value = "";
-        }
-        if (privateKeyFileInput) {
-          privateKeyFileInput.value = "";
+        if (certificateArchiveInput) {
+          certificateArchiveInput.value = "";
         }
       }
     });
@@ -2835,14 +2860,30 @@ export async function renderSites(container, ctx) {
         return;
       }
       try {
-        const payload = await ctx.api.get(`/api/certificate-materials/export/${encodeURIComponent(certificateID)}`);
-        const certificatePEM = String(payload?.certificate_pem || "");
-        const privateKeyPEM = String(payload?.private_key_pem || "");
-        if (!certificatePEM || !privateKeyPEM) {
-          throw new Error(ctx.t("sites.tls.exportEmpty"));
+        const response = await fetch("/api/certificate-materials/export", {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            Accept: "application/zip, application/json",
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ certificate_ids: [certificateID] })
+        });
+        if (!response.ok) {
+          const bodyText = await response.text();
+          let message = `HTTP ${response.status}`;
+          if (bodyText) {
+            try {
+              const payload = JSON.parse(bodyText);
+              message = String(payload?.error || payload?.message || message);
+            } catch {
+              message = bodyText;
+            }
+          }
+          throw new Error(message);
         }
-        downloadText(`${certificateID}.certificate.pem`, certificatePEM);
-        downloadText(`${certificateID}.private.key`, privateKeyPEM);
+        const blob = await response.blob();
+        downloadBlob(`${certificateID}-materials.zip`, blob);
         ctx.notify(ctx.t("sites.tls.exported"));
       } catch (error) {
         setError(feedback, `${ctx.t("sites.tls.exportFailed")}: ${String(error?.message || error)}`);

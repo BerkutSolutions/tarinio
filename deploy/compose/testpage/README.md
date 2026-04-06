@@ -160,7 +160,7 @@ docker compose ps
 Stop and cleanup:
 
 ```powershell
-docker compose down -v --remove-orphans --rmi local
+docker compose down --remove-orphans
 ```
 
 ## Services UI Import/Export (JSON + ENV)

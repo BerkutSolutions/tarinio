@@ -8,12 +8,12 @@ const nextStorageKey = "waf_login_next";
 
 async function nextLocation() {
   const setup = await api.get("/api/setup/status");
-  return setup.needs_bootstrap ? onboardingUrl("/onboarding/user-creation") : secureAppUrl("/dashboard");
+  return setup.needs_bootstrap ? onboardingUrl("/onboarding/user-creation") : secureAppUrl("/healthcheck");
 }
 
 function currentNext() {
   const value = new URLSearchParams(window.location.search).get("next") || "";
-  return String(value || secureAppUrl("/dashboard")).trim();
+  return String(value || secureAppUrl("/healthcheck")).trim();
 }
 
 function showError(message) {
@@ -25,6 +25,24 @@ function showError(message) {
   const translated = key ? t(key) : "";
   box.hidden = false;
   box.textContent = translated && translated !== key ? translated : key || t("login.errorFailed");
+}
+
+function reasonMessage(reason) {
+  const key = String(reason || "").trim();
+  if (!key) return "";
+  if (key === "session_expired") return t("login.reason.sessionExpired");
+  if (key === "session_missing") return t("login.reason.sessionMissing");
+  if (key === "session_invalid") return t("login.reason.sessionInvalid");
+  if (key === "session_check_failed") return t("login.reason.sessionCheckFailed");
+  return "";
+}
+
+function showReasonFromQuery() {
+  const params = new URLSearchParams(window.location.search);
+  const message = reasonMessage(params.get("reason") || "");
+  if (message) {
+    showError(message);
+  }
 }
 
 function clearError() {
@@ -70,6 +88,7 @@ async function bootstrap() {
   } catch {
     // keep login screen visible
   }
+  showReasonFromQuery();
 
   const switcher = document.getElementById("language-switcher");
   if (switcher) {

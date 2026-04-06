@@ -60,6 +60,9 @@ func (s *Store) Put(certificateID string, certificatePEM []byte, privateKeyPEM [
 	defer s.mu.Unlock()
 
 	certificateID = normalizeID(certificateID)
+	if err := validateMaterialID(certificateID); err != nil {
+		return MaterialRecord{}, err
+	}
 	if certificateID == "" {
 		return MaterialRecord{}, errors.New("certificate material certificate_id is required")
 	}
@@ -128,6 +131,9 @@ func (s *Store) Get(certificateID string) (MaterialRecord, error) {
 	defer s.mu.Unlock()
 
 	certificateID = normalizeID(certificateID)
+	if err := validateMaterialID(certificateID); err != nil {
+		return MaterialRecord{}, err
+	}
 	if certificateID == "" {
 		return MaterialRecord{}, errors.New("certificate material certificate_id is required")
 	}
@@ -149,6 +155,9 @@ func (s *Store) Read(certificateID string) (MaterialRecord, []byte, []byte, erro
 	defer s.mu.Unlock()
 
 	certificateID = normalizeID(certificateID)
+	if err := validateMaterialID(certificateID); err != nil {
+		return MaterialRecord{}, nil, nil, err
+	}
 	if certificateID == "" {
 		return MaterialRecord{}, nil, nil, errors.New("certificate material certificate_id is required")
 	}
@@ -205,6 +214,28 @@ func (s *Store) saveLocked(current *state) error {
 
 func normalizeID(value string) string {
 	return strings.ToLower(strings.TrimSpace(value))
+}
+
+func validateMaterialID(value string) error {
+	if value == "" {
+		return errors.New("certificate material certificate_id is required")
+	}
+	if value == "." || value == ".." {
+		return errors.New("certificate material certificate_id is invalid")
+	}
+	if strings.Contains(value, "..") {
+		return errors.New("certificate material certificate_id must not contain '..'")
+	}
+	if strings.ContainsAny(value, `/\`) {
+		return errors.New("certificate material certificate_id must not contain path separators")
+	}
+	if strings.HasPrefix(value, "~") || strings.HasPrefix(value, ":") {
+		return errors.New("certificate material certificate_id is invalid")
+	}
+	if strings.Contains(value, "\x00") {
+		return errors.New("certificate material certificate_id is invalid")
+	}
+	return nil
 }
 
 func sortMaterials(items []MaterialRecord) {

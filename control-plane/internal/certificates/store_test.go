@@ -97,3 +97,26 @@ func TestStore_NormalizesCertificate(t *testing.T) {
 		t.Fatalf("expected normalized SANs, got %+v", created.SANList)
 	}
 }
+
+func TestStore_RejectsTraversalCertificateID(t *testing.T) {
+	store, err := NewStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("create store failed: %v", err)
+	}
+
+	cases := []string{
+		"../cert-a",
+		"..\\cert-a",
+		"/etc/passwd",
+		"..",
+	}
+	for _, id := range cases {
+		if _, err := store.Create(Certificate{
+			ID:         id,
+			CommonName: "example.com",
+			Status:     "active",
+		}); err == nil {
+			t.Fatalf("expected invalid id error for %q", id)
+		}
+	}
+}

@@ -1,12 +1,11 @@
 import { getLanguage } from "./i18n.js";
 
-const key = "waf_ui_prefs";
-
 const defaults = {
   language: "ru",
   timeZone: "Europe/Moscow",
   autoLogout: false,
 };
+let memoryPreferences = null;
 
 function detectTimeZone() {
   try {
@@ -17,22 +16,14 @@ function detectTimeZone() {
 }
 
 export function loadPreferences() {
-  try {
-    const raw = window.localStorage.getItem(key);
-    const parsed = raw ? JSON.parse(raw) : {};
-    return {
-      ...defaults,
-      timeZone: detectTimeZone(),
-      language: getLanguage(),
-      ...parsed,
-    };
-  } catch {
-    return {
+  if (!memoryPreferences) {
+    memoryPreferences = {
       ...defaults,
       timeZone: detectTimeZone(),
       language: getLanguage(),
     };
   }
+  return { ...memoryPreferences };
 }
 
 export function savePreferences(next) {
@@ -40,7 +31,7 @@ export function savePreferences(next) {
     ...loadPreferences(),
     ...(next || {}),
   };
-  window.localStorage.setItem(key, JSON.stringify(merged));
+  memoryPreferences = { ...merged };
   return merged;
 }
 

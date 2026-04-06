@@ -51,7 +51,7 @@ export function createNotificationCenter(ctx) {
           key: `jobs:${revisionId}`,
           title: ctx.t("notifications.jobsFailedTitle"),
           message: ctx.t("notifications.jobsFailedMessage", { revisionId }),
-          targetPath: "/jobs",
+          targetPath: "/activity",
           ts: timestamp(row?.created_at),
         });
       });

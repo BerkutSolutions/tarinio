@@ -18,6 +18,9 @@ type Server struct {
 
 func New(
 	addr string,
+	runtimeRoot string,
+	revisionStoreDir string,
+	runtimeHealthURL string,
 	setupService interface {
 		Status() (services.SetupStatus, error)
 	},
@@ -62,6 +65,9 @@ func New(
 	mux.Handle("/healthz", handlers.NewHealthHandler(revisionService))
 	mux.Handle("/api/setup/status", handlers.NewSetupHandler(setupService))
 	mux.Handle("/api/app/meta", withAuth(authService, "", handlers.NewAppMetaHandler()))
+	mux.Handle("/api/app/ping", withAuth(authService, rbac.PermissionAuthSelf, handlers.NewAppPingHandler()))
+	mux.Handle("/api/app/compat", withAuth(authService, rbac.PermissionAuthSelf, handlers.NewAppCompatHandler(runtimeRoot, revisionStoreDir)))
+	mux.Handle("/api/app/compat/fix", withAuth(authService, rbac.PermissionAuthSelf, handlers.NewAppCompatHandler(runtimeRoot, revisionStoreDir)))
 	mux.Handle("/api/settings/runtime", withAuth(authService, rbac.PermissionAuthSelf, handlers.NewSettingsRuntimeHandler()))
 	mux.Handle("/api/settings/runtime/check-updates", withAuth(authService, rbac.PermissionAuthSelf, handlers.NewSettingsRuntimeHandler()))
 	mux.Handle("/api/owasp-crs/status", withMethodPermissions(authService, map[string]rbac.Permission{
@@ -134,6 +140,7 @@ func New(
 	}, handlers.NewTLSAutoRenewHandler(tlsAutoRenewService)))
 	certificateACMEHandler := handlers.NewCertificateACMEHandler(certificateACMEService, certificateSelfSignedService)
 	mux.Handle("/api/certificate-materials/upload", withAuth(authService, rbac.PermissionCertificatesWrite, handlers.NewCertificateUploadHandler(certificateUploadService)))
+	mux.Handle("/api/certificate-materials/import-archive", withAuth(authService, rbac.PermissionCertificatesWrite, handlers.NewCertificateUploadHandler(certificateUploadService)))
 	mux.Handle("/api/certificate-materials/export", withAuth(authService, rbac.PermissionCertificatesRead, handlers.NewCertificateMaterialExportHandler(certificateMaterialReader)))
 	mux.Handle("/api/certificate-materials/export/", withAuth(authService, rbac.PermissionCertificatesRead, handlers.NewCertificateMaterialExportHandler(certificateMaterialReader)))
 	mux.Handle("/api/certificates/acme/issue", withAuth(authService, rbac.PermissionCertificatesWrite, certificateACMEHandler))

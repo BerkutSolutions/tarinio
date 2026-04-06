@@ -1,6 +1,6 @@
 # TARINIO Architecture (overview)
 
-Documentation baseline: `1.1.2`
+Documentation baseline: `1.1.3`
 
 TARINIO is a standalone self-hosted WAF built around NGINX + ModSecurity + OWASP CRS.
 

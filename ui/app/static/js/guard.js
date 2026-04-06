@@ -153,7 +153,7 @@ export async function checkEntryAccess(mode) {
       return { setup, user, allowed: false };
     }
     user = await getCurrentUserQuiet();
-    replace(user ? secureAppUrl("/dashboard") : secureAppUrl("/login"));
+    replace(user ? secureAppUrl("/healthcheck") : secureAppUrl("/login"));
     return { setup, user, allowed: false };
   }
 
@@ -172,7 +172,7 @@ export async function checkEntryAccess(mode) {
     }
     user = await getCurrentUserQuiet();
     if (user) {
-      replace(secureAppUrl("/dashboard"));
+      replace(secureAppUrl("/healthcheck"));
       return { setup, user, allowed: false };
     }
     return { setup, user, allowed: true };
@@ -193,7 +193,7 @@ export async function checkEntryAccess(mode) {
     }
     user = await getCurrentUserQuiet();
     if (user) {
-      replace(secureAppUrl("/dashboard"));
+      replace(secureAppUrl("/healthcheck"));
       return { setup, user, allowed: false };
     }
     return { setup, user, allowed: true };
@@ -205,7 +205,7 @@ export async function checkEntryAccess(mode) {
       return { setup, user, allowed: false };
     }
     if (window.location.protocol !== "https:") {
-      replace(httpsUrl(window.location.pathname || "/dashboard"));
+      replace(httpsUrl(window.location.pathname || "/healthcheck"));
       return { setup, user, allowed: false };
     }
     try {

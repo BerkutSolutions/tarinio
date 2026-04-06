@@ -162,10 +162,17 @@ func (s *ManualBanService) resolveSiteID(siteID string) (string, error) {
 	aliasToken := normalizeSiteAliasToken(siteID)
 	for _, item := range items {
 		id := strings.ToLower(strings.TrimSpace(item.ID))
+		host := strings.ToLower(strings.TrimSpace(item.PrimaryHost))
 		if id == siteID {
 			return item.ID, nil
 		}
 		if normalizeSiteAliasToken(id) == aliasToken {
+			return item.ID, nil
+		}
+		if host == siteID {
+			return item.ID, nil
+		}
+		if normalizeSiteAliasToken(host) == aliasToken {
 			return item.ID, nil
 		}
 	}

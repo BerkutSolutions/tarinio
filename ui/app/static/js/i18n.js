@@ -1,7 +1,7 @@
-const languageStorageKey = "waf_ui_lang";
 const defaultLanguage = "ru";
 const languageChangedEvent = "app:language-changed";
 const dictionaries = new Map();
+let currentLanguage = defaultLanguage;
 
 function normalizeLanguage(language) {
   return language === "en" ? "en" : defaultLanguage;
@@ -50,8 +50,7 @@ function translateFromDictionary(language, key, params = {}) {
 }
 
 export function getLanguage() {
-  const stored = window.localStorage.getItem(languageStorageKey);
-  return normalizeLanguage(stored);
+  return normalizeLanguage(currentLanguage);
 }
 
 export async function preloadTranslations(language = getLanguage()) {
@@ -97,7 +96,7 @@ export async function applyTranslations(language = getLanguage()) {
 export async function setLanguage(language) {
   const normalized = normalizeLanguage(language);
   const previous = getLanguage();
-  window.localStorage.setItem(languageStorageKey, normalized);
+  currentLanguage = normalized;
   await applyTranslations(normalized);
   if (previous !== normalized) {
     window.dispatchEvent(new CustomEvent(languageChangedEvent, { detail: { language: normalized } }));

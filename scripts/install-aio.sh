@@ -5,8 +5,14 @@ REPO_URL="${REPO_URL:-https://github.com/BerkutSolutions/tarinio.git}"
 INSTALL_DIR="${INSTALL_DIR:-/opt/tarinio}"
 BRANCH="${BRANCH:-main}"
 PROFILE="${PROFILE:-default}"
+COMPAT_CONTRACT_VERSION="${COMPAT_CONTRACT_VERSION:-2026-04-06-healthcheck-v1}"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 LOG_FILE="/tmp/tarinio-install-${PROFILE}-${TIMESTAMP}.log"
+BACKUP_BASE_DIR="${BACKUP_BASE_DIR:-/tmp/tarinio-upgrade-backups}"
+BACKUP_DIR="${BACKUP_BASE_DIR}/${PROFILE}-${TIMESTAMP}"
+BACKUP_MAX_TOTAL_MB="${BACKUP_MAX_TOTAL_MB:-1024}"
+BACKUP_MAX_VOLUME_MB="${BACKUP_MAX_VOLUME_MB:-512}"
+BACKUP_HELPER_IMAGE="${BACKUP_HELPER_IMAGE:-busybox:1.36}"
 FAILED=0
 
 if [ -t 1 ]; then
@@ -64,6 +70,141 @@ run_logged() {
   "$@" >>"$LOG_FILE" 2>&1
 }
 
+safe_snapshot() {
+  mkdir -p "$BACKUP_DIR"
+  if [ -f "$INSTALL_DIR/deploy/compose/$PROFILE/.env" ]; then
+    cp "$INSTALL_DIR/deploy/compose/$PROFILE/.env" "$BACKUP_DIR/.env"
+  fi
+  if [ -f "$INSTALL_DIR/deploy/compose/$PROFILE/docker-compose.yml" ]; then
+    cp "$INSTALL_DIR/deploy/compose/$PROFILE/docker-compose.yml" "$BACKUP_DIR/docker-compose.yml"
+  fi
+  if [ -f "$INSTALL_DIR/control-plane/internal/appmeta/meta.go" ]; then
+    cp "$INSTALL_DIR/control-plane/internal/appmeta/meta.go" "$BACKUP_DIR/meta.go"
+  fi
+  ok "safe snapshot saved: $BACKUP_DIR"
+}
+
+compose_capture() {
+  if [ "${COMPOSE_LEGACY:-0}" -eq 1 ]; then
+    docker-compose "$@" 2>>"$LOG_FILE"
+  else
+    docker compose "$@" 2>>"$LOG_FILE"
+  fi
+}
+
+should_backup_volume() {
+  name="$1"
+  case "$name" in
+    *runtime-data*|*control-plane-data*|*certificates-data*|*postgres-data*|*ddos-model-state*|*request-archive-data*|*l4-adaptive*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+safe_data_backup() {
+  profile_dir="$INSTALL_DIR/deploy/compose/$PROFILE"
+  compose_file="$profile_dir/docker-compose.yml"
+  if [ ! -f "$compose_file" ]; then
+    warn "docker-compose.yml not found for profile $PROFILE, skipping volume backup"
+    return 0
+  fi
+
+  mkdir -p "$BACKUP_DIR/volumes"
+  manifest="$BACKUP_DIR/backup-manifest.txt"
+  : >"$manifest"
+
+  volumes="$(cd "$profile_dir" && compose_capture -f docker-compose.yml config --volumes || true)"
+  if [ -z "$volumes" ]; then
+    warn "no named volumes found in compose config, skipping volume backup"
+    return 0
+  fi
+
+  total_estimated_mb=0
+  saved_count=0
+  skipped_count=0
+
+  for volume in $volumes; do
+    if ! should_backup_volume "$volume"; then
+      continue
+    fi
+
+    if ! docker volume inspect "$volume" >/dev/null 2>&1; then
+      skipped_count=$((skipped_count + 1))
+      printf "skip %s: volume not found\n" "$volume" >>"$manifest"
+      continue
+    fi
+
+    estimated_mb="$(docker run --rm -v "${volume}:/data:ro" "$BACKUP_HELPER_IMAGE" sh -lc "du -sm /data 2>/dev/null | awk '{print \$1}'" 2>>"$LOG_FILE" || true)"
+    estimated_mb="$(printf "%s" "$estimated_mb" | tr -d '\r' | awk 'NF{print $1; exit}')"
+    case "$estimated_mb" in
+      ''|*[!0-9]*) estimated_mb=0 ;;
+    esac
+
+    if [ "$estimated_mb" -gt "$BACKUP_MAX_VOLUME_MB" ]; then
+      skipped_count=$((skipped_count + 1))
+      warn "skip volume $volume: estimated ${estimated_mb}MB > per-volume limit ${BACKUP_MAX_VOLUME_MB}MB"
+      printf "skip %s: estimated %sMB > per-volume limit %sMB\n" "$volume" "$estimated_mb" "$BACKUP_MAX_VOLUME_MB" >>"$manifest"
+      continue
+    fi
+
+    projected_total=$((total_estimated_mb + estimated_mb))
+    if [ "$projected_total" -gt "$BACKUP_MAX_TOTAL_MB" ]; then
+      skipped_count=$((skipped_count + 1))
+      warn "skip volume $volume: total backup limit ${BACKUP_MAX_TOTAL_MB}MB would be exceeded"
+      printf "skip %s: total limit %sMB would be exceeded (current %sMB + %sMB)\n" "$volume" "$BACKUP_MAX_TOTAL_MB" "$total_estimated_mb" "$estimated_mb" >>"$manifest"
+      continue
+    fi
+
+    safe_name="$(printf "%s" "$volume" | tr '/:' '__')"
+    target_file="$BACKUP_DIR/volumes/${safe_name}.tar.gz"
+    if docker run --rm -v "${volume}:/data:ro" -v "$BACKUP_DIR/volumes:/backup" "$BACKUP_HELPER_IMAGE" sh -lc "cd /data && tar -czf '/backup/${safe_name}.tar.gz' ." >>"$LOG_FILE" 2>&1; then
+      total_estimated_mb="$projected_total"
+      saved_count=$((saved_count + 1))
+      ok "backup saved: $volume -> $target_file (~${estimated_mb}MB)"
+      printf "saved %s: %s (~%sMB)\n" "$volume" "$target_file" "$estimated_mb" >>"$manifest"
+    else
+      skipped_count=$((skipped_count + 1))
+      warn "failed to backup volume $volume (see log: $LOG_FILE)"
+      printf "skip %s: backup command failed\n" "$volume" >>"$manifest"
+    fi
+  done
+
+  ok "lightweight volume backup finished: saved=$saved_count skipped=$skipped_count estimated_total<=${total_estimated_mb}MB"
+  ok "backup manifest: $manifest"
+}
+
+probe_container_http() {
+  service="$1"
+  url="$2"
+  attempts="${3:-30}"
+  i=1
+  while [ "$i" -le "$attempts" ]; do
+    if run_logged $COMPOSE_CMD -f docker-compose.yml exec -T "$service" sh -lc "wget -qO- '$url' >/dev/null 2>&1 || curl -fsS '$url' >/dev/null 2>&1"; then
+      ok "$service responded: $url"
+      return 0
+    fi
+    sleep 2
+    i=$((i + 1))
+  done
+  fail "$service health probe failed for $url after ${attempts} attempts"
+}
+
+probe_host_http() {
+  url="$1"
+  if command -v curl >/dev/null 2>&1; then
+    run_logged curl -fsS -I "$url"
+    return
+  fi
+  if command -v wget >/dev/null 2>&1; then
+    run_logged wget -qO- "$url"
+    return
+  fi
+  fail "curl/wget is required for host probe: $url"
+}
+
 extract_version() {
   file="$1"
   if [ ! -f "$file" ]; then
@@ -112,6 +253,12 @@ fi
 
 section "Repository"
 if [ -d "$INSTALL_DIR/.git" ]; then
+  section "Safety Snapshot"
+  step "Saving pre-upgrade snapshot for rollback"
+  safe_snapshot
+  step "Saving lightweight data backup to /tmp (size-limited)"
+  safe_data_backup
+
   step "Updating existing repository in $INSTALL_DIR"
   run_logged git -C "$INSTALL_DIR" fetch --all --tags
   run_logged git -C "$INSTALL_DIR" checkout "$BRANCH"
@@ -131,6 +278,7 @@ ok "branch/commit: $BRANCH ($TARGET_COMMIT)"
 ok "profile: $PROFILE"
 ok "install path: $INSTALL_DIR"
 ok "detailed log: $LOG_FILE"
+ok "compat contract: $COMPAT_CONTRACT_VERSION"
 
 section "Profile Preparation"
 cd "$INSTALL_DIR/deploy/compose/$PROFILE"
@@ -178,6 +326,15 @@ step "Checking container status"
 run_logged $COMPOSE_CMD -f docker-compose.yml ps
 ok "status collected"
 
+section "Post-Upgrade Health Gate"
+step "Probing control-plane health endpoint"
+probe_container_http control-plane "http://127.0.0.1:8080/healthz" 45
+step "Probing runtime health endpoint"
+probe_container_http runtime "http://127.0.0.1:8081/healthz" 45
+step "Probing UI healthcheck page route"
+probe_host_http "http://127.0.0.1:8080/healthcheck"
+ok "post-upgrade health gate passed"
+
 section "Done"
 echo "TARINIO is starting."
 echo "Installed version: $TARGET_VERSION"
@@ -186,6 +343,9 @@ echo "After onboarding: https://<your-domain>/login"
 echo "WAF HTTP:  http://<server-ip>/"
 echo "WAF HTTPS: https://<server-ip>/"
 echo "Installer log: $LOG_FILE"
+echo "Backup dir: $BACKUP_DIR"
+echo "Backup limits: per-volume=${BACKUP_MAX_VOLUME_MB}MB, total=${BACKUP_MAX_TOTAL_MB}MB"
+echo "Compatibility contract: $COMPAT_CONTRACT_VERSION"
 echo
 echo "Follow logs with:"
 echo "  cd $INSTALL_DIR/deploy/compose/$PROFILE"

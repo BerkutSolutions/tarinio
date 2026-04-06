@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WAF Admin | Проверка системы</title>
+  <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon16.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon32.png">
+  <link rel="icon" type="image/png" sizes="48x48" href="/static/favicon48.png">
+  <link rel="icon" type="image/png" sizes="64x64" href="/static/favicon64.png">
+  <link rel="stylesheet" href="/static/styles.css?v=20260406-healthcheck-2">
+</head>
+<body class="healthcheck-page">
+  <div class="healthcheck-container">
+    <div class="card container-card">
+      <div class="card-body">
+        <div class="hc-title-row">
+          <h2 class="hc-title" data-i18n="healthcheck.title">Проверка системы</h2>
+        </div>
+
+        <div class="hc-accordion">
+          <button type="button" class="hc-toggle" data-hc-toggle="hc-checks">
+            <span class="healthcheck-step-icon hc-toggle-icon" aria-hidden="true" data-status="pending"></span>
+            <span id="hc-checks-count" class="muted hc-toggle-count">0/0</span>
+            <span class="hc-toggle-title" data-i18n="healthcheck.section.checks">Проверки</span>
+            <span class="hc-chevron" aria-hidden="true"></span>
+          </button>
+          <div id="hc-checks" class="hc-panel" hidden>
+            <ul id="healthcheck-steps" class="hc-list"></ul>
+          </div>
+
+          <button type="button" class="hc-toggle" data-hc-toggle="hc-compat">
+            <span class="healthcheck-step-icon hc-toggle-icon" aria-hidden="true" data-status="pending"></span>
+            <span id="hc-compat-count" class="muted hc-toggle-count">0/0</span>
+            <span class="hc-toggle-title" data-i18n="healthcheck.section.compat">Совместимость</span>
+            <span class="hc-chevron" aria-hidden="true"></span>
+          </button>
+          <div id="hc-compat" class="hc-panel" hidden>
+            <div id="hc-compat-summary" class="muted hc-summary"></div>
+            <ul id="healthcheck-compat" class="hc-list"></ul>
+          </div>
+        </div>
+
+        <div id="healthcheck-error" class="alert" hidden></div>
+      </div>
+    </div>
+
+    <div class="healthcheck-actions">
+      <button id="healthcheck-continue" class="btn primary" data-i18n="healthcheck.continue">Перейти в панель</button>
+    </div>
+  </div>
+
+  <script type="module" src="/static/js/healthcheck.js?v=20260406-healthcheck-2"></script>
+</body>
+</html>

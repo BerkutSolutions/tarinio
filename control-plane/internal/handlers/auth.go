@@ -2,15 +2,24 @@ package handlers
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"strings"
+	"sync"
 
 	"waf/control-plane/internal/services"
 )
 
 const SessionCookieName = "waf_session"
+const SessionBootCookieName = "waf_session_boot"
 const sessionCookieMaxAgeSeconds = 12 * 60 * 60
+
+var (
+	sessionBootToken   = generateSessionBootToken()
+	sessionBootTokenMu sync.RWMutex
+)
 
 type authService interface {
 	Bootstrap(ctx context.Context, username, email, password string) (services.SessionResult, error)
@@ -484,9 +493,22 @@ func SetSessionCookieForRequest(w http.ResponseWriter, r *http.Request, sessionI
 }
 
 func SetSessionCookieWithOptions(w http.ResponseWriter, sessionID string, secure bool) {
+	sessionBootTokenMu.RLock()
+	bootToken := sessionBootToken
+	sessionBootTokenMu.RUnlock()
+
 	http.SetCookie(w, &http.Cookie{
 		Name:     SessionCookieName,
 		Value:    sessionID,
+		Path:     "/",
+		MaxAge:   sessionCookieMaxAgeSeconds,
+		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
+		Secure:   secure,
+	})
+	http.SetCookie(w, &http.Cookie{
+		Name:     SessionBootCookieName,
+		Value:    bootToken,
 		Path:     "/",
 		MaxAge:   sessionCookieMaxAgeSeconds,
 		HttpOnly: true,
@@ -517,6 +539,23 @@ func ClearSessionCookie(w http.ResponseWriter) {
 		SameSite: http.SameSiteStrictMode,
 		Secure:   true,
 	})
+	http.SetCookie(w, &http.Cookie{
+		Name:     SessionBootCookieName,
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
+	})
+	http.SetCookie(w, &http.Cookie{
+		Name:     SessionBootCookieName,
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
+		Secure:   true,
+	})
 }
 
 func readSessionID(r *http.Request) (string, bool) {
@@ -526,4 +565,18 @@ func readSessionID(r *http.Request) (string, bool) {
 	}
 	value := strings.TrimSpace(cookie.Value)
 	return value, value != ""
+}
+
+func SessionBootToken() string {
+	sessionBootTokenMu.RLock()
+	defer sessionBootTokenMu.RUnlock()
+	return sessionBootToken
+}
+
+func generateSessionBootToken() string {
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		return "boot-token-fallback"
+	}
+	return base64.RawURLEncoding.EncodeToString(buf)
 }

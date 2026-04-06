@@ -7,6 +7,7 @@ import (
 
 	"waf/control-plane/internal/accesspolicies"
 	"waf/control-plane/internal/antiddos"
+	"waf/control-plane/internal/appcompat"
 	"waf/control-plane/internal/audits"
 	"waf/control-plane/internal/certificatematerials"
 	"waf/control-plane/internal/certificates"
@@ -83,6 +84,10 @@ type App struct {
 }
 
 func New(cfg config.Config) (*App, error) {
+	if err := appcompat.EnsureLegacyDataTransferred(cfg.RuntimeRoot, cfg.RevisionStoreDir); err != nil {
+		return nil, err
+	}
+
 	redisClient := redis.NewClient(cfg.Redis)
 	redisBackend := redis.NewBackend(redisClient)
 
@@ -238,7 +243,7 @@ func New(cfg config.Config) (*App, error) {
 	dashboardService := services.NewDashboardService(eventService, runtimeRequestCollector, cfg.RuntimeHealthURL)
 	runtimeCRSService := services.NewRuntimeCRSService(services.RuntimeBaseURLFromHealthURL(cfg.RuntimeHealthURL))
 	containerRuntimeService := services.NewContainerRuntimeService()
-	httpServer := httpserver.New(cfg.HTTPAddr, setupService, revisionService, authService, siteService, manualBanService, upstreamService, certificateService, tlsConfigService, tlsAutoRenewService, certificateUploadService, certificateMaterialStore, letsEncryptService, selfSignedCertificateService, wafPolicyService, accessPolicyService, rateLimitPolicyService, easySiteProfileService, antiDDoSService, eventService, revisionCompileService, applyService, auditService, reportService, dashboardService, containerRuntimeService, runtimeCRSService, runtimeRequestCollector)
+	httpServer := httpserver.New(cfg.HTTPAddr, cfg.RuntimeRoot, cfg.RevisionStoreDir, cfg.RuntimeHealthURL, setupService, revisionService, authService, siteService, manualBanService, upstreamService, certificateService, tlsConfigService, tlsAutoRenewService, certificateUploadService, certificateMaterialStore, letsEncryptService, selfSignedCertificateService, wafPolicyService, accessPolicyService, rateLimitPolicyService, easySiteProfileService, antiDDoSService, eventService, revisionCompileService, applyService, auditService, reportService, dashboardService, containerRuntimeService, runtimeCRSService, runtimeRequestCollector)
 	var devFastStartBootstrapper *services.DevFastStartBootstrapper
 	if cfg.DevFastStart.Enabled {
 		devFastStartCertificateIssuer := letsEncryptService

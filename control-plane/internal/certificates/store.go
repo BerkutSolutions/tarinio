@@ -174,13 +174,16 @@ func validateCertificate(item Certificate) error {
 	if item.ID == "" {
 		return errors.New("certificate id is required")
 	}
+	if err := validateCertificateID(item.ID); err != nil {
+		return err
+	}
 	if item.CommonName == "" {
 		return errors.New("certificate common_name is required")
 	}
 	switch item.Status {
-	case "active", "expired", "revoked":
+	case "active", "inactive", "expired", "revoked":
 	default:
-		return errors.New("certificate status must be active, expired, or revoked")
+		return errors.New("certificate status must be active, inactive, expired, or revoked")
 	}
 	if item.NotBefore != "" {
 		if _, err := time.Parse(time.RFC3339, item.NotBefore); err != nil {
@@ -191,6 +194,28 @@ func validateCertificate(item Certificate) error {
 		if _, err := time.Parse(time.RFC3339, item.NotAfter); err != nil {
 			return errors.New("certificate not_after must be RFC3339")
 		}
+	}
+	return nil
+}
+
+func validateCertificateID(value string) error {
+	if value == "" {
+		return errors.New("certificate id is required")
+	}
+	if value == "." || value == ".." {
+		return errors.New("certificate id is invalid")
+	}
+	if strings.Contains(value, "..") {
+		return errors.New("certificate id must not contain '..'")
+	}
+	if strings.ContainsAny(value, `/\`) {
+		return errors.New("certificate id must not contain path separators")
+	}
+	if strings.HasPrefix(value, "~") || strings.HasPrefix(value, ":") {
+		return errors.New("certificate id is invalid")
+	}
+	if strings.Contains(value, "\x00") {
+		return errors.New("certificate id is invalid")
 	}
 	return nil
 }

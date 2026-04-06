@@ -14,7 +14,7 @@ Scope:
 Environment:
 - Windows host
 - Docker Compose stack from `deploy/compose/`
-- fresh reset before validation: `docker compose down -v`
+- fresh reset before validation: `docker compose down --remove-orphans`
 
 Notes:
 - Validation was executed after fixing several blocking defects found during the run:

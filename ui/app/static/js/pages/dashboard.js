@@ -1,11 +1,11 @@
 import { escapeHtml, setError } from "../ui.js";
 
-const LAYOUT_KEY = "waf_dashboard_layout_v7";
-const WIDGET_VISIBILITY_KEY = "waf_dashboard_widgets_v1";
 const GRID = 20;
 const MIN_WIDTH = 220;
 const MIN_HEIGHT = 140;
 const OBSERVATION_WINDOW_MS = 24 * 60 * 60 * 1000;
+let layoutState = null;
+const visibleWidgetsByScope = new Map();
 
 const WIDGETS = [
   { id: "services-up", titleKey: "dashboard.widget.servicesUp", width: 240, height: 180, x: 20, y: 20 },
@@ -47,47 +47,38 @@ function normalizeLayout(raw) {
 }
 
 function loadLayout() {
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(LAYOUT_KEY) || "[]");
-    return normalizeLayout(parsed);
-  } catch (_error) {
-    return normalizeLayout([]);
+  if (!layoutState) {
+    layoutState = normalizeLayout([]);
   }
+  return normalizeLayout(layoutState);
 }
 
 function saveLayout(layout) {
-  window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout));
-}
-
-function scopedWidgetsKey(scopeID = "") {
-  const scope = String(scopeID || "").trim().toLowerCase();
-  return scope ? `${WIDGET_VISIBILITY_KEY}:${scope}` : WIDGET_VISIBILITY_KEY;
+  layoutState = normalizeLayout(layout);
 }
 
 function loadVisibleWidgetIDs(scopeID = "") {
   const fallback = WIDGETS.map((widget) => widget.id);
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(scopedWidgetsKey(scopeID)) || "[]");
-    if (!Array.isArray(parsed) || !parsed.length) {
-      return fallback;
-    }
-    const allowed = new Set(fallback);
-    const unique = [];
-    parsed.forEach((id) => {
-      const token = String(id || "");
-      if (!allowed.has(token) || unique.includes(token)) {
-        return;
-      }
-      unique.push(token);
-    });
-    return unique.length ? unique : fallback;
-  } catch (_error) {
+  const scope = String(scopeID || "").trim().toLowerCase();
+  const parsed = visibleWidgetsByScope.get(scope);
+  if (!Array.isArray(parsed) || !parsed.length) {
     return fallback;
   }
+  const allowed = new Set(fallback);
+  const unique = [];
+  parsed.forEach((id) => {
+    const token = String(id || "");
+    if (!allowed.has(token) || unique.includes(token)) {
+      return;
+    }
+    unique.push(token);
+  });
+  return unique.length ? unique : fallback;
 }
 
 function saveVisibleWidgetIDs(ids, scopeID = "") {
-  window.localStorage.setItem(scopedWidgetsKey(scopeID), JSON.stringify(Array.isArray(ids) ? ids : []));
+  const scope = String(scopeID || "").trim().toLowerCase();
+  visibleWidgetsByScope.set(scope, Array.isArray(ids) ? ids.slice() : []);
 }
 
 function formatNumber(value) {

@@ -1,6 +1,6 @@
 # Upgrade / rollback (EN)
 
-Documentation baseline: `1.1.2`
+Documentation baseline: `1.1.3`
 
 Minimum supported upgrade path: `latest-1 -> latest`.
 
