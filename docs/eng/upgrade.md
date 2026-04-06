@@ -1,6 +1,6 @@
 # Upgrade / rollback (EN)
 
-Documentation baseline: `1.1.0`
+Documentation baseline: `1.1.1`
 
 Minimum supported upgrade path: `latest-1 -> latest`.
 
@@ -72,5 +72,6 @@ Rollback path:
 - Do not skip backup to save time.
 - Do not batch unrelated risky changes in the same window.
 - Keep an upgrade log with timestamps and operator actions.
+
 
 

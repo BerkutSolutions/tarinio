@@ -339,10 +339,10 @@ func TestApplyService_CompilesEasyProfileArtifacts(t *testing.T) {
 	if !strings.Contains(easyConf, "if ($request_uri ~* \"/admin\") { return 403; }") {
 		t.Fatalf("expected blacklist uri in easy conf, got: %s", easyConf)
 	}
-	if !strings.Contains(easyConf, "if ($waf_country_code = \"US\") { set $waf_country_allowed 1; }") {
+	if !strings.Contains(easyConf, "if ($waf_country_code != \"\" && $waf_country_code !~ \"^(?:US)$\") { return 403; }") {
 		t.Fatalf("expected whitelist country in easy conf, got: %s", easyConf)
 	}
-	if !strings.Contains(easyConf, "if ($waf_country_code = \"RU\") { return 403; }") {
+	if !strings.Contains(easyConf, "if ($waf_country_code != \"\" && $waf_country_code ~ \"^(?:RU)$\") { return 403; }") {
 		t.Fatalf("expected blacklist country in easy conf, got: %s", easyConf)
 	}
 	if !strings.Contains(easyConf, "add_header X-WAF-Antibot-Mode \"recaptcha\" always;") {

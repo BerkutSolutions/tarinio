@@ -28,10 +28,29 @@ func NewHTTPRuntimeRequestCollector(healthURL string) *HTTPRuntimeRequestCollect
 }
 
 func (c *HTTPRuntimeRequestCollector) Collect() ([]map[string]any, error) {
+	return c.CollectWithOptions(nil)
+}
+
+func (c *HTTPRuntimeRequestCollector) CollectWithOptions(query url.Values) ([]map[string]any, error) {
 	if c == nil || strings.TrimSpace(c.URL) == "" {
 		return []map[string]any{}, nil
 	}
-	req, err := http.NewRequest(http.MethodGet, c.URL, nil)
+	targetURL := c.URL
+	if len(query) > 0 {
+		if parsed, err := url.Parse(targetURL); err == nil {
+			q := parsed.Query()
+			for _, key := range []string{"limit", "offset", "since"} {
+				value := strings.TrimSpace(query.Get(key))
+				if value == "" {
+					continue
+				}
+				q.Set(key, value)
+			}
+			parsed.RawQuery = q.Encode()
+			targetURL = parsed.String()
+		}
+	}
+	req, err := http.NewRequest(http.MethodGet, targetURL, nil)
 	if err != nil {
 		return nil, err
 	}

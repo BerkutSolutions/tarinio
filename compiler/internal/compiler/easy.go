@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -46,8 +47,8 @@ type easySiteData struct {
 	BlacklistUserAgent []string
 	BlacklistURI       []string
 
-	BlacklistCountry []string
-	WhitelistCountry []string
+	BlacklistCountryPattern string
+	WhitelistCountryPattern string
 
 	UseModSecurity         bool
 	UseModSecurityEasyFile bool
@@ -209,8 +210,8 @@ func RenderEasyArtifacts(sites []SiteInput, profiles []EasyProfileInput) ([]Arti
 			BlacklistIP:                  profile.BlacklistIP,
 			BlacklistUserAgent:           profile.BlacklistUserAgent,
 			BlacklistURI:                 profile.BlacklistURI,
-			BlacklistCountry:             profile.BlacklistCountry,
-			WhitelistCountry:             profile.WhitelistCountry,
+			BlacklistCountryPattern:      countrySelectorPattern(profile.BlacklistCountry),
+			WhitelistCountryPattern:      countrySelectorPattern(profile.WhitelistCountry),
 			UseModSecurity:               profile.UseModSecurity,
 			UseModSecurityEasyFile:       profile.UseModSecurity,
 			ModSecurityEasyRulesOn:       profile.UseModSecurity,
@@ -349,6 +350,24 @@ func toQuotedList(values []string) string {
 		parts = append(parts, strconv.Quote(v))
 	}
 	return strings.Join(parts, " ")
+}
+
+func countrySelectorPattern(values []string) string {
+	if len(values) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(values))
+	for _, value := range values {
+		token := strings.ToUpper(strings.TrimSpace(value))
+		if token == "" {
+			continue
+		}
+		parts = append(parts, regexp.QuoteMeta(token))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "^(?:" + strings.Join(parts, "|") + ")$"
 }
 
 func buildSHA1HTPasswdLine(user, password string) string {

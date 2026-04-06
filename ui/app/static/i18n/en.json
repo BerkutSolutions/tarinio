@@ -181,7 +181,7 @@
   "app.sites": "Services",
   "app.tls": "TLS / Certificates",
   "app.user.noRoles": "No roles",
-  "app.version": "v1.1.0",
+  "app.version": "v1.1.1",
   "auth.2fa.challengeMissing": "2FA challenge is missing. Please sign in again.",
   "auth.2fa.code": "2FA code",
   "auth.2fa.codeRequired": "2FA code is required",
@@ -1121,4 +1121,5 @@
   "tls.autoRenew.renewBeforeDays": "Renew before expiry (days)",
   "tls.autoRenew.saved": "Auto-renew settings saved"
 }
+
 

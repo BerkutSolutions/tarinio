@@ -100,22 +100,12 @@ if ($http_user_agent ~* "{{ . }}") { return 403; }
 if ($request_uri ~* "{{ . }}") { return 403; }
 {{- end }}
 
-{{- if .WhitelistCountry }}
-if ($waf_country_code != "") {
-    set $waf_country_allowed 0;
-{{- range .WhitelistCountry }}
-    if ($waf_country_code = "{{ . }}") { set $waf_country_allowed 1; }
-{{- end }}
-    if ($waf_country_allowed = 0) { return 403; }
-}
+{{- if .WhitelistCountryPattern }}
+if ($waf_country_code != "" && $waf_country_code !~ "{{ .WhitelistCountryPattern }}") { return 403; }
 {{- end }}
 
-{{- if .BlacklistCountry }}
-if ($waf_country_code != "") {
-{{- range .BlacklistCountry }}
-    if ($waf_country_code = "{{ . }}") { return 403; }
-{{- end }}
-}
+{{- if .BlacklistCountryPattern }}
+if ($waf_country_code != "" && $waf_country_code ~ "{{ .BlacklistCountryPattern }}") { return 403; }
 {{- end }}
 
 {{- if not .UseModSecurity }}

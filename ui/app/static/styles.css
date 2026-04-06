@@ -5263,6 +5263,7 @@
   white-space: nowrap;
   font-size: 12px;
   color: rgba(255, 255, 255, 0.74);
+  font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", "Segoe UI", Tahoma, Arial, sans-serif;
 }
 
 #dashboard-page .dashboard-ip-country-block {

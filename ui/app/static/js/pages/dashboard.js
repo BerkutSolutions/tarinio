@@ -923,6 +923,13 @@ function bindRequestsChartHover(bodyNode, rows, ctx) {
 
 function mergeWidgetData(stats, detailModel, containersOverview, ctx) {
   const statsTopIPs = Array.isArray(stats?.top_attacker_ips) ? stats.top_attacker_ips : [];
+  const statsTopCountries = Array.isArray(stats?.top_attacker_countries) ? stats.top_attacker_countries : [];
+  const fallbackTopCountries = Array.isArray(detailModel?.attacksByCountry) ? detailModel.attacksByCountry : [];
+  const topCountryItems = (statsTopCountries.length ? statsTopCountries : fallbackTopCountries).map((item) => ({
+    key: item?.key,
+    count: item?.count,
+    countryCode: item?.key
+  }));
   const topIPItems = statsTopIPs.map((item) => {
     const key = String(item?.key || "").trim();
     return {
@@ -951,7 +958,7 @@ function mergeWidgetData(stats, detailModel, containersOverview, ctx) {
       }
     }),
     "top-ips": renderIPTopList(topIPItems, ctx.t("dashboard.empty.topIPs"), "top-ips"),
-    "top-countries": renderTopList((stats?.top_attacker_countries || []).map((item) => ({ key: item?.key, count: item?.count, countryCode: item?.key })), ctx.t("dashboard.empty.topCountries"), {
+    "top-countries": renderTopList(topCountryItems, ctx.t("dashboard.empty.topCountries"), {
       containerAction: "top-countries",
       renderLabel: (item) => renderCountryBadge(item?.countryCode || item?.key),
       rowAttrs: (item) => `data-widget-action="country-detail" data-country-code="${escapeHtml(normalizeCountryCode(item?.countryCode || item?.key))}"`
@@ -1617,8 +1624,6 @@ export async function renderDashboard(container, ctx) {
 
   const renderStats = (stats) => {
     latestStats = stats;
-    detailModel = null;
-    detailModelGeneratedAt = "";
     const rendered = mergeWidgetData(stats, detailModel, latestContainersOverview, ctx);
     WIDGETS.forEach((widget) => {
       const bodyNode = boardNode.querySelector(`[data-widget-body="${widget.id}"]`);
@@ -1644,7 +1649,7 @@ export async function renderDashboard(container, ctx) {
         return;
       }
       const rerendered = mergeWidgetData(stats, computed, latestContainersOverview, ctx);
-      ["unique-attackers", "top-ips", "containers-health"].forEach((id) => {
+      ["unique-attackers", "top-ips", "top-countries", "containers-health"].forEach((id) => {
         const bodyNode = boardNode.querySelector(`[data-widget-body="${id}"]`);
         if (!bodyNode) return;
         const prevContainersScrollTop = id === "containers-health"

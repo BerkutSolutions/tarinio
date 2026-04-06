@@ -1,5 +1,7 @@
 import { escapeHtml, formatDate, setError, setLoading } from "../ui.js";
 
+const DEFAULT_REQUESTS_FETCH_LIMIT = 2000;
+
 function normalizeList(value) {
   return Array.isArray(value) ? value : [];
 }
@@ -66,7 +68,8 @@ export async function renderRequests(container, ctx) {
     sortBy: "timestamp",
     sortDirection: "desc",
     pageSize: 10,
-    page: 1
+    page: 1,
+    fetchLimit: DEFAULT_REQUESTS_FETCH_LIMIT
   };
 
   const columns = [
@@ -347,7 +350,9 @@ export async function renderRequests(container, ctx) {
   const load = async () => {
     try {
       setLoading(container, ctx.t("requests.loading"));
-      const response = await fetch("/api/requests", {
+      const params = new URLSearchParams();
+      params.set("limit", String(state.fetchLimit));
+      const response = await fetch(`/api/requests?${params.toString()}`, {
         method: "GET",
         credentials: "include",
         headers: { Accept: "text/plain" }

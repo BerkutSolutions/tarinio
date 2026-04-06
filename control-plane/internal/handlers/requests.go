@@ -1,9 +1,17 @@
 package handlers
 
-import "net/http"
+import (
+	"net/http"
+	"net/url"
+	"strconv"
+)
 
 type requestCollector interface {
 	Collect() ([]map[string]any, error)
+}
+
+type requestCollectorWithOptions interface {
+	CollectWithOptions(values url.Values) ([]map[string]any, error)
 }
 
 type RequestsHandler struct {
@@ -23,10 +31,47 @@ func (h *RequestsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, []map[string]any{})
 		return
 	}
-	items, err := h.collector.Collect()
+	var (
+		items []map[string]any
+		err   error
+	)
+	if advanced, ok := h.collector.(requestCollectorWithOptions); ok {
+		items, err = advanced.CollectWithOptions(r.URL.Query())
+	} else {
+		items, err = h.collector.Collect()
+	}
 	if err != nil {
 		writeJSON(w, http.StatusOK, []map[string]any{})
 		return
 	}
+	items = applyOffsetLimit(items, r.URL.Query())
 	writeJSON(w, http.StatusOK, items)
+}
+
+func applyOffsetLimit(items []map[string]any, query url.Values) []map[string]any {
+	total := len(items)
+	if total == 0 {
+		return items
+	}
+	offset := parsePositiveInt(query.Get("offset"), 0)
+	limit := parsePositiveInt(query.Get("limit"), 0)
+	if offset >= total {
+		return []map[string]any{}
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	end := total
+	if limit > 0 && offset+limit < end {
+		end = offset + limit
+	}
+	return items[offset:end]
+}
+
+func parsePositiveInt(raw string, fallback int) int {
+	v, err := strconv.Atoi(raw)
+	if err != nil || v < 0 {
+		return fallback
+	}
+	return v
 }
