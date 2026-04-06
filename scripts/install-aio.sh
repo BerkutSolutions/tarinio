@@ -100,9 +100,11 @@ fi
 
 if docker compose version >/dev/null 2>&1; then
   COMPOSE_CMD="docker compose"
+  COMPOSE_LEGACY=0
   ok "using docker compose"
 elif command -v docker-compose >/dev/null 2>&1; then
   COMPOSE_CMD="docker-compose"
+  COMPOSE_LEGACY=1
   warn "using legacy docker-compose"
 else
   fail "docker compose / docker-compose is not installed"
@@ -143,16 +145,25 @@ else
 fi
 
 section "Build And Start"
-RUNNING_CONTAINERS="$($COMPOSE_CMD -f docker-compose.yml ps -q 2>/dev/null || true)"
-if [ -n "$RUNNING_CONTAINERS" ]; then
-  step "Running containers detected, stopping gracefully (without volumes)"
-  if run_logged $COMPOSE_CMD -f docker-compose.yml stop; then
-    ok "existing containers stopped"
+EXISTING_CONTAINERS="$($COMPOSE_CMD -f docker-compose.yml ps -aq 2>/dev/null || true)"
+if [ -n "$EXISTING_CONTAINERS" ]; then
+  if [ "$COMPOSE_LEGACY" -eq 1 ]; then
+    step "Legacy docker-compose detected: removing old project containers to avoid recreate bug (without volumes)"
+    if run_logged $COMPOSE_CMD -f docker-compose.yml down --remove-orphans; then
+      ok "existing containers removed (volumes preserved)"
+    else
+      warn "failed to remove old containers, continuing with rebuild"
+    fi
   else
-    warn "failed to stop some containers, continuing with rebuild"
+    step "Existing project containers detected, stopping gracefully (without volumes)"
+    if run_logged $COMPOSE_CMD -f docker-compose.yml stop; then
+      ok "existing containers stopped"
+    else
+      warn "failed to stop some containers, continuing with rebuild"
+    fi
   fi
 else
-  ok "no running containers from this profile"
+  ok "no existing containers from this profile"
 fi
 
 step "Building images (details are written to log)"
