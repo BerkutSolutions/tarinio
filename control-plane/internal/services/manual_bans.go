@@ -17,6 +17,8 @@ type ManualBanService struct {
 	audits *AuditService
 }
 
+const allServicesSiteID = "all-services"
+
 func NewManualBanService(store AccessPolicyStore, sites SiteReader, audits *AuditService) *ManualBanService {
 	return &ManualBanService{
 		store:  store,
@@ -39,6 +41,9 @@ func (s *ManualBanService) Ban(ctx context.Context, siteID string, address strin
 	}()
 	siteID = strings.ToLower(strings.TrimSpace(siteID))
 	address = strings.TrimSpace(address)
+	if isAllServicesSelector(siteID) {
+		return s.banAllSites(ctx, address)
+	}
 	canonicalSiteID, err := s.resolveSiteID(siteID)
 	if err != nil {
 		return accesspolicies.AccessPolicy{}, err
@@ -95,6 +100,9 @@ func (s *ManualBanService) Unban(ctx context.Context, siteID string, address str
 	}()
 	siteID = strings.ToLower(strings.TrimSpace(siteID))
 	address = strings.TrimSpace(address)
+	if isAllServicesSelector(siteID) {
+		return s.unbanAllSites(ctx, address)
+	}
 	canonicalSiteID, err := s.resolveSiteID(siteID)
 	if err != nil {
 		return accesspolicies.AccessPolicy{}, err
@@ -135,6 +143,74 @@ func (s *ManualBanService) Unban(ctx context.Context, siteID string, address str
 		return accesspolicies.AccessPolicy{}, applyErr
 	}
 	return updated, nil
+}
+
+func (s *ManualBanService) banAllSites(ctx context.Context, address string) (accesspolicies.AccessPolicy, error) {
+	siteIDs, err := s.listAllSiteIDs()
+	if err != nil {
+		return accesspolicies.AccessPolicy{}, err
+	}
+	if len(siteIDs) == 0 {
+		return accesspolicies.AccessPolicy{}, fmt.Errorf("no sites found")
+	}
+	var last accesspolicies.AccessPolicy
+	for _, currentSiteID := range siteIDs {
+		last, err = s.Ban(ctx, currentSiteID, address)
+		if err != nil {
+			return accesspolicies.AccessPolicy{}, err
+		}
+	}
+	return accesspolicies.AccessPolicy{
+		ID:        allServicesSiteID + "-access",
+		SiteID:    allServicesSiteID,
+		Enabled:   true,
+		AllowList: nil,
+		DenyList:  []string{address},
+		CreatedAt: last.CreatedAt,
+		UpdatedAt: last.UpdatedAt,
+	}, nil
+}
+
+func (s *ManualBanService) unbanAllSites(ctx context.Context, address string) (accesspolicies.AccessPolicy, error) {
+	siteIDs, err := s.listAllSiteIDs()
+	if err != nil {
+		return accesspolicies.AccessPolicy{}, err
+	}
+	if len(siteIDs) == 0 {
+		return accesspolicies.AccessPolicy{}, fmt.Errorf("no sites found")
+	}
+	var last accesspolicies.AccessPolicy
+	for _, currentSiteID := range siteIDs {
+		last, err = s.Unban(ctx, currentSiteID, address)
+		if err != nil {
+			return accesspolicies.AccessPolicy{}, err
+		}
+	}
+	return accesspolicies.AccessPolicy{
+		ID:        allServicesSiteID + "-access",
+		SiteID:    allServicesSiteID,
+		Enabled:   false,
+		AllowList: nil,
+		DenyList:  nil,
+		CreatedAt: last.CreatedAt,
+		UpdatedAt: last.UpdatedAt,
+	}, nil
+}
+
+func (s *ManualBanService) listAllSiteIDs() ([]string, error) {
+	items, err := s.sites.List()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		id := strings.TrimSpace(item.ID)
+		if id == "" {
+			continue
+		}
+		out = append(out, id)
+	}
+	return out, nil
 }
 
 func (s *ManualBanService) findBySite(siteID string) (accesspolicies.AccessPolicy, bool, error) {
@@ -199,6 +275,15 @@ func normalizeSiteAliasToken(value string) string {
 	}
 	normalized := strings.Trim(b.String(), "-")
 	return normalized
+}
+
+func isAllServicesSelector(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "*", "all", "all-services", "__all__", "all_services":
+		return true
+	default:
+		return false
+	}
 }
 
 func defaultAccessPolicyID(siteID string) string {

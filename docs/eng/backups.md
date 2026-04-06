@@ -1,6 +1,6 @@
 # Backups (EN)
 
-Documentation baseline: `1.1.5`
+Documentation baseline: `1.1.6`
 
 ## Goal
 

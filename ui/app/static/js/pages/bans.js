@@ -3,6 +3,7 @@ import { confirmAction, escapeHtml, formatDate, setError, setLoading } from "../
 const ICON_PLUS = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M11 5h2v14h-2zM5 11h14v2H5z"/></svg>';
 const ICON_UNLOCK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a5 5 0 0 1 5 5v2h-2V7a3 3 0 1 0-6 0v2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h2V7a5 5 0 0 1 5-5Z"/></svg>';
 const MANUAL_BAN_TIMERS = new Map();
+const ALL_SERVICES_SITE_ID = "__all__";
 
 const EXTEND_DURATIONS = [
   { key: "1h", seconds: 60 * 60, labelKey: "bans.extend.duration.1h" },
@@ -731,14 +732,15 @@ export async function renderBans(container, ctx) {
       .filter(Boolean)
       .sort((left, right) => left.label.localeCompare(right.label, undefined, { sensitivity: "base" }));
     latestSiteIDs = options.map((item) => item.id);
-    createSiteNode.innerHTML = options.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.label)}</option>`).join("");
+    createSiteNode.innerHTML = [
+      `<option value="${ALL_SERVICES_SITE_ID}">${escapeHtml(ctx.t("bans.site.allServices"))}</option>`,
+      ...options.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.label)}</option>`)
+    ].join("");
     if (selected && latestSiteIDs.includes(selected)) {
       createSiteNode.value = selected;
       return;
     }
-    if (latestSiteIDs.length) {
-      createSiteNode.value = latestSiteIDs[0];
-    }
+    createSiteNode.value = ALL_SERVICES_SITE_ID;
   };
 
   const renderDetail = (row, siteLabel) => {
@@ -831,7 +833,13 @@ export async function renderBans(container, ctx) {
       ]);
 
       const sites = mergeByID(sitesResponse, unwrapList(sitesSecondary, ["sites"]), "id");
-      const accessPolicies = mergeByID(accessResponse?.access_policies, unwrapList(accessSecondary, ["access_policies"]), "id");
+      // /api/access-policies returns an array in current backend contract.
+      // Keep backward compatibility with older wrapped payloads too.
+      const accessPolicies = mergeByID(
+        unwrapList(accessResponse, ["access_policies"]),
+        unwrapList(accessSecondary, ["access_policies"]),
+        "id"
+      );
       const events = mergeByID(unwrapList(eventsResponse, ["events", "items"]), unwrapList(eventsSecondary, ["events", "items"]), "id");
 
       const siteByID = new Map(sites.map((site) => [String(site?.id || ""), site]));
@@ -1042,12 +1050,19 @@ export async function renderBans(container, ctx) {
     }
     try {
       createSubmitNode.disabled = true;
-      await postBanAction(ctx, siteID, "primary", "ban", ip);
+      const targets = siteID === ALL_SERVICES_SITE_ID ? [...latestSiteIDs] : [siteID];
+      if (!targets.length) {
+        setError(createStatusNode, ctx.t("bans.error.createValidation"));
+        return;
+      }
+      await Promise.all(targets.map((targetSiteID) => postBanAction(ctx, targetSiteID, "primary", "ban", ip)));
       const timers = loadManualBanTimers();
-      if (durationSec > 0) {
-        upsertManualBanTimer(timers, siteID, ip, new Date(Date.now() + (durationSec * 1000)));
-      } else {
-        removeManualBanTimer(timers, siteID, ip);
+      for (const targetSiteID of targets) {
+        if (durationSec > 0) {
+          upsertManualBanTimer(timers, targetSiteID, ip, new Date(Date.now() + (durationSec * 1000)));
+        } else {
+          removeManualBanTimer(timers, targetSiteID, ip);
+        }
       }
       saveManualBanTimers(timers);
       createIPNode.value = "";

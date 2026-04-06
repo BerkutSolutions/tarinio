@@ -148,3 +148,57 @@ func TestManualBanService_BanResolvesPrimaryHostAlias(t *testing.T) {
 		t.Fatalf("expected canonical site id, got %+v", policy)
 	}
 }
+
+func TestManualBanService_BanAllServices(t *testing.T) {
+	store := &fakeAccessPolicyStore{}
+	service := NewManualBanService(store, &fakeSiteReader{items: []sites.Site{
+		{ID: "site-a"},
+		{ID: "site-b"},
+	}}, nil)
+
+	_, err := service.Ban(context.Background(), "__all__", "10.0.0.1")
+	if err != nil {
+		t.Fatalf("ban all services failed: %v", err)
+	}
+
+	items, err := store.List()
+	if err != nil {
+		t.Fatalf("list failed: %v", err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("expected 2 policies, got %d", len(items))
+	}
+	for _, item := range items {
+		if len(item.DenyList) != 1 || item.DenyList[0] != "10.0.0.1" {
+			t.Fatalf("unexpected denylist in %+v", item)
+		}
+	}
+}
+
+func TestManualBanService_UnbanAllServices(t *testing.T) {
+	store := &fakeAccessPolicyStore{
+		items: []accesspolicies.AccessPolicy{
+			{ID: "site-a-access", SiteID: "site-a", Enabled: true, DenyList: []string{"10.0.0.1"}},
+			{ID: "site-b-access", SiteID: "site-b", Enabled: true, DenyList: []string{"10.0.0.1"}},
+		},
+	}
+	service := NewManualBanService(store, &fakeSiteReader{items: []sites.Site{
+		{ID: "site-a"},
+		{ID: "site-b"},
+	}}, nil)
+
+	_, err := service.Unban(context.Background(), "all-services", "10.0.0.1")
+	if err != nil {
+		t.Fatalf("unban all services failed: %v", err)
+	}
+
+	items, err := store.List()
+	if err != nil {
+		t.Fatalf("list failed: %v", err)
+	}
+	for _, item := range items {
+		if len(item.DenyList) != 0 {
+			t.Fatalf("expected empty denylist in %+v", item)
+		}
+	}
+}
