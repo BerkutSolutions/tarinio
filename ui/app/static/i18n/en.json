@@ -181,7 +181,7 @@
   "app.sites": "Services",
   "app.tls": "TLS / Certificates",
   "app.user.noRoles": "No roles",
-  "app.version": "v1.0.19",
+  "app.version": "v1.1.0",
   "auth.2fa.challengeMissing": "2FA challenge is missing. Please sign in again.",
   "auth.2fa.code": "2FA code",
   "auth.2fa.codeRequired": "2FA code is required",
@@ -197,6 +197,7 @@
   "auth.passkeys.notSupported": "Passkeys are not supported in this browser/device.",
   "auth.passkeys.securityError": "Passkey security check failed in browser.",
   "auth.passkeys.useAs2FA": "Use passkey",
+  "bans.action.ban": "Ban",
   "bans.action.extend": "Extend",
   "bans.action.unban": "Unban",
   "bans.col.actions": "Actions",
@@ -209,7 +210,11 @@
   "bans.confirm.extend": "Extend ban for {{ip}} on site {{site}}?",
   "bans.confirm.unban": "Unban {{ip}} on site {{site}}?",
   "bans.empty": "No active bans.",
+  "bans.create.duration": "Ban time (sec)",
+  "bans.create.subtitle": "Set site, IP and optional timeout. 0 means permanent manual ban.",
+  "bans.create.title": "Ban IP",
   "bans.error.action": "Ban action failed",
+  "bans.error.createValidation": "Site, IP and valid time are required.",
   "bans.error.load": "Failed to load bans.",
   "bans.loading": "Loading bans...",
   "bans.module.access": "access",
@@ -377,6 +382,7 @@
   "dashboard.containers.logs.error": "Failed to load container logs.",
   "events.col.severity": "Severity",
   "events.col.site": "Site",
+  "events.col.status": "Status",
   "events.col.summary": "Summary",
   "events.col.time": "Time",
   "events.col.type": "Type",
@@ -1115,3 +1121,4 @@
   "tls.autoRenew.renewBeforeDays": "Renew before expiry (days)",
   "tls.autoRenew.saved": "Auto-renew settings saved"
 }
+

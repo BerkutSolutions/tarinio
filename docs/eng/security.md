@@ -1,6 +1,6 @@
 # Security (EN)
 
-Documentation baseline: `1.0.19`
+Documentation baseline: `1.1.0`
 
 ## Production baseline
 
@@ -55,4 +55,5 @@ Documentation baseline: `1.0.19`
 - `docs/eng/backups.md`
 - `docs/eng/upgrade.md`
 - `docs/eng/runbook.md`
+
 

@@ -1188,6 +1188,14 @@ function buildWidgetDetail(action, payload, stats, detailModel, containersOvervi
       count: item.count,
       total: attackBySiteMap.get(item.key) || 0
     }));
+    const blockedIPs = (detailModel?.ipDetailsSummary || [])
+      .filter((item) => Number(item?.blocked || 0) > 0)
+      .slice(0, 20)
+      .map((item) => ({
+        key: item.ip,
+        count: item.blocked,
+        countryCode: item.countryCode
+      }));
     return {
       title: ctx.t("dashboard.widget.blockedAttacks"),
       subtitle: ctx.t("dashboard.detail.blockedSubtitle"),
@@ -1195,6 +1203,13 @@ function buildWidgetDetail(action, payload, stats, detailModel, containersOvervi
         labelFormatter: (item) => {
           const pct = item.total > 0 ? `${((item.count * 100) / item.total).toFixed(1)}%` : "0%";
           return `${escapeHtml(item.key)} <span class="muted">(${escapeHtml(pct)})</span>`;
+        }
+      }) +
+      renderDetailTable(blockedIPs, ctx, ctx.t("dashboard.detail.ip"), ctx.t("dashboard.detail.blocked"), {
+        labelFormatter: (item) => `${escapeHtml(String(item?.key || "-"))} ${renderCountryBadge(item?.countryCode)}`,
+        rowAttrs: (item) => {
+          const ip = String(item?.key || "").trim();
+          return ip ? `data-widget-action="ip-detail" data-ip="${escapeHtml(ip)}"` : "";
         }
       })
     };

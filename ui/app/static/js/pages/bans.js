@@ -2,6 +2,7 @@ import { confirmAction, escapeHtml, formatDate, setError, setLoading } from "../
 
 const ICON_PLUS = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M11 5h2v14h-2zM5 11h14v2H5z"/></svg>';
 const ICON_UNLOCK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a5 5 0 0 1 5 5v2h-2V7a3 3 0 1 0-6 0v2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h2V7a5 5 0 0 1 5-5Z"/></svg>';
+const MANUAL_BAN_TIMERS_KEY = "waf_manual_ban_timers_v1";
 
 function normalizeIP(value) {
   return String(value || "").trim();
@@ -203,7 +204,94 @@ function formatRemaining(expiresAt, now, t) {
   return `${seconds}s`;
 }
 
-function buildManualBanRows(accessPolicies, resolveSiteID) {
+function manualBanTimerRowKey(siteID, ip) {
+  return `${String(siteID || "").trim().toLowerCase()}::${normalizeIP(ip).toLowerCase()}`;
+}
+
+function loadManualBanTimers() {
+  try {
+    const raw = localStorage.getItem(MANUAL_BAN_TIMERS_KEY);
+    if (!raw) {
+      return new Map();
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return new Map();
+    }
+    const out = new Map();
+    for (const item of parsed) {
+      const siteID = String(item?.siteID || "").trim();
+      const ip = normalizeIP(item?.ip);
+      const unbanAt = String(item?.unbanAt || "").trim();
+      if (!siteID || !ip || !unbanAt) {
+        continue;
+      }
+      const timestamp = Date.parse(unbanAt);
+      if (Number.isNaN(timestamp)) {
+        continue;
+      }
+      out.set(manualBanTimerRowKey(siteID, ip), {
+        siteID,
+        ip,
+        unbanAt: new Date(timestamp).toISOString(),
+        createdAt: String(item?.createdAt || "").trim() || new Date().toISOString()
+      });
+    }
+    return out;
+  } catch (_error) {
+    return new Map();
+  }
+}
+
+function saveManualBanTimers(map) {
+  const payload = Array.from(map.values())
+    .map((item) => ({
+      siteID: String(item?.siteID || "").trim(),
+      ip: normalizeIP(item?.ip),
+      unbanAt: String(item?.unbanAt || "").trim(),
+      createdAt: String(item?.createdAt || "").trim()
+    }))
+    .filter((item) => item.siteID && item.ip && item.unbanAt);
+  localStorage.setItem(MANUAL_BAN_TIMERS_KEY, JSON.stringify(payload));
+}
+
+function upsertManualBanTimer(map, siteID, ip, unbanAt, createdAt = new Date().toISOString()) {
+  const key = manualBanTimerRowKey(siteID, ip);
+  map.set(key, {
+    siteID: String(siteID || "").trim(),
+    ip: normalizeIP(ip),
+    unbanAt: new Date(unbanAt).toISOString(),
+    createdAt: String(createdAt || "").trim() || new Date().toISOString()
+  });
+}
+
+function removeManualBanTimer(map, siteID, ip) {
+  map.delete(manualBanTimerRowKey(siteID, ip));
+}
+
+async function processExpiredManualBanTimers(ctx, timers) {
+  const now = Date.now();
+  let changed = false;
+  for (const item of Array.from(timers.values())) {
+    const unbanAt = Date.parse(String(item?.unbanAt || ""));
+    if (Number.isNaN(unbanAt) || unbanAt > now) {
+      continue;
+    }
+    try {
+      await postBanAction(ctx, item.siteID, "primary", "unban", item.ip);
+      removeManualBanTimer(timers, item.siteID, item.ip);
+      changed = true;
+    } catch (_error) {
+      // Keep timer entry and retry on next refresh/page open.
+    }
+  }
+  if (changed) {
+    saveManualBanTimers(timers);
+  }
+}
+
+function buildManualBanRows(accessPolicies, resolveSiteID, manualBanTimers) {
+  const now = Date.now();
   const rows = [];
   for (const policy of normalizeList(accessPolicies)) {
     const siteID = resolveSiteID(String(policy?.site_id || "").trim());
@@ -216,19 +304,153 @@ function buildManualBanRows(accessPolicies, resolveSiteID) {
       if (!value) {
         continue;
       }
+      const timer = manualBanTimers.get(manualBanTimerRowKey(siteID, value));
+      const timerStamp = Date.parse(String(timer?.unbanAt || ""));
+      const expiresAt = Number.isNaN(timerStamp) || timerStamp <= now ? null : new Date(timerStamp);
       rows.push({
         siteID,
         ip: value,
         country: "-",
         source: "manual",
         occurredAt: updatedAt,
-        expiresAt: null,
+        expiresAt,
         modules: new Set(["manual"]),
         origin: policy?._origin || "primary"
       });
     }
   }
   return rows;
+}
+
+function parsePositiveNumber(value, fallback = 0) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return fallback;
+  }
+  return parsed;
+}
+
+function parseSecurityStatus(value) {
+  const parsed = Number.parseInt(String(value || ""), 10);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function deriveModuleFromEvent(item) {
+  const type = String(item?.type || "").trim().toLowerCase();
+  const status = parseSecurityStatus(item?.details?.status);
+  if (type === "security_rate_limit" || status === 429) {
+    return "limits";
+  }
+  if (type === "security_access" || status === 403 || status === 444) {
+    return "access";
+  }
+  if (type === "security_waf") {
+    return "bad_behavior";
+  }
+  return "unknown";
+}
+
+function shouldTreatAsAutoBanEvent(item) {
+  const type = String(item?.type || "").trim().toLowerCase();
+  if (type === "security_rate_limit" || type === "security_access") {
+    return true;
+  }
+  const status = parseSecurityStatus(item?.details?.status);
+  return status === 403 || status === 429 || status === 444;
+}
+
+function renderReasonList(values) {
+  const list = Array.from(values || []);
+  if (!list.length) {
+    return "-";
+  }
+  return list.join(", ");
+}
+
+function buildAutoBanRows(events, resolveSiteID, siteBanDurationByID) {
+  const grouped = new Map();
+  for (const item of normalizeList(events)) {
+    if (!shouldTreatAsAutoBanEvent(item)) {
+      continue;
+    }
+    const details = item?.details && typeof item.details === "object" ? item.details : {};
+    const ip = normalizeIP(details.client_ip || details.ip);
+    if (!ip) {
+      continue;
+    }
+    const siteID = resolveSiteID(item?.site_id, details.host);
+    if (!siteID) {
+      continue;
+    }
+    const occurredAt = asDate(item?.occurred_at);
+    if (!occurredAt) {
+      continue;
+    }
+    const durationSec = parsePositiveNumber(siteBanDurationByID.get(siteID), 300);
+    const key = `${siteID}::${ip}`;
+    const current = grouped.get(key) || {
+      siteID,
+      ip,
+      country: String(details.country || details.client_country || "-").trim() || "-",
+      source: "auto",
+      occurredAt,
+      expiresAt: durationSec === 0 ? null : new Date(occurredAt.getTime() + (durationSec * 1000)),
+      modules: new Set(),
+      statuses: new Set(),
+      reasons: new Set(),
+      paths: new Set(),
+      hosts: new Set(),
+      referers: new Set(),
+      userAgents: new Set(),
+      eventIDs: new Set(),
+      blockedCount: 0,
+      latestEvent: item,
+      origin: "primary"
+    };
+
+    if (!current.occurredAt || occurredAt.getTime() >= current.occurredAt.getTime()) {
+      current.occurredAt = occurredAt;
+      current.latestEvent = item;
+      current.country = String(details.country || details.client_country || current.country || "-").trim() || "-";
+      current.expiresAt = durationSec === 0 ? null : new Date(occurredAt.getTime() + (durationSec * 1000));
+    }
+
+    const moduleID = deriveModuleFromEvent(item);
+    if (moduleID) {
+      current.modules.add(moduleID);
+    }
+    const status = parseSecurityStatus(details.status);
+    if (status > 0) {
+      current.statuses.add(String(status));
+    }
+    const reason = String(item?.summary || "").trim();
+    if (reason) {
+      current.reasons.add(reason);
+    }
+    const path = String(details.path || details.uri || "").trim();
+    if (path) {
+      current.paths.add(path);
+    }
+    const host = String(details.host || "").trim();
+    if (host) {
+      current.hosts.add(host);
+    }
+    const referer = String(details.referer || "").trim();
+    if (referer) {
+      current.referers.add(referer);
+    }
+    const ua = String(details.user_agent || "").trim();
+    if (ua) {
+      current.userAgents.add(ua);
+    }
+    const eventID = String(item?.id || "").trim();
+    if (eventID) {
+      current.eventIDs.add(eventID);
+    }
+    current.blockedCount += 1;
+    grouped.set(key, current);
+  }
+  return Array.from(grouped.values());
 }
 
 function renderModules(modules, t) {
@@ -264,17 +486,77 @@ export async function renderBans(container, ctx) {
           <h3>${escapeHtml(ctx.t("app.bans"))}</h3>
           <div class="muted">${escapeHtml(ctx.t("bans.subtitle"))}</div>
         </div>
-        <button class="btn ghost btn-sm" id="bans-refresh" type="button">${escapeHtml(ctx.t("common.refresh"))}</button>
+        <div class="waf-actions">
+          <button class="btn" id="bans-create" type="button">${escapeHtml(ctx.t("bans.action.ban"))}</button>
+          <button class="btn ghost btn-sm" id="bans-refresh" type="button">${escapeHtml(ctx.t("common.refresh"))}</button>
+        </div>
       </div>
       <div class="waf-card-body waf-stack">
         <div id="bans-status"></div>
         <div id="bans-list"></div>
       </div>
     </section>
+    <div class="waf-modal waf-hidden" id="bans-create-modal" role="dialog" aria-modal="true" aria-labelledby="bans-create-title" tabindex="-1">
+      <button class="waf-modal-overlay" type="button" data-bans-create-close="true" aria-label="${escapeHtml(ctx.t("ui.close"))}"></button>
+      <div class="waf-modal-card">
+        <div class="waf-card-head">
+          <div>
+            <h3 id="bans-create-title">${escapeHtml(ctx.t("bans.create.title"))}</h3>
+            <div class="muted">${escapeHtml(ctx.t("bans.create.subtitle"))}</div>
+          </div>
+          <button class="btn ghost btn-sm" type="button" data-bans-create-close="true">${escapeHtml(ctx.t("ui.close"))}</button>
+        </div>
+        <div class="waf-card-body waf-stack">
+          <div id="bans-create-status"></div>
+          <div class="waf-form-grid three">
+            <div class="waf-field">
+              <label for="bans-create-site">${escapeHtml(ctx.t("bans.col.site"))}</label>
+              <select id="bans-create-site"></select>
+            </div>
+            <div class="waf-field">
+              <label for="bans-create-ip">${escapeHtml(ctx.t("bans.col.ip"))}</label>
+              <input id="bans-create-ip" type="text" placeholder="203.0.113.10">
+            </div>
+            <div class="waf-field">
+              <label for="bans-create-duration">${escapeHtml(ctx.t("bans.create.duration"))}</label>
+              <input id="bans-create-duration" type="number" min="0" step="1" value="0">
+            </div>
+          </div>
+          <div class="waf-actions">
+            <button class="btn" id="bans-create-submit" type="button">${escapeHtml(ctx.t("bans.action.ban"))}</button>
+            <button class="btn ghost" type="button" data-bans-create-close="true">${escapeHtml(ctx.t("common.cancel"))}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="waf-modal waf-hidden" id="bans-detail-modal" role="dialog" aria-modal="true" aria-labelledby="bans-detail-title" tabindex="-1">
+      <button class="waf-modal-overlay" type="button" data-bans-detail-close="true" aria-label="${escapeHtml(ctx.t("ui.close"))}"></button>
+      <div class="waf-modal-card">
+        <div class="waf-card-head">
+          <div>
+            <h3 id="bans-detail-title">${escapeHtml(ctx.t("events.detail.title"))}</h3>
+            <div class="muted">${escapeHtml(ctx.t("events.detail.subtitle"))}</div>
+          </div>
+          <button class="btn ghost btn-sm" type="button" data-bans-detail-close="true">${escapeHtml(ctx.t("ui.close"))}</button>
+        </div>
+        <div class="waf-card-body" id="bans-detail-content">
+          <div class="waf-empty">${escapeHtml(ctx.t("common.loading"))}</div>
+        </div>
+      </div>
+    </div>
   `;
 
   const statusNode = container.querySelector("#bans-status");
   const listNode = container.querySelector("#bans-list");
+  const createModalNode = container.querySelector("#bans-create-modal");
+  const createStatusNode = container.querySelector("#bans-create-status");
+  const createSiteNode = container.querySelector("#bans-create-site");
+  const createIPNode = container.querySelector("#bans-create-ip");
+  const createDurationNode = container.querySelector("#bans-create-duration");
+  const createSubmitNode = container.querySelector("#bans-create-submit");
+  const detailModalNode = container.querySelector("#bans-detail-modal");
+  const detailContentNode = container.querySelector("#bans-detail-content");
+  let latestSiteIDs = [];
   const pagingState = {
     pageSize: 10,
     page: 1
@@ -293,25 +575,170 @@ export async function renderBans(container, ctx) {
     return { totalPages, start, end };
   };
 
+  const closeDetail = () => {
+    detailModalNode?.classList.add("waf-hidden");
+  };
+  const openCreateModal = () => {
+    createStatusNode.innerHTML = "";
+    if (createSiteNode && latestSiteIDs.length && !createSiteNode.value) {
+      createSiteNode.value = latestSiteIDs[0];
+    }
+    createModalNode?.classList.remove("waf-hidden");
+    createIPNode?.focus();
+  };
+  const closeCreateModal = () => {
+    createModalNode?.classList.add("waf-hidden");
+  };
+
+  detailModalNode?.querySelectorAll("[data-bans-detail-close]").forEach((node) => {
+    node.addEventListener("click", closeDetail);
+  });
+  detailModalNode?.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeDetail();
+    }
+  });
+  createModalNode?.querySelectorAll("[data-bans-create-close]").forEach((node) => {
+    node.addEventListener("click", closeCreateModal);
+  });
+  createModalNode?.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeCreateModal();
+    }
+  });
+
+  const renderCreateSiteOptions = (sites) => {
+    if (!createSiteNode) {
+      return;
+    }
+    const selected = String(createSiteNode.value || "").trim();
+    const options = normalizeList(sites)
+      .map((site) => {
+        const id = String(site?.id || "").trim();
+        if (!id) {
+          return null;
+        }
+        const label = String(site?.primary_host || id).trim() || id;
+        return { id, label };
+      })
+      .filter(Boolean)
+      .sort((left, right) => left.label.localeCompare(right.label, undefined, { sensitivity: "base" }));
+    latestSiteIDs = options.map((item) => item.id);
+    createSiteNode.innerHTML = options.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.label)}</option>`).join("");
+    if (selected && latestSiteIDs.includes(selected)) {
+      createSiteNode.value = selected;
+      return;
+    }
+    if (latestSiteIDs.length) {
+      createSiteNode.value = latestSiteIDs[0];
+    }
+  };
+
+  const renderDetail = (row, siteLabel) => {
+    if (!detailContentNode || !row) {
+      return;
+    }
+    const detailRows = [
+      ["events.detail.field.time", row.occurredAt ? row.occurredAt.toISOString() : "-"],
+      ["events.detail.field.site", siteLabel || row.siteID || "-"],
+      ["bans.col.ip", row.ip || "-"],
+      ["bans.col.country", row.country || "-"],
+      ["bans.col.module", renderModules(row.modules || new Set(), ctx.t) || "-"],
+      ["events.detail.field.summary", renderReasonList(row.reasons || new Set())],
+      ["bans.col.left", row.expiresAt ? formatRemaining(row.expiresAt, new Date(), ctx.t) : ctx.t("bans.time.permanent")]
+    ];
+    if (row.blockedCount > 0) {
+      detailRows.push(["dashboard.detail.blocked", String(row.blockedCount)]);
+    }
+    if (row.statuses?.size) {
+      detailRows.push(["events.col.status", renderReasonList(row.statuses)]);
+    }
+    const latestRaw = row.latestEvent?.details && typeof row.latestEvent.details === "object"
+      ? row.latestEvent.details
+      : {};
+    const eventMeta = {
+      event_ids: Array.from(row.eventIDs || []),
+      paths: Array.from(row.paths || []),
+      hosts: Array.from(row.hosts || []),
+      referers: Array.from(row.referers || []),
+      user_agents: Array.from(row.userAgents || []),
+      latest_event: latestRaw
+    };
+    detailContentNode.innerHTML = `
+      <div class="waf-table-wrap">
+        <table class="waf-table waf-detail-table">
+          <tbody>
+            ${detailRows.map(([labelKey, value]) => `
+              <tr>
+                <th>${escapeHtml(ctx.t(labelKey) === labelKey ? labelKey : ctx.t(labelKey))}</th>
+                <td><pre class="waf-code">${escapeHtml(String(value || "-"))}</pre></td>
+              </tr>
+            `).join("")}
+            <tr>
+              <th>${escapeHtml(ctx.t("events.detail.field.details"))}</th>
+              <td><pre class="waf-code">${escapeHtml(JSON.stringify(eventMeta, null, 2))}</pre></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    `;
+    detailModalNode?.classList.remove("waf-hidden");
+  };
+
+  const loadSiteBanDurations = async (sites, resolveSiteID) => {
+    const entries = await Promise.all(
+      normalizeList(sites).map(async (site) => {
+        const candidate = String(site?.id || "").trim();
+        if (!candidate) {
+          return null;
+        }
+        try {
+          const profile = await ctx.api.get(`/api/easy-site-profiles/${encodeURIComponent(candidate)}`);
+          const duration = parsePositiveNumber(profile?.security_behavior_and_limits?.bad_behavior_ban_time_seconds, 300);
+          return [resolveSiteID(candidate), duration];
+        } catch (_error) {
+          return [resolveSiteID(candidate), 300];
+        }
+      })
+    );
+    const out = new Map();
+    for (const item of entries) {
+      if (!item || !item[0]) {
+        continue;
+      }
+      out.set(item[0], item[1]);
+    }
+    return out;
+  };
+
   const renderRows = async () => {
     setLoading(statusNode, ctx.t("bans.loading"));
     try {
-      const [sitesResponse, accessResponse, sitesSecondary, accessSecondary] = await Promise.all([
+      const [sitesResponse, accessResponse, eventsResponse, sitesSecondary, accessSecondary, eventsSecondary] = await Promise.all([
         ctx.api.get("/api/sites"),
         ctx.api.get("/api/access-policies"),
+        ctx.api.get("/api/events"),
         tryGetJSON("/api-app/sites"),
-        tryGetJSON("/api-app/access-policies")
+        tryGetJSON("/api-app/access-policies"),
+        tryGetJSON("/api-app/events")
       ]);
 
       const sites = mergeByID(sitesResponse, unwrapList(sitesSecondary, ["sites"]), "id");
       const accessPolicies = mergeByID(accessResponse?.access_policies, unwrapList(accessSecondary, ["access_policies"]), "id");
+      const events = mergeByID(unwrapList(eventsResponse, ["events", "items"]), unwrapList(eventsSecondary, ["events", "items"]), "id");
 
       const siteByID = new Map(sites.map((site) => [String(site?.id || ""), site]));
+      renderCreateSiteOptions(sites);
       const siteAliasMap = buildSiteAliasMap(sites);
       const hostSiteMap = buildHostSiteMap(sites);
       const canonicalSiteID = (value, hostHint = "") => resolveCanonicalSiteID(value, siteAliasMap, hostSiteMap, hostHint);
       const allowlistBySite = buildIPSetBySite(accessPolicies, "allowlist", canonicalSiteID);
-      const rows = buildManualBanRows(accessPolicies, canonicalSiteID).sort((a, b) => {
+      const siteBanDurationByID = await loadSiteBanDurations(sites, canonicalSiteID);
+      const manualBanTimers = loadManualBanTimers();
+      await processExpiredManualBanTimers(ctx, manualBanTimers);
+      const manualRows = buildManualBanRows(accessPolicies, canonicalSiteID, manualBanTimers);
+      const autoRows = buildAutoBanRows(events, canonicalSiteID, siteBanDurationByID);
+      const rows = [...manualRows, ...autoRows].sort((a, b) => {
         const left = a.occurredAt ? a.occurredAt.getTime() : 0;
         const right = b.occurredAt ? b.occurredAt.getTime() : 0;
         return right - left;
@@ -347,21 +774,23 @@ export async function renderBans(container, ctx) {
               ${pageRows.map((row, index) => {
                 const site = siteByID.get(row.siteID);
                 const siteLabel = site?.primary_host || row.siteID;
+                const allowlisted = (allowlistBySite.get(row.siteID) || new Set()).has(row.ip);
+                const unbanEnabled = row.source === "manual";
                 return `
-                  <tr>
+                  <tr class="waf-table-row-clickable" data-ban-row="${meta.start + index}" tabindex="0" role="button">
                     <td>${escapeHtml(row.ip)}</td>
                     <td>${escapeHtml(row.country)}</td>
                     <td>${escapeHtml(row.occurredAt ? formatDate(row.occurredAt.toISOString()) : "-")}</td>
                     <td>${escapeHtml(formatRemaining(row.expiresAt, now, ctx.t))}</td>
                     <td>${escapeHtml(siteLabel)}</td>
-                    <td>${escapeHtml(renderModules(row.modules, ctx.t))}${(allowlistBySite.get(row.siteID) || new Set()).has(row.ip) ? " (allowlist)" : ""}</td>
+                    <td>${escapeHtml(renderModules(row.modules, ctx.t))}${allowlisted ? " (allowlist)" : ""}</td>
                     <td>
                       <div class="waf-ban-actions">
                         <button type="button" class="btn success btn-sm waf-ban-btn" data-action="extend" data-row="${meta.start + index}" title="${escapeHtml(ctx.t("bans.action.extend"))}">
                           <span class="waf-ban-btn-icon">${ICON_PLUS}</span>
                           <span>${escapeHtml(ctx.t("bans.action.extend"))}</span>
                         </button>
-                        <button type="button" class="btn danger btn-sm waf-ban-btn" data-action="unban" data-row="${meta.start + index}" title="${escapeHtml(ctx.t("bans.action.unban"))}">
+                        <button type="button" class="btn danger btn-sm waf-ban-btn" data-action="unban" data-row="${meta.start + index}" title="${escapeHtml(ctx.t("bans.action.unban"))}"${unbanEnabled ? "" : " disabled"}>
                           <span class="waf-ban-btn-icon">${ICON_UNLOCK}</span>
                           <span>${escapeHtml(ctx.t("bans.action.unban"))}</span>
                         </button>
@@ -412,6 +841,7 @@ export async function renderBans(container, ctx) {
 
       listNode.querySelectorAll(".waf-ban-btn").forEach((button) => {
         button.addEventListener("click", async () => {
+          button.blur();
           const action = String(button.dataset.action || "");
           const rowIndex = Number.parseInt(String(button.dataset.row || "-1"), 10);
           const row = rows[rowIndex];
@@ -424,6 +854,9 @@ export async function renderBans(container, ctx) {
             ctx.notify("IP is in allowlist for this site; no ban actions applied.");
             return;
           }
+          if (action === "unban" && row.source !== "manual") {
+            return;
+          }
 
           if (action === "unban") {
             if (!confirmAction(ctx.t("bans.confirm.unban", { ip: row.ip, site: row.siteID }))) {
@@ -432,6 +865,9 @@ export async function renderBans(container, ctx) {
             try {
               button.disabled = true;
               await postBanAction(ctx, row.siteID, row.origin, "unban", ip);
+              const timers = loadManualBanTimers();
+              removeManualBanTimer(timers, row.siteID, ip);
+              saveManualBanTimers(timers);
               clearRateLimitCookies(row.siteID);
               ctx.notify(ctx.t("toast.ipUnbanned"));
               await renderRows();
@@ -449,6 +885,15 @@ export async function renderBans(container, ctx) {
           try {
             button.disabled = true;
             await postBanAction(ctx, row.siteID, row.origin, "ban", ip);
+            const timers = loadManualBanTimers();
+            const baseDuration = parsePositiveNumber(siteBanDurationByID.get(row.siteID), 300);
+            if (baseDuration > 0) {
+              const currentTimer = timers.get(manualBanTimerRowKey(row.siteID, ip));
+              const currentUnbanAt = Date.parse(String(currentTimer?.unbanAt || row.expiresAt?.toISOString?.() || ""));
+              const startFrom = Number.isNaN(currentUnbanAt) ? Date.now() : Math.max(Date.now(), currentUnbanAt);
+              upsertManualBanTimer(timers, row.siteID, ip, new Date(startFrom + (baseDuration * 1000)));
+              saveManualBanTimers(timers);
+            }
             ctx.notify(ctx.t("toast.ipBanned"));
             await renderRows();
           } catch (error) {
@@ -456,6 +901,32 @@ export async function renderBans(container, ctx) {
           } finally {
             button.disabled = false;
           }
+        });
+      });
+
+      listNode.querySelectorAll("[data-ban-row]").forEach((rowNode) => {
+        const open = () => {
+          const rowIndex = Number.parseInt(String(rowNode.getAttribute("data-ban-row") || "-1"), 10);
+          const row = rows[rowIndex];
+          if (!row) {
+            return;
+          }
+          const site = siteByID.get(row.siteID);
+          const siteLabel = site?.primary_host || row.siteID;
+          renderDetail(row, siteLabel);
+        };
+        rowNode.addEventListener("click", (event) => {
+          if (event.target instanceof HTMLElement && event.target.closest(".waf-ban-btn")) {
+            return;
+          }
+          open();
+        });
+        rowNode.addEventListener("keydown", (event) => {
+          if (event.key !== "Enter" && event.key !== " ") {
+            return;
+          }
+          event.preventDefault();
+          open();
         });
       });
     } catch (_error) {
@@ -466,6 +937,42 @@ export async function renderBans(container, ctx) {
 
   container.querySelector("#bans-refresh")?.addEventListener("click", () => {
     renderRows();
+  });
+  container.querySelector("#bans-create")?.addEventListener("click", () => {
+    openCreateModal();
+  });
+  createSubmitNode?.addEventListener("click", async () => {
+    const siteID = String(createSiteNode?.value || "").trim();
+    const ip = normalizeIP(createIPNode?.value || "");
+    const durationSec = Number.parseInt(String(createDurationNode?.value || "0"), 10);
+    if (!siteID || !ip) {
+      setError(createStatusNode, ctx.t("bans.error.createValidation"));
+      return;
+    }
+    if (!Number.isFinite(durationSec) || durationSec < 0) {
+      setError(createStatusNode, ctx.t("bans.error.createValidation"));
+      return;
+    }
+    try {
+      createSubmitNode.disabled = true;
+      await postBanAction(ctx, siteID, "primary", "ban", ip);
+      const timers = loadManualBanTimers();
+      if (durationSec > 0) {
+        upsertManualBanTimer(timers, siteID, ip, new Date(Date.now() + (durationSec * 1000)));
+      } else {
+        removeManualBanTimer(timers, siteID, ip);
+      }
+      saveManualBanTimers(timers);
+      createIPNode.value = "";
+      createDurationNode.value = "0";
+      closeCreateModal();
+      ctx.notify(ctx.t("toast.ipBanned"));
+      await renderRows();
+    } catch (error) {
+      setError(createStatusNode, error?.message || ctx.t("bans.error.action"));
+    } finally {
+      createSubmitNode.disabled = false;
+    }
   });
 
   await renderRows();

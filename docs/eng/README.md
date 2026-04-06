@@ -1,6 +1,6 @@
 # Berkut Solutions - TARINIO Documentation (EN)
 
-Documentation baseline: `1.0.19`
+Documentation baseline: `1.1.0`
 
 ## Sections
 
@@ -27,7 +27,7 @@ Documentation baseline: `1.0.19`
    - `docs/eng/oss/CODE_OF_CONDUCT.md`
    - `docs/eng/oss/SUPPORT.md`
 
-## Release context for 1.0.19
+## Release context for 1.1.0
 
 - Product branding unified as `Berkut Solutions - TARINIO`.
 - Application version source centralized via `control-plane/internal/appmeta/meta.go`.
@@ -39,6 +39,7 @@ Documentation baseline: `1.0.19`
 
 Stage 0 architecture decisions are frozen and are the source of truth:
 - `docs/architecture/`
+
 
 
 

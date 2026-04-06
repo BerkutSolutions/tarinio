@@ -181,7 +181,7 @@
   "app.sites": "Сервисы",
   "app.tls": "TLS / Сертификаты",
   "app.user.noRoles": "Нет ролей",
-  "app.version": "Версия 1.0.19",
+  "app.version": "Версия 1.1.0",
   "auth.2fa.challengeMissing": "Запрос 2FA отсутствует. Пожалуйста, войдите снова.",
   "auth.2fa.code": "Код 2FA",
   "auth.2fa.codeRequired": "Нужен код 2FA",
@@ -197,6 +197,7 @@
   "auth.passkeys.notSupported": "Passkeys не поддерживаются в этом браузере/устройстве.",
   "auth.passkeys.securityError": "Проверка безопасности passkey не выполнена в браузере.",
   "auth.passkeys.useAs2FA": "Использовать ключ доступа",
+  "bans.action.ban": "Забанить",
   "bans.action.extend": "Продлить",
   "bans.action.unban": "Разбанить",
   "bans.col.actions": "Действия",
@@ -209,7 +210,11 @@
   "bans.confirm.extend": "Продлить бан для {{ip}} на сервисе {{site}}?",
   "bans.confirm.unban": "Снять бан для {{ip}} на сервисе {{site}}?",
   "bans.empty": "Нет активных банов.",
+  "bans.create.duration": "Время бана (сек)",
+  "bans.create.subtitle": "Укажите сайт, IP и опциональное время. 0 означает бессрочный ручной бан.",
+  "bans.create.title": "Заблокировать IP",
   "bans.error.action": "Действие бана не выполнено",
+  "bans.error.createValidation": "Нужно указать сайт, IP и корректное время.",
   "bans.error.load": "Не удалось загрузить баны.",
   "bans.loading": "Загрузка банов...",
   "bans.module.access": "Доступ",
@@ -377,6 +382,7 @@
   "dashboard.containers.logs.error": "Не удалось загрузить логи контейнера.",
   "events.col.severity": "Критичность",
   "events.col.site": "Сайт",
+  "events.col.status": "Статус",
   "events.col.summary": "Общая сводка",
   "events.col.time": "Время",
   "events.col.type": "Тип",
@@ -1115,3 +1121,4 @@
   "sites.tls.exportEmpty": "Материал сертификата пуст",
   "sites.tls.importRequired": "Сначала импортируйте материал сертификата"
 }
+
