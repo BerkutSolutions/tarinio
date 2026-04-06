@@ -1,6 +1,6 @@
 # Berkut Solutions - TARINIO Documentation (EN)
 
-Documentation baseline: `1.1.4`
+Documentation baseline: `1.1.5`
 
 ## Sections
 
@@ -27,7 +27,7 @@ Documentation baseline: `1.1.4`
    - `docs/eng/oss/CODE_OF_CONDUCT.md`
    - `docs/eng/oss/SUPPORT.md`
 
-## Release context for 1.1.4
+## Release context for 1.1.5
 
 - Product branding unified as `Berkut Solutions - TARINIO`.
 - Application version source centralized via `control-plane/internal/appmeta/meta.go`.

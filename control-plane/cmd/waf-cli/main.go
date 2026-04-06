@@ -368,14 +368,14 @@ func cmdAudit(c *cli, args []string, noAuth bool) error {
 
 func cmdBanLike(c *cli, action string, args []string, noAuth bool) error {
 	defaultSite := envOrDefault("WAF_CLI_DEFAULT_SITE", envOrDefault("CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID", "control-plane-access"))
-	siteID := defaultSite
-	fs := flag.NewFlagSet(action, flag.ExitOnError)
-	fs.StringVar(&siteID, "site", defaultSite, "site id")
-	_ = fs.Parse(args)
-	if fs.NArg() < 1 {
+	siteID, positional, err := extractSiteFlag(args, defaultSite)
+	if err != nil {
+		return err
+	}
+	if len(positional) < 1 {
 		return fmt.Errorf("usage: waf-cli %s <ip> [--site %s]", action, defaultSite)
 	}
-	ip := strings.TrimSpace(fs.Arg(0))
+	ip := strings.TrimSpace(positional[0])
 	if ip == "" {
 		return fmt.Errorf("ip is required")
 	}
@@ -394,6 +394,39 @@ func cmdBanLike(c *cli, action string, args []string, noAuth bool) error {
 		fmt.Printf("Active denylist size: %d\n", len(deny))
 	}
 	return nil
+}
+
+func extractSiteFlag(args []string, defaultSite string) (string, []string, error) {
+	siteID := defaultSite
+	out := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		current := strings.TrimSpace(args[i])
+		if current == "" {
+			continue
+		}
+		if strings.HasPrefix(current, "--site=") {
+			value := strings.TrimSpace(strings.TrimPrefix(current, "--site="))
+			if value == "" {
+				return "", nil, fmt.Errorf("--site value is required")
+			}
+			siteID = value
+			continue
+		}
+		if current == "--site" {
+			if i+1 >= len(args) {
+				return "", nil, fmt.Errorf("--site value is required")
+			}
+			value := strings.TrimSpace(args[i+1])
+			if value == "" || strings.HasPrefix(value, "--") {
+				return "", nil, fmt.Errorf("--site value is required")
+			}
+			siteID = value
+			i += 1
+			continue
+		}
+		out = append(out, args[i])
+	}
+	return siteID, out, nil
 }
 
 func cmdBans(c *cli, args []string, noAuth bool) error {

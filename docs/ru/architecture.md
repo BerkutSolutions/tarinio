@@ -1,6 +1,6 @@
 # Архитектура TARINIO (обзор)
 
-Базовая версия документации: `1.1.4`
+Базовая версия документации: `1.1.5`
 
 TARINIO — standalone self-hosted WAF на базе NGINX + ModSecurity + OWASP CRS.
 
