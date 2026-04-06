@@ -297,6 +297,56 @@ function buildManualBanRows(accessPolicies, resolveSiteID, manualBanTimers) {
   return rows;
 }
 
+function mergeBanRows(manualRows, autoRows) {
+  const merged = new Map();
+  const allRows = [...normalizeList(autoRows), ...normalizeList(manualRows)];
+  for (const row of allRows) {
+    const key = `${String(row?.siteID || "").trim().toLowerCase()}::${normalizeIP(row?.ip || "").toLowerCase()}`;
+    if (!key || key === "::") {
+      continue;
+    }
+    const existing = merged.get(key);
+    if (!existing) {
+      merged.set(key, {
+        ...row,
+        modules: new Set(row?.modules || []),
+        statuses: new Set(row?.statuses || []),
+        reasons: new Set(row?.reasons || []),
+        paths: new Set(row?.paths || []),
+        hosts: new Set(row?.hosts || []),
+        referers: new Set(row?.referers || []),
+        userAgents: new Set(row?.userAgents || []),
+        eventIDs: new Set(row?.eventIDs || [])
+      });
+      continue;
+    }
+
+    const existingAt = existing?.occurredAt instanceof Date ? existing.occurredAt.getTime() : 0;
+    const nextAt = row?.occurredAt instanceof Date ? row.occurredAt.getTime() : 0;
+    const preferRow = row.source === "manual" || nextAt >= existingAt;
+
+    merged.set(key, {
+      ...(preferRow ? existing : row),
+      ...(preferRow ? row : existing),
+      source: existing.source === "manual" || row.source === "manual" ? "manual" : (row.source || existing.source),
+      occurredAt: preferRow ? row.occurredAt : existing.occurredAt,
+      expiresAt: row.source === "manual" ? row.expiresAt : (existing.source === "manual" ? existing.expiresAt : (preferRow ? row.expiresAt : existing.expiresAt)),
+      modules: new Set([...(existing.modules || []), ...(row.modules || [])]),
+      statuses: new Set([...(existing.statuses || []), ...(row.statuses || [])]),
+      reasons: new Set([...(existing.reasons || []), ...(row.reasons || [])]),
+      paths: new Set([...(existing.paths || []), ...(row.paths || [])]),
+      hosts: new Set([...(existing.hosts || []), ...(row.hosts || [])]),
+      referers: new Set([...(existing.referers || []), ...(row.referers || [])]),
+      userAgents: new Set([...(existing.userAgents || []), ...(row.userAgents || [])]),
+      eventIDs: new Set([...(existing.eventIDs || []), ...(row.eventIDs || [])]),
+      blockedCount: Math.max(Number(existing.blockedCount || 0), Number(row.blockedCount || 0)),
+      latestEvent: preferRow ? (row.latestEvent || existing.latestEvent) : (existing.latestEvent || row.latestEvent),
+      origin: existing.origin === "primary" || row.origin === "primary" ? "primary" : (row.origin || existing.origin)
+    });
+  }
+  return Array.from(merged.values());
+}
+
 function parsePositiveNumber(value, fallback = 0) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 0) {
@@ -494,7 +544,9 @@ export async function renderBans(container, ctx) {
             </div>
             <div class="waf-field">
               <label for="bans-create-duration">${escapeHtml(ctx.t("bans.create.duration"))}</label>
-              <input id="bans-create-duration" type="number" min="0" step="1" value="0">
+              <select id="bans-create-duration">
+                ${EXTEND_DURATIONS.map((item) => `<option value="${escapeHtml(String(item.seconds))}">${escapeHtml(ctx.t(item.labelKey))}</option>`).join("")}
+              </select>
             </div>
           </div>
           <div class="waf-actions">
@@ -599,6 +651,9 @@ export async function renderBans(container, ctx) {
     createStatusNode.innerHTML = "";
     if (createSiteNode && latestSiteIDs.length && !createSiteNode.value) {
       createSiteNode.value = latestSiteIDs[0];
+    }
+    if (createDurationNode && !createDurationNode.value) {
+      createDurationNode.value = String(EXTEND_DURATIONS[0]?.seconds || 0);
     }
     createModalNode?.classList.remove("waf-hidden");
     createIPNode?.focus();
@@ -790,7 +845,7 @@ export async function renderBans(container, ctx) {
       await processExpiredManualBanTimers(ctx, manualBanTimers);
       const manualRows = buildManualBanRows(accessPolicies, canonicalSiteID, manualBanTimers);
       const autoRows = buildAutoBanRows(events, canonicalSiteID, siteBanDurationByID);
-      const rows = [...manualRows, ...autoRows].sort((a, b) => {
+      const rows = mergeBanRows(manualRows, autoRows).sort((a, b) => {
         const left = a.occurredAt ? a.occurredAt.getTime() : 0;
         const right = b.occurredAt ? b.occurredAt.getTime() : 0;
         return right - left;
@@ -996,7 +1051,7 @@ export async function renderBans(container, ctx) {
       }
       saveManualBanTimers(timers);
       createIPNode.value = "";
-      createDurationNode.value = "0";
+      createDurationNode.value = String(EXTEND_DURATIONS[0]?.seconds || 0);
       closeCreateModal();
       ctx.notify(ctx.t("toast.ipBanned"));
       await renderRows();
