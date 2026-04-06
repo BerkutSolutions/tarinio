@@ -190,7 +190,7 @@
   "app.sites": "Сервисы",
   "app.tls": "TLS / Сертификаты",
   "app.user.noRoles": "Нет ролей",
-  "app.version": "Версия 1.1.6",
+  "app.version": "Версия 1.1.7",
   "auth.2fa.challengeMissing": "Запрос 2FA отсутствует. Пожалуйста, войдите снова.",
   "auth.2fa.code": "Код 2FA",
   "auth.2fa.codeRequired": "Нужен код 2FA",
@@ -223,6 +223,8 @@
   "bans.create.duration": "Срок бана",
   "bans.create.subtitle": "Укажите сайт, IP и срок. Выберите «Навсегда» для бессрочного ручного бана.",
   "bans.create.title": "Заблокировать IP",
+  "bans.unban.subtitle": "Подтвердите снятие блокировки для выбранного IP-адреса.",
+  "bans.unban.title": "Снять бан",
   "bans.extend.duration": "Продлить на",
   "bans.extend.duration.12h": "12 часов",
   "bans.extend.duration.1d": "1 день",
@@ -1215,6 +1217,7 @@
   "compat.details.settings": "Проверка совместимости схемы и поведения настроек.",
   "compat.details.profile": "Проверка совместимости схемы и поведения профиля."
 }
+
 
 
 

@@ -1,4 +1,4 @@
-import { confirmAction, escapeHtml, formatDate, setError, setLoading } from "../ui.js";
+import { escapeHtml, formatDate, setError, setLoading } from "../ui.js";
 
 const ICON_PLUS = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M11 5h2v14h-2zM5 11h14v2H5z"/></svg>';
 const ICON_UNLOCK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a5 5 0 0 1 5 5v2h-2V7a3 3 0 1 0-6 0v2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h2V7a5 5 0 0 1 5-5Z"/></svg>';
@@ -220,6 +220,10 @@ function manualBanTimerRowKey(siteID, ip) {
   return `${String(siteID || "").trim().toLowerCase()}::${normalizeIP(ip).toLowerCase()}`;
 }
 
+function isStartupSelfTestSite(siteID) {
+  return String(siteID || "").trim().toLowerCase().startsWith("startup-self-test-");
+}
+
 function loadManualBanTimers() {
   return new Map(Array.from(MANUAL_BAN_TIMERS.entries()).map(([key, value]) => [key, { ...value }]));
 }
@@ -270,7 +274,11 @@ function buildManualBanRows(accessPolicies, resolveSiteID, manualBanTimers) {
   const now = Date.now();
   const rows = [];
   for (const policy of normalizeList(accessPolicies)) {
-    const siteID = resolveSiteID(String(policy?.site_id || "").trim());
+    const rawSiteID = String(policy?.site_id || "").trim();
+    if (isStartupSelfTestSite(rawSiteID)) {
+      continue;
+    }
+    const siteID = resolveSiteID(rawSiteID) || rawSiteID;
     if (!siteID) {
       continue;
     }
@@ -404,7 +412,11 @@ function buildAutoBanRows(events, resolveSiteID, siteBanDurationByID) {
     if (!ip) {
       continue;
     }
-    const siteID = resolveSiteID(item?.site_id, details.host);
+    const rawSiteID = String(item?.site_id || "").trim();
+    if (isStartupSelfTestSite(rawSiteID)) {
+      continue;
+    }
+    const siteID = resolveSiteID(rawSiteID, details.host);
     if (!siteID) {
       continue;
     }
@@ -607,6 +619,35 @@ export async function renderBans(container, ctx) {
         </div>
       </div>
     </div>
+    <div class="waf-modal waf-hidden" id="bans-unban-modal" role="dialog" aria-modal="true" aria-labelledby="bans-unban-title" tabindex="-1">
+      <button class="waf-modal-overlay" type="button" data-bans-unban-close="true" aria-label="${escapeHtml(ctx.t("ui.close"))}"></button>
+      <div class="waf-modal-card">
+        <div class="waf-card-head">
+          <div>
+            <h3 id="bans-unban-title">${escapeHtml(ctx.t("bans.unban.title"))}</h3>
+            <div class="muted">${escapeHtml(ctx.t("bans.unban.subtitle"))}</div>
+          </div>
+          <button class="btn ghost btn-sm" type="button" data-bans-unban-close="true">${escapeHtml(ctx.t("ui.close"))}</button>
+        </div>
+        <div class="waf-card-body waf-stack">
+          <div id="bans-unban-status"></div>
+          <div class="waf-form-grid three">
+            <div class="waf-field">
+              <label for="bans-unban-site">${escapeHtml(ctx.t("bans.col.site"))}</label>
+              <input id="bans-unban-site" type="text" readonly>
+            </div>
+            <div class="waf-field">
+              <label for="bans-unban-ip">${escapeHtml(ctx.t("bans.col.ip"))}</label>
+              <input id="bans-unban-ip" type="text" readonly>
+            </div>
+          </div>
+          <div class="waf-actions">
+            <button class="btn danger" id="bans-unban-submit" type="button">${escapeHtml(ctx.t("bans.action.unban"))}</button>
+            <button class="btn ghost" type="button" data-bans-unban-close="true">${escapeHtml(ctx.t("common.cancel"))}</button>
+          </div>
+        </div>
+      </div>
+    </div>
   `;
 
   const statusNode = container.querySelector("#bans-status");
@@ -625,8 +666,14 @@ export async function renderBans(container, ctx) {
   const extendIPNode = container.querySelector("#bans-extend-ip");
   const extendDurationNode = container.querySelector("#bans-extend-duration");
   const extendSubmitNode = container.querySelector("#bans-extend-submit");
+  const unbanModalNode = container.querySelector("#bans-unban-modal");
+  const unbanStatusNode = container.querySelector("#bans-unban-status");
+  const unbanSiteNode = container.querySelector("#bans-unban-site");
+  const unbanIPNode = container.querySelector("#bans-unban-ip");
+  const unbanSubmitNode = container.querySelector("#bans-unban-submit");
   let latestSiteIDs = [];
   let extendDraft = null;
+  let unbanDraft = null;
   const pagingState = {
     pageSize: 10,
     page: 1
@@ -689,6 +736,30 @@ export async function renderBans(container, ctx) {
     extendModalNode.classList.remove("waf-hidden");
     extendDurationNode?.focus();
   };
+  const closeUnbanModal = () => {
+    unbanDraft = null;
+    if (unbanStatusNode) {
+      unbanStatusNode.innerHTML = "";
+    }
+    unbanModalNode?.classList.add("waf-hidden");
+  };
+  const openUnbanModal = (row, siteLabel) => {
+    if (!row || !unbanModalNode) {
+      return;
+    }
+    unbanDraft = { row };
+    if (unbanSiteNode) {
+      unbanSiteNode.value = String(siteLabel || row.siteID || "").trim();
+    }
+    if (unbanIPNode) {
+      unbanIPNode.value = String(row.ip || "").trim();
+    }
+    if (unbanStatusNode) {
+      unbanStatusNode.innerHTML = "";
+    }
+    unbanModalNode.classList.remove("waf-hidden");
+    unbanSubmitNode?.focus();
+  };
 
   detailModalNode?.querySelectorAll("[data-bans-detail-close]").forEach((node) => {
     node.addEventListener("click", closeDetail);
@@ -714,6 +785,14 @@ export async function renderBans(container, ctx) {
       closeExtendModal();
     }
   });
+  unbanModalNode?.querySelectorAll("[data-bans-unban-close]").forEach((node) => {
+    node.addEventListener("click", closeUnbanModal);
+  });
+  unbanModalNode?.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeUnbanModal();
+    }
+  });
 
   const renderCreateSiteOptions = (sites) => {
     if (!createSiteNode) {
@@ -724,6 +803,9 @@ export async function renderBans(container, ctx) {
       .map((site) => {
         const id = String(site?.id || "").trim();
         if (!id) {
+          return null;
+        }
+        if (isStartupSelfTestSite(id)) {
           return null;
         }
         const label = String(site?.primary_host || id).trim() || id;
@@ -974,23 +1056,8 @@ export async function renderBans(container, ctx) {
           }
 
           if (action === "unban") {
-            if (!confirmAction(ctx.t("bans.confirm.unban", { ip: row.ip, site: row.siteID }))) {
-              return;
-            }
-            try {
-              button.disabled = true;
-              await postBanAction(ctx, row.siteID, "primary", "unban", ip);
-              const timers = loadManualBanTimers();
-              removeManualBanTimer(timers, row.siteID, ip);
-              saveManualBanTimers(timers);
-              clearRateLimitCookies(row.siteID);
-              ctx.notify(ctx.t("toast.ipUnbanned"));
-              await renderRows();
-            } catch (error) {
-              setError(statusNode, error?.message || ctx.t("bans.error.action"));
-            } finally {
-              button.disabled = false;
-            }
+            const site = siteByID.get(row.siteID);
+            openUnbanModal(row, site?.primary_host || row.siteID);
             return;
           }
 
@@ -1109,6 +1176,30 @@ export async function renderBans(container, ctx) {
       setError(extendStatusNode, error?.message || ctx.t("bans.error.action"));
     } finally {
       extendSubmitNode.disabled = false;
+    }
+  });
+
+  unbanSubmitNode?.addEventListener("click", async () => {
+    const row = unbanDraft?.row;
+    if (!row || !row.siteID || !row.ip) {
+      setError(unbanStatusNode, ctx.t("bans.error.action"));
+      return;
+    }
+    const ip = normalizeIP(row.ip);
+    try {
+      unbanSubmitNode.disabled = true;
+      await postBanAction(ctx, row.siteID, "primary", "unban", ip);
+      const timers = loadManualBanTimers();
+      removeManualBanTimer(timers, row.siteID, ip);
+      saveManualBanTimers(timers);
+      clearRateLimitCookies(row.siteID);
+      closeUnbanModal();
+      ctx.notify(ctx.t("toast.ipUnbanned"));
+      await renderRows();
+    } catch (error) {
+      setError(unbanStatusNode, error?.message || ctx.t("bans.error.action"));
+    } finally {
+      unbanSubmitNode.disabled = false;
     }
   });
 

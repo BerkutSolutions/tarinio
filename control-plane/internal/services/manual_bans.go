@@ -105,7 +105,13 @@ func (s *ManualBanService) Unban(ctx context.Context, siteID string, address str
 	}
 	canonicalSiteID, err := s.resolveSiteID(siteID)
 	if err != nil {
-		return accesspolicies.AccessPolicy{}, err
+		// Backward-compatible fallback: allow unban for stale policies whose site
+		// was deleted, but policy entry still exists in storage.
+		if stalePolicy, staleFound, staleErr := s.findBySite(siteID); staleErr == nil && staleFound {
+			canonicalSiteID = stalePolicy.SiteID
+		} else {
+			return accesspolicies.AccessPolicy{}, err
+		}
 	}
 	siteID = canonicalSiteID
 

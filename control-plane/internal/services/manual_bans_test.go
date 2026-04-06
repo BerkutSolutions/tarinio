@@ -202,3 +202,28 @@ func TestManualBanService_UnbanAllServices(t *testing.T) {
 		}
 	}
 }
+
+func TestManualBanService_UnbanAllowsStalePolicyWithoutSite(t *testing.T) {
+	store := &fakeAccessPolicyStore{
+		items: []accesspolicies.AccessPolicy{
+			{
+				ID:       "startup-self-test-1-access",
+				SiteID:   "startup-self-test-1",
+				Enabled:  true,
+				DenyList: []string{"198.51.100.25"},
+			},
+		},
+	}
+	service := NewManualBanService(store, &fakeSiteReader{items: []sites.Site{{ID: "site-a"}}}, nil)
+
+	policy, err := service.Unban(context.Background(), "startup-self-test-1", "198.51.100.25")
+	if err != nil {
+		t.Fatalf("unban stale policy failed: %v", err)
+	}
+	if policy.SiteID != "startup-self-test-1" {
+		t.Fatalf("expected stale policy site id preserved, got %+v", policy)
+	}
+	if len(policy.DenyList) != 0 {
+		t.Fatalf("expected empty denylist after stale unban, got %+v", policy.DenyList)
+	}
+}

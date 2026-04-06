@@ -190,7 +190,7 @@
   "app.sites": "Services",
   "app.tls": "TLS / Certificates",
   "app.user.noRoles": "No roles",
-  "app.version": "v1.1.6",
+  "app.version": "v1.1.7",
   "auth.2fa.challengeMissing": "2FA challenge is missing. Please sign in again.",
   "auth.2fa.code": "2FA code",
   "auth.2fa.codeRequired": "2FA code is required",
@@ -223,6 +223,8 @@
   "bans.create.duration": "Ban duration",
   "bans.create.subtitle": "Set site, IP and duration. Choose Forever for a permanent manual ban.",
   "bans.create.title": "Ban IP",
+  "bans.unban.subtitle": "Confirm unban for the selected IP address.",
+  "bans.unban.title": "Unban",
   "bans.extend.duration": "Extend for",
   "bans.extend.duration.12h": "12 hours",
   "bans.extend.duration.1d": "1 day",
@@ -1215,6 +1217,7 @@
   "compat.details.settings": "Checks settings compatibility schema and behavior.",
   "compat.details.profile": "Checks profile compatibility schema and behavior."
 }
+
 
 
 

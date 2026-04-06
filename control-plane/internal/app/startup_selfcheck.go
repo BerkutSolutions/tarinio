@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"waf/control-plane/internal/easysiteprofiles"
@@ -17,11 +18,14 @@ func (a *App) RunStartupSelfTest(ctx context.Context) error {
 	if !a.Config.StartupSelfTest {
 		return nil
 	}
-	if a.SiteService == nil || a.EasySiteProfileService == nil || a.EasySiteProfileStore == nil {
+	if a.SiteService == nil || a.EasySiteProfileService == nil || a.EasySiteProfileStore == nil || a.SiteStore == nil || a.AccessPolicyStore == nil {
 		return fmt.Errorf("startup self-test: dependencies are not wired")
 	}
 
 	testCtx := services.WithAutoApplyDisabled(ctx)
+	if err := a.cleanupStartupSelfTestArtifacts(); err != nil {
+		return fmt.Errorf("startup self-test: cleanup stale artifacts failed: %w", err)
+	}
 	siteID := fmt.Sprintf("startup-self-test-%d", time.Now().UTC().UnixNano())
 	site := sites.Site{
 		ID:          siteID,
@@ -38,6 +42,7 @@ func (a *App) RunStartupSelfTest(ctx context.Context) error {
 	defer func() {
 		if cleanupSite != "" {
 			_ = a.EasySiteProfileStore.Delete(cleanupSite)
+			_ = a.AccessPolicyStore.Delete(cleanupSite + "-access")
 			_ = a.SiteService.Delete(testCtx, cleanupSite)
 		}
 	}()
@@ -83,6 +88,39 @@ func (a *App) RunStartupSelfTest(ctx context.Context) error {
 		return fmt.Errorf("startup self-test: update profile assertion failed: %w", err)
 	}
 
+	return nil
+}
+
+func (a *App) cleanupStartupSelfTestArtifacts() error {
+	siteItems, err := a.SiteStore.List()
+	if err != nil {
+		return err
+	}
+	activeSites := make(map[string]struct{}, len(siteItems))
+	for _, item := range siteItems {
+		id := strings.TrimSpace(item.ID)
+		if id == "" {
+			continue
+		}
+		activeSites[id] = struct{}{}
+	}
+
+	accessItems, err := a.AccessPolicyStore.List()
+	if err != nil {
+		return err
+	}
+	for _, item := range accessItems {
+		siteID := strings.TrimSpace(item.SiteID)
+		if !strings.HasPrefix(siteID, "startup-self-test-") {
+			continue
+		}
+		if _, ok := activeSites[siteID]; ok {
+			continue
+		}
+		if err := a.AccessPolicyStore.Delete(item.ID); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

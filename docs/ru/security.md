@@ -1,6 +1,6 @@
 # Безопасность (RU)
 
-Базовая версия документации: `1.1.6`
+Базовая версия документации: `1.1.7`
 
 ## Production baseline
 
@@ -55,6 +55,7 @@
 - `docs/ru/backups.md`
 - `docs/ru/upgrade.md`
 - `docs/ru/runbook.md`
+
 
 
 

@@ -1,10 +1,10 @@
 # API (EN)
 
-Documentation baseline: `1.1.6`
+Documentation baseline: `1.1.7`
 
 ## Release notes
 
-### 1.1.6 (2026-04-04)
+### 1.1.7 (2026-04-04)
 
 - Fixed Easy site profile save flow for reverse proxy: when `upstream_routing.reverse_proxy_host` is empty in UI, it is now derived from upstream scheme/host/port.
 - Eliminated false `400 Bad Request` on service save when reverse proxy is enabled and upstream target fields are already filled.
@@ -91,6 +91,7 @@ Documentation baseline: `1.1.6`
 
 - Compile: `POST /api/revisions/compile`
 - Apply: `POST /api/revisions/{revisionID}/apply`
+
 
 
 
