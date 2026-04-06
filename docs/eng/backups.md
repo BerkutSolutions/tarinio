@@ -1,6 +1,6 @@
 # Backups (EN)
 
-Documentation baseline: `1.0.18`
+Documentation baseline: `1.0.19`
 
 ## Goal
 
@@ -65,3 +65,4 @@ If restore is not tested, backup quality is unknown.
 
 - `docs/eng/upgrade.md` (mandatory pre-upgrade flow)
 - `docs/eng/runbook.md` (incident and rollback operations)
+

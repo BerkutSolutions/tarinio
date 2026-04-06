@@ -248,12 +248,24 @@ function topCounts(map, limit = 10) {
 }
 
 function normalizeCountryCode(value) {
-  const token = String(value || "").trim().toUpperCase();
+  const raw = String(value || "").trim();
+  const token = raw.toUpperCase();
   if (!token || token === "UNKNOWN" || token === "-" || token === "N/A") {
     return "UNK";
   }
+
+  const bracket = token.match(/\(([A-Z]{2})\)\s*$/);
+  if (bracket) {
+    return bracket[1];
+  }
+
+  const exact = token.match(/\b([A-Z]{2})\b/);
+  if (exact) {
+    return exact[1];
+  }
+
   const compact = token.replace(/[^A-Z]/g, "");
-  if (compact.length === 2 || compact.length === 3) {
+  if (compact.length === 2) {
     return compact;
   }
   return "UNK";
@@ -761,8 +773,10 @@ function renderTopList(items, emptyText, options = {}) {
 function renderIPTopList(items, emptyText, widgetAction = "") {
   return renderTopList(items, emptyText, {
     containerAction: widgetAction,
-    renderLabel: (item) => `<span class="dashboard-ip-main">${escapeHtml(String(item?.key || "-"))}</span>`,
-    renderLabel: (item) => renderCountryBadge(item?.countryCode || item?.key),
+    renderLabel: (item) => {
+      const ip = String(item?.key || "-").trim() || "-";
+      return `<span class="dashboard-ip-main">${escapeHtml(ip)}</span><div class="dashboard-ip-country-block">${renderCountryBadge(item?.countryCode || item?.key)}</div>`;
+    },
     rowAttrs: (item) => {
       const ip = String(item?.key || "").trim();
       if (!ip) {
@@ -1894,4 +1908,3 @@ export async function renderDashboard(container, ctx) {
 
   await load(false);
 }
-

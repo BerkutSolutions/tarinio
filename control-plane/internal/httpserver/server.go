@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"waf/control-plane/internal/certificatematerials"
 	"waf/control-plane/internal/handlers"
 	"waf/control-plane/internal/jobs"
 	"waf/control-plane/internal/rbac"
@@ -27,7 +28,14 @@ func New(
 	upstreamService *services.UpstreamService,
 	certificateService *services.CertificateService,
 	tlsConfigService *services.TLSConfigService,
+	tlsAutoRenewService interface {
+		Settings() (services.TLSAutoRenewSettings, error)
+		UpdateSettings(input services.TLSAutoRenewSettings) (services.TLSAutoRenewSettings, error)
+	},
 	certificateUploadService *services.CertificateUploadService,
+	certificateMaterialReader interface {
+		Read(certificateID string) (certificatematerials.MaterialRecord, []byte, []byte, error)
+	},
 	certificateACMEService interface {
 		Issue(ctx context.Context, certificateID string, commonName string, sanList []string, options *services.ACMEIssueOptions) (jobs.Job, error)
 		Renew(ctx context.Context, certificateID string, options *services.ACMEIssueOptions) (jobs.Job, error)
@@ -120,8 +128,14 @@ func New(
 		http.MethodPut:    rbac.PermissionTLSWrite,
 		http.MethodDelete: rbac.PermissionTLSWrite,
 	}, handlers.NewTLSConfigsHandler(tlsConfigService)))
+	mux.Handle("/api/tls/auto-renew", withMethodPermissions(authService, map[string]rbac.Permission{
+		http.MethodGet: rbac.PermissionTLSRead,
+		http.MethodPut: rbac.PermissionTLSWrite,
+	}, handlers.NewTLSAutoRenewHandler(tlsAutoRenewService)))
 	certificateACMEHandler := handlers.NewCertificateACMEHandler(certificateACMEService, certificateSelfSignedService)
 	mux.Handle("/api/certificate-materials/upload", withAuth(authService, rbac.PermissionCertificatesWrite, handlers.NewCertificateUploadHandler(certificateUploadService)))
+	mux.Handle("/api/certificate-materials/export", withAuth(authService, rbac.PermissionCertificatesRead, handlers.NewCertificateMaterialExportHandler(certificateMaterialReader)))
+	mux.Handle("/api/certificate-materials/export/", withAuth(authService, rbac.PermissionCertificatesRead, handlers.NewCertificateMaterialExportHandler(certificateMaterialReader)))
 	mux.Handle("/api/certificates/acme/issue", withAuth(authService, rbac.PermissionCertificatesWrite, certificateACMEHandler))
 	mux.Handle("/api/certificates/acme/renew/", withAuth(authService, rbac.PermissionCertificatesWrite, certificateACMEHandler))
 	mux.Handle("/api/certificates/self-signed/issue", withAuth(authService, rbac.PermissionCertificatesWrite, certificateACMEHandler))

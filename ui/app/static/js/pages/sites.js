@@ -1508,6 +1508,7 @@ function renderDetailView(state, ctx) {
                       <option value="letsencrypt"${draft.certificate_authority_server === "letsencrypt" ? " selected" : ""}>letsencrypt</option>
                       <option value="zerossl"${draft.certificate_authority_server === "zerossl" ? " selected" : ""}>zerossl</option>
                       <option value="custom"${draft.certificate_authority_server === "custom" ? " selected" : ""}>custom</option>
+                      <option value="import"${draft.certificate_authority_server === "import" ? " selected" : ""}>${escapeHtml(ctx.t("sites.tls.importOption"))}</option>
                     </select>
                   </div>
                   <label class="waf-checkbox">
@@ -1537,6 +1538,12 @@ function renderDetailView(state, ctx) {
                   <div class="waf-field waf-field-cert-id">
                     <label for="service-certificate-id">${escapeHtml(ctx.t("sites.tls.certificateId"))}</label>
                     <input id="service-certificate-id" value="${escapeHtml(draft.certificate_id)}" placeholder="${escapeHtml(ctx.t("sites.tls.certificatePlaceholder"))}">
+                    <div class="waf-actions" id="service-certificate-import-actions"${draft.certificate_authority_server === "import" ? "" : " style=\"display:none\""}>
+                      <button class="btn ghost btn-sm" type="button" id="service-certificate-import">${escapeHtml(ctx.t("sites.tls.importButton"))}</button>
+                      <button class="btn ghost btn-sm" type="button" id="service-certificate-export">${escapeHtml(ctx.t("sites.tls.exportButton"))}</button>
+                    </div>
+                    <input id="service-certificate-file" type="file" accept=".pem,.crt,.cer,text/plain,application/x-pem-file" class="waf-hidden">
+                    <input id="service-private-key-file" type="file" accept=".pem,.key,text/plain,application/x-pem-file" class="waf-hidden">
                   </div>
                 </div>
               </section>
@@ -2082,20 +2089,26 @@ async function upsertSiteResources(draft, ctx, existingSite, existingUpstream, e
     if (draft.tls_enabled) {
       const certificateID = (draft.certificate_id.trim() || `${sitePayload.id}-tls`).toLowerCase();
       const hadCertificateBefore = await certificateExists(certificateID);
-      const issueEndpoint = draft.tls_self_signed ? "/api/certificates/self-signed/issue" : "/api/certificates/acme/issue";
-      const acmeAccountEmail = draft.tls_self_signed ? "" : await resolveACMEAccountEmail(draft, ctx);
-      if (!draft.tls_self_signed && acmeAccountEmail) {
-        draft.acme_account_email = acmeAccountEmail;
+      const importMode = String(draft.certificate_authority_server || "").trim().toLowerCase() === "import";
+      if (importMode && !hadCertificateBefore) {
+        throw new Error(ctx.t("sites.tls.importRequired"));
       }
-      await ctx.api.post(issueEndpoint, {
-        certificate_id: certificateID,
-        common_name: sitePayload.primary_host,
-        san_list: [],
-        certificate_authority_server: draft.certificate_authority_server,
-        use_lets_encrypt_staging: Boolean(draft.use_lets_encrypt_staging),
-        account_email: acmeAccountEmail
-      });
-      if (!hadCertificateBefore) {
+      if (!importMode && !hadCertificateBefore) {
+        const issueEndpoint = draft.tls_self_signed ? "/api/certificates/self-signed/issue" : "/api/certificates/acme/issue";
+        const acmeAccountEmail = draft.tls_self_signed ? "" : await resolveACMEAccountEmail(draft, ctx);
+        if (!draft.tls_self_signed && acmeAccountEmail) {
+          draft.acme_account_email = acmeAccountEmail;
+        }
+        await ctx.api.post(issueEndpoint, {
+          certificate_id: certificateID,
+          common_name: sitePayload.primary_host,
+          san_list: [],
+          certificate_authority_server: draft.certificate_authority_server,
+          use_lets_encrypt_staging: Boolean(draft.use_lets_encrypt_staging),
+          account_email: acmeAccountEmail
+        });
+      }
+      if (!hadCertificateBefore && !importMode) {
         rollbackable(async () => deleteIgnoreNotFound(`/api/certificates/${encodeURIComponent(certificateID)}`));
       }
       const tlsPayload = { site_id: sitePayload.id, certificate_id: certificateID };
@@ -2717,6 +2730,86 @@ export async function renderSites(container, ctx) {
     container.querySelector("#service-certificate-id")?.addEventListener("input", (event) => {
       event.target.dataset.dirty = event.target.value.trim() ? "true" : "";
     });
+
+    const toggleCertificateImportActions = () => {
+      const caServer = String(container.querySelector("#service-ca-server")?.value || "").trim().toLowerCase();
+      const row = container.querySelector("#service-certificate-import-actions");
+      if (!row) {
+        return;
+      }
+      row.style.display = caServer === "import" ? "" : "none";
+    };
+
+    container.querySelector("#service-ca-server")?.addEventListener("change", toggleCertificateImportActions);
+    const certificateFileInput = container.querySelector("#service-certificate-file");
+    const privateKeyFileInput = container.querySelector("#service-private-key-file");
+
+    container.querySelector("#service-certificate-import")?.addEventListener("click", () => {
+      const certID = String(container.querySelector("#service-certificate-id")?.value || "").trim().toLowerCase();
+      if (!certID) {
+        ctx.notify(ctx.t("sites.tls.certificateIdRequired"), "error");
+        return;
+      }
+      certificateFileInput?.click();
+    });
+
+    certificateFileInput?.addEventListener("change", () => {
+      if (certificateFileInput?.files?.[0]) {
+        privateKeyFileInput?.click();
+      }
+    });
+
+    privateKeyFileInput?.addEventListener("change", async () => {
+      const certFile = certificateFileInput?.files?.[0] || null;
+      const keyFile = privateKeyFileInput?.files?.[0] || null;
+      const certificateID = String(container.querySelector("#service-certificate-id")?.value || "").trim().toLowerCase();
+      if (!certFile || !keyFile || !certificateID) {
+        return;
+      }
+      const commonName = String(container.querySelector("#service-host")?.value || "").trim().toLowerCase();
+      const formData = new FormData();
+      formData.set("certificate_id", certificateID);
+      formData.set("common_name", commonName || certificateID);
+      formData.set("status", "active");
+      formData.set("certificate_file", certFile);
+      formData.set("private_key_file", keyFile);
+      try {
+        await ctx.api.post("/api/certificate-materials/upload", formData);
+        ctx.notify(ctx.t("sites.tls.imported"));
+      } catch (error) {
+        setError(feedback, `${ctx.t("sites.tls.importFailed")}: ${String(error?.message || error)}`);
+      } finally {
+        if (certificateFileInput) {
+          certificateFileInput.value = "";
+        }
+        if (privateKeyFileInput) {
+          privateKeyFileInput.value = "";
+        }
+      }
+    });
+
+    container.querySelector("#service-certificate-export")?.addEventListener("click", async () => {
+      const certificateID = String(container.querySelector("#service-certificate-id")?.value || "").trim().toLowerCase();
+      if (!certificateID) {
+        ctx.notify(ctx.t("sites.tls.certificateIdRequired"), "error");
+        return;
+      }
+      try {
+        const payload = await ctx.api.get(`/api/certificate-materials/export/${encodeURIComponent(certificateID)}`);
+        const certificatePEM = String(payload?.certificate_pem || "");
+        const privateKeyPEM = String(payload?.private_key_pem || "");
+        if (!certificatePEM || !privateKeyPEM) {
+          throw new Error(ctx.t("sites.tls.exportEmpty"));
+        }
+        downloadText(`${certificateID}.certificate.pem`, certificatePEM);
+        downloadText(`${certificateID}.private.key`, privateKeyPEM);
+        ctx.notify(ctx.t("sites.tls.exported"));
+      } catch (error) {
+        setError(feedback, `${ctx.t("sites.tls.exportFailed")}: ${String(error?.message || error)}`);
+      }
+    });
+
+    toggleCertificateImportActions();
     container.querySelector("#service-use-modsecurity-custom-configuration")?.addEventListener("change", () => {
       syncStateDraftFromForm();
       render();

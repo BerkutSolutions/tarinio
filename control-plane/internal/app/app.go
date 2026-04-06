@@ -63,6 +63,7 @@ type App struct {
 	LetsEncryptService       *services.LetsEncryptService
 	TLSConfigStore           *tlsconfigs.Store
 	TLSConfigService         *services.TLSConfigService
+	TLSAutoRenewService      *services.TLSAutoRenewService
 	WAFPolicyStore           *wafpolicies.Store
 	WAFPolicyService         *services.WAFPolicyService
 	AccessPolicyStore        *accesspolicies.Store
@@ -210,6 +211,11 @@ func New(cfg config.Config) (*App, error) {
 	letsEncryptService := services.NewLetsEncryptService(letsEncryptClient, jobStore, certificateStore, certificateMaterialStore, auditService)
 	selfSignedCertificateService := services.NewLetsEncryptService(services.NewDevelopmentLetsEncryptClient(), jobStore, certificateStore, certificateMaterialStore, auditService)
 	tlsConfigService := services.NewTLSConfigService(tlsConfigStore, siteStore, certificateStore, auditService)
+	tlsAutoRenewService, err := services.NewTLSAutoRenewService(filepath.Join(cfg.RevisionStoreDir, "tls-auto-renew"), certificateStore, tlsConfigStore, letsEncryptService)
+	if err != nil {
+		return nil, err
+	}
+	tlsAutoRenewService.Start()
 	wafPolicyService := services.NewWAFPolicyService(wafPolicyStore, siteStore, auditService)
 	accessPolicyService := services.NewAccessPolicyService(accessPolicyStore, siteStore, auditService)
 	rateLimitPolicyService := services.NewRateLimitPolicyService(rateLimitPolicyStore, siteStore, auditService)
@@ -232,7 +238,7 @@ func New(cfg config.Config) (*App, error) {
 	dashboardService := services.NewDashboardService(eventService, runtimeRequestCollector, cfg.RuntimeHealthURL)
 	runtimeCRSService := services.NewRuntimeCRSService(services.RuntimeBaseURLFromHealthURL(cfg.RuntimeHealthURL))
 	containerRuntimeService := services.NewContainerRuntimeService()
-	httpServer := httpserver.New(cfg.HTTPAddr, setupService, revisionService, authService, siteService, manualBanService, upstreamService, certificateService, tlsConfigService, certificateUploadService, letsEncryptService, selfSignedCertificateService, wafPolicyService, accessPolicyService, rateLimitPolicyService, easySiteProfileService, antiDDoSService, eventService, revisionCompileService, applyService, auditService, reportService, dashboardService, containerRuntimeService, runtimeCRSService, runtimeRequestCollector)
+	httpServer := httpserver.New(cfg.HTTPAddr, setupService, revisionService, authService, siteService, manualBanService, upstreamService, certificateService, tlsConfigService, tlsAutoRenewService, certificateUploadService, certificateMaterialStore, letsEncryptService, selfSignedCertificateService, wafPolicyService, accessPolicyService, rateLimitPolicyService, easySiteProfileService, antiDDoSService, eventService, revisionCompileService, applyService, auditService, reportService, dashboardService, containerRuntimeService, runtimeCRSService, runtimeRequestCollector)
 	var devFastStartBootstrapper *services.DevFastStartBootstrapper
 	if cfg.DevFastStart.Enabled {
 		devFastStartCertificateIssuer := letsEncryptService
@@ -288,6 +294,7 @@ func New(cfg config.Config) (*App, error) {
 		LetsEncryptService:       letsEncryptService,
 		TLSConfigStore:           tlsConfigStore,
 		TLSConfigService:         tlsConfigService,
+		TLSAutoRenewService:      tlsAutoRenewService,
 		WAFPolicyStore:           wafPolicyStore,
 		WAFPolicyService:         wafPolicyService,
 		AccessPolicyStore:        accessPolicyStore,

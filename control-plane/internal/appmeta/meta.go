@@ -2,7 +2,7 @@ package appmeta
 
 // AppVersion is the product version displayed in UI and exposed via /api/app/meta.
 // Keep in sync with release documentation and CHANGELOG.md.
-var AppVersion = "1.0.18"
+var AppVersion = "1.0.19"
 
 const (
 	ProductName = "Berkut Solutions - TARINIO"

@@ -1,6 +1,6 @@
 # Runbook (RU)
 
-Базовая версия документации: `1.0.18`
+Базовая версия документации: `1.0.19`
 
 ## Быстрые проверки
 
@@ -68,3 +68,4 @@
 - `docs/ru/operators/anti-ddos-runbook.md`
 - `docs/ru/operators/waf-tuning-guide.md`
 - `docs/ru/security.md`
+

@@ -45,6 +45,21 @@ function unwrapList(payload, keys = []) {
   return [];
 }
 
+function downloadBlob(filename, blob) {
+  const link = document.createElement("a");
+  const href = URL.createObjectURL(blob);
+  link.href = href;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(href);
+}
+
+function downloadText(filename, content, type = "text/plain;charset=utf-8") {
+  downloadBlob(filename, new Blob([content], { type }));
+}
+
 async function tryGetJSON(path) {
   try {
     const response = await fetch(path, {
@@ -101,24 +116,30 @@ async function syncLetsEncryptProfileOptions(ctx, siteID, options) {
   await putWithPostFallback(ctx, endpoint, next);
 }
 
-function renderCertificates(items, ctx) {
+function renderCertificates(items, selectedIDs, ctx) {
   if (!items.length) {
     return `<div class="waf-empty">${escapeHtml(ctx.t("tls.empty.certificates"))}</div>`;
   }
+  const allSelected = items.length > 0 && items.every((item) => selectedIDs.has(String(item?.id || "")));
   return `
     <div class="waf-table-wrap">
       <table class="waf-table">
-        <thead><tr><th>${escapeHtml(ctx.t("tls.table.id"))}</th><th>${escapeHtml(ctx.t("tls.table.commonName"))}</th><th>${escapeHtml(ctx.t("tls.table.san"))}</th><th>${escapeHtml(ctx.t("tls.table.status"))}</th><th>${escapeHtml(ctx.t("tls.table.notAfter"))}</th></tr></thead>
+        <thead><tr><th><input type="checkbox" id="tls-cert-select-all" ${allSelected ? "checked" : ""}></th><th>${escapeHtml(ctx.t("tls.table.id"))}</th><th>${escapeHtml(ctx.t("tls.table.commonName"))}</th><th>${escapeHtml(ctx.t("tls.table.san"))}</th><th>${escapeHtml(ctx.t("tls.table.status"))}</th><th>${escapeHtml(ctx.t("tls.table.notAfter"))}</th></tr></thead>
         <tbody>
-          ${items.map((item) => `
-            <tr>
-              <td class="waf-code">${escapeHtml(item.id)}</td>
-              <td>${escapeHtml(item.common_name)}</td>
-              <td>${escapeHtml((item.san_list || []).join(", "))}</td>
-              <td>${statusBadge(item.status)}</td>
-              <td>${formatDate(item.not_after)}</td>
-            </tr>
-          `).join("")}
+          ${items.map((item) => {
+            const id = String(item?.id || "");
+            const checked = selectedIDs.has(id) ? "checked" : "";
+            return `
+              <tr>
+                <td><input type="checkbox" data-cert-select-id="${escapeHtml(id)}" ${checked}></td>
+                <td class="waf-code">${escapeHtml(id)}</td>
+                <td>${escapeHtml(item.common_name)}</td>
+                <td>${escapeHtml((item.san_list || []).join(", "))}</td>
+                <td>${statusBadge(item.status)}</td>
+                <td>${formatDate(item.not_after)}</td>
+              </tr>
+            `;
+          }).join("")}
         </tbody>
       </table>
     </div>
@@ -148,11 +169,14 @@ function renderTLSConfigs(items, siteNamesByID, ctx) {
 }
 
 export async function renderTLS(container, ctx) {
+  const selectedCertificateIDs = new Set();
+  let certificatesState = [];
+
   container.innerHTML = `
     <div class="waf-page-stack waf-tls-page-stack">
       <div class="waf-grid two waf-grid-compact">
         <section class="waf-card waf-card-compact">
-          <div class="waf-card-head"><div><h3>${escapeHtml(ctx.t("tls.meta.title"))}</h3><div class="muted">${escapeHtml(ctx.t("tls.meta.subtitle"))}</div></div></div>
+          <div class="waf-card-head"><div><h3>${escapeHtml(ctx.t("tls.certificates.title"))}</h3><div class="muted">${escapeHtml(ctx.t("tls.certificates.subtitle"))}</div></div></div>
           <div class="waf-card-body waf-stack">
             <form id="certificate-form" class="waf-form">
               <div class="waf-form-grid waf-form-grid-compact">
@@ -169,6 +193,12 @@ export async function renderTLS(container, ctx) {
                 <button class="btn ghost btn-sm" type="button" id="certificate-refresh">${escapeHtml(ctx.t("common.refresh"))}</button>
               </div>
             </form>
+            <div class="waf-actions">
+              <button class="btn ghost btn-sm" type="button" id="tls-certificate-import">${escapeHtml(ctx.t("tls.certificates.import"))}</button>
+              <button class="btn ghost btn-sm" type="button" id="tls-certificate-export">${escapeHtml(ctx.t("tls.certificates.export"))}</button>
+            </div>
+            <input id="tls-certificate-import-file" type="file" accept=".pem,.crt,.cer,text/plain,application/x-pem-file" class="waf-hidden">
+            <input id="tls-private-key-import-file" type="file" accept=".pem,.key,text/plain,application/x-pem-file" class="waf-hidden">
             <div id="certificate-list"></div>
           </div>
         </section>
@@ -187,6 +217,24 @@ export async function renderTLS(container, ctx) {
               </div>
             </form>
             <div id="tls-config-list"></div>
+          </div>
+        </section>
+        <section class="waf-card waf-card-compact">
+          <div class="waf-card-head"><div><h3>${escapeHtml(ctx.t("tls.autoRenew.title"))}</h3><div class="muted">${escapeHtml(ctx.t("tls.autoRenew.subtitle"))}</div></div></div>
+          <div class="waf-card-body waf-stack">
+            <form id="tls-auto-renew-form" class="waf-form">
+              <label class="waf-checkbox">
+                <input id="tls-auto-renew-enabled" type="checkbox">
+                <span>${escapeHtml(ctx.t("tls.autoRenew.enabled"))}</span>
+              </label>
+              <div class="waf-field">
+                <label for="tls-auto-renew-days">${escapeHtml(ctx.t("tls.autoRenew.renewBeforeDays"))}</label>
+                <input id="tls-auto-renew-days" type="number" min="1" max="365" step="1" value="30">
+              </div>
+              <div class="waf-actions">
+                <button class="btn primary btn-sm" type="submit">${escapeHtml(ctx.t("common.save"))}</button>
+              </div>
+            </form>
           </div>
         </section>
       </div>
@@ -281,6 +329,62 @@ export async function renderTLS(container, ctx) {
     </div>
   `;
 
+  const certImportFileInput = container.querySelector("#tls-certificate-import-file");
+  const keyImportFileInput = container.querySelector("#tls-private-key-import-file");
+  const selectedIDs = () => Array.from(selectedCertificateIDs.values());
+  const getSingleSelectedID = () => (selectedCertificateIDs.size === 1 ? selectedIDs()[0] : "");
+
+  const bindCertificateSelection = (certificates) => {
+    container.querySelectorAll("[data-cert-select-id]").forEach((node) => {
+      node.addEventListener("change", () => {
+        const id = String(node.getAttribute("data-cert-select-id") || "");
+        if (!id) return;
+        if (node.checked) {
+          selectedCertificateIDs.add(id);
+        } else {
+          selectedCertificateIDs.delete(id);
+        }
+      });
+    });
+    container.querySelector("#tls-cert-select-all")?.addEventListener("change", (event) => {
+      const checked = Boolean(event?.target?.checked);
+      if (checked) {
+        certificates.forEach((item) => {
+          const id = String(item?.id || "");
+          if (id) {
+            selectedCertificateIDs.add(id);
+          }
+        });
+      } else {
+        selectedCertificateIDs.clear();
+      }
+      container.querySelectorAll("[data-cert-select-id]").forEach((node) => {
+        node.checked = checked;
+      });
+    });
+  };
+
+  const loadAutoRenewSettings = async () => {
+    let settings = { enabled: false, renew_before_days: 30 };
+    try {
+      const payload = await ctx.api.get("/api/tls/auto-renew");
+      settings = {
+        enabled: Boolean(payload?.enabled),
+        renew_before_days: Number(payload?.renew_before_days || 30) || 30,
+      };
+    } catch {
+      // fallback defaults
+    }
+    const enabledNode = container.querySelector("#tls-auto-renew-enabled");
+    const daysNode = container.querySelector("#tls-auto-renew-days");
+    if (enabledNode) {
+      enabledNode.checked = settings.enabled;
+    }
+    if (daysNode) {
+      daysNode.value = String(settings.renew_before_days);
+    }
+  };
+
   const load = async () => {
     const [certificates, tlsConfigs, sites, sitesSecondary] = await Promise.all([
       ctx.api.get("/api/certificates"),
@@ -288,13 +392,21 @@ export async function renderTLS(container, ctx) {
       ctx.api.get("/api/sites"),
       tryGetJSON("/api-app/sites")
     ]);
+    certificatesState = normalizeList(certificates || []);
+    const existingIDs = new Set(certificatesState.map((item) => String(item?.id || "")).filter(Boolean));
+    for (const id of Array.from(selectedCertificateIDs.values())) {
+      if (!existingIDs.has(id)) {
+        selectedCertificateIDs.delete(id);
+      }
+    }
     const siteNamesByID = new Map(
       [...normalizeList(sites), ...unwrapList(sitesSecondary, ["sites"])]
         .map((site) => [String(site?.id || ""), String(site?.primary_host || site?.id || "")])
         .filter(([id, host]) => id && host)
     );
-    container.querySelector("#certificate-list").innerHTML = renderCertificates(certificates || [], ctx);
+    container.querySelector("#certificate-list").innerHTML = renderCertificates(certificatesState, selectedCertificateIDs, ctx);
     container.querySelector("#tls-config-list").innerHTML = renderTLSConfigs(tlsConfigs || [], siteNamesByID, ctx);
+    bindCertificateSelection(certificatesState);
   };
 
   container.querySelector("#certificate-form").addEventListener("submit", async (event) => {
@@ -313,7 +425,7 @@ export async function renderTLS(container, ctx) {
       await ctx.api.put(`/api/certificates/${encodeURIComponent(payload.id)}`, payload);
     }
     ctx.notify(ctx.t("tls.toast.metaSaved"));
-    await load();
+    await Promise.all([load(), loadAutoRenewSettings()]);
   });
 
   container.querySelector("#certificate-delete").addEventListener("click", async () => {
@@ -321,10 +433,109 @@ export async function renderTLS(container, ctx) {
     if (!id) return;
     await ctx.api.delete(`/api/certificates/${encodeURIComponent(id)}`);
     ctx.notify(ctx.t("tls.toast.certificateDeleted"));
-    await load();
+    await Promise.all([load(), loadAutoRenewSettings()]);
   });
 
   container.querySelector("#certificate-refresh").addEventListener("click", load);
+
+  container.querySelector("#tls-certificate-import")?.addEventListener("click", () => {
+    if (selectedCertificateIDs.size !== 1) {
+      ctx.notify(ctx.t("tls.certificates.selectOne"), "error");
+      return;
+    }
+    certImportFileInput?.click();
+  });
+
+  certImportFileInput?.addEventListener("change", () => {
+    if (certImportFileInput?.files?.[0]) {
+      keyImportFileInput?.click();
+    }
+  });
+
+  keyImportFileInput?.addEventListener("change", async () => {
+    const certFile = certImportFileInput?.files?.[0] || null;
+    const keyFile = keyImportFileInput?.files?.[0] || null;
+    const certificateID = getSingleSelectedID();
+    if (!certFile || !keyFile || !certificateID) {
+      return;
+    }
+    const selectedCert = certificatesState.find((item) => String(item?.id || "") === certificateID);
+    const formData = new FormData();
+    formData.set("certificate_id", certificateID);
+    formData.set("common_name", String(selectedCert?.common_name || certificateID));
+    formData.set("status", "active");
+    formData.set("certificate_file", certFile);
+    formData.set("private_key_file", keyFile);
+    try {
+      await ctx.api.post("/api/certificate-materials/upload", formData);
+      ctx.notify(ctx.t("tls.certificates.imported"));
+      await Promise.all([load(), loadAutoRenewSettings()]);
+    } catch (error) {
+      ctx.notify(`${ctx.t("sites.tls.importFailed")}: ${String(error?.message || error)}`, "error");
+    } finally {
+      if (certImportFileInput) {
+        certImportFileInput.value = "";
+      }
+      if (keyImportFileInput) {
+        keyImportFileInput.value = "";
+      }
+    }
+  });
+
+  container.querySelector("#tls-certificate-export")?.addEventListener("click", async () => {
+    const ids = selectedIDs();
+    if (!ids.length) {
+      ctx.notify(ctx.t("tls.certificates.selectAny"), "error");
+      return;
+    }
+    if (ids.length === 1) {
+      const certificateID = ids[0];
+      try {
+        const payload = await ctx.api.get(`/api/certificate-materials/export/${encodeURIComponent(certificateID)}`);
+        const certificatePEM = String(payload?.certificate_pem || "");
+        const privateKeyPEM = String(payload?.private_key_pem || "");
+        if (!certificatePEM || !privateKeyPEM) {
+          throw new Error(ctx.t("sites.tls.exportEmpty"));
+        }
+        downloadText(`${certificateID}.certificate.pem`, certificatePEM);
+        downloadText(`${certificateID}.private.key`, privateKeyPEM);
+        ctx.notify(ctx.t("tls.certificates.exported"));
+      } catch (error) {
+        ctx.notify(`${ctx.t("sites.tls.exportFailed")}: ${String(error?.message || error)}`, "error");
+      }
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/certificate-materials/export", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          Accept: "application/zip, application/json",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ certificate_ids: ids })
+      });
+      if (!response.ok) {
+        const bodyText = await response.text();
+        let message = `HTTP ${response.status}`;
+        if (bodyText) {
+          try {
+            const payload = JSON.parse(bodyText);
+            message = String(payload?.error || payload?.message || message);
+          } catch {
+            message = bodyText;
+          }
+        }
+        throw new Error(message);
+      }
+      const blob = await response.blob();
+      downloadBlob("certificate-materials.zip", blob);
+      ctx.notify(ctx.t("tls.certificates.exportArchive"));
+    } catch (error) {
+      ctx.notify(`${ctx.t("sites.tls.exportFailed")}: ${String(error?.message || error)}`, "error");
+    }
+  });
 
   container.querySelector("#tls-config-form").addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -338,7 +549,7 @@ export async function renderTLS(container, ctx) {
       await ctx.api.put(`/api/tls-configs/${encodeURIComponent(payload.site_id)}`, payload);
     }
     ctx.notify(ctx.t("tls.toast.bindingSaved"));
-    await load();
+    await Promise.all([load(), loadAutoRenewSettings()]);
   });
 
   container.querySelector("#tls-config-delete").addEventListener("click", async () => {
@@ -346,10 +557,21 @@ export async function renderTLS(container, ctx) {
     if (!siteID) return;
     await ctx.api.delete(`/api/tls-configs/${encodeURIComponent(siteID)}`);
     ctx.notify(ctx.t("tls.toast.bindingDeleted"));
-    await load();
+    await Promise.all([load(), loadAutoRenewSettings()]);
   });
 
   container.querySelector("#tls-config-refresh").addEventListener("click", load);
+
+  container.querySelector("#tls-auto-renew-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const payload = {
+      enabled: Boolean(container.querySelector("#tls-auto-renew-enabled")?.checked),
+      renew_before_days: Number(container.querySelector("#tls-auto-renew-days")?.value || 30),
+    };
+    await ctx.api.put("/api/tls/auto-renew", payload);
+    ctx.notify(ctx.t("tls.autoRenew.saved"));
+    await loadAutoRenewSettings();
+  });
 
   container.querySelector("#certificate-upload-form").addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -365,7 +587,7 @@ export async function renderTLS(container, ctx) {
     formData.set("private_key_file", container.querySelector("#private-key-file").files[0]);
     await ctx.api.post("/api/certificate-materials/upload", formData);
     ctx.notify(ctx.t("tls.toast.uploaded"));
-    await load();
+    await Promise.all([load(), loadAutoRenewSettings()]);
   });
 
   const toggleACMEConditionalFields = () => {
@@ -450,11 +672,11 @@ export async function renderTLS(container, ctx) {
         await ctx.api.put(`/api/tls-configs/${encodeURIComponent(siteID)}`, bindingPayload);
       }
       ctx.notify(ctx.t("tls.toast.issueAndBindJob"));
-      await load();
+      await Promise.all([load(), loadAutoRenewSettings()]);
       return;
     }
     ctx.notify(ctx.t("tls.toast.issueJob"));
-    await load();
+    await Promise.all([load(), loadAutoRenewSettings()]);
   };
 
   container.querySelector("#letsencrypt-form").addEventListener("submit", async (event) => {
@@ -473,5 +695,16 @@ export async function renderTLS(container, ctx) {
     ctx.notify(ctx.t("tls.toast.renewJob"));
   });
 
-  await load();
+  await Promise.all([load(), loadAutoRenewSettings()]);
 }
+
+
+
+
+
+
+
+
+
+
+

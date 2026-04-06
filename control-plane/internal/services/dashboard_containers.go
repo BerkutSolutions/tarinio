@@ -49,6 +49,7 @@ type DashboardContainerMetrics struct {
 	NetworkInBytes   uint64  `json:"network_in_bytes"`
 	NetworkOutBytes  uint64  `json:"network_out_bytes"`
 	PIDs             int     `json:"pids"`
+	ComposeProject   string  `json:"-"`
 }
 
 type DashboardContainerLogsRequest struct {
@@ -108,7 +109,7 @@ func (s *ContainerRuntimeService) Overview() (DashboardContainerOverview, error)
 		}
 		return DashboardContainerOverview{}, err
 	}
-	containers := parseDockerPS(psOut)
+	containers := filterDashboardContainers(parseDockerPS(psOut))
 	statsCtx, cancelStats := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancelStats()
 	statsOut, statsErr := s.runner.Run(statsCtx, "docker", "stats", "--no-stream", "--format", "{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.PIDs}}")
@@ -177,7 +178,7 @@ func (s *ContainerRuntimeService) Overview() (DashboardContainerOverview, error)
 func (s *ContainerRuntimeService) runDockerPS() ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
-	out, err := s.runner.Run(ctx, "docker", "ps", "-a", "--no-trunc", "--format", "{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.State}}\t{{.RunningFor}}")
+	out, err := s.runner.Run(ctx, "docker", "ps", "-a", "--no-trunc", "--format", "{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.State}}\t{{.RunningFor}}\t{{.Labels}}")
 	if err == nil {
 		return out, nil
 	}
@@ -186,7 +187,7 @@ func (s *ContainerRuntimeService) runDockerPS() ([]byte, error) {
 	}
 	retryCtx, retryCancel := context.WithTimeout(context.Background(), 16*time.Second)
 	defer retryCancel()
-	return s.runner.Run(retryCtx, "docker", "ps", "-a", "--no-trunc", "--format", "{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.State}}\t{{.RunningFor}}")
+	return s.runner.Run(retryCtx, "docker", "ps", "-a", "--no-trunc", "--format", "{{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.State}}\t{{.RunningFor}}\t{{.Labels}}")
 }
 
 func (s *ContainerRuntimeService) getCachedOverview() (DashboardContainerOverview, bool) {
@@ -267,16 +268,61 @@ func parseDockerPS(out []byte) []DashboardContainerMetrics {
 		if len(parts) < 6 {
 			continue
 		}
+		labels := ""
+		if len(parts) > 6 {
+			labels = strings.TrimSpace(parts[6])
+		}
 		items = append(items, DashboardContainerMetrics{
-			ID:         strings.TrimSpace(parts[0]),
-			Name:       strings.TrimSpace(parts[1]),
-			Image:      strings.TrimSpace(parts[2]),
-			Status:     strings.TrimSpace(parts[3]),
-			State:      strings.TrimSpace(parts[4]),
-			RunningFor: strings.TrimSpace(parts[5]),
+			ID:             strings.TrimSpace(parts[0]),
+			Name:           strings.TrimSpace(parts[1]),
+			Image:          strings.TrimSpace(parts[2]),
+			Status:         strings.TrimSpace(parts[3]),
+			State:          strings.TrimSpace(parts[4]),
+			RunningFor:     strings.TrimSpace(parts[5]),
+			ComposeProject: parseDockerComposeProject(labels),
 		})
 	}
 	return items
+}
+
+func parseDockerComposeProject(labelsRaw string) string {
+	for _, pair := range strings.Split(strings.TrimSpace(labelsRaw), ",") {
+		part := strings.TrimSpace(pair)
+		if part == "" {
+			continue
+		}
+		pieces := strings.SplitN(part, "=", 2)
+		if len(pieces) != 2 {
+			continue
+		}
+		if strings.TrimSpace(pieces[0]) == "com.docker.compose.project" {
+			return strings.TrimSpace(pieces[1])
+		}
+	}
+	return ""
+}
+
+func filterDashboardContainers(items []DashboardContainerMetrics) []DashboardContainerMetrics {
+	if len(items) == 0 {
+		return items
+	}
+	composeCount := 0
+	for _, item := range items {
+		if strings.TrimSpace(item.ComposeProject) != "" {
+			composeCount++
+		}
+	}
+	if composeCount == 0 {
+		return items
+	}
+	filtered := make([]DashboardContainerMetrics, 0, composeCount)
+	for _, item := range items {
+		if strings.TrimSpace(item.ComposeProject) == "" {
+			continue
+		}
+		filtered = append(filtered, item)
+	}
+	return filtered
 }
 
 func parseDockerStats(out []byte) map[string]DashboardContainerMetrics {

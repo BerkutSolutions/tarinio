@@ -1,10 +1,10 @@
 # API (RU)
 
-Базовая версия документации: `1.0.18`
+Базовая версия документации: `1.0.19`
 
 ## Release notes
 
-### 1.0.18 (2026-04-04)
+### 1.0.19 (2026-04-04)
 
 - Исправлено сохранение Easy site profile для reverse proxy: если `upstream_routing.reverse_proxy_host` не заполнен в UI, он теперь вычисляется из `scheme/host/port` апстрима.
 - Устранен ложный `400 Bad Request` при сохранении сервиса с включенным reverse proxy и заполненной upstream-целью.
@@ -91,6 +91,7 @@
 
 - Compile: `POST /api/revisions/compile`
 - Apply: `POST /api/revisions/{revisionID}/apply`
+
 
 
 

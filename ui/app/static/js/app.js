@@ -413,14 +413,14 @@ async function loadMeta() {
     }
     renderUpdateBadge(meta);
   } catch {
-    setVersion("v1.0.18");
+    setVersion("v1.0.19");
     renderUpdateBadge(null);
   }
 }
 
 async function bootstrap() {
   await applyTranslations(getLanguage());
-  setVersion("v1.0.18");
+  setVersion("v1.0.19");
 
   const access = await checkEntryAccess("app");
   if (!access.allowed) {
@@ -453,5 +453,3 @@ async function bootstrap() {
 }
 
 bootstrap();
-
-
