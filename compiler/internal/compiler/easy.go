@@ -31,6 +31,10 @@ type easySiteData struct {
 	ReverseProxySSLSNIName string
 	ReverseProxyWebsocket  bool
 	ReverseProxyKeepalive  bool
+	PassHostHeader         bool
+	SendXForwardedFor      bool
+	SendXForwardedProto    bool
+	SendXRealIP            bool
 	RateLimitBanSeconds    int
 
 	UseAuthBasic      bool
@@ -159,6 +163,10 @@ func RenderEasyArtifacts(sites []SiteInput, profiles []EasyProfileInput) ([]Arti
 				LimitConnMaxHTTP1:         200,
 				UseLimitReq:               true,
 				LimitReqRate:              "100r/s",
+				PassHostHeader:            true,
+				SendXForwardedFor:         true,
+				SendXForwardedProto:       true,
+				SendXRealIP:               false,
 				UseBadBehavior:            true,
 				BadBehaviorStatusCodes:    []int{400, 401, 403, 404, 405, 429, 444},
 				BadBehaviorBanTimeSeconds: 30,
@@ -199,6 +207,10 @@ func RenderEasyArtifacts(sites []SiteInput, profiles []EasyProfileInput) ([]Arti
 			ReverseProxySSLSNIName:       profile.ReverseProxySSLSNIName,
 			ReverseProxyWebsocket:        profile.ReverseProxyWebsocket,
 			ReverseProxyKeepalive:        profile.ReverseProxyKeepalive,
+			PassHostHeader:               profile.PassHostHeader,
+			SendXForwardedFor:            profile.SendXForwardedFor,
+			SendXForwardedProto:          profile.SendXForwardedProto,
+			SendXRealIP:                  profile.SendXRealIP,
 			RateLimitBanSeconds:          rateLimitBanSeconds(profile),
 			UseAuthBasic:                 profile.UseAuthBasic && profile.AuthBasicUser != "" && profile.AuthBasicPassword != "",
 			AuthBasicRealm:               profile.AuthBasicText,

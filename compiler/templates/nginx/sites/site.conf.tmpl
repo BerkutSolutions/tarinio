@@ -124,10 +124,10 @@ server {
         modsecurity on;
         modsecurity_rules_file /etc/waf/modsecurity/sites/{{ .SiteID }}.conf;
         include /etc/waf/nginx/ratelimits/{{ .SiteID }}.conf;
-        include /etc/waf/nginx/easy/{{ .SiteID }}.conf;
 {{- if .PassHostHeader }}
         proxy_set_header Host $http_host;
 {{- end }}
+        include /etc/waf/nginx/easy/{{ .SiteID }}.conf;
         proxy_pass {{ .ProxyPassTarget }};
     }
 
@@ -135,10 +135,10 @@ server {
         modsecurity on;
         modsecurity_rules_file /etc/waf/modsecurity/sites/{{ .SiteID }}.conf;
         include /etc/waf/nginx/ratelimits/{{ .SiteID }}.conf;
-        include /etc/waf/nginx/easy/{{ .SiteID }}.conf;
 {{- if .PassHostHeader }}
         proxy_set_header Host $http_host;
 {{- end }}
+        include /etc/waf/nginx/easy/{{ .SiteID }}.conf;
         proxy_pass {{ .ProxyPassTarget }};
     }
 }

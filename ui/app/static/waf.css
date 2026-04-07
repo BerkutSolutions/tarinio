@@ -496,6 +496,24 @@ label,
   align-items: end;
 }
 
+.waf-subframe {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid rgba(125, 155, 255, 0.22);
+  border-radius: 10px;
+  background: rgba(14, 21, 33, 0.55);
+}
+
+.waf-list-title-sm {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.waf-upstream-headers-frame .waf-note {
+  margin-top: 4px;
+  margin-bottom: 10px;
+}
+
 .waf-antiddos-frame {
   padding: 14px;
   border: 1px solid rgba(125, 155, 255, 0.2);

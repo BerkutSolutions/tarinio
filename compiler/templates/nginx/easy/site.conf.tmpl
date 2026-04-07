@@ -48,8 +48,23 @@ add_header Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
 add_header Access-Control-Allow-Headers "*" always;
 {{- end }}
 
-{{- if .ReverseProxyCustomHost }}
+{{- if and .PassHostHeader .ReverseProxyCustomHost }}
 proxy_set_header Host {{ .ReverseProxyCustomHost }};
+{{- end }}
+{{- if .SendXForwardedFor }}
+proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+{{- else }}
+proxy_set_header X-Forwarded-For "";
+{{- end }}
+{{- if .SendXForwardedProto }}
+proxy_set_header X-Forwarded-Proto $scheme;
+{{- else }}
+proxy_set_header X-Forwarded-Proto "";
+{{- end }}
+{{- if .SendXRealIP }}
+proxy_set_header X-Real-IP $remote_addr;
+{{- else }}
+proxy_set_header X-Real-IP "";
 {{- end }}
 {{- if .ReverseProxySSLSNI }}
 proxy_ssl_server_name on;

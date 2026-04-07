@@ -43,6 +43,10 @@ type UpstreamRoutingSettings struct {
 	ReverseProxySSLSNIName string `json:"reverse_proxy_ssl_sni_name"`
 	ReverseProxyWebsocket  bool   `json:"reverse_proxy_websocket"`
 	ReverseProxyKeepalive  bool   `json:"reverse_proxy_keepalive"`
+	DisableHostHeader      bool   `json:"disable_host_header"`
+	DisableXForwardedFor   bool   `json:"disable_x_forwarded_for"`
+	DisableXForwardedProto bool   `json:"disable_x_forwarded_proto"`
+	EnableXRealIP          bool   `json:"enable_x_real_ip"`
 }
 
 type HTTPBehaviorSettings struct {
@@ -230,6 +234,10 @@ func DefaultProfile(siteID string) EasySiteProfile {
 			ReverseProxySSLSNIName: "",
 			ReverseProxyWebsocket:  true,
 			ReverseProxyKeepalive:  true,
+			DisableHostHeader:      false,
+			DisableXForwardedFor:   false,
+			DisableXForwardedProto: false,
+			EnableXRealIP:          false,
 		},
 		HTTPBehavior: HTTPBehaviorSettings{
 			AllowedMethods: allowedMethods,

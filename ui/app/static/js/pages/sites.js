@@ -502,6 +502,10 @@ const SETTINGS_SEARCH_INDEX = [
   { id: "upstream_host", tab: "upstream", selector: "#service-upstream-host", labelKey: "sites.upstream.field.host" },
   { id: "upstream_port", tab: "upstream", selector: "#service-upstream-port", labelKey: "sites.upstream.field.port" },
   { id: "use_reverse_proxy", tab: "upstream", selector: "#service-use-reverse-proxy", labelKey: "sites.easy.upstream.useReverseProxy" },
+  { id: "pass_host_header", tab: "upstream", selector: "#service-pass-host-header", labelKey: "sites.easy.upstream.passHostHeader" },
+  { id: "send_x_forwarded_for", tab: "upstream", selector: "#service-send-x-forwarded-for", labelKey: "sites.easy.upstream.sendXForwardedFor" },
+  { id: "send_x_forwarded_proto", tab: "upstream", selector: "#service-send-x-forwarded-proto", labelKey: "sites.easy.upstream.sendXForwardedProto" },
+  { id: "send_x_real_ip", tab: "upstream", selector: "#service-send-x-real-ip", labelKey: "sites.easy.upstream.sendXRealIp" },
   { id: "allowed_methods", tab: "http", selector: "#list-input-allowed_methods", labelKey: "sites.easy.http.allowedMethods" },
   { id: "max_client_size", tab: "http", selector: "#service-max-client-size", labelKey: "sites.easy.http.maxBodySize" },
   { id: "content_security_policy", tab: "headers", selector: "#service-content-security-policy", labelKey: "sites.easy.headers.contentSecurityPolicy" },
@@ -655,6 +659,10 @@ function defaultSiteDraft() {
     reverse_proxy_ssl_sni_name: "",
     reverse_proxy_websocket: true,
     reverse_proxy_keepalive: true,
+    pass_host_header: true,
+    send_x_forwarded_for: true,
+    send_x_forwarded_proto: true,
+    send_x_real_ip: false,
     allowed_methods: ["GET", "POST", "HEAD", "OPTIONS", "PUT", "PATCH", "DELETE"],
     max_client_size: "100m",
     http2: true,
@@ -773,6 +781,10 @@ function applyEasyProfileToDraft(draft, profile) {
     reverse_proxy_ssl_sni_name: upstream.reverse_proxy_ssl_sni_name || draft.reverse_proxy_ssl_sni_name,
     reverse_proxy_websocket: Boolean(upstream.reverse_proxy_websocket ?? draft.reverse_proxy_websocket),
     reverse_proxy_keepalive: Boolean(upstream.reverse_proxy_keepalive ?? draft.reverse_proxy_keepalive),
+    pass_host_header: !(Boolean(upstream.disable_host_header ?? !draft.pass_host_header)),
+    send_x_forwarded_for: !(Boolean(upstream.disable_x_forwarded_for ?? !draft.send_x_forwarded_for)),
+    send_x_forwarded_proto: !(Boolean(upstream.disable_x_forwarded_proto ?? !draft.send_x_forwarded_proto)),
+    send_x_real_ip: Boolean(upstream.enable_x_real_ip ?? draft.send_x_real_ip),
     allowed_methods: normalizeStringArray(httpBehavior.allowed_methods).length ? normalizeStringArray(httpBehavior.allowed_methods) : draft.allowed_methods,
     max_client_size: httpBehavior.max_client_size || draft.max_client_size,
     http2: Boolean(httpBehavior.http2 ?? draft.http2),
@@ -887,7 +899,11 @@ function draftToEasyProfile(draft) {
       reverse_proxy_ssl_sni: draft.reverse_proxy_ssl_sni,
       reverse_proxy_ssl_sni_name: draft.reverse_proxy_ssl_sni_name,
       reverse_proxy_websocket: draft.reverse_proxy_websocket,
-      reverse_proxy_keepalive: draft.reverse_proxy_keepalive
+      reverse_proxy_keepalive: draft.reverse_proxy_keepalive,
+      disable_host_header: !draft.pass_host_header,
+      disable_x_forwarded_for: !draft.send_x_forwarded_for,
+      disable_x_forwarded_proto: !draft.send_x_forwarded_proto,
+      enable_x_real_ip: draft.send_x_real_ip
     },
     http_behavior: {
       allowed_methods: draft.allowed_methods,
@@ -1605,7 +1621,7 @@ function renderDetailView(state, ctx) {
                   <div class="waf-form-grid three">
                     <div class="waf-field">
                       <label for="service-reverse-proxy-custom-host">${escapeHtml(ctx.t("sites.easy.upstream.reverseProxyCustomHost"))}</label>
-                      <input id="service-reverse-proxy-custom-host" value="${escapeHtml(draft.reverse_proxy_custom_host)}">
+                      <input id="service-reverse-proxy-custom-host" value="${escapeHtml(draft.reverse_proxy_custom_host)}"${draft.pass_host_header ? "" : " disabled"}>
                     </div>
                     <div class="waf-field">
                     <label for="service-reverse-proxy-host">${escapeHtml(ctx.t("sites.easy.upstream.reverseProxyHost"))}</label>
@@ -1632,6 +1648,28 @@ function renderDetailView(state, ctx) {
                       <label for="service-upstream-port">${escapeHtml(ctx.t("sites.upstream.field.port"))}</label>
                       <input id="service-upstream-port" type="number" min="1" max="65535" value="${escapeHtml(String(draft.upstream_port))}">
                     </div>
+                  </div>
+                </div>
+                <div class="waf-subframe waf-upstream-headers-frame">
+                  <div class="waf-list-title-sm">${escapeHtml(ctx.t("sites.easy.upstream.headerForwardingTitle"))}</div>
+                  <div class="waf-note">${escapeHtml(ctx.t("sites.easy.upstream.headerForwardingHint"))}</div>
+                  <div class="waf-form-grid two">
+                    <label class="waf-checkbox">
+                      <input id="service-pass-host-header" type="checkbox"${draft.pass_host_header ? " checked" : ""}>
+                      <span>${escapeHtml(ctx.t("sites.easy.upstream.passHostHeader"))}</span>
+                    </label>
+                    <label class="waf-checkbox">
+                      <input id="service-send-x-forwarded-for" type="checkbox"${draft.send_x_forwarded_for ? " checked" : ""}>
+                      <span>${escapeHtml(ctx.t("sites.easy.upstream.sendXForwardedFor"))}</span>
+                    </label>
+                    <label class="waf-checkbox">
+                      <input id="service-send-x-forwarded-proto" type="checkbox"${draft.send_x_forwarded_proto ? " checked" : ""}>
+                      <span>${escapeHtml(ctx.t("sites.easy.upstream.sendXForwardedProto"))}</span>
+                    </label>
+                    <label class="waf-checkbox">
+                      <input id="service-send-x-real-ip" type="checkbox"${draft.send_x_real_ip ? " checked" : ""}>
+                      <span>${escapeHtml(ctx.t("sites.easy.upstream.sendXRealIp"))}</span>
+                    </label>
                   </div>
                 </div>
                 <div class="waf-form-grid two waf-upstream-sni-row">
@@ -2707,6 +2745,10 @@ export async function renderSites(container, ctx) {
       reverse_proxy_ssl_sni_name: container.querySelector("#service-reverse-proxy-ssl-sni-name").value.trim(),
       reverse_proxy_websocket: container.querySelector("#service-reverse-proxy-websocket").checked,
       reverse_proxy_keepalive: container.querySelector("#service-reverse-proxy-keepalive").checked,
+      pass_host_header: container.querySelector("#service-pass-host-header")?.checked ?? true,
+      send_x_forwarded_for: container.querySelector("#service-send-x-forwarded-for")?.checked ?? true,
+      send_x_forwarded_proto: container.querySelector("#service-send-x-forwarded-proto")?.checked ?? true,
+      send_x_real_ip: container.querySelector("#service-send-x-real-ip")?.checked ?? false,
       allowed_methods: normalizeStringArray(state.draft.allowed_methods),
       max_client_size: container.querySelector("#service-max-client-size").value.trim(),
       http2: container.querySelector("#service-http2").checked,
@@ -2920,6 +2962,10 @@ export async function renderSites(container, ctx) {
 
     toggleCertificateImportActions();
     container.querySelector("#service-use-modsecurity-custom-configuration")?.addEventListener("change", () => {
+      syncStateDraftFromForm();
+      render();
+    });
+    container.querySelector("#service-pass-host-header")?.addEventListener("change", () => {
       syncStateDraftFromForm();
       render();
     });

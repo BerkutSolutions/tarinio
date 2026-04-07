@@ -269,7 +269,7 @@ func (s *ApplyService) emitEvent(event events.Event) {
 }
 
 func (s *ApplyService) compileBundle(revision revisions.Revision, snapshot revisionsnapshots.Snapshot) (*pipeline.RevisionBundle, error) {
-	siteInputs, upstreamInputs := mapSiteUpstreamInputs(snapshot.Sites, snapshot.Upstreams, snapshot.TLSConfigs)
+	siteInputs, upstreamInputs := mapSiteUpstreamInputs(snapshot.Sites, snapshot.Upstreams, snapshot.TLSConfigs, snapshot.EasySiteProfiles)
 	antiDDoSSettings := antiddos.NormalizeSettings(snapshot.AntiDDoSSettings)
 	tlsInputs, certInputs, tlsMaterialArtifacts, err := s.mapTLSInputs(snapshot.TLSConfigs, snapshot.CertificateMaterials)
 	if err != nil {
@@ -358,6 +358,10 @@ func applyAntiDDoSDefaultEasyProfiles(siteInputs []pipeline.SiteInput, items []p
 			AuthBasicText:            "Restricted area",
 			AntibotChallenge:         "no",
 			AntibotURI:               "/challenge",
+			PassHostHeader:           true,
+			SendXForwardedFor:        true,
+			SendXForwardedProto:      true,
+			SendXRealIP:              false,
 			ModSecurityCRSVersion:    "4",
 			ModSecurityCustomPath:    "modsec/anomaly_score.conf",
 		}
@@ -542,7 +546,7 @@ func (s *ApplyService) mapTLSInputs(configs []tlsconfigs.TLSConfig, materials []
 	return tlsInputs, certInputs, tlsMaterialArtifacts, nil
 }
 
-func mapSiteUpstreamInputs(siteItems []sites.Site, upstreamItems []upstreams.Upstream, tlsItems []tlsconfigs.TLSConfig) ([]pipeline.SiteInput, []pipeline.UpstreamInput) {
+func mapSiteUpstreamInputs(siteItems []sites.Site, upstreamItems []upstreams.Upstream, tlsItems []tlsconfigs.TLSConfig, easyItems []easysiteprofiles.EasySiteProfile) ([]pipeline.SiteInput, []pipeline.UpstreamInput) {
 	sortedSites := append([]sites.Site(nil), siteItems...)
 	sort.Slice(sortedSites, func(i, j int) bool { return sortedSites[i].ID < sortedSites[j].ID })
 
@@ -559,6 +563,10 @@ func mapSiteUpstreamInputs(siteItems []sites.Site, upstreamItems []upstreams.Ups
 		if _, exists := defaultUpstreamBySite[item.SiteID]; !exists {
 			defaultUpstreamBySite[item.SiteID] = item.ID
 		}
+	}
+	hostHeaderEnabledBySite := make(map[string]bool, len(easyItems))
+	for _, item := range easyItems {
+		hostHeaderEnabledBySite[item.SiteID] = !item.UpstreamRouting.DisableHostHeader
 	}
 
 	siteInputs := make([]pipeline.SiteInput, 0, len(sortedSites))
@@ -577,6 +585,10 @@ func mapSiteUpstreamInputs(siteItems []sites.Site, upstreamItems []upstreams.Ups
 
 	upstreamInputs := make([]pipeline.UpstreamInput, 0, len(sortedUpstreams))
 	for _, item := range sortedUpstreams {
+		passHostHeader := true
+		if configured, ok := hostHeaderEnabledBySite[item.SiteID]; ok {
+			passHostHeader = configured
+		}
 		upstreamInputs = append(upstreamInputs, pipeline.UpstreamInput{
 			ID:             item.ID,
 			SiteID:         item.SiteID,
@@ -585,7 +597,7 @@ func mapSiteUpstreamInputs(siteItems []sites.Site, upstreamItems []upstreams.Ups
 			Host:           item.Host,
 			Port:           item.Port,
 			BasePath:       "/",
-			PassHostHeader: true,
+			PassHostHeader: passHostHeader,
 		})
 	}
 	return siteInputs, upstreamInputs
@@ -680,6 +692,10 @@ func mapEasyInputs(items []easysiteprofiles.EasySiteProfile) []pipeline.EasyProf
 			ReverseProxySSLSNIName: item.UpstreamRouting.ReverseProxySSLSNIName,
 			ReverseProxyWebsocket:  item.UpstreamRouting.ReverseProxyWebsocket,
 			ReverseProxyKeepalive:  item.UpstreamRouting.ReverseProxyKeepalive,
+			PassHostHeader:         !item.UpstreamRouting.DisableHostHeader,
+			SendXForwardedFor:      !item.UpstreamRouting.DisableXForwardedFor,
+			SendXForwardedProto:    !item.UpstreamRouting.DisableXForwardedProto,
+			SendXRealIP:            item.UpstreamRouting.EnableXRealIP,
 
 			UseAuthBasic:      item.SecurityAuthBasic.UseAuthBasic,
 			AuthBasicUser:     item.SecurityAuthBasic.AuthBasicUser,

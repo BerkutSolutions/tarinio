@@ -122,6 +122,10 @@ type EasyProfileInput struct {
 	ReverseProxySSLSNIName string
 	ReverseProxyWebsocket  bool
 	ReverseProxyKeepalive  bool
+	PassHostHeader         bool
+	SendXForwardedFor      bool
+	SendXForwardedProto    bool
+	SendXRealIP            bool
 
 	UseAuthBasic      bool
 	AuthBasicUser     string

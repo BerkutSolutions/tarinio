@@ -327,6 +327,15 @@ func TestApplyService_CompilesEasyProfileArtifacts(t *testing.T) {
 	if !strings.Contains(easyConf, "proxy_set_header Host backend.internal;") {
 		t.Fatalf("expected reverse proxy custom host in easy conf, got: %s", easyConf)
 	}
+	if !strings.Contains(easyConf, "proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;") {
+		t.Fatalf("expected default x-forwarded-for forwarding in easy conf, got: %s", easyConf)
+	}
+	if !strings.Contains(easyConf, "proxy_set_header X-Forwarded-Proto $scheme;") {
+		t.Fatalf("expected default x-forwarded-proto forwarding in easy conf, got: %s", easyConf)
+	}
+	if !strings.Contains(easyConf, "proxy_set_header X-Real-IP \"\";") {
+		t.Fatalf("expected x-real-ip disabled by default in easy conf, got: %s", easyConf)
+	}
 	if !strings.Contains(easyConf, "proxy_ssl_server_name on;") || !strings.Contains(easyConf, "proxy_ssl_name backend.internal;") {
 		t.Fatalf("expected reverse proxy sni directives in easy conf, got: %s", easyConf)
 	}
@@ -381,6 +390,26 @@ func TestApplyService_CompilesEasyProfileArtifacts(t *testing.T) {
 	}
 	if !strings.Contains(string(rateHTTPContent), "rate=40r/s") {
 		t.Fatalf("expected global anti-ddos l7 rate override in ratelimits config, got: %s", string(rateHTTPContent))
+	}
+}
+
+func TestMapSiteUpstreamInputs_RespectsHostHeaderToggle(t *testing.T) {
+	siteInputs, upstreamInputs := mapSiteUpstreamInputs(
+		[]sites.Site{{ID: "site-a", PrimaryHost: "a.example.com", Enabled: true}},
+		[]upstreams.Upstream{{ID: "upstream-a", SiteID: "site-a", Host: "127.0.0.1", Port: 8080, Scheme: "http"}},
+		nil,
+		[]easysiteprofiles.EasySiteProfile{{
+			SiteID: "site-a",
+			UpstreamRouting: easysiteprofiles.UpstreamRoutingSettings{
+				DisableHostHeader: true,
+			},
+		}},
+	)
+	if len(siteInputs) != 1 || len(upstreamInputs) != 1 {
+		t.Fatalf("unexpected mapped inputs: sites=%d upstreams=%d", len(siteInputs), len(upstreamInputs))
+	}
+	if upstreamInputs[0].PassHostHeader {
+		t.Fatalf("expected host header forwarding disabled, got %+v", upstreamInputs[0])
 	}
 }
 

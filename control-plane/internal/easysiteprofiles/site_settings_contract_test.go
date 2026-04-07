@@ -92,6 +92,10 @@ func TestSiteSettings_FieldContract(t *testing.T) {
 		"upstream_routing.reverse_proxy_custom_host",
 		"upstream_routing.reverse_proxy_host",
 		"upstream_routing.reverse_proxy_keepalive",
+		"upstream_routing.disable_host_header",
+		"upstream_routing.disable_x_forwarded_for",
+		"upstream_routing.disable_x_forwarded_proto",
+		"upstream_routing.enable_x_real_ip",
 		"upstream_routing.reverse_proxy_ssl_sni",
 		"upstream_routing.reverse_proxy_ssl_sni_name",
 		"upstream_routing.reverse_proxy_url",
@@ -202,6 +206,10 @@ func allFieldsProfile(siteID string) EasySiteProfile {
 	profile.UpstreamRouting.ReverseProxySSLSNIName = "backend.internal"
 	profile.UpstreamRouting.ReverseProxyWebsocket = false
 	profile.UpstreamRouting.ReverseProxyKeepalive = false
+	profile.UpstreamRouting.DisableHostHeader = false
+	profile.UpstreamRouting.DisableXForwardedFor = true
+	profile.UpstreamRouting.DisableXForwardedProto = true
+	profile.UpstreamRouting.EnableXRealIP = true
 
 	profile.HTTPBehavior.AllowedMethods = []string{"POST", "GET", "PUT"}
 	profile.HTTPBehavior.MaxClientSize = "64m"
