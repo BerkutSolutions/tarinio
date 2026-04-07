@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -17,8 +18,6 @@ import (
 type nginxMainData struct {
 	SitesIncludeGlob string
 }
-
-type nginxBaseData struct{}
 
 type nginxSiteData struct {
 	SiteID                    string
@@ -53,6 +52,14 @@ type errorPageData struct {
 	AccentSoft         string
 }
 
+const globalErrorSiteID = "_global"
+
+var supportedErrorStatusCodes = []int{
+	400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415,
+	416, 417, 418, 421, 422, 423, 424, 425, 426, 428, 429, 431, 444, 451, 500, 501,
+	502, 503, 504, 505, 507, 508, 510, 511, 520, 521, 522, 523, 524, 525, 526,
+}
+
 // RenderSiteUpstreamArtifacts produces deterministic nginx artifacts for the MVP
 // Site and Upstream compiler mapping.
 func RenderSiteUpstreamArtifacts(sites []SiteInput, upstreams []UpstreamInput) ([]ArtifactOutput, error) {
@@ -71,11 +78,19 @@ func RenderSiteUpstreamArtifacts(sites []SiteInput, upstreams []UpstreamInput) (
 	}
 	artifacts = append(artifacts, newArtifact("nginx/nginx.conf", ArtifactKindNginxConfig, mainContent))
 
-	baseContent, err := renderTemplate(filepath.Join(templatesRoot(), "conf.d", "base.conf.tmpl"), nginxBaseData{})
+	baseContent, err := renderTemplate(filepath.Join(templatesRoot(), "conf.d", "base.conf.tmpl"), nginxBaseData{
+		ErrorStatusCodes: append([]int(nil), supportedErrorStatusCodes...),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("render nginx base template: %w", err)
 	}
 	artifacts = append(artifacts, newArtifact("nginx/conf.d/base.conf", ArtifactKindNginxConfig, baseContent))
+
+	globalErrorArtifacts, err := renderSiteErrorArtifacts(globalErrorSiteID)
+	if err != nil {
+		return nil, fmt.Errorf("render global error pages: %w", err)
+	}
+	artifacts = append(artifacts, globalErrorArtifacts...)
 
 	for _, site := range sortedSites {
 		if !site.Enabled {
@@ -260,8 +275,30 @@ func templatesRoot() string {
 }
 
 func renderSiteErrorArtifacts(siteID string) ([]ArtifactOutput, error) {
-	pages := []errorPageData{
-		{
+	pages := buildErrorPageCatalog()
+
+	artifacts := make([]ArtifactOutput, 0, len(pages))
+	for _, page := range pages {
+		content, err := renderTemplate(filepath.Join(templatesRoot(), "..", "errors", "status.html.tmpl"), page)
+		if err != nil {
+			return nil, err
+		}
+		artifacts = append(artifacts, newArtifact(
+			fmt.Sprintf("errors/%s/%d.html", siteID, page.StatusCode),
+			ArtifactKindNginxConfig,
+			content,
+		))
+	}
+	return artifacts, nil
+}
+
+type nginxBaseData struct {
+	ErrorStatusCodes []int
+}
+
+func buildErrorPageCatalog() []errorPageData {
+	overrides := map[int]errorPageData{
+		400: {
 			StatusCode:         400,
 			Title:              "Bad Request",
 			Category:           "Client-side request issue",
@@ -279,7 +316,7 @@ func renderSiteErrorArtifacts(siteID string) ([]ArtifactOutput, error) {
 			Accent:             "#ffbe63",
 			AccentSoft:         "rgba(255, 190, 99, 0.18)",
 		},
-		{
+		401: {
 			StatusCode:         401,
 			Title:              "Authentication Required",
 			Category:           "Protected resource",
@@ -297,7 +334,7 @@ func renderSiteErrorArtifacts(siteID string) ([]ArtifactOutput, error) {
 			Accent:             "#86a8ff",
 			AccentSoft:         "rgba(134, 168, 255, 0.16)",
 		},
-		{
+		403: {
 			StatusCode:         403,
 			Title:              "Forbidden",
 			Category:           "Access denied",
@@ -315,7 +352,7 @@ func renderSiteErrorArtifacts(siteID string) ([]ArtifactOutput, error) {
 			Accent:             "#ff7f7f",
 			AccentSoft:         "rgba(255, 127, 127, 0.18)",
 		},
-		{
+		404: {
 			StatusCode:         404,
 			Title:              "Not Found",
 			Category:           "Missing route",
@@ -333,7 +370,7 @@ func renderSiteErrorArtifacts(siteID string) ([]ArtifactOutput, error) {
 			Accent:             "#86a8ff",
 			AccentSoft:         "rgba(134, 168, 255, 0.16)",
 		},
-		{
+		405: {
 			StatusCode:         405,
 			Title:              "Method Not Allowed",
 			Category:           "Request method rejected",
@@ -351,7 +388,7 @@ func renderSiteErrorArtifacts(siteID string) ([]ArtifactOutput, error) {
 			Accent:             "#ffbe63",
 			AccentSoft:         "rgba(255, 190, 99, 0.18)",
 		},
-		{
+		408: {
 			StatusCode:         408,
 			Title:              "Request Timeout",
 			Category:           "Client-side timeout",
@@ -369,7 +406,7 @@ func renderSiteErrorArtifacts(siteID string) ([]ArtifactOutput, error) {
 			Accent:             "#ffbe63",
 			AccentSoft:         "rgba(255, 190, 99, 0.18)",
 		},
-		{
+		421: {
 			StatusCode:         421,
 			Title:              "Host Not Configured",
 			Category:           "WAF direct address protection",
@@ -387,7 +424,7 @@ func renderSiteErrorArtifacts(siteID string) ([]ArtifactOutput, error) {
 			Accent:             "#86a8ff",
 			AccentSoft:         "rgba(134, 168, 255, 0.16)",
 		},
-		{
+		429: {
 			StatusCode:         429,
 			Title:              "Too Many Requests",
 			Category:           "Rate limiting",
@@ -405,7 +442,7 @@ func renderSiteErrorArtifacts(siteID string) ([]ArtifactOutput, error) {
 			Accent:             "#ff7f7f",
 			AccentSoft:         "rgba(255, 127, 127, 0.18)",
 		},
-		{
+		500: {
 			StatusCode:         500,
 			Title:              "Internal Server Error",
 			Category:           "Application-side failure",
@@ -423,7 +460,7 @@ func renderSiteErrorArtifacts(siteID string) ([]ArtifactOutput, error) {
 			Accent:             "#ff7f7f",
 			AccentSoft:         "rgba(255, 127, 127, 0.18)",
 		},
-		{
+		502: {
 			StatusCode:         502,
 			Title:              "Bad Gateway",
 			Category:           "Upstream connection issue",
@@ -441,7 +478,7 @@ func renderSiteErrorArtifacts(siteID string) ([]ArtifactOutput, error) {
 			Accent:             "#ff7f7f",
 			AccentSoft:         "rgba(255, 127, 127, 0.18)",
 		},
-		{
+		503: {
 			StatusCode:         503,
 			Title:              "Service Unavailable",
 			Category:           "Temporary unavailability",
@@ -459,7 +496,7 @@ func renderSiteErrorArtifacts(siteID string) ([]ArtifactOutput, error) {
 			Accent:             "#ffbe63",
 			AccentSoft:         "rgba(255, 190, 99, 0.18)",
 		},
-		{
+		504: {
 			StatusCode:         504,
 			Title:              "Gateway Timeout",
 			Category:           "Slow upstream response",
@@ -479,17 +516,56 @@ func renderSiteErrorArtifacts(siteID string) ([]ArtifactOutput, error) {
 		},
 	}
 
-	artifacts := make([]ArtifactOutput, 0, len(pages))
-	for _, page := range pages {
-		content, err := renderTemplate(filepath.Join(templatesRoot(), "..", "errors", "status.html.tmpl"), page)
-		if err != nil {
-			return nil, err
+	out := make([]errorPageData, 0, len(supportedErrorStatusCodes))
+	for _, code := range supportedErrorStatusCodes {
+		if page, ok := overrides[code]; ok {
+			out = append(out, page)
+			continue
 		}
-		artifacts = append(artifacts, newArtifact(
-			fmt.Sprintf("errors/%s/%d.html", siteID, page.StatusCode),
-			ArtifactKindNginxConfig,
-			content,
-		))
+		out = append(out, buildGenericErrorPageData(code))
 	}
-	return artifacts, nil
+	return out
+}
+
+func buildGenericErrorPageData(code int) errorPageData {
+	title := strings.TrimSpace(http.StatusText(code))
+	if title == "" {
+		title = "Request Failed"
+	}
+	category := "Request failed"
+	accent := "#ffbe63"
+	accentSoft := "rgba(255, 190, 99, 0.18)"
+	clientLabel := "Check request"
+	clientTone := "warn"
+	upstreamLabel := "Check upstream"
+	upstreamTone := "warn"
+	if code >= 500 {
+		category = "Upstream/server failure"
+		accent = "#ff7f7f"
+		accentSoft = "rgba(255, 127, 127, 0.18)"
+		clientLabel = "Looks normal"
+		clientTone = "ok"
+		upstreamLabel = "Investigate"
+		upstreamTone = "bad"
+	} else if code >= 400 {
+		category = "Client or access error"
+	}
+	return errorPageData{
+		StatusCode:         code,
+		Title:              title,
+		Category:           category,
+		Summary:            "TARINIO returned a controlled fallback page for this response code.",
+		ClientStateLabel:   clientLabel,
+		ClientStateTone:    clientTone,
+		ClientStateText:    "Validate request path, method, headers, and client behavior.",
+		WAFStateLabel:      "Online",
+		WAFStateTone:       "ok",
+		WAFStateText:       "The WAF is active and handling this response path safely.",
+		UpstreamStateLabel: upstreamLabel,
+		UpstreamStateTone:  upstreamTone,
+		UpstreamStateText:  "If this repeats, inspect upstream availability and policy match conditions.",
+		Suggestions:        []string{"Retry the request after validating URL and method.", "Review WAF/access/rate-limit rules for this endpoint.", "Check upstream logs for related request IDs."},
+		Accent:             accent,
+		AccentSoft:         accentSoft,
+	}
 }

@@ -18,11 +18,19 @@ type accessSiteData struct {
 type rateLimitHTTPEntry struct {
 	ZoneName     string
 	ConnZoneName string
+	KeyVar       string
 	Rate         string
 }
 
+type rateLimitExceptionEntry struct {
+	ExceptionVar string
+	KeyVar       string
+	AllowCIDRs   []string
+}
+
 type rateLimitHTTPData struct {
-	Entries []rateLimitHTTPEntry
+	Exceptions []rateLimitExceptionEntry
+	Entries    []rateLimitHTTPEntry
 }
 
 type rateLimitSiteData struct {
@@ -91,10 +99,23 @@ func RenderAccessRateLimitArtifacts(
 		if !site.Enabled {
 			continue
 		}
+		accessPolicy, ok := accessBySite[site.ID]
+		if !ok {
+			accessPolicy = AccessPolicyInput{
+				SiteID:        site.ID,
+				DefaultAction: "allow",
+			}
+		}
+		httpData.Exceptions = append(httpData.Exceptions, rateLimitExceptionEntry{
+			ExceptionVar: siteExceptionVar(site.ID),
+			KeyVar:       siteRateLimitKeyVar(site.ID),
+			AllowCIDRs:   append([]string(nil), accessPolicy.AllowCIDRs...),
+		})
 		if policy, ok := rateBySite[site.ID]; ok && policy.Enabled {
 			httpData.Entries = append(httpData.Entries, rateLimitHTTPEntry{
 				ZoneName:     reqZoneName(site.ID),
 				ConnZoneName: connZoneName(site.ID),
+				KeyVar:       siteRateLimitKeyVar(site.ID),
 				Rate:         formatRate(policy.Requests, policy.WindowSeconds),
 			})
 		}
@@ -184,6 +205,14 @@ func reqZoneName(siteID string) string {
 
 func connZoneName(siteID string) string {
 	return fmt.Sprintf("site_%s_conn", siteID)
+}
+
+func siteExceptionVar(siteID string) string {
+	return fmt.Sprintf("waf_allow_bypass_%s", slugSiteID(siteID))
+}
+
+func siteRateLimitKeyVar(siteID string) string {
+	return fmt.Sprintf("waf_rate_limit_key_%s", slugSiteID(siteID))
 }
 
 func formatRate(requests, windowSeconds int) string {

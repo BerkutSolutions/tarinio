@@ -16,6 +16,7 @@ type easySiteData struct {
 	SiteID                       string
 	RateLimitCookieVar           string
 	RateLimitEscalationCookieVar string
+	ExceptionVar                 string
 	AllowedMethodsPattern        string
 	MaxClientSize                string
 
@@ -47,8 +48,8 @@ type easySiteData struct {
 	BlacklistUserAgent []string
 	BlacklistURI       []string
 
-	BlacklistCountryPattern string
-	WhitelistCountryPattern string
+	BlacklistCountryGuardPattern string
+	WhitelistCountryGuardPattern string
 
 	UseModSecurity         bool
 	UseModSecurityEasyFile bool
@@ -185,6 +186,7 @@ func RenderEasyArtifacts(sites []SiteInput, profiles []EasyProfileInput) ([]Arti
 			SiteID:                       site.ID,
 			RateLimitCookieVar:           rateLimitCookieVar(site.ID),
 			RateLimitEscalationCookieVar: rateLimitEscalationCookieVar(site.ID),
+			ExceptionVar:                 siteExceptionVar(site.ID),
 			AllowedMethodsPattern:        methodPattern(profile.AllowedMethods),
 			MaxClientSize:                profile.MaxClientSize,
 			ReferrerPolicy:               profile.ReferrerPolicy,
@@ -210,8 +212,8 @@ func RenderEasyArtifacts(sites []SiteInput, profiles []EasyProfileInput) ([]Arti
 			BlacklistIP:                  profile.BlacklistIP,
 			BlacklistUserAgent:           profile.BlacklistUserAgent,
 			BlacklistURI:                 profile.BlacklistURI,
-			BlacklistCountryPattern:      blacklistCountrySelectorPattern(profile.BlacklistCountry),
-			WhitelistCountryPattern:      whitelistCountrySelectorPattern(profile.WhitelistCountry),
+			BlacklistCountryGuardPattern: blacklistCountryGuardPattern(profile.BlacklistCountry),
+			WhitelistCountryGuardPattern: whitelistCountryGuardPattern(profile.WhitelistCountry),
 			UseModSecurity:               profile.UseModSecurity,
 			UseModSecurityEasyFile:       profile.UseModSecurity,
 			ModSecurityEasyRulesOn:       profile.UseModSecurity,
@@ -370,17 +372,29 @@ func blacklistCountrySelectorPattern(values []string) string {
 	return "^(?:" + strings.Join(parts, "|") + ")$"
 }
 
-func whitelistCountrySelectorPattern(values []string) string {
-	blacklistPattern := blacklistCountrySelectorPattern(values)
-	if blacklistPattern == "" {
+func whitelistCountryGuardPattern(values []string) string {
+	basePattern := blacklistCountrySelectorPattern(values)
+	if basePattern == "" {
 		return ""
 	}
-	// Allow empty country code (GeoIP unavailable) to preserve existing behavior.
-	if strings.HasPrefix(blacklistPattern, "^(?:") && strings.HasSuffix(blacklistPattern, ")$") {
-		core := strings.TrimSuffix(strings.TrimPrefix(blacklistPattern, "^(?:"), ")$")
-		return "^(?:" + "|" + core + ")$"
+	if strings.HasPrefix(basePattern, "^(?:") && strings.HasSuffix(basePattern, ")$") {
+		core := strings.TrimSuffix(strings.TrimPrefix(basePattern, "^(?:"), ")$")
+		// Allow empty country code (GeoIP unavailable) to preserve existing behavior.
+		return "^(?:1:.*|0:(?:|" + core + "))$"
 	}
-	return blacklistPattern
+	return ""
+}
+
+func blacklistCountryGuardPattern(values []string) string {
+	basePattern := blacklistCountrySelectorPattern(values)
+	if basePattern == "" {
+		return ""
+	}
+	if strings.HasPrefix(basePattern, "^(?:") && strings.HasSuffix(basePattern, ")$") {
+		core := strings.TrimSuffix(strings.TrimPrefix(basePattern, "^(?:"), ")$")
+		return "^(?:0:(?:" + core + "))$"
+	}
+	return ""
 }
 
 func buildSHA1HTPasswdLine(user, password string) string {

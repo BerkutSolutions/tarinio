@@ -436,7 +436,7 @@ function regionDisplayLabel(code) {
   }
   if (isCountryCode(normalized)) {
     const flag = countryFlagEmoji(normalized);
-    return `${name} (${normalized}${flag ? ` ${flag}` : ""})`;
+    return flag ? `${name} (${flag})` : name;
   }
   return `${name} (${normalized})`;
 }
@@ -474,6 +474,7 @@ const LIST_FIELD_SET = new Set([
   "keep_upstream_headers",
   "cors_allowed_origins",
   "access_allowlist",
+  "exceptions_ip",
   "access_denylist",
   "blacklist_ip",
   "blacklist_rdns",
@@ -506,6 +507,7 @@ const SETTINGS_SEARCH_INDEX = [
   { id: "content_security_policy", tab: "headers", selector: "#service-content-security-policy", labelKey: "sites.easy.headers.contentSecurityPolicy" },
   { id: "permissions_policy", tab: "headers", selector: "#list-input-permissions_policy", labelKey: "sites.easy.headers.permissionsPolicy" },
   { id: "access_allowlist", tab: "traffic", selector: "#list-input-access_allowlist", labelKey: "sites.lists.allowlist" },
+  { id: "exceptions_ip", tab: "traffic", selector: "#list-input-exceptions_ip", labelKey: "sites.easy.traffic.exceptions" },
   { id: "access_denylist", tab: "traffic", selector: "#list-input-access_denylist", labelKey: "sites.lists.denylist" },
   { id: "use_blacklist", tab: "traffic", selector: "#service-use-blacklist", labelKey: "sites.easy.traffic.activateBlacklisting" },
   { id: "use_limit_req", tab: "traffic", selector: "#service-use-limit-req", labelKey: "sites.easy.traffic.activateLimitRequests" },
@@ -666,7 +668,9 @@ function defaultSiteDraft() {
     use_cors: false,
     cors_allowed_origins: ["*"],
     use_allowlist: false,
+    use_exceptions: false,
     access_allowlist: [],
+    exceptions_ip: [],
     access_denylist: [],
     use_bad_behavior: true,
     bad_behavior_status_codes: [400, 401, 405, 444],
@@ -794,6 +798,8 @@ function applyEasyProfileToDraft(draft, profile) {
       security.ban_escalation_stages_seconds,
       Number(security.bad_behavior_ban_time_seconds ?? draft.bad_behavior_ban_time_seconds)
     ),
+    use_exceptions: Boolean(security.use_exceptions ?? draft.use_exceptions),
+    exceptions_ip: normalizeStringArray(security.exceptions_ip),
     use_blacklist: Boolean(security.use_blacklist ?? draft.use_blacklist),
     use_dnsbl: Boolean(security.use_dnsbl ?? draft.use_dnsbl),
     blacklist_ip: normalizeStringArray(security.blacklist_ip),
@@ -908,6 +914,8 @@ function draftToEasyProfile(draft) {
       ban_escalation_enabled: draft.ban_escalation_enabled,
       ban_escalation_scope: banEscalationScope,
       ban_escalation_stages_seconds: banEscalationStages,
+      use_exceptions: draft.use_exceptions,
+      exceptions_ip: draft.exceptions_ip,
       use_blacklist: draft.use_blacklist,
       use_dnsbl: draft.use_dnsbl,
       blacklist_ip: draft.blacklist_ip,
@@ -1760,8 +1768,13 @@ function renderDetailView(state, ctx) {
                         <input id="service-use-allowlist" type="checkbox"${draft.use_allowlist ? " checked" : ""}>
                         <span>${escapeHtml(ctx.t("sites.easy.traffic.activateAllowlist"))}</span>
                       </label>
+                      <label class="waf-checkbox waf-field full">
+                        <input id="service-use-exceptions" type="checkbox"${draft.use_exceptions ? " checked" : ""}>
+                        <span>${escapeHtml(ctx.t("sites.easy.traffic.activateExceptions"))}</span>
+                      </label>
                       ${renderListEditor("access_denylist", ctx.t("sites.lists.denylist"), draft.access_denylist, "203.0.113.10", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
                       ${renderListEditor("access_allowlist", ctx.t("sites.lists.allowlist"), draft.access_allowlist, "10.0.0.0/24", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
+                      ${renderListEditor("exceptions_ip", ctx.t("sites.easy.traffic.exceptions"), draft.exceptions_ip, "203.0.113.0/24", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
                       ${draft.use_allowlist || normalizeStringArray(draft.access_allowlist).length
                         ? ""
                         : `<div class="waf-note waf-field full">${escapeHtml(ctx.t("sites.easy.traffic.allowlistDisabledHint"))}</div>`}
@@ -1937,7 +1950,14 @@ async function upsertAccessPolicy(draft, ctx, existingAccessPolicy) {
   if (!siteID) {
     return;
   }
-  const allowlist = draft.use_allowlist ? normalizeStringArray(draft.access_allowlist) : [];
+  const allowlistSources = [];
+  if (draft.use_allowlist) {
+    allowlistSources.push(...normalizeStringArray(draft.access_allowlist));
+  }
+  if (draft.use_exceptions) {
+    allowlistSources.push(...normalizeStringArray(draft.exceptions_ip));
+  }
+  const allowlist = Array.from(new Set(allowlistSources));
   const denylist = normalizeStringArray(draft.access_denylist);
   if (!allowlist.length && !denylist.length && !existingAccessPolicy) {
     return;
@@ -2475,6 +2495,12 @@ export async function renderSites(container, ctx) {
     state.draft.access_allowlist = normalizeStringArray(accessPolicy?.allowlist);
     state.draft.access_denylist = normalizeStringArray(accessPolicy?.denylist);
     state.draft.use_allowlist = state.draft.access_allowlist.length > 0;
+    if (!normalizeStringArray(state.draft.exceptions_ip).length) {
+      state.draft.exceptions_ip = [...state.draft.access_allowlist];
+    }
+    if (!state.draft.use_exceptions) {
+      state.draft.use_exceptions = normalizeStringArray(state.draft.exceptions_ip).length > 0;
+    }
     state.activeTab = "front";
     state.settingsSearch = "";
     state.settingsMatches = [];
@@ -2694,7 +2720,9 @@ export async function renderSites(container, ctx) {
       use_cors: container.querySelector("#service-use-cors").checked,
       cors_allowed_origins: normalizeStringArray(state.draft.cors_allowed_origins),
       use_allowlist: container.querySelector("#service-use-allowlist")?.checked || false,
+      use_exceptions: container.querySelector("#service-use-exceptions")?.checked || false,
       access_allowlist: normalizeStringArray(state.draft.access_allowlist),
+      exceptions_ip: normalizeStringArray(state.draft.exceptions_ip),
       access_denylist: normalizeStringArray(state.draft.access_denylist),
       use_bad_behavior: container.querySelector("#service-use-bad-behavior").checked,
       bad_behavior_status_codes: normalizeArray(state.draft.bad_behavior_status_codes).map((item) => Number(item)).filter((item) => Number.isInteger(item)),

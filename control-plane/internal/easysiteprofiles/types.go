@@ -79,6 +79,8 @@ type SecurityBehaviorAndLimitsSettings struct {
 	BanEscalationStagesSeconds  []int  `json:"ban_escalation_stages_seconds"`
 
 	UseBlacklist           bool     `json:"use_blacklist"`
+	UseExceptions          bool     `json:"use_exceptions"`
+	ExceptionsIP           []string `json:"exceptions_ip"`
 	UseDNSBL               bool     `json:"use_dnsbl"`
 	BlacklistIP            []string `json:"blacklist_ip"`
 	BlacklistRDNS          []string `json:"blacklist_rdns"`
@@ -255,6 +257,8 @@ func DefaultProfile(siteID string) EasySiteProfile {
 			BanEscalationScope:          "all_sites",
 			BanEscalationStagesSeconds:  []int{300, 86400, 0},
 			UseBlacklist:                false,
+			UseExceptions:               false,
+			ExceptionsIP:                []string{},
 			UseDNSBL:                    false,
 			BlacklistIP:                 []string{},
 			BlacklistRDNS:               []string{},

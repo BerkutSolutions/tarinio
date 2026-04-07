@@ -9,6 +9,7 @@ import (
 
 type easyRateLimitHTTPEntry struct {
 	ZoneName string
+	KeyVar   string
 	Rate     string
 }
 
@@ -56,6 +57,7 @@ func RenderEasyRateLimitArtifacts(sites []SiteInput, upstreams []UpstreamInput, 
 		for index, rule := range rules {
 			httpData.Entries = append(httpData.Entries, easyRateLimitHTTPEntry{
 				ZoneName: easyCustomReqZoneName(site.ID, index),
+				KeyVar:   siteRateLimitKeyVar(site.ID),
 				Rate:     rule.Rate,
 			})
 		}

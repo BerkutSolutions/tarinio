@@ -239,7 +239,7 @@ function topCounts(map, limit = 10) {
 }
 
 function normalizeCountryCode(value) {
-  const raw = String(value || "").trim();
+  const raw = String(value || "").trim().replace(/^["']+|["']+$/g, "");
   const token = raw.toUpperCase();
   if (!token || token === "UNKNOWN" || token === "-" || token === "N/A") {
     return "UNK";
@@ -265,11 +265,24 @@ function normalizeCountryCode(value) {
 function countryFlag(code) {
   const token = normalizeCountryCode(code);
   if (!/^[A-Z]{2}$/.test(token)) {
-    return "??";
+    return "";
   }
   const first = 127397 + token.charCodeAt(0);
   const second = 127397 + token.charCodeAt(1);
   return String.fromCodePoint(first, second);
+}
+
+function countryName(code) {
+  const token = normalizeCountryCode(code);
+  if (token === "UNK") {
+    return "Unknown";
+  }
+  try {
+    const names = new Intl.DisplayNames(["ru", "en"], { type: "region" });
+    return names.of(token) || token;
+  } catch (_error) {
+    return token;
+  }
 }
 
 function blockedByStatus(status) {
@@ -730,7 +743,12 @@ function renderMetric(value, label, tone = "success", widgetAction = "") {
 
 function renderCountryBadge(code) {
   const normalized = normalizeCountryCode(code);
-  return `<span class="dashboard-ip-country">${escapeHtml(countryFlag(normalized))} (${escapeHtml(normalized)})</span>`;
+  if (normalized === "UNK") {
+    return `<span class="dashboard-ip-country">${escapeHtml(countryName(normalized))}</span>`;
+  }
+  const flag = countryFlag(normalized);
+  const name = countryName(normalized);
+  return `<span class="dashboard-ip-country">${escapeHtml(name)}${flag ? ` (${escapeHtml(flag)})` : ""}</span>`;
 }
 
 function renderTopList(items, emptyText, options = {}) {
@@ -1279,7 +1297,7 @@ function buildWidgetDetail(action, payload, stats, detailModel, containersOvervi
     const code = normalizeCountryCode(payload?.countryCode || "");
     const rows = code && code !== "UNK" ? (detailModel?.attacksByCountry || []).filter((item) => normalizeCountryCode(item.key) === code) : (detailModel?.attacksByCountry || []);
     return {
-      title: code && code !== "UNK" ? `${ctx.t("dashboard.detail.country")} ${code}` : ctx.t("dashboard.widget.topCountries"),
+      title: code && code !== "UNK" ? `${ctx.t("dashboard.detail.country")} ${countryName(code)}${countryFlag(code) ? ` (${countryFlag(code)})` : ""}` : ctx.t("dashboard.widget.topCountries"),
       subtitle: ctx.t("dashboard.detail.countrySubtitle"),
       body: renderDetailTable(rows, ctx, ctx.t("dashboard.detail.country"), ctx.t("dashboard.detail.attacks"), { labelFormatter: (item) => renderCountryBadge(item.key) })
     };

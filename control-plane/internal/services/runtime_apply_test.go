@@ -333,16 +333,16 @@ func TestApplyService_CompilesEasyProfileArtifacts(t *testing.T) {
 	if !strings.Contains(easyConf, "deny 203.0.113.7;") {
 		t.Fatalf("expected blacklist ip in easy conf, got: %s", easyConf)
 	}
-	if !strings.Contains(easyConf, "if ($http_user_agent ~* \"curl\") { return 403; }") {
+	if !strings.Contains(easyConf, "if ($waf_blacklist_ua_guard ~* \"^0:.*curl\") { return 403; }") {
 		t.Fatalf("expected blacklist user-agent in easy conf, got: %s", easyConf)
 	}
-	if !strings.Contains(easyConf, "if ($request_uri ~* \"/admin\") { return 403; }") {
+	if !strings.Contains(easyConf, "if ($waf_blacklist_uri_guard ~* \"^0:.*/admin\") { return 403; }") {
 		t.Fatalf("expected blacklist uri in easy conf, got: %s", easyConf)
 	}
-	if !strings.Contains(easyConf, "if ($waf_country_code !~ \"^(?:|US)$\") { return 403; }") {
+	if !strings.Contains(easyConf, "if ($waf_country_guard !~ \"^(?:1:.*|0:(?:|US))$\") { return 403; }") {
 		t.Fatalf("expected whitelist country in easy conf, got: %s", easyConf)
 	}
-	if !strings.Contains(easyConf, "if ($waf_country_code ~ \"^(?:RU)$\") { return 403; }") {
+	if !strings.Contains(easyConf, "if ($waf_country_guard ~ \"^(?:0:(?:RU))$\") { return 403; }") {
 		t.Fatalf("expected blacklist country in easy conf, got: %s", easyConf)
 	}
 	if !strings.Contains(easyConf, "add_header X-WAF-Antibot-Mode \"recaptcha\" always;") {

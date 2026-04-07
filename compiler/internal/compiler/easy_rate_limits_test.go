@@ -42,10 +42,10 @@ func TestRenderEasyRateLimitArtifacts_GeneratesRouteSpecificArtifacts(t *testing
 	}
 
 	httpConf := byPath["nginx/conf.d/easy-ratelimits.conf"]
-	if !strings.Contains(httpConf, "limit_req_zone $binary_remote_addr zone=easy_control_plane_access_req_0:10m rate=6r/s;") {
+	if !strings.Contains(httpConf, "limit_req_zone $waf_rate_limit_key_control_plane_access zone=easy_control_plane_access_req_0:10m rate=6r/s;") {
 		t.Fatalf("expected exact login zone in easy rate limit http conf, got: %s", httpConf)
 	}
-	if !strings.Contains(httpConf, "limit_req_zone $binary_remote_addr zone=easy_control_plane_access_req_1:10m rate=12r/s;") {
+	if !strings.Contains(httpConf, "limit_req_zone $waf_rate_limit_key_control_plane_access zone=easy_control_plane_access_req_1:10m rate=12r/s;") {
 		t.Fatalf("expected prefix api auth zone in easy rate limit http conf, got: %s", httpConf)
 	}
 

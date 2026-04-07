@@ -4,6 +4,10 @@ client_max_body_size {{ .MaxClientSize }};
 set $waf_rate_limited_max_age {{ .RateLimitBanSeconds }};
 set $waf_rate_limited_active 0;
 set $waf_rate_limited_escalated 0;
+set $waf_easy_exception_guard 0;
+if (${{ .ExceptionVar }} = 1) {
+    set $waf_easy_exception_guard 1;
+}
 
 if ($waf_rate_limited_max_age ~ "^[1-9][0-9]*$") {
     set $waf_rate_limited_active 1;
@@ -13,6 +17,10 @@ if ($cookie_{{ .RateLimitCookieVar }} != "1") {
 }
 if ($cookie_{{ .RateLimitEscalationCookieVar }} = "1") {
     set $waf_rate_limited_escalated 1;
+}
+if ($waf_easy_exception_guard = 1) {
+    set $waf_rate_limited_active 0;
+    set $waf_rate_limited_escalated 0;
 }
 if ($waf_rate_limited_escalated = 1) {
     return 403;
@@ -75,7 +83,8 @@ set $waf_antibot_verified 0;
 if ($arg_waf_antibot = "ok") { set $waf_antibot_verified 1; }
 if ($cookie_waf_antibot = "ok") { set $waf_antibot_verified 1; }
 if ($request_uri = "{{ .AntibotURI }}") { set $waf_antibot_verified 1; }
-if ($waf_antibot_verified = 0) { return 403; }
+set $waf_antibot_guard "$waf_easy_exception_guard:$waf_antibot_verified";
+if ($waf_antibot_guard = "0:0") { return 403; }
 add_header X-WAF-Antibot-Mode "{{ .AntibotChallenge }}" always;
 {{- if .AntibotRecaptchaHint }}
 add_header X-WAF-Antibot-Provider "recaptcha" always;
@@ -93,19 +102,23 @@ deny {{ . }};
 {{- end }}
 
 {{- range .BlacklistUserAgent }}
-if ($http_user_agent ~* "{{ . }}") { return 403; }
+set $waf_blacklist_ua_guard "$waf_easy_exception_guard:$http_user_agent";
+if ($waf_blacklist_ua_guard ~* "^0:.*{{ . }}") { return 403; }
 {{- end }}
 
 {{- range .BlacklistURI }}
-if ($request_uri ~* "{{ . }}") { return 403; }
+set $waf_blacklist_uri_guard "$waf_easy_exception_guard:$request_uri";
+if ($waf_blacklist_uri_guard ~* "^0:.*{{ . }}") { return 403; }
 {{- end }}
 
-{{- if .WhitelistCountryPattern }}
-if ($waf_country_code !~ "{{ .WhitelistCountryPattern }}") { return 403; }
+{{- if .WhitelistCountryGuardPattern }}
+set $waf_country_guard "$waf_easy_exception_guard:$waf_country_code";
+if ($waf_country_guard !~ "{{ .WhitelistCountryGuardPattern }}") { return 403; }
 {{- end }}
 
-{{- if .BlacklistCountryPattern }}
-if ($waf_country_code ~ "{{ .BlacklistCountryPattern }}") { return 403; }
+{{- if .BlacklistCountryGuardPattern }}
+set $waf_country_guard "$waf_easy_exception_guard:$waf_country_code";
+if ($waf_country_guard ~ "{{ .BlacklistCountryGuardPattern }}") { return 403; }
 {{- end }}
 
 {{- if not .UseModSecurity }}

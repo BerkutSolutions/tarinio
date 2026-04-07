@@ -54,6 +54,7 @@ func TestSiteSettings_FieldContract(t *testing.T) {
 		"security_behavior_and_limits.ban_escalation_enabled",
 		"security_behavior_and_limits.ban_escalation_scope",
 		"security_behavior_and_limits.ban_escalation_stages_seconds",
+		"security_behavior_and_limits.exceptions_ip",
 		"security_behavior_and_limits.blacklist_asn",
 		"security_behavior_and_limits.blacklist_asn_urls",
 		"security_behavior_and_limits.blacklist_ip",
@@ -73,6 +74,7 @@ func TestSiteSettings_FieldContract(t *testing.T) {
 		"security_behavior_and_limits.limit_req_url",
 		"security_behavior_and_limits.use_bad_behavior",
 		"security_behavior_and_limits.use_blacklist",
+		"security_behavior_and_limits.use_exceptions",
 		"security_behavior_and_limits.use_dnsbl",
 		"security_behavior_and_limits.use_limit_conn",
 		"security_behavior_and_limits.use_limit_req",
@@ -221,6 +223,8 @@ func allFieldsProfile(siteID string) EasySiteProfile {
 	profile.SecurityBehaviorAndLimits.BadBehaviorThreshold = 3
 	profile.SecurityBehaviorAndLimits.BadBehaviorCountTimeSeconds = 11
 	profile.SecurityBehaviorAndLimits.UseBlacklist = true
+	profile.SecurityBehaviorAndLimits.UseExceptions = true
+	profile.SecurityBehaviorAndLimits.ExceptionsIP = []string{"198.51.100.11", "203.0.113.11"}
 	profile.SecurityBehaviorAndLimits.UseDNSBL = true
 	profile.SecurityBehaviorAndLimits.BlacklistIP = []string{"198.51.100.10", "203.0.113.10"}
 	profile.SecurityBehaviorAndLimits.BlacklistRDNS = []string{".scanner.example", ".bad.example"}

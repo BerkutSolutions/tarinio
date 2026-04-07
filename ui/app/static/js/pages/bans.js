@@ -369,6 +369,38 @@ function parseSecurityStatus(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function normalizeCountryCode(value) {
+  const raw = String(value || "").trim().replace(/^["']+|["']+$/g, "");
+  const token = raw.toUpperCase();
+  if (!token || token === "UNKNOWN" || token === "-" || token === "N/A") {
+    return "";
+  }
+  const bracket = token.match(/\(([A-Z]{2})\)\s*$/);
+  if (bracket) {
+    return bracket[1];
+  }
+  const exact = token.match(/\b([A-Z]{2})\b/);
+  if (exact) {
+    return exact[1];
+  }
+  const compact = token.replace(/[^A-Z]/g, "");
+  return compact.length === 2 ? compact : "";
+}
+
+function countryFlagEmoji(value) {
+  const code = normalizeCountryCode(value);
+  if (!code) {
+    return "-";
+  }
+  const base = 0x1f1e6;
+  const first = code.charCodeAt(0) - 65;
+  const second = code.charCodeAt(1) - 65;
+  if (first < 0 || first > 25 || second < 0 || second > 25) {
+    return "-";
+  }
+  return String.fromCodePoint(base + first, base + second);
+}
+
 function deriveModuleFromEvent(item) {
   const type = String(item?.type || "").trim().toLowerCase();
   const status = parseSecurityStatus(item?.details?.status);
@@ -429,7 +461,7 @@ function buildAutoBanRows(events, resolveSiteID, siteBanDurationByID) {
     const current = grouped.get(key) || {
       siteID,
       ip,
-      country: String(details.country || details.client_country || "-").trim() || "-",
+      country: normalizeCountryCode(details.country || details.client_country || ""),
       source: "auto",
       occurredAt,
       expiresAt: durationSec === 0 ? null : new Date(occurredAt.getTime() + (durationSec * 1000)),
@@ -449,7 +481,7 @@ function buildAutoBanRows(events, resolveSiteID, siteBanDurationByID) {
     if (!current.occurredAt || occurredAt.getTime() >= current.occurredAt.getTime()) {
       current.occurredAt = occurredAt;
       current.latestEvent = item;
-      current.country = String(details.country || details.client_country || current.country || "-").trim() || "-";
+      current.country = normalizeCountryCode(details.country || details.client_country || current.country || "");
       current.expiresAt = durationSec === 0 ? null : new Date(occurredAt.getTime() + (durationSec * 1000));
     }
 
@@ -514,6 +546,22 @@ async function postBanAction(ctx, siteID, origin, action, ip) {
     return;
   }
   await ctx.api.post(path, { ip });
+}
+
+async function addExceptionForSite(ctx, siteID, ip) {
+  const policies = normalizeList(await ctx.api.get("/api/access-policies"));
+  const existing = policies.find((item) => String(item?.site_id || "").trim() === String(siteID || "").trim()) || null;
+  const allowlist = new Set(normalizeList(existing?.allowlist).map((item) => normalizeIP(item)).filter(Boolean));
+  allowlist.add(normalizeIP(ip));
+  const denylist = normalizeList(existing?.denylist).map((item) => normalizeIP(item)).filter(Boolean);
+  const payload = {
+    id: String(existing?.id || `${siteID}-access`),
+    site_id: String(siteID || "").trim(),
+    enabled: true,
+    allowlist: Array.from(allowlist),
+    denylist
+  };
+  await ctx.api.post("/api/access-policies/upsert", payload);
 }
 
 export async function renderBans(container, ctx) {
@@ -833,7 +881,7 @@ export async function renderBans(container, ctx) {
       ["events.detail.field.time", row.occurredAt ? row.occurredAt.toISOString() : "-"],
       ["events.detail.field.site", siteLabel || row.siteID || "-"],
       ["bans.col.ip", row.ip || "-"],
-      ["bans.col.country", row.country || "-"],
+      ["bans.col.country", countryFlagEmoji(row.country)],
       ["bans.col.module", renderModules(row.modules || new Set(), ctx.t) || "-"],
       ["events.detail.field.summary", renderReasonList(row.reasons || new Set())],
       ["bans.col.left", row.expiresAt ? formatRemaining(row.expiresAt, new Date(), ctx.t) : ctx.t("bans.time.permanent")]
@@ -885,6 +933,12 @@ export async function renderBans(container, ctx) {
         }
         try {
           const profile = await ctx.api.get(`/api/easy-site-profiles/${encodeURIComponent(candidate)}`);
+          const whitelist = normalizeList(profile?.security_country_policy?.whitelist_country)
+            .map((item) => String(item || "").trim())
+            .filter(Boolean);
+          if (whitelist.length > 0) {
+            return [resolveSiteID(candidate), 0];
+          }
           const duration = parsePositiveNumber(profile?.security_behavior_and_limits?.bad_behavior_ban_time_seconds, 300);
           return [resolveSiteID(candidate), duration];
         } catch (_error) {
@@ -972,11 +1026,10 @@ export async function renderBans(container, ctx) {
                 const site = siteByID.get(row.siteID);
                 const siteLabel = site?.primary_host || row.siteID;
                 const allowlisted = (allowlistBySite.get(row.siteID) || new Set()).has(row.ip);
-                const unbanEnabled = row.source === "manual";
                 return `
                   <tr class="waf-table-row-clickable" data-ban-row="${meta.start + index}" tabindex="0" role="button">
                     <td>${escapeHtml(row.ip)}</td>
-                    <td>${escapeHtml(row.country)}</td>
+                    <td>${escapeHtml(countryFlagEmoji(row.country))}</td>
                     <td>${escapeHtml(row.occurredAt ? formatDate(row.occurredAt.toISOString()) : "-")}</td>
                     <td>${escapeHtml(formatRemaining(row.expiresAt, now, ctx.t))}</td>
                     <td>${escapeHtml(siteLabel)}</td>
@@ -987,7 +1040,7 @@ export async function renderBans(container, ctx) {
                           <span class="waf-ban-btn-icon">${ICON_PLUS}</span>
                           <span>${escapeHtml(ctx.t("bans.action.extend"))}</span>
                         </button>
-                        <button type="button" class="btn danger btn-sm waf-ban-btn" data-action="unban" data-row="${meta.start + index}" title="${escapeHtml(ctx.t("bans.action.unban"))}"${unbanEnabled ? "" : " disabled"}>
+                        <button type="button" class="btn danger btn-sm waf-ban-btn" data-action="unban" data-row="${meta.start + index}" title="${escapeHtml(ctx.t("bans.action.unban"))}">
                           <span class="waf-ban-btn-icon">${ICON_UNLOCK}</span>
                           <span>${escapeHtml(ctx.t("bans.action.unban"))}</span>
                         </button>
@@ -1051,10 +1104,6 @@ export async function renderBans(container, ctx) {
             ctx.notify("IP is in allowlist for this site; no ban actions applied.");
             return;
           }
-          if (action === "unban" && row.source !== "manual") {
-            return;
-          }
-
           if (action === "unban") {
             const site = siteByID.get(row.siteID);
             openUnbanModal(row, site?.primary_host || row.siteID);
@@ -1188,10 +1237,14 @@ export async function renderBans(container, ctx) {
     const ip = normalizeIP(row.ip);
     try {
       unbanSubmitNode.disabled = true;
-      await postBanAction(ctx, row.siteID, "primary", "unban", ip);
-      const timers = loadManualBanTimers();
-      removeManualBanTimer(timers, row.siteID, ip);
-      saveManualBanTimers(timers);
+      if (row.source === "manual") {
+        await postBanAction(ctx, row.siteID, "primary", "unban", ip);
+        const timers = loadManualBanTimers();
+        removeManualBanTimer(timers, row.siteID, ip);
+        saveManualBanTimers(timers);
+      } else {
+        await addExceptionForSite(ctx, row.siteID, ip);
+      }
       clearRateLimitCookies(row.siteID);
       closeUnbanModal();
       ctx.notify(ctx.t("toast.ipUnbanned"));

@@ -1,4 +1,16 @@
+{{- range .Exceptions }}
+geo ${{ .ExceptionVar }} {
+    default 0;
+{{- range .AllowCIDRs }}
+    {{ . }} 1;
+{{- end }}
+}
+map ${{ .ExceptionVar }} ${{ .KeyVar }} {
+    default $binary_remote_addr;
+    1 "";
+}
+{{- end }}
 {{- range .Entries }}
-limit_req_zone $binary_remote_addr zone={{ .ZoneName }}:10m rate={{ .Rate }};
-limit_conn_zone $binary_remote_addr zone={{ .ConnZoneName }}:10m;
+limit_req_zone ${{ .KeyVar }} zone={{ .ZoneName }}:10m rate={{ .Rate }};
+limit_conn_zone ${{ .KeyVar }} zone={{ .ConnZoneName }}:10m;
 {{- end }}

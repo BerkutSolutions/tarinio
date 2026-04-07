@@ -195,7 +195,7 @@ func TestEasySiteProfileService_GetLoadsLegacyPolicies(t *testing.T) {
 		&fakeEasySiteProfileStore{items: map[string]easysiteprofiles.EasySiteProfile{}},
 		&fakeSiteReader{items: []sites.Site{{ID: "site-a", PrimaryHost: "www.example.com"}}},
 		&fakeEasyWAFStore{items: []wafpolicies.WAFPolicy{{ID: "waf-a", SiteID: "site-a", Enabled: true, CRSEnabled: true, CustomRuleIncludes: []string{"plugin-a"}}}},
-		&fakeEasyAccessStore{items: []accesspolicies.AccessPolicy{{ID: "access-a", SiteID: "site-a", DenyList: []string{"203.0.113.10"}}}},
+		&fakeEasyAccessStore{items: []accesspolicies.AccessPolicy{{ID: "access-a", SiteID: "site-a", AllowList: []string{"198.51.100.10"}, DenyList: []string{"203.0.113.10"}}}},
 		&fakeEasyRateStore{items: []ratelimitpolicies.RateLimitPolicy{{ID: "rate-a", SiteID: "site-a", Enabled: true, Limits: ratelimitpolicies.Limits{RequestsPerSecond: 25, Burst: 5}}}},
 		nil,
 		nil,
@@ -214,6 +214,9 @@ func TestEasySiteProfileService_GetLoadsLegacyPolicies(t *testing.T) {
 	}
 	if len(item.SecurityBehaviorAndLimits.BlacklistIP) != 1 || item.SecurityBehaviorAndLimits.BlacklistIP[0] != "203.0.113.10" {
 		t.Fatalf("expected bridged blacklist ip, got %+v", item.SecurityBehaviorAndLimits.BlacklistIP)
+	}
+	if !item.SecurityBehaviorAndLimits.UseExceptions || len(item.SecurityBehaviorAndLimits.ExceptionsIP) != 1 || item.SecurityBehaviorAndLimits.ExceptionsIP[0] != "198.51.100.10" {
+		t.Fatalf("expected bridged exceptions ip, got enabled=%v items=%+v", item.SecurityBehaviorAndLimits.UseExceptions, item.SecurityBehaviorAndLimits.ExceptionsIP)
 	}
 }
 
@@ -236,6 +239,8 @@ func TestEasySiteProfileService_UpsertSyncsLegacyPolicies(t *testing.T) {
 	item.FrontService.SecurityMode = easysiteprofiles.SecurityModeBlock
 	item.SecurityBehaviorAndLimits.UseBlacklist = true
 	item.SecurityBehaviorAndLimits.BlacklistIP = []string{"203.0.113.20"}
+	item.SecurityBehaviorAndLimits.UseExceptions = true
+	item.SecurityBehaviorAndLimits.ExceptionsIP = []string{"198.51.100.20"}
 	item.SecurityBehaviorAndLimits.UseLimitReq = true
 	item.SecurityBehaviorAndLimits.LimitReqRate = "15r/s"
 	item.SecurityModSecurity.UseModSecurity = true
@@ -254,6 +259,9 @@ func TestEasySiteProfileService_UpsertSyncsLegacyPolicies(t *testing.T) {
 	}
 	if len(accessStore.items) != 1 || len(accessStore.items[0].DenyList) != 1 || accessStore.items[0].DenyList[0] != "203.0.113.20" {
 		t.Fatalf("unexpected synced access policy: %+v", accessStore.items)
+	}
+	if len(accessStore.items[0].AllowList) != 1 || accessStore.items[0].AllowList[0] != "198.51.100.20" {
+		t.Fatalf("unexpected synced access allowlist: %+v", accessStore.items[0])
 	}
 	if len(rateStore.items) != 1 || rateStore.items[0].Limits.RequestsPerSecond != 15 {
 		t.Fatalf("unexpected synced rate policy: %+v", rateStore.items)

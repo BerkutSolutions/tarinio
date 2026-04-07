@@ -73,6 +73,9 @@ func TestRenderEasyArtifacts_GeneratesSiteAndAuthBasicFiles(t *testing.T) {
 	if !strings.Contains(siteConf, "if ($request_uri = \"/challenge\") { set $waf_antibot_verified 1; }") {
 		t.Fatalf("expected antibot challenge uri rule, got: %s", siteConf)
 	}
+	if !strings.Contains(siteConf, "if ($waf_allow_bypass_site_a = 1)") {
+		t.Fatalf("expected allowlist bypass guard in easy template, got: %s", siteConf)
+	}
 	if !strings.Contains(siteConf, "add_header X-WAF-Antibot-Mode \"recaptcha\" always;") {
 		t.Fatalf("expected antibot mode header, got: %s", siteConf)
 	}

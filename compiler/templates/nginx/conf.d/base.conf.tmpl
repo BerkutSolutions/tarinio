@@ -49,6 +49,19 @@ access_log /var/log/nginx/access.log waf_security_json;
 server {
     listen 80 default_server;
     server_name _;
+    add_header Server-Timing "rid;desc=$arg_rid,ip;desc=$arg_ip,ts;desc=$arg_ts" always;
+    proxy_intercept_errors on;
+{{- range .ErrorStatusCodes }}
+    error_page {{ . }} /__waf_errors/_global/{{ . }}.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+
+{{- range .ErrorStatusCodes }}
+    location = /__waf_errors/_global/{{ . }}.html {
+        internal;
+        allow all;
+        alias /etc/waf/errors/_global/{{ . }}.html;
+    }
+{{- end }}
 
     location ^~ /.well-known/acme-challenge/ {
         default_type text/plain;
@@ -56,7 +69,7 @@ server {
     }
 
     location / {
-        return 421;
+        return 308 https://$host$request_uri;
     }
 }
 

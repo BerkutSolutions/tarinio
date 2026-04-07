@@ -233,6 +233,8 @@ func (s *EasySiteProfileService) applyLegacyToEasy(siteID string, out *easysitep
 			if item.SiteID != siteID {
 				continue
 			}
+			out.SecurityBehaviorAndLimits.UseExceptions = len(item.AllowList) > 0
+			out.SecurityBehaviorAndLimits.ExceptionsIP = append([]string(nil), item.AllowList...)
 			out.SecurityBehaviorAndLimits.BlacklistIP = append([]string(nil), item.DenyList...)
 			break
 		}
@@ -321,10 +323,14 @@ func (s *EasySiteProfileService) syncEasyToLegacy(profile easysiteprofiles.EasyS
 			}
 		}
 		target := accesspolicies.AccessPolicy{
-			ID:       accessID,
-			SiteID:   profile.SiteID,
-			Enabled:  profile.SecurityBehaviorAndLimits.UseBlacklist,
-			DenyList: append([]string(nil), profile.SecurityBehaviorAndLimits.BlacklistIP...),
+			ID:        accessID,
+			SiteID:    profile.SiteID,
+			Enabled:   profile.SecurityBehaviorAndLimits.UseBlacklist || profile.SecurityBehaviorAndLimits.UseExceptions,
+			AllowList: nil,
+			DenyList:  append([]string(nil), profile.SecurityBehaviorAndLimits.BlacklistIP...),
+		}
+		if profile.SecurityBehaviorAndLimits.UseExceptions {
+			target.AllowList = append([]string(nil), profile.SecurityBehaviorAndLimits.ExceptionsIP...)
 		}
 		if !accessExists {
 			if _, err := s.accessPolicies.Create(target); err != nil {

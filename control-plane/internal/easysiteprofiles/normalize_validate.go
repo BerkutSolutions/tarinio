@@ -3,6 +3,7 @@ package easysiteprofiles
 import (
 	"errors"
 	"fmt"
+	"net"
 	"regexp"
 	"slices"
 	"sort"
@@ -52,6 +53,7 @@ func normalizeProfile(profile EasySiteProfile) EasySiteProfile {
 	if len(profile.SecurityBehaviorAndLimits.BanEscalationStagesSeconds) == 0 {
 		profile.SecurityBehaviorAndLimits.BanEscalationStagesSeconds = []int{300, 86400, 0}
 	}
+	profile.SecurityBehaviorAndLimits.ExceptionsIP = normalizeTrimmedList(profile.SecurityBehaviorAndLimits.ExceptionsIP)
 	profile.SecurityBehaviorAndLimits.BlacklistIP = normalizeTrimmedList(profile.SecurityBehaviorAndLimits.BlacklistIP)
 	profile.SecurityBehaviorAndLimits.BlacklistRDNS = normalizeTrimmedList(profile.SecurityBehaviorAndLimits.BlacklistRDNS)
 	profile.SecurityBehaviorAndLimits.BlacklistASN = normalizeTrimmedList(profile.SecurityBehaviorAndLimits.BlacklistASN)
@@ -192,6 +194,11 @@ func validateProfile(profile EasySiteProfile) error {
 			// A single finite stage is allowed.
 		}
 	}
+	for _, value := range profile.SecurityBehaviorAndLimits.ExceptionsIP {
+		if !isValidIPOrCIDR(value) {
+			return fmt.Errorf("easy site profile security_behavior_and_limits.exceptions_ip contains invalid value %s", value)
+		}
+	}
 	if profile.SecurityBehaviorAndLimits.LimitConnMaxHTTP1 <= 0 ||
 		profile.SecurityBehaviorAndLimits.LimitConnMaxHTTP2 <= 0 ||
 		profile.SecurityBehaviorAndLimits.LimitConnMaxHTTP3 <= 0 {
@@ -297,6 +304,18 @@ func validateProfile(profile EasySiteProfile) error {
 	}
 
 	return nil
+}
+
+func isValidIPOrCIDR(value string) bool {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return false
+	}
+	if ip := net.ParseIP(trimmed); ip != nil {
+		return true
+	}
+	_, _, err := net.ParseCIDR(trimmed)
+	return err == nil
 }
 
 func normalizeID(value string) string {
