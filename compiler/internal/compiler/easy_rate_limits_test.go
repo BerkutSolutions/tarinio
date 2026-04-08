@@ -42,10 +42,10 @@ func TestRenderEasyRateLimitArtifacts_GeneratesRouteSpecificArtifacts(t *testing
 	}
 
 	httpConf := byPath["nginx/conf.d/easy-ratelimits.conf"]
-	if !strings.Contains(httpConf, "limit_req_zone $waf_rate_limit_key_control_plane_access zone=easy_control_plane_access_req_0:10m rate=6r/s;") {
+	if !strings.Contains(httpConf, "limit_req_zone $waf_rate_limit_key_control_plane_access zone=easy_control_plane_access_req_v2_0:10m rate=6r/s;") {
 		t.Fatalf("expected exact login zone in easy rate limit http conf, got: %s", httpConf)
 	}
-	if !strings.Contains(httpConf, "limit_req_zone $waf_rate_limit_key_control_plane_access zone=easy_control_plane_access_req_1:10m rate=12r/s;") {
+	if !strings.Contains(httpConf, "limit_req_zone $waf_rate_limit_key_control_plane_access zone=easy_control_plane_access_req_v2_1:10m rate=12r/s;") {
 		t.Fatalf("expected prefix api auth zone in easy rate limit http conf, got: %s", httpConf)
 	}
 
@@ -56,10 +56,10 @@ func TestRenderEasyRateLimitArtifacts_GeneratesRouteSpecificArtifacts(t *testing
 	if !strings.Contains(locationsConf, "location ^~ /api/auth/ {") {
 		t.Fatalf("expected prefix location for /api/auth/, got: %s", locationsConf)
 	}
-	if !strings.Contains(locationsConf, "limit_req zone=easy_control_plane_access_req_0 burst=6 nodelay;") {
+	if !strings.Contains(locationsConf, "limit_req zone=easy_control_plane_access_req_v2_0 burst=6 nodelay;") {
 		t.Fatalf("expected exact route limit_req directive, got: %s", locationsConf)
 	}
-	if !strings.Contains(locationsConf, "limit_req zone=easy_control_plane_access_req_1 burst=12 nodelay;") {
+	if !strings.Contains(locationsConf, "limit_req zone=easy_control_plane_access_req_v2_1 burst=12 nodelay;") {
 		t.Fatalf("expected prefix route limit_req directive, got: %s", locationsConf)
 	}
 	if !strings.Contains(locationsConf, "proxy_set_header Host $http_host;") {

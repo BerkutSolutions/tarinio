@@ -422,11 +422,38 @@ export async function renderTLS(container, ctx) {
   });
 
   container.querySelector("#certificate-delete").addEventListener("click", async () => {
-    const id = container.querySelector("#certificate-id").value.trim();
-    if (!id) return;
-    await ctx.api.delete(`/api/certificates/${encodeURIComponent(id)}`);
-    ctx.notify(ctx.t("tls.toast.certificateDeleted"));
-    await Promise.all([load(), loadAutoRenewSettings()]);
+    const ids = selectedIDs();
+    const typedID = container.querySelector("#certificate-id").value.trim();
+    const targetIDs = ids.length ? ids : (typedID ? [typedID] : []);
+    if (!targetIDs.length) {
+      return;
+    }
+    try {
+      const tlsConfigs = normalizeList(await ctx.api.get("/api/tls-configs"));
+      for (const certificateID of targetIDs) {
+        const linkedSiteIDs = tlsConfigs
+          .filter((item) => String(item?.certificate_id || "").trim().toLowerCase() === certificateID.toLowerCase())
+          .map((item) => String(item?.site_id || "").trim())
+          .filter(Boolean);
+        for (const siteID of linkedSiteIDs) {
+          await ctx.api.delete(`/api/tls-configs/${encodeURIComponent(siteID)}`).catch((error) => {
+            if (error?.status !== 404) {
+              throw error;
+            }
+          });
+        }
+        await ctx.api.delete(`/api/certificates/${encodeURIComponent(certificateID)}`).catch((error) => {
+          if (error?.status !== 404) {
+            throw error;
+          }
+        });
+        selectedCertificateIDs.delete(certificateID);
+      }
+      ctx.notify(ctx.t("tls.toast.certificateDeleted"));
+      await Promise.all([load(), loadAutoRenewSettings()]);
+    } catch (error) {
+      ctx.notify(String(error?.message || error || ctx.t("common.error")), "error");
+    }
   });
 
   container.querySelector("#certificate-refresh").addEventListener("click", load);

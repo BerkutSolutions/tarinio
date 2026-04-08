@@ -168,7 +168,9 @@ func customLimitBurst(rate string) int {
 }
 
 func easyCustomReqZoneName(siteID string, index int) string {
-	return fmt.Sprintf("easy_%s_req_%d", slugSiteID(siteID), index)
+	// Keep zone names versioned to avoid nginx reload failures when zone key changes
+	// between releases (shared-memory zones are immutable across reloads).
+	return fmt.Sprintf("easy_%s_req_v2_%d", slugSiteID(siteID), index)
 }
 
 func isReservedBaseLocationPath(path string) bool {

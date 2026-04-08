@@ -2141,6 +2141,16 @@ async function upsertSiteResources(draft, ctx, existingSite, existingUpstream, e
     const message = String(error?.message || "").toLowerCase();
     return message.includes("default upstream is required");
   };
+  const shouldKeepStateOnApplyError = (error) => {
+    const message = String(error?.message || "").toLowerCase();
+    // Auto-apply failures may return after resources were persisted in control-plane state.
+    // Do not rollback saved entities in this case, otherwise TLS bindings can be silently removed.
+    return message.includes("apply failed") ||
+      message.includes("reload failed") ||
+      message.includes("health-check failed") ||
+      message.includes("default upstream is required") ||
+      message.includes("limit_req");
+  };
   const isNotFound = (error) => error?.status === 404;
   const deleteIgnoreNotFound = async (path) => {
     try {
@@ -2258,7 +2268,9 @@ async function upsertSiteResources(draft, ctx, existingSite, existingUpstream, e
       }
     }
   } catch (error) {
-    await runCleanup();
+    if (!shouldKeepStateOnApplyError(error)) {
+      await runCleanup();
+    }
     throw error;
   }
 
@@ -2843,23 +2855,42 @@ export async function renderSites(container, ctx) {
     };
 
     const back = () => go(routeBase());
+    const idInput = container.querySelector("#service-id");
+    const hostInput = container.querySelector("#service-host");
+    const certificateInput = container.querySelector("#service-certificate-id");
+    const upstreamInput = container.querySelector("#service-upstream-id");
+    const normalizeAutoSiteID = (value) => String(value || "").trim().toLowerCase().replace(/[^a-z0-9.-]+/g, "-").replace(/^-+|-+$/g, "");
+    const syncDerivedFieldsFromID = () => {
+      const id = String(idInput?.value || "").trim().toLowerCase();
+      if (upstreamInput) {
+        upstreamInput.value = computeUpstreamID(id);
+      }
+      if (certificateInput && (!certificateInput.dataset.dirty || !certificateInput.value.trim())) {
+        certificateInput.value = id ? `${id}-tls` : "";
+      }
+    };
+    if (state.route.mode !== "create") {
+      if (idInput?.value?.trim()) {
+        idInput.dataset.dirty = "true";
+      }
+      if (certificateInput?.value?.trim()) {
+        certificateInput.dataset.dirty = "true";
+      }
+    }
     container.querySelector("#service-back")?.addEventListener("click", back);
     container.querySelector("#service-back-bottom")?.addEventListener("click", back);
     container.querySelector("#service-host")?.addEventListener("input", (event) => {
       const host = event.target.value.trim().toLowerCase();
-      const idInput = container.querySelector("#service-id");
-      if (!idInput.value.trim()) {
-        idInput.value = host.replace(/[^a-z0-9.-]+/g, "-").replace(/^-+|-+$/g, "");
+      if (idInput && !idInput.dataset.dirty) {
+        idInput.value = normalizeAutoSiteID(host);
+        syncDerivedFieldsFromID();
       }
     });
     container.querySelector("#service-id")?.addEventListener("input", (event) => {
       const id = event.target.value.trim().toLowerCase();
-      const upstreamInput = container.querySelector("#service-upstream-id");
-      const certificateInput = container.querySelector("#service-certificate-id");
-      upstreamInput.value = computeUpstreamID(id);
-      if (!certificateInput.dataset.dirty || !certificateInput.value.trim()) {
-        certificateInput.value = id ? `${id}-tls` : "";
-      }
+      const autoID = normalizeAutoSiteID(hostInput?.value || "");
+      event.target.dataset.dirty = id && id !== autoID ? "true" : "";
+      syncDerivedFieldsFromID();
     });
     container.querySelector("#service-certificate-id")?.addEventListener("input", (event) => {
       event.target.dataset.dirty = event.target.value.trim() ? "true" : "";
@@ -3244,9 +3275,6 @@ export async function renderSites(container, ctx) {
       }
       try {
         const upstreamsForSite = state.upstreams.filter((item) => String(item?.site_id || "") === siteID);
-        const linkedTLS = state.tlsBySite.get(siteID) || null;
-        const linkedCertificateID = String(linkedTLS?.certificate_id || "").trim();
-
         // Remove dependents first so a re-create does not fail on stale leftovers.
         for (const upstream of upstreamsForSite) {
           await ctx.api.delete(`/api/upstreams/${encodeURIComponent(String(upstream.id || ""))}`).catch((error) => {
@@ -3265,21 +3293,51 @@ export async function renderSites(container, ctx) {
             throw error;
           }
         });
+        await ctx.api.delete(`/api/easy-site-profiles/${encodeURIComponent(siteID)}`).catch((error) => {
+          if (error?.status !== 404) {
+            throw error;
+          }
+        });
+        const [wafPolicies, ratePolicies, accessPolicies] = await Promise.all([
+          ctx.api.get("/api/waf-policies").catch(() => []),
+          ctx.api.get("/api/rate-limit-policies").catch(() => []),
+          ctx.api.get("/api/access-policies").catch(() => [])
+        ]);
+        for (const policy of normalizeArray(wafPolicies).filter((item) => normalizeSiteID(item?.site_id) === normalizeSiteID(siteID))) {
+          const policyID = String(policy?.id || "").trim();
+          if (!policyID) {
+            continue;
+          }
+          await ctx.api.delete(`/api/waf-policies/${encodeURIComponent(policyID)}`).catch((error) => {
+            if (error?.status !== 404) {
+              throw error;
+            }
+          });
+        }
+        for (const policy of normalizeArray(ratePolicies).filter((item) => normalizeSiteID(item?.site_id) === normalizeSiteID(siteID))) {
+          const policyID = String(policy?.id || "").trim();
+          if (!policyID) {
+            continue;
+          }
+          await ctx.api.delete(`/api/rate-limit-policies/${encodeURIComponent(policyID)}`).catch((error) => {
+            if (error?.status !== 404) {
+              throw error;
+            }
+          });
+        }
+        for (const policy of normalizeArray(accessPolicies).filter((item) => normalizeSiteID(item?.site_id) === normalizeSiteID(siteID))) {
+          const policyID = String(policy?.id || "").trim();
+          if (!policyID) {
+            continue;
+          }
+          await ctx.api.delete(`/api/access-policies/${encodeURIComponent(policyID)}`).catch((error) => {
+            if (error?.status !== 404) {
+              throw error;
+            }
+          });
+        }
 
         await ctx.api.delete(`/api/sites/${encodeURIComponent(siteID)}`);
-
-        // If certificate became orphaned, remove it too.
-        if (linkedCertificateID) {
-          const tlsConfigs = await ctx.api.get("/api/tls-configs").catch(() => []);
-          const stillUsed = Array.isArray(tlsConfigs) && tlsConfigs.some((item) => String(item?.certificate_id || "") === linkedCertificateID);
-          if (!stillUsed) {
-            await ctx.api.delete(`/api/certificates/${encodeURIComponent(linkedCertificateID)}`).catch((error) => {
-              if (error?.status !== 404) {
-                throw error;
-              }
-            });
-          }
-        }
 
         ctx.notify(ctx.t("toast.siteDeleted"));
         back();
