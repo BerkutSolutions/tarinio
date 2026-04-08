@@ -4,7 +4,17 @@ import { applyTranslations, getLanguage, t } from "./i18n.js";
 
 const MIN_STEP_MS = 150;
 const CHECKS_CONCURRENCY = 4;
-const CONTRACT_VERSION = "2026-04-06-healthcheck-v1";
+const PROBE_TIMEOUT_MS = 8000;
+const PROBE_SLOW_MS = 2500;
+const CONTRACT_VERSION = "2026-04-08-healthcheck-v2";
+
+function todayDateKeyLocal() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
 const TAB_PROBES = [
   { id: "tab.dashboard", titleKey: "healthcheck.tab.dashboard", path: "/api/dashboard/stats" },
@@ -12,7 +22,7 @@ const TAB_PROBES = [
   { id: "tab.antiddos", titleKey: "healthcheck.tab.antiddos", path: "/api/anti-ddos/settings" },
   { id: "tab.owaspcrs", titleKey: "healthcheck.tab.owaspcrs", path: "/api/owasp-crs/status" },
   { id: "tab.tls", titleKey: "healthcheck.tab.tls", path: "/api/certificates" },
-  { id: "tab.requests", titleKey: "healthcheck.tab.requests", path: "/api/requests" },
+  { id: "tab.requests", titleKey: "healthcheck.tab.requests", path: () => `/api/requests?limit=1&day=${encodeURIComponent(todayDateKeyLocal())}` },
   { id: "tab.events", titleKey: "healthcheck.tab.events", path: "/api/events" },
   { id: "tab.bans", titleKey: "healthcheck.tab.bans", path: "/api/sites" },
   { id: "tab.administration", titleKey: "healthcheck.tab.administration", path: "/api/audit?limit=1" },
@@ -97,6 +107,9 @@ function updateRow(row, subtitle, status) {
 }
 
 function normalizeProbeError(error) {
+  if (error?.name === "AbortError") {
+    return { status: "failed", desc: t("healthcheck.probe.timeout").replace("{ms}", String(PROBE_TIMEOUT_MS)) };
+  }
   const status = Number(error?.status || 0);
   if (status === 403) {
     return { status: "skipped", desc: t("healthcheck.probe.forbidden") };
@@ -111,11 +124,26 @@ function normalizeProbeError(error) {
 }
 
 async function probe(path) {
+  const targetPath = typeof path === "function" ? path() : path;
+  const controller = new AbortController();
+  const timeoutID = window.setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+  const startedAt = Date.now();
   try {
-    await api.get(path);
+    await api.get(targetPath, { signal: controller.signal });
+    const elapsed = Date.now() - startedAt;
+    if (elapsed >= PROBE_SLOW_MS) {
+      return {
+        status: "needs_attention",
+        desc: t("healthcheck.probe.slow")
+          .replace("{ms}", String(elapsed))
+          .replace("{threshold}", String(PROBE_SLOW_MS)),
+      };
+    }
     return { status: "done", desc: t("healthcheck.probe.ok") };
   } catch (error) {
     return normalizeProbeError(error);
+  } finally {
+    window.clearTimeout(timeoutID);
   }
 }
 
@@ -158,12 +186,14 @@ function updateChecksHeader() {
   let done = 0;
   let hasFailed = false;
   let hasRunning = false;
+  let hasAttention = false;
   state.checks.forEach((value) => {
     const status = String(value.status || "");
-    if (status === "done" || status === "failed" || status === "skipped") {
+    if (status === "done" || status === "failed" || status === "skipped" || status === "needs_attention") {
       done++;
     }
     if (status === "failed") hasFailed = true;
+    if (status === "needs_attention") hasAttention = true;
     if (status === "running" || status === "pending") hasRunning = true;
   });
   setToggleCount("hc-checks-count", done, total);
@@ -171,6 +201,8 @@ function updateChecksHeader() {
     setToggleStatus("hc-checks", "running");
   } else if (hasFailed) {
     setToggleStatus("hc-checks", "failed");
+  } else if (hasAttention) {
+    setToggleStatus("hc-checks", "skipped");
   } else {
     setToggleStatus("hc-checks", "done");
   }
@@ -226,7 +258,8 @@ function renderCompat(items) {
     const moduleID = String(item?.module_id || "-");
     const row = addRow(list, moduleID, title, subtitle, status);
 
-    if (status === "needs_attention" || status === "needs_reinit" || status === "broken") {
+    const supportsFix = item?.supports_fix !== false;
+    if (supportsFix && (status === "needs_attention" || status === "needs_reinit" || status === "broken")) {
       const body = row.querySelector(".hc-item-body");
       if (!body) return;
       const actions = document.createElement("div");
@@ -340,7 +373,7 @@ async function runChecks() {
     if (elapsed < MIN_STEP_MS) {
       await sleep(MIN_STEP_MS - elapsed);
     }
-    state.checks.set(spec.id, { status: result.status });
+    state.checks.set(spec.id, { status: result.status, desc: result.desc });
     updateRow(row, result.desc, result.status);
     updateChecksHeader();
     if (spec.id === "session" && result.status !== "done") {
@@ -370,11 +403,42 @@ async function runChecks() {
   await Promise.all(workers);
 }
 
+function buildProbeCompatIssues() {
+  const issues = [];
+  TAB_PROBES.forEach((probeSpec) => {
+    const result = state.checks.get(probeSpec.id);
+    const status = String(result?.status || "");
+    const desc = String(result?.desc || "").trim();
+    if (status !== "failed" && status !== "needs_attention") {
+      return;
+    }
+    const title = t(probeSpec.titleKey);
+    issues.push(`${title}: ${desc || status}`);
+  });
+  return issues;
+}
+
 async function loadCompat() {
   setToggleStatus("hc-compat", "running");
   try {
     const report = await api.get("/api/app/compat");
-    renderCompat(report?.items || []);
+    const items = Array.isArray(report?.items) ? report.items.slice() : [];
+    const issues = buildProbeCompatIssues();
+    if (issues.length > 0) {
+      const hasHardFailures = issues.some((line) => /401|404|502|503|504|timeout|unauthorized|not found|ошиб|недостаточно прав/i.test(line));
+      items.push({
+        module_id: "runtime-probes",
+        title_i18n_key: "healthcheck.compat.runtimeProbes",
+        status: hasHardFailures ? "broken" : "needs_attention",
+        expected_schema_version: 1,
+        applied_schema_version: 1,
+        expected_behavior_version: 1,
+        applied_behavior_version: 1,
+        last_error: issues.join(" | "),
+        supports_fix: false,
+      });
+    }
+    renderCompat(items);
   } catch (error) {
     setError(String(error?.message || t("healthcheck.error.compat")));
     setToggleStatus("hc-compat", "failed");

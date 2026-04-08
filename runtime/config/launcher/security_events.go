@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -61,6 +62,8 @@ type requestStreamSource struct {
 	lastIngestError     string
 	lastProcessedOffset int64
 }
+
+const requestIngestBatchLines = 4000
 
 func newRequestStreamSource(path string, maxItems int, archiveRoot string, defaultRetention int) *requestStreamSource {
 	if maxItems <= 0 {
@@ -194,16 +197,35 @@ func (s *requestStreamSource) ingestLatestLocked(retentionDays int) error {
 		return err
 	}
 
-	scanner := bufio.NewScanner(file)
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	reader := bufio.NewReaderSize(file, 64*1024)
 	rowsByDay := map[string][][]byte{}
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
+	nextOffset := s.lastProcessedOffset
+	processed := 0
+	for processed < requestIngestBatchLines {
+		chunk, readErr := reader.ReadBytes('\n')
+		if len(chunk) == 0 && errors.Is(readErr, io.EOF) {
+			break
+		}
+		if readErr != nil && !errors.Is(readErr, io.EOF) {
+			return readErr
+		}
+		if len(chunk) == 0 {
+			break
+		}
+		nextOffset += int64(len(chunk))
+		processed++
+		line := strings.TrimSpace(string(chunk))
 		if line == "" {
+			if errors.Is(readErr, io.EOF) {
+				break
+			}
 			continue
 		}
 		item, ok := parseAccessLine(line)
 		if !ok {
+			if errors.Is(readErr, io.EOF) {
+				break
+			}
 			continue
 		}
 		row := map[string]any{
@@ -230,13 +252,11 @@ func (s *requestStreamSource) ingestLatestLocked(retentionDays int) error {
 		}
 		day := item.when.UTC().Format("2006-01-02")
 		rowsByDay[day] = append(rowsByDay[day], append(content, '\n'))
+		if errors.Is(readErr, io.EOF) {
+			break
+		}
 	}
-	if err := scanner.Err(); err != nil {
-		return err
-	}
-	if offset, err := file.Seek(0, 1); err == nil {
-		s.lastProcessedOffset = offset
-	}
+	s.lastProcessedOffset = nextOffset
 
 	for day, batch := range rowsByDay {
 		path := filepath.Join(s.archiveRoot, day+".jsonl")

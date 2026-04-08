@@ -124,6 +124,9 @@ func runtimeIndexesFromQuery(values url.Values) map[string]any {
 	if runtimeRequestIndexes == nil {
 		return nil
 	}
+	if strings.TrimSpace(values.Get("storage_indexes_limit")) == "" && strings.TrimSpace(values.Get("storage_indexes_offset")) == "" {
+		return nil
+	}
 	limit := 10
 	offset := 0
 	if raw := strings.TrimSpace(values.Get("storage_indexes_limit")); raw != "" {

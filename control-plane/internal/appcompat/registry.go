@@ -25,7 +25,7 @@ type ModuleSpec struct {
 
 // ContractVersion is used by tests and installer checks to force explicit updates
 // when compatibility logic changes.
-const ContractVersion = "2026-04-06-healthcheck-v1"
+const ContractVersion = "2026-04-08-healthcheck-v2"
 
 func DefaultRegistry() []ModuleSpec {
 	return []ModuleSpec{

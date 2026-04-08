@@ -170,11 +170,6 @@ export async function checkEntryAccess(mode) {
       clearOnboardingRedirecting();
       return { setup, user, allowed: true };
     }
-    user = await getCurrentUserQuiet();
-    if (user) {
-      replace(secureAppUrl("/healthcheck"));
-      return { setup, user, allowed: false };
-    }
     return { setup, user, allowed: true };
   }
 
@@ -190,11 +185,6 @@ export async function checkEntryAccess(mode) {
     if (onboardingRedirecting) {
       clearOnboardingRedirecting();
       return { setup, user, allowed: true };
-    }
-    user = await getCurrentUserQuiet();
-    if (user) {
-      replace(secureAppUrl("/healthcheck"));
-      return { setup, user, allowed: false };
     }
     return { setup, user, allowed: true };
   }

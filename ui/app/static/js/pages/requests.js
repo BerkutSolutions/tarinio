@@ -323,7 +323,7 @@ export async function renderRequests(container, ctx) {
           <button class="btn ghost btn-sm" id="requests-refresh" type="button">${escapeHtml(ctx.t("common.refresh"))}</button>
         </div>
         <div class="waf-card-body waf-stack">
-          <div class="waf-form-grid three">
+          <div class="waf-form-grid requests-filter-row requests-filter-row-main">
             <div class="waf-field">
               <label for="requests-filter-service">${escapeHtml(ctx.t("requests.filter.service"))}</label>
               <select id="requests-filter-service">
@@ -345,8 +345,6 @@ export async function renderRequests(container, ctx) {
                 ${state.statusOptions.map((item) => `<option value="${escapeHtml(item)}"${state.selectedStatus === item ? " selected" : ""}>${escapeHtml(item)}</option>`).join("")}
               </select>
             </div>
-          </div>
-          <div class="waf-form-grid three">
             <div class="waf-field">
               <label for="requests-filter-time">${escapeHtml(ctx.t("requests.filter.time"))}</label>
               <select id="requests-filter-time">
@@ -358,6 +356,8 @@ export async function renderRequests(container, ctx) {
                 <option value="datetime"${timePreset === "datetime" ? " selected" : ""}>${escapeHtml(ctx.t("requests.time.datetime"))}</option>
               </select>
             </div>
+          </div>
+          <div class="waf-form-grid requests-filter-row requests-filter-row-secondary">
             <div class="waf-field${timePreset === "date" ? "" : " waf-hidden"}">
               <label for="requests-filter-date">${escapeHtml(ctx.t("requests.filter.date"))}</label>
               <input id="requests-filter-date" type="date" value="${escapeHtml(state.selectedDate)}">

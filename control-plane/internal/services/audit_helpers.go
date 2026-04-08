@@ -8,7 +8,7 @@ import (
 )
 
 func recordAudit(ctx context.Context, service *AuditService, event audits.AuditEvent) {
-	if service == nil {
+	if service == nil || isAuditDisabled(ctx) {
 		return
 	}
 	actorUserID, actorIP := auditActorFromContext(ctx)

@@ -182,6 +182,15 @@ func (s *RevisionCompileService) Create(ctx context.Context) (result CompileRequ
 	}, nil
 }
 
+// Preview builds a snapshot without persisting revisions/jobs/snapshot files.
+func (s *RevisionCompileService) Preview() (revisionsnapshots.Snapshot, error) {
+	snapshot, _, err := s.buildSnapshot()
+	if err != nil {
+		return revisionsnapshots.Snapshot{}, err
+	}
+	return snapshot, nil
+}
+
 func (s *RevisionCompileService) buildSnapshot() (revisionsnapshots.Snapshot, []revisionsnapshots.MaterialContent, error) {
 	siteItems, err := s.sites.List()
 	if err != nil {

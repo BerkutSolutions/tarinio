@@ -6,9 +6,13 @@ import (
 	"strings"
 	"time"
 
+	"waf/control-plane/internal/certificates"
 	"waf/control-plane/internal/easysiteprofiles"
+	"waf/control-plane/internal/revisionsnapshots"
 	"waf/control-plane/internal/services"
 	"waf/control-plane/internal/sites"
+	"waf/control-plane/internal/tlsconfigs"
+	"waf/control-plane/internal/upstreams"
 )
 
 func (a *App) RunStartupSelfTest(ctx context.Context) error {
@@ -18,15 +22,31 @@ func (a *App) RunStartupSelfTest(ctx context.Context) error {
 	if !a.Config.StartupSelfTest {
 		return nil
 	}
-	if a.SiteService == nil || a.EasySiteProfileService == nil || a.EasySiteProfileStore == nil || a.SiteStore == nil || a.AccessPolicyStore == nil {
+	if a.SiteService == nil ||
+		a.UpstreamService == nil ||
+		a.TLSConfigService == nil ||
+		a.EasySiteProfileService == nil ||
+		a.EasySiteProfileStore == nil ||
+		a.SiteStore == nil ||
+		a.UpstreamStore == nil ||
+		a.CertificateStore == nil ||
+		a.TLSConfigStore == nil ||
+		a.WAFPolicyStore == nil ||
+		a.AccessPolicyStore == nil ||
+		a.RateLimitPolicyStore == nil ||
+		a.RevisionCompileService == nil {
 		return fmt.Errorf("startup self-test: dependencies are not wired")
 	}
 
-	testCtx := services.WithAutoApplyDisabled(ctx)
+	testCtx := services.WithAutoApplyDisabled(services.WithAuditDisabled(ctx))
 	if err := a.cleanupStartupSelfTestArtifacts(); err != nil {
 		return fmt.Errorf("startup self-test: cleanup stale artifacts failed: %w", err)
 	}
+
 	siteID := fmt.Sprintf("startup-self-test-%d", time.Now().UTC().UnixNano())
+	upstreamID := siteID + "-upstream"
+	certInitialID := siteID + "-cert-initial"
+	certUpdatedID := siteID + "-cert-updated"
 	site := sites.Site{
 		ID:          siteID,
 		PrimaryHost: fmt.Sprintf("%s.example.test", siteID),
@@ -42,10 +62,74 @@ func (a *App) RunStartupSelfTest(ctx context.Context) error {
 	defer func() {
 		if cleanupSite != "" {
 			_ = a.EasySiteProfileStore.Delete(cleanupSite)
-			_ = a.AccessPolicyStore.Delete(cleanupSite + "-access")
+			_ = a.deletePoliciesBySiteID(cleanupSite)
+			_ = a.deleteTLSConfigIfExists(testCtx, cleanupSite)
+			_ = a.deleteUpstreamsBySiteID(testCtx, cleanupSite)
 			_ = a.SiteService.Delete(testCtx, cleanupSite)
 		}
+		_ = a.CertificateStore.Delete(certInitialID)
+		_ = a.CertificateStore.Delete(certUpdatedID)
 	}()
+
+	createdUpstream, err := a.UpstreamService.Create(testCtx, upstreams.Upstream{
+		ID:     upstreamID,
+		SiteID: siteID,
+		Host:   "upstream-a.internal",
+		Port:   8080,
+		Scheme: "http",
+	})
+	if err != nil {
+		return fmt.Errorf("startup self-test: create upstream failed: %w", err)
+	}
+	createdUpstream.Host = "upstream-b.internal"
+	createdUpstream.Port = 8443
+	createdUpstream.Scheme = "https"
+	updatedUpstream, err := a.UpstreamService.Update(testCtx, createdUpstream)
+	if err != nil {
+		return fmt.Errorf("startup self-test: update upstream failed: %w", err)
+	}
+	if updatedUpstream.Scheme != "https" || updatedUpstream.Host != "upstream-b.internal" || updatedUpstream.Port != 8443 {
+		return fmt.Errorf("startup self-test: upstream values mismatch after update")
+	}
+
+	now := time.Now().UTC()
+	if _, err := a.CertificateStore.Create(certificates.Certificate{
+		ID:         certInitialID,
+		CommonName: createdSite.PrimaryHost,
+		SANList:    []string{createdSite.PrimaryHost},
+		Status:     "active",
+		NotBefore:  now.Add(-time.Hour).Format(time.RFC3339),
+		NotAfter:   now.Add(24 * time.Hour).Format(time.RFC3339),
+	}); err != nil {
+		return fmt.Errorf("startup self-test: create initial certificate failed: %w", err)
+	}
+	if _, err := a.CertificateStore.Create(certificates.Certificate{
+		ID:         certUpdatedID,
+		CommonName: "updated-" + createdSite.PrimaryHost,
+		SANList:    []string{"updated-" + createdSite.PrimaryHost},
+		Status:     "active",
+		NotBefore:  now.Add(-time.Hour).Format(time.RFC3339),
+		NotAfter:   now.Add(48 * time.Hour).Format(time.RFC3339),
+	}); err != nil {
+		return fmt.Errorf("startup self-test: create updated certificate failed: %w", err)
+	}
+
+	if _, err := a.TLSConfigService.Create(testCtx, tlsconfigs.TLSConfig{
+		SiteID:        siteID,
+		CertificateID: certInitialID,
+	}); err != nil {
+		return fmt.Errorf("startup self-test: create tls config failed: %w", err)
+	}
+	updatedTLS, err := a.TLSConfigService.Update(testCtx, tlsconfigs.TLSConfig{
+		SiteID:        siteID,
+		CertificateID: certUpdatedID,
+	})
+	if err != nil {
+		return fmt.Errorf("startup self-test: update tls config failed: %w", err)
+	}
+	if updatedTLS.CertificateID != certUpdatedID {
+		return fmt.Errorf("startup self-test: tls certificate mismatch after update")
+	}
 
 	createdSite.PrimaryHost = fmt.Sprintf("updated-%s.example.test", siteID)
 	updatedSite, err := a.SiteService.Update(testCtx, createdSite)
@@ -88,39 +172,325 @@ func (a *App) RunStartupSelfTest(ctx context.Context) error {
 		return fmt.Errorf("startup self-test: update profile assertion failed: %w", err)
 	}
 
+	snapshotAfterUpdate, err := a.startupSelfTestPreviewSnapshot()
+	if err != nil {
+		return fmt.Errorf("startup self-test: preview snapshot after update failed: %w", err)
+	}
+	if err := assertStartupSnapshotContainsServiceArtifacts(snapshotAfterUpdate, siteID, upstreamID, certUpdatedID); err != nil {
+		return fmt.Errorf("startup self-test: snapshot after update assertion failed: %w", err)
+	}
+
+	if err := a.EasySiteProfileStore.Delete(siteID); err != nil && !isNotFoundError(err) {
+		return fmt.Errorf("startup self-test: delete easy profile failed: %w", err)
+	}
+	if err := a.deletePoliciesBySiteID(siteID); err != nil {
+		return fmt.Errorf("startup self-test: delete policies failed: %w", err)
+	}
+	if err := a.deleteTLSConfigIfExists(testCtx, siteID); err != nil {
+		return fmt.Errorf("startup self-test: delete tls config failed: %w", err)
+	}
+	if err := a.deleteUpstreamsBySiteID(testCtx, siteID); err != nil {
+		return fmt.Errorf("startup self-test: delete upstreams failed: %w", err)
+	}
+	if err := a.SiteService.Delete(testCtx, siteID); err != nil {
+		return fmt.Errorf("startup self-test: delete site failed: %w", err)
+	}
+	if err := a.CertificateStore.Delete(certInitialID); err != nil && !isNotFoundError(err) {
+		return fmt.Errorf("startup self-test: delete initial certificate failed: %w", err)
+	}
+	if err := a.CertificateStore.Delete(certUpdatedID); err != nil && !isNotFoundError(err) {
+		return fmt.Errorf("startup self-test: delete updated certificate failed: %w", err)
+	}
+	cleanupSite = ""
+
+	snapshotAfterDelete, err := a.startupSelfTestPreviewSnapshot()
+	if err != nil {
+		return fmt.Errorf("startup self-test: preview snapshot after delete failed: %w", err)
+	}
+	if err := assertStartupSnapshotCleaned(snapshotAfterDelete, siteID); err != nil {
+		return fmt.Errorf("startup self-test: snapshot cleanup assertion failed: %w", err)
+	}
+	if err := a.assertNoStartupSelfTestArtifacts(); err != nil {
+		return fmt.Errorf("startup self-test: residual artifacts detected: %w", err)
+	}
+
+	return nil
+}
+
+func (a *App) startupSelfTestPreviewSnapshot() (revisionsnapshots.Snapshot, error) {
+	snapshot, err := a.RevisionCompileService.Preview()
+	if err != nil {
+		return revisionsnapshots.Snapshot{}, err
+	}
+	return snapshot, nil
+}
+
+func (a *App) deletePoliciesBySiteID(siteID string) error {
+	wafPolicies, err := a.WAFPolicyStore.List()
+	if err != nil {
+		return err
+	}
+	for _, policy := range wafPolicies {
+		if policy.SiteID != siteID {
+			continue
+		}
+		if err := a.WAFPolicyStore.Delete(policy.ID); err != nil && !isNotFoundError(err) {
+			return err
+		}
+	}
+
+	accessPolicies, err := a.AccessPolicyStore.List()
+	if err != nil {
+		return err
+	}
+	for _, policy := range accessPolicies {
+		if policy.SiteID != siteID {
+			continue
+		}
+		if err := a.AccessPolicyStore.Delete(policy.ID); err != nil && !isNotFoundError(err) {
+			return err
+		}
+	}
+
+	ratePolicies, err := a.RateLimitPolicyStore.List()
+	if err != nil {
+		return err
+	}
+	for _, policy := range ratePolicies {
+		if policy.SiteID != siteID {
+			continue
+		}
+		if err := a.RateLimitPolicyStore.Delete(policy.ID); err != nil && !isNotFoundError(err) {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (a *App) deleteUpstreamsBySiteID(ctx context.Context, siteID string) error {
+	items, err := a.UpstreamStore.List()
+	if err != nil {
+		return err
+	}
+	for _, item := range items {
+		if item.SiteID != siteID {
+			continue
+		}
+		if err := a.UpstreamService.Delete(ctx, item.ID); err != nil && !isNotFoundError(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func (a *App) deleteTLSConfigIfExists(ctx context.Context, siteID string) error {
+	if err := a.TLSConfigService.Delete(ctx, siteID); err != nil && !isNotFoundError(err) {
+		return err
+	}
 	return nil
 }
 
 func (a *App) cleanupStartupSelfTestArtifacts() error {
+	const prefix = "startup-self-test-"
+
+	easyProfiles, err := a.EasySiteProfileStore.List()
+	if err != nil {
+		return err
+	}
+	for _, item := range easyProfiles {
+		if !strings.HasPrefix(strings.TrimSpace(item.SiteID), prefix) {
+			continue
+		}
+		if err := a.EasySiteProfileStore.Delete(item.SiteID); err != nil && !isNotFoundError(err) {
+			return err
+		}
+	}
+
+	tlsItems, err := a.TLSConfigStore.List()
+	if err != nil {
+		return err
+	}
+	for _, item := range tlsItems {
+		if !strings.HasPrefix(strings.TrimSpace(item.SiteID), prefix) {
+			continue
+		}
+		if err := a.TLSConfigStore.Delete(item.SiteID); err != nil && !isNotFoundError(err) {
+			return err
+		}
+	}
+
+	upstreamItems, err := a.UpstreamStore.List()
+	if err != nil {
+		return err
+	}
+	for _, item := range upstreamItems {
+		if !strings.HasPrefix(strings.TrimSpace(item.SiteID), prefix) {
+			continue
+		}
+		if err := a.UpstreamStore.Delete(item.ID); err != nil && !isNotFoundError(err) {
+			return err
+		}
+	}
+
+	if err := a.deletePoliciesBySitePrefix(prefix); err != nil {
+		return err
+	}
+
 	siteItems, err := a.SiteStore.List()
 	if err != nil {
 		return err
 	}
-	activeSites := make(map[string]struct{}, len(siteItems))
 	for _, item := range siteItems {
 		id := strings.TrimSpace(item.ID)
-		if id == "" {
+		if !strings.HasPrefix(id, prefix) {
 			continue
 		}
-		activeSites[id] = struct{}{}
-	}
-
-	accessItems, err := a.AccessPolicyStore.List()
-	if err != nil {
-		return err
-	}
-	for _, item := range accessItems {
-		siteID := strings.TrimSpace(item.SiteID)
-		if !strings.HasPrefix(siteID, "startup-self-test-") {
-			continue
-		}
-		if _, ok := activeSites[siteID]; ok {
-			continue
-		}
-		if err := a.AccessPolicyStore.Delete(item.ID); err != nil {
+		if err := a.SiteStore.Delete(id); err != nil && !isNotFoundError(err) {
 			return err
 		}
 	}
+
+	certificatesItems, err := a.CertificateStore.List()
+	if err != nil {
+		return err
+	}
+	for _, item := range certificatesItems {
+		if !strings.HasPrefix(strings.TrimSpace(item.ID), prefix) {
+			continue
+		}
+		if err := a.CertificateStore.Delete(item.ID); err != nil && !isNotFoundError(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func (a *App) deletePoliciesBySitePrefix(prefix string) error {
+	wafPolicies, err := a.WAFPolicyStore.List()
+	if err != nil {
+		return err
+	}
+	for _, policy := range wafPolicies {
+		if !strings.HasPrefix(strings.TrimSpace(policy.SiteID), prefix) {
+			continue
+		}
+		if err := a.WAFPolicyStore.Delete(policy.ID); err != nil && !isNotFoundError(err) {
+			return err
+		}
+	}
+
+	accessPolicies, err := a.AccessPolicyStore.List()
+	if err != nil {
+		return err
+	}
+	for _, policy := range accessPolicies {
+		if !strings.HasPrefix(strings.TrimSpace(policy.SiteID), prefix) {
+			continue
+		}
+		if err := a.AccessPolicyStore.Delete(policy.ID); err != nil && !isNotFoundError(err) {
+			return err
+		}
+	}
+
+	ratePolicies, err := a.RateLimitPolicyStore.List()
+	if err != nil {
+		return err
+	}
+	for _, policy := range ratePolicies {
+		if !strings.HasPrefix(strings.TrimSpace(policy.SiteID), prefix) {
+			continue
+		}
+		if err := a.RateLimitPolicyStore.Delete(policy.ID); err != nil && !isNotFoundError(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func (a *App) assertNoStartupSelfTestArtifacts() error {
+	const prefix = "startup-self-test-"
+
+	siteItems, err := a.SiteStore.List()
+	if err != nil {
+		return err
+	}
+	for _, item := range siteItems {
+		if strings.HasPrefix(strings.TrimSpace(item.ID), prefix) {
+			return fmt.Errorf("site %s still exists", item.ID)
+		}
+	}
+
+	upstreamItems, err := a.UpstreamStore.List()
+	if err != nil {
+		return err
+	}
+	for _, item := range upstreamItems {
+		if strings.HasPrefix(strings.TrimSpace(item.SiteID), prefix) {
+			return fmt.Errorf("upstream %s for startup self-test site still exists", item.ID)
+		}
+	}
+
+	tlsItems, err := a.TLSConfigStore.List()
+	if err != nil {
+		return err
+	}
+	for _, item := range tlsItems {
+		if strings.HasPrefix(strings.TrimSpace(item.SiteID), prefix) {
+			return fmt.Errorf("tls config for startup self-test site %s still exists", item.SiteID)
+		}
+	}
+
+	easyItems, err := a.EasySiteProfileStore.List()
+	if err != nil {
+		return err
+	}
+	for _, item := range easyItems {
+		if strings.HasPrefix(strings.TrimSpace(item.SiteID), prefix) {
+			return fmt.Errorf("easy profile for startup self-test site %s still exists", item.SiteID)
+		}
+	}
+
+	wafPolicies, err := a.WAFPolicyStore.List()
+	if err != nil {
+		return err
+	}
+	for _, item := range wafPolicies {
+		if strings.HasPrefix(strings.TrimSpace(item.SiteID), prefix) {
+			return fmt.Errorf("waf policy %s for startup self-test site still exists", item.ID)
+		}
+	}
+
+	accessPolicies, err := a.AccessPolicyStore.List()
+	if err != nil {
+		return err
+	}
+	for _, item := range accessPolicies {
+		if strings.HasPrefix(strings.TrimSpace(item.SiteID), prefix) {
+			return fmt.Errorf("access policy %s for startup self-test site still exists", item.ID)
+		}
+	}
+
+	ratePolicies, err := a.RateLimitPolicyStore.List()
+	if err != nil {
+		return err
+	}
+	for _, item := range ratePolicies {
+		if strings.HasPrefix(strings.TrimSpace(item.SiteID), prefix) {
+			return fmt.Errorf("rate limit policy %s for startup self-test site still exists", item.ID)
+		}
+	}
+
+	certificateItems, err := a.CertificateStore.List()
+	if err != nil {
+		return err
+	}
+	for _, item := range certificateItems {
+		if strings.HasPrefix(strings.TrimSpace(item.ID), prefix) {
+			return fmt.Errorf("certificate %s from startup self-test still exists", item.ID)
+		}
+	}
+
 	return nil
 }
 
@@ -211,6 +581,138 @@ func startupSelfTestCreateProfile(siteID, host string) easysiteprofiles.EasySite
 	profile.SecurityModSecurity.CustomConfiguration.Content = `SecAction "id:110001,phase:1,pass"`
 
 	return profile
+}
+
+func assertStartupSnapshotContainsServiceArtifacts(snapshot revisionsnapshots.Snapshot, siteID, upstreamID, certificateID string) error {
+	if !snapshotHasSite(snapshot, siteID) {
+		return fmt.Errorf("site %s not found in snapshot", siteID)
+	}
+	if !snapshotHasUpstream(snapshot, upstreamID, siteID) {
+		return fmt.Errorf("upstream %s not found in snapshot", upstreamID)
+	}
+	if !snapshotHasTLSConfig(snapshot, siteID, certificateID) {
+		return fmt.Errorf("tls config for site %s not found in snapshot", siteID)
+	}
+	if !snapshotHasEasyProfile(snapshot, siteID) {
+		return fmt.Errorf("easy profile for site %s not found in snapshot", siteID)
+	}
+	if !snapshotHasWAFPolicy(snapshot, siteID) {
+		return fmt.Errorf("waf policy for site %s not found in snapshot", siteID)
+	}
+	if !snapshotHasAccessPolicy(snapshot, siteID) {
+		return fmt.Errorf("access policy for site %s not found in snapshot", siteID)
+	}
+	if !snapshotHasRateLimitPolicy(snapshot, siteID) {
+		return fmt.Errorf("rate limit policy for site %s not found in snapshot", siteID)
+	}
+	return nil
+}
+
+func assertStartupSnapshotCleaned(snapshot revisionsnapshots.Snapshot, siteID string) error {
+	if snapshotHasSite(snapshot, siteID) {
+		return fmt.Errorf("site %s still present in snapshot", siteID)
+	}
+	for _, item := range snapshot.Upstreams {
+		if item.SiteID == siteID {
+			return fmt.Errorf("upstream %s for site %s still present in snapshot", item.ID, siteID)
+		}
+	}
+	for _, item := range snapshot.TLSConfigs {
+		if item.SiteID == siteID {
+			return fmt.Errorf("tls config for site %s still present in snapshot", siteID)
+		}
+	}
+	for _, item := range snapshot.EasySiteProfiles {
+		if item.SiteID == siteID {
+			return fmt.Errorf("easy profile for site %s still present in snapshot", siteID)
+		}
+	}
+	for _, item := range snapshot.WAFPolicies {
+		if item.SiteID == siteID {
+			return fmt.Errorf("waf policy %s for site %s still present in snapshot", item.ID, siteID)
+		}
+	}
+	for _, item := range snapshot.AccessPolicies {
+		if item.SiteID == siteID {
+			return fmt.Errorf("access policy %s for site %s still present in snapshot", item.ID, siteID)
+		}
+	}
+	for _, item := range snapshot.RateLimitPolicies {
+		if item.SiteID == siteID {
+			return fmt.Errorf("rate limit policy %s for site %s still present in snapshot", item.ID, siteID)
+		}
+	}
+	return nil
+}
+
+func snapshotHasSite(snapshot revisionsnapshots.Snapshot, siteID string) bool {
+	for _, item := range snapshot.Sites {
+		if item.ID == siteID {
+			return true
+		}
+	}
+	return false
+}
+
+func snapshotHasUpstream(snapshot revisionsnapshots.Snapshot, upstreamID, siteID string) bool {
+	for _, item := range snapshot.Upstreams {
+		if item.ID == upstreamID && item.SiteID == siteID {
+			return true
+		}
+	}
+	return false
+}
+
+func snapshotHasTLSConfig(snapshot revisionsnapshots.Snapshot, siteID, certificateID string) bool {
+	for _, item := range snapshot.TLSConfigs {
+		if item.SiteID == siteID && item.CertificateID == certificateID {
+			return true
+		}
+	}
+	return false
+}
+
+func snapshotHasEasyProfile(snapshot revisionsnapshots.Snapshot, siteID string) bool {
+	for _, item := range snapshot.EasySiteProfiles {
+		if item.SiteID == siteID {
+			return true
+		}
+	}
+	return false
+}
+
+func snapshotHasWAFPolicy(snapshot revisionsnapshots.Snapshot, siteID string) bool {
+	for _, item := range snapshot.WAFPolicies {
+		if item.SiteID == siteID {
+			return true
+		}
+	}
+	return false
+}
+
+func snapshotHasAccessPolicy(snapshot revisionsnapshots.Snapshot, siteID string) bool {
+	for _, item := range snapshot.AccessPolicies {
+		if item.SiteID == siteID {
+			return true
+		}
+	}
+	return false
+}
+
+func snapshotHasRateLimitPolicy(snapshot revisionsnapshots.Snapshot, siteID string) bool {
+	for _, item := range snapshot.RateLimitPolicies {
+		if item.SiteID == siteID {
+			return true
+		}
+	}
+	return false
+}
+
+func isNotFoundError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "not found")
 }
 
 func startupSelfTestUpdateProfile(siteID, host string) easysiteprofiles.EasySiteProfile {
