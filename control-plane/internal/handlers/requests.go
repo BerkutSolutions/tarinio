@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 )
 
 type requestCollector interface {
@@ -32,11 +33,18 @@ func (h *RequestsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var (
-		items []map[string]any
-		err   error
+		items              []map[string]any
+		err                error
+		collectorPaginates bool
 	)
 	if advanced, ok := h.collector.(requestCollectorWithOptions); ok {
-		items, err = advanced.CollectWithOptions(r.URL.Query())
+		query := r.URL.Query()
+		if strings.TrimSpace(query.Get("retention_days")) == "" {
+			storage := CurrentStorageRetention()
+			query.Set("retention_days", strconv.Itoa(storage.LogsDays))
+		}
+		items, err = advanced.CollectWithOptions(query)
+		collectorPaginates = true
 	} else {
 		items, err = h.collector.Collect()
 	}
@@ -44,7 +52,9 @@ func (h *RequestsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, []map[string]any{})
 		return
 	}
-	items = applyOffsetLimit(items, r.URL.Query())
+	if !collectorPaginates {
+		items = applyOffsetLimit(items, r.URL.Query())
+	}
 	writeJSON(w, http.StatusOK, items)
 }
 

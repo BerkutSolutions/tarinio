@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"time"
 
 	"waf/control-plane/internal/audits"
 )
@@ -36,6 +37,12 @@ func (h *AuditHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		To:           r.URL.Query().Get("to"),
 		Limit:        parseInt(r.URL.Query().Get("limit"), 100),
 		Offset:       parseInt(r.URL.Query().Get("offset"), 0),
+	}
+	if query.From == "" {
+		storage := CurrentStorageRetention()
+		if storage.ActivityDays > 0 {
+			query.From = time.Now().UTC().AddDate(0, 0, -storage.ActivityDays).Format(time.RFC3339)
+		}
 	}
 	result, err := h.audits.List(query)
 	if err != nil {

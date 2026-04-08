@@ -3,8 +3,12 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
+	"net/url"
 	"os"
+	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -49,34 +53,150 @@ func shouldSkipInternalSite(siteID string) bool {
 }
 
 type requestStreamSource struct {
-	mu       sync.Mutex
-	path     string
-	maxItems int
+	mu                  sync.Mutex
+	path                string
+	maxItems            int
+	archiveRoot         string
+	defaultRetention    int
+	lastIngestError     string
+	lastProcessedOffset int64
 }
 
-func newRequestStreamSource(path string, maxItems int) *requestStreamSource {
+func newRequestStreamSource(path string, maxItems int, archiveRoot string, defaultRetention int) *requestStreamSource {
 	if maxItems <= 0 {
 		maxItems = 500
 	}
-	return &requestStreamSource{path: path, maxItems: maxItems}
+	if defaultRetention <= 0 {
+		defaultRetention = 30
+	}
+	return &requestStreamSource{
+		path:             path,
+		maxItems:         maxItems,
+		archiveRoot:      archiveRoot,
+		defaultRetention: defaultRetention,
+	}
 }
 
-func (s *requestStreamSource) latest() ([]map[string]any, error) {
+type requestQueryOptions struct {
+	Limit         int
+	Offset        int
+	Since         time.Time
+	Day           string
+	RetentionDays int
+}
+
+func parseRequestQueryOptions(values url.Values, maxItems int, defaultRetention int) requestQueryOptions {
+	limit := maxItems
+	if raw := strings.TrimSpace(values.Get("limit")); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+	if limit <= 0 {
+		limit = 500
+	}
+	offset := 0
+	if raw := strings.TrimSpace(values.Get("offset")); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+			offset = parsed
+		}
+	}
+	since := time.Time{}
+	if raw := strings.TrimSpace(values.Get("since")); raw != "" {
+		if parsed, err := time.Parse(time.RFC3339Nano, raw); err == nil {
+			since = parsed.UTC()
+		} else if parsed, err := time.Parse(time.RFC3339, raw); err == nil {
+			since = parsed.UTC()
+		}
+	}
+	day := strings.TrimSpace(values.Get("day"))
+	if day != "" {
+		if _, err := time.Parse("2006-01-02", day); err != nil {
+			day = ""
+		}
+	}
+	retentionDays := defaultRetention
+	if raw := strings.TrimSpace(values.Get("retention_days")); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+			retentionDays = parsed
+		}
+	}
+	if retentionDays <= 0 {
+		retentionDays = defaultRetention
+	}
+	return requestQueryOptions{
+		Limit:         limit,
+		Offset:        offset,
+		Since:         since,
+		Day:           day,
+		RetentionDays: retentionDays,
+	}
+}
+
+func (s *requestStreamSource) latest(query url.Values) ([]map[string]any, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	options := parseRequestQueryOptions(query, s.maxItems, s.defaultRetention)
+
+	if err := s.ensureArchiveRootLocked(); err != nil {
+		return nil, err
+	}
+
+	if err := s.ingestLatestLocked(options.RetentionDays); err != nil {
+		return nil, err
+	}
+	return s.loadArchiveRowsLocked(options)
+}
+
+func (s *requestStreamSource) startBackgroundIngest(interval time.Duration) {
+	if interval <= 0 {
+		interval = 3 * time.Second
+	}
+	ticker := time.NewTicker(interval)
+	go func() {
+		for range ticker.C {
+			s.mu.Lock()
+			if err := s.ensureArchiveRootLocked(); err != nil {
+				s.lastIngestError = err.Error()
+				s.mu.Unlock()
+				continue
+			}
+			if err := s.ingestLatestLocked(s.defaultRetention); err != nil {
+				s.lastIngestError = err.Error()
+			} else {
+				s.lastIngestError = ""
+			}
+			s.mu.Unlock()
+		}
+	}()
+}
+
+func (s *requestStreamSource) ingestLatestLocked(retentionDays int) error {
 	file, err := os.Open(s.path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return []map[string]any{}, nil
+			s.pruneArchiveLocked(retentionDays)
+			return nil
 		}
-		return nil, err
+		return err
 	}
 	defer file.Close()
 
+	stat, err := file.Stat()
+	if err != nil {
+		return err
+	}
+	if s.lastProcessedOffset > stat.Size() {
+		s.lastProcessedOffset = 0
+	}
+	if _, err := file.Seek(s.lastProcessedOffset, 0); err != nil {
+		return err
+	}
+
 	scanner := bufio.NewScanner(file)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-	out := make([]map[string]any, 0, s.maxItems)
+	rowsByDay := map[string][][]byte{}
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" {
@@ -104,15 +224,288 @@ func (s *requestStreamSource) latest() ([]map[string]any, error) {
 				"user_agent":    item.userAgent,
 			},
 		}
-		out = append(out, row)
-		if len(out) > s.maxItems {
-			out = out[len(out)-s.maxItems:]
+		content, marshalErr := json.Marshal(row)
+		if marshalErr != nil {
+			continue
 		}
+		day := item.when.UTC().Format("2006-01-02")
+		rowsByDay[day] = append(rowsByDay[day], append(content, '\n'))
 	}
 	if err := scanner.Err(); err != nil {
+		return err
+	}
+	if offset, err := file.Seek(0, 1); err == nil {
+		s.lastProcessedOffset = offset
+	}
+
+	for day, batch := range rowsByDay {
+		path := filepath.Join(s.archiveRoot, day+".jsonl")
+		handle, openErr := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+		if openErr != nil {
+			continue
+		}
+		for _, row := range batch {
+			_, _ = handle.Write(row)
+		}
+		_ = handle.Close()
+	}
+	s.pruneArchiveLocked(retentionDays)
+	return nil
+}
+
+func (s *requestStreamSource) ensureArchiveRootLocked() error {
+	if err := os.MkdirAll(s.archiveRoot, 0o755); err == nil {
+		return nil
+	}
+	fallback := filepath.Join(os.TempDir(), "waf-requests-archive")
+	if mkErr := os.MkdirAll(fallback, 0o755); mkErr != nil {
+		return mkErr
+	}
+	s.archiveRoot = fallback
+	return nil
+}
+
+func (s *requestStreamSource) pruneArchiveLocked(retentionDays int) {
+	if retentionDays <= 0 {
+		retentionDays = 30
+	}
+	entries, err := os.ReadDir(s.archiveRoot)
+	if err != nil {
+		return
+	}
+	cutoff := time.Now().UTC().AddDate(0, 0, -retentionDays)
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := strings.TrimSpace(entry.Name())
+		if !strings.HasSuffix(name, ".jsonl") {
+			continue
+		}
+		day := strings.TrimSuffix(name, ".jsonl")
+		parsed, parseErr := time.Parse("2006-01-02", day)
+		if parseErr != nil {
+			continue
+		}
+		if parsed.Before(cutoff) {
+			_ = os.Remove(filepath.Join(s.archiveRoot, name))
+		}
+	}
+}
+
+func (s *requestStreamSource) listArchiveDaysLocked(targetDay string) ([]string, error) {
+	if strings.TrimSpace(targetDay) != "" {
+		return []string{targetDay}, nil
+	}
+	entries, err := os.ReadDir(s.archiveRoot)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []string{}, nil
+		}
 		return nil, err
 	}
+	days := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := strings.TrimSpace(entry.Name())
+		if !strings.HasSuffix(name, ".jsonl") {
+			continue
+		}
+		day := strings.TrimSuffix(name, ".jsonl")
+		if _, err := time.Parse("2006-01-02", day); err != nil {
+			continue
+		}
+		days = append(days, day)
+	}
+	sort.Slice(days, func(i, j int) bool { return days[i] > days[j] })
+	return days, nil
+}
+
+func (s *requestStreamSource) loadArchiveRowsLocked(options requestQueryOptions) ([]map[string]any, error) {
+	days, err := s.listArchiveDaysLocked(options.Day)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]map[string]any, 0, options.Limit)
+	skip := options.Offset
+
+	for _, day := range days {
+		if len(out) >= options.Limit {
+			break
+		}
+		content, readErr := os.ReadFile(filepath.Join(s.archiveRoot, day+".jsonl"))
+		if readErr != nil {
+			if os.IsNotExist(readErr) {
+				continue
+			}
+			return nil, readErr
+		}
+		lines := strings.Split(string(content), "\n")
+		for i := len(lines) - 1; i >= 0; i-- {
+			line := strings.TrimSpace(lines[i])
+			if line == "" {
+				continue
+			}
+			var row map[string]any
+			if err := json.Unmarshal([]byte(line), &row); err != nil {
+				continue
+			}
+			if !options.Since.IsZero() {
+				entry, _ := row["entry"].(map[string]any)
+				ts := ""
+				if entry != nil {
+					ts = strings.TrimSpace(asString(entry["timestamp"]))
+				}
+				if ts == "" {
+					ts = strings.TrimSpace(asString(row["ingested_at"]))
+				}
+				if ts != "" {
+					parsed, err := time.Parse(time.RFC3339Nano, ts)
+					if err != nil {
+						parsed, err = time.Parse(time.RFC3339, ts)
+					}
+					if err == nil && parsed.UTC().Before(options.Since) {
+						continue
+					}
+				}
+			}
+			if skip > 0 {
+				skip--
+				continue
+			}
+			out = append(out, row)
+			if len(out) >= options.Limit {
+				break
+			}
+		}
+	}
+	reverseRequestRows(out)
 	return out, nil
+}
+
+type requestArchiveIndex struct {
+	Date      string `json:"date"`
+	FileName  string `json:"file_name"`
+	SizeBytes int64  `json:"size_bytes"`
+	Lines     int    `json:"lines"`
+	UpdatedAt string `json:"updated_at"`
+}
+
+func (s *requestStreamSource) indexes(query url.Values) (map[string]any, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if err := s.ensureArchiveRootLocked(); err != nil {
+		return nil, err
+	}
+	if err := s.ingestLatestLocked(s.defaultRetention); err != nil {
+		s.lastIngestError = err.Error()
+	}
+
+	limit := 10
+	offset := 0
+	if raw := strings.TrimSpace(query.Get("limit")); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+	if raw := strings.TrimSpace(query.Get("offset")); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed >= 0 {
+			offset = parsed
+		}
+	}
+	if limit > 50 {
+		limit = 50
+	}
+
+	days, err := s.listArchiveDaysLocked("")
+	if err != nil {
+		return nil, err
+	}
+	total := len(days)
+	if offset > total {
+		offset = total
+	}
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+
+	items := make([]requestArchiveIndex, 0, end-offset)
+	for _, day := range days[offset:end] {
+		path := filepath.Join(s.archiveRoot, day+".jsonl")
+		info, statErr := os.Stat(path)
+		if statErr != nil {
+			continue
+		}
+		lines := 0
+		file, openErr := os.Open(path)
+		if openErr == nil {
+			scanner := bufio.NewScanner(file)
+			for scanner.Scan() {
+				if strings.TrimSpace(scanner.Text()) != "" {
+					lines++
+				}
+			}
+			_ = file.Close()
+		}
+		items = append(items, requestArchiveIndex{
+			Date:      day,
+			FileName:  filepath.Base(path),
+			SizeBytes: info.Size(),
+			Lines:     lines,
+			UpdatedAt: info.ModTime().UTC().Format(time.RFC3339),
+		})
+	}
+
+	return map[string]any{
+		"items":             items,
+		"total":             total,
+		"limit":             limit,
+		"offset":            offset,
+		"archive_root":      s.archiveRoot,
+		"last_ingest_error": s.lastIngestError,
+	}, nil
+}
+
+func (s *requestStreamSource) deleteIndex(query url.Values) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if err := s.ensureArchiveRootLocked(); err != nil {
+		return err
+	}
+	day := strings.TrimSpace(query.Get("date"))
+	if day == "" {
+		return errors.New("date is required")
+	}
+	if _, err := time.Parse("2006-01-02", day); err != nil {
+		return errors.New("date must be in YYYY-MM-DD format")
+	}
+	path := filepath.Join(s.archiveRoot, day+".jsonl")
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
+func reverseRequestRows(items []map[string]any) {
+	for left, right := 0, len(items)-1; left < right; left, right = left+1, right-1 {
+		items[left], items[right] = items[right], items[left]
+	}
+}
+
+func asString(value any) string {
+	switch typed := value.(type) {
+	case string:
+		return typed
+	case []byte:
+		return string(typed)
+	default:
+		return ""
+	}
 }
 
 func (s *securityEventSource) next() ([]securityEvent, error) {

@@ -257,12 +257,32 @@ func (s *runtimeStatus) handlers(process *runtimeProcess, securitySource *securi
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		items, err := requestSource.latest()
+		items, err := requestSource.latest(r.URL.Query())
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadGateway)
 			return
 		}
 		writeJSON(w, http.StatusOK, items)
+	})
+	mux.HandleFunc("/requests/indexes", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			if err := requestSource.deleteIndex(r.URL.Query()); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		payload, err := requestSource.indexes(r.URL.Query())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		writeJSON(w, http.StatusOK, payload)
 	})
 	mux.HandleFunc("/crs/status", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -398,7 +418,13 @@ func run() error {
 
 	process := newRuntimeProcess(runtimeRoot, crsPath, status, manager, modsecurityModulePath, geoIPModulePath)
 	securitySource := newSecurityEventSource("/var/log/nginx/access.log")
-	requestSource := newRequestStreamSource("/var/log/nginx/access.log", 50000)
+	requestSource := newRequestStreamSource(
+		"/var/log/nginx/access.log",
+		50000,
+		filepath.Join(runtimeRoot, "requests-archive"),
+		30,
+	)
+	requestSource.startBackgroundIngest(3 * time.Second)
 	if err := startHealthServer(healthAddr, status, process, securitySource, requestSource); err != nil {
 		return err
 	}

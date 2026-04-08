@@ -30,6 +30,7 @@ var legacyControlPlaneSubdirs = []string{
 	"easysiteprofiles",
 	"antiddos",
 	"tls-auto-renew",
+	"settings",
 }
 
 var moduleLegacyDirs = map[string][]string{
@@ -43,7 +44,7 @@ var moduleLegacyDirs = map[string][]string{
 	"bans":           {"accesspolicies", "sites"},
 	"administration": {"users", "roles", "sessions", "passkeys", "audits"},
 	"activity":       {"audits"},
-	"settings":       {"users", "roles", "tls-auto-renew"},
+	"settings":       {"users", "roles", "tls-auto-renew", "settings"},
 	"profile":        {"users", "sessions", "passkeys"},
 }
 

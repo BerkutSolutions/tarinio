@@ -4642,6 +4642,17 @@
   height: 14px;
 }
 
+#dashboard-page .dashboard-widget-picker-actions {
+  position: sticky;
+  bottom: 0;
+  margin: 10px -10px -10px;
+  padding: 10px;
+  background: linear-gradient(180deg, rgba(8, 11, 18, 0.2), rgba(8, 11, 18, 0.98));
+  border-top: 1px solid rgba(125, 155, 255, 0.2);
+  display: flex;
+  justify-content: flex-end;
+}
+
 #dashboard-page .dashboard-board {
   position: relative;
   width: 100%;
@@ -11791,7 +11802,7 @@ body.auth-locked #main-screen {
   }
 }
 
-/* Accesses v1.1.11 overrides: compact services column + service filter + improved modal pills */
+/* Accesses v1.1.12 overrides: compact services column + service filter + improved modal pills */
 #accesses-page .accesses-toolbar {
   align-items: flex-end;
   gap: 12px;

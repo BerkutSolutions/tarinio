@@ -3,6 +3,7 @@ import { escapeHtml } from "../ui.js";
 
 const SETTINGS_TABS = [
   { id: "general", path: "/settings/general", labelKey: "settings.tabs.general" },
+  { id: "storage", path: "/settings/storage", labelKey: "settings.tabs.storage" },
   { id: "about", path: "/settings/about", labelKey: "settings.tabs.about" },
 ];
 
@@ -77,6 +78,8 @@ function renderUpdateStatus(ctx, element, payload) {
 
 export async function renderSettings(container, ctx) {
   clearRuntimeAutoCheckTimer();
+  let storageIndexesOffset = 0;
+  const storageIndexesLimit = 10;
 
   container.innerHTML = `
     <div class="waf-page-stack" id="settings-page">
@@ -147,6 +150,42 @@ export async function renderSettings(container, ctx) {
         </section>
       </div>
 
+      <div class="settings-panel" data-settings-panel="storage" hidden>
+        <section class="waf-card">
+          <div class="waf-card-head">
+            <div>
+              <h3>${escapeHtml(ctx.t("settings.storage.title"))}</h3>
+              <div class="muted">${escapeHtml(ctx.t("settings.storage.subtitle"))}</div>
+            </div>
+          </div>
+          <div class="waf-card-body waf-stack">
+            <div class="waf-form-grid two">
+              <div class="waf-field">
+                <label for="settings-storage-logs">${escapeHtml(ctx.t("settings.storage.logs"))}</label>
+                <input id="settings-storage-logs" type="number" min="1" step="1" value="14">
+              </div>
+              <div class="waf-field">
+                <label for="settings-storage-activity">${escapeHtml(ctx.t("settings.storage.activity"))}</label>
+                <input id="settings-storage-activity" type="number" min="1" step="1" value="30">
+              </div>
+              <div class="waf-field">
+                <label for="settings-storage-events">${escapeHtml(ctx.t("settings.storage.events"))}</label>
+                <input id="settings-storage-events" type="number" min="1" step="1" value="30">
+              </div>
+              <div class="waf-field">
+                <label for="settings-storage-bans">${escapeHtml(ctx.t("settings.storage.bans"))}</label>
+                <input id="settings-storage-bans" type="number" min="1" step="1" value="30">
+              </div>
+            </div>
+            <div class="waf-note">${escapeHtml(ctx.t("settings.storage.note"))}</div>
+            <div class="waf-actions">
+              <button id="settings-storage-save" class="btn primary btn-sm" type="button">${escapeHtml(ctx.t("common.save"))}</button>
+            </div>
+            <div id="settings-storage-indexes"></div>
+          </div>
+        </section>
+      </div>
+
       <div class="settings-panel" data-settings-panel="about" hidden>
         <section class="waf-card">
           <div class="waf-card-head">
@@ -183,6 +222,12 @@ export async function renderSettings(container, ctx) {
   const aboutVersionInline = container.querySelector("#settings-about-version-inline");
   const aboutProjectLink = container.querySelector("#settings-about-project-link");
   const updatesEnabled = container.querySelector("#settings-updates-enabled");
+  const storageLogs = container.querySelector("#settings-storage-logs");
+  const storageActivity = container.querySelector("#settings-storage-activity");
+  const storageEvents = container.querySelector("#settings-storage-events");
+  const storageBans = container.querySelector("#settings-storage-bans");
+  const storageSave = container.querySelector("#settings-storage-save");
+  const storageIndexesNode = container.querySelector("#settings-storage-indexes");
   const languageSelect = container.querySelector("#settings-language-select");
   const runtimeSave = container.querySelector("#settings-runtime-save");
   const prefs = loadPreferences();
@@ -203,14 +248,130 @@ export async function renderSettings(container, ctx) {
     alert.classList.toggle("success", !!success);
   };
 
+  const renderStorageIndexes = (indexes) => {
+    if (!storageIndexesNode) {
+      return;
+    }
+    const items = Array.isArray(indexes?.items) ? indexes.items : [];
+    const total = Number(indexes?.total || 0);
+    const limit = Number(indexes?.limit || storageIndexesLimit);
+    const offset = Number(indexes?.offset || 0);
+    const currentPage = Math.floor(offset / Math.max(1, limit)) + 1;
+    const totalPages = Math.max(1, Math.ceil(total / Math.max(1, limit)));
+    const pages = [];
+    for (let page = 1; page <= Math.min(10, totalPages); page += 1) {
+      pages.push(`<button type="button" class="btn ghost btn-sm${page === currentPage ? " active" : ""}" data-storage-index-page="${page}">${page}</button>`);
+    }
+    if (totalPages > 10) {
+      pages.push(`<span class="muted">...</span>`);
+      pages.push(`<button type="button" class="btn ghost btn-sm${currentPage === totalPages ? " active" : ""}" data-storage-index-page="${totalPages}">${totalPages}</button>`);
+    }
+    storageIndexesNode.innerHTML = `
+      <section class="waf-card">
+        <div class="waf-card-head">
+          <div>
+            <h3>${escapeHtml(ctx.t("settings.storage.indexes.title"))}</h3>
+            <div class="muted">${escapeHtml(ctx.t("settings.storage.indexes.subtitle"))}</div>
+          </div>
+        </div>
+        <div class="waf-card-body waf-stack">
+          <div class="waf-empty">${escapeHtml(ctx.t("settings.storage.indexes.total"))}: ${total}</div>
+          <div class="waf-table-wrap">
+            <table class="waf-table">
+              <thead>
+                <tr>
+                  <th>${escapeHtml(ctx.t("settings.storage.indexes.col.date"))}</th>
+                  <th>${escapeHtml(ctx.t("settings.storage.indexes.col.file"))}</th>
+                  <th>${escapeHtml(ctx.t("settings.storage.indexes.col.lines"))}</th>
+                  <th>${escapeHtml(ctx.t("settings.storage.indexes.col.size"))}</th>
+                  <th>${escapeHtml(ctx.t("settings.storage.indexes.col.updated"))}</th>
+                  <th>${escapeHtml(ctx.t("settings.storage.indexes.col.actions"))}</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${items.length
+                  ? items.map((item) => `
+                    <tr>
+                      <td>${escapeHtml(String(item?.date || "-"))}</td>
+                      <td>${escapeHtml(String(item?.file_name || "-"))}</td>
+                      <td>${escapeHtml(String(item?.lines ?? 0))}</td>
+                      <td>${escapeHtml(String(item?.size_bytes ?? 0))}</td>
+                      <td>${escapeHtml(String(item?.updated_at || "-"))}</td>
+                      <td>
+                        <button
+                          type="button"
+                          class="btn ghost btn-sm"
+                          data-storage-index-delete="${escapeHtml(String(item?.date || ""))}"
+                        >${escapeHtml(ctx.t("common.delete"))}</button>
+                      </td>
+                    </tr>
+                  `).join("")
+                  : `<tr><td colspan="6"><div class="waf-empty">${escapeHtml(ctx.t("settings.storage.indexes.empty"))}</div></td></tr>`}
+              </tbody>
+            </table>
+          </div>
+          <div class="waf-pager">
+            <div class="muted">${escapeHtml(ctx.t("settings.storage.indexes.page"))}: ${currentPage}/${totalPages}</div>
+            <div class="waf-actions">${pages.join("")}</div>
+          </div>
+        </div>
+      </section>
+    `;
+    storageIndexesNode.querySelectorAll("[data-storage-index-page]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const page = Number.parseInt(String(button.dataset.storageIndexPage || "1"), 10);
+        if (!Number.isFinite(page) || page < 1) {
+          return;
+        }
+        storageIndexesOffset = (page - 1) * storageIndexesLimit;
+        await renderRuntime();
+      });
+    });
+    storageIndexesNode.querySelectorAll("[data-storage-index-delete]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const day = String(button.dataset.storageIndexDelete || "").trim();
+        if (!day) {
+          return;
+        }
+        if (!window.confirm(ctx.t("settings.storage.indexes.deleteConfirm", { date: day }))) {
+          return;
+        }
+        setAlert("");
+        try {
+          await ctx.api.delete(`/api/settings/runtime/storage-indexes?date=${encodeURIComponent(day)}`);
+          setAlert(ctx.t("settings.saved"), true);
+          await renderRuntime();
+        } catch (error) {
+          setAlert(error?.message || ctx.t("common.error"));
+        }
+      });
+    });
+  };
+
   const renderRuntime = async () => {
     try {
-      const runtime = await ctx.api.get("/api/settings/runtime");
+      const runtime = await ctx.api.get(`/api/settings/runtime?storage_indexes_limit=${storageIndexesLimit}&storage_indexes_offset=${storageIndexesOffset}`);
       const mode = String(runtime?.deployment_mode || "-");
       runtimeStatus.textContent = ctx.t("settings.runtime.loaded", { mode });
       if (updatesEnabled) {
         updatesEnabled.checked = !!runtime?.update_checks_enabled;
       }
+      const storage = runtime?.storage || {};
+      if (storageLogs) {
+        storageLogs.value = String(Number(storage?.logs_days || 14));
+      }
+      if (storageActivity) {
+        storageActivity.value = String(Number(storage?.activity_days || 30));
+      }
+      if (storageEvents) {
+        storageEvents.value = String(Number(storage?.events_days || 30));
+      }
+      if (storageBans) {
+        storageBans.value = String(Number(storage?.bans_days || 30));
+      }
+      const indexesPayload = runtime?.storage_indexes || {};
+      storageIndexesOffset = Number(indexesPayload?.offset || 0);
+      renderStorageIndexes(indexesPayload);
       renderUpdateStatus(ctx, updateStatus, runtime || {});
       const currentVersion = String(runtime?.app_version || runtime?.version || "").trim();
       if (currentVersion) {
@@ -235,6 +396,7 @@ export async function renderSettings(container, ctx) {
     } catch {
       runtimeStatus.textContent = ctx.t("settings.runtime.shell");
       updateStatus.textContent = ctx.t("settings.updates.notAvailable");
+      renderStorageIndexes({ items: [], total: 0, limit: storageIndexesLimit, offset: storageIndexesOffset });
       clearRuntimeAutoCheckTimer();
     }
   };
@@ -265,9 +427,30 @@ export async function renderSettings(container, ctx) {
       if (languageChanged && typeof ctx.setLanguage === "function") {
         await ctx.setLanguage(nextLanguage);
       }
-      const payload = { update_checks_enabled: !!updatesEnabled?.checked };
+      const payload = {
+        update_checks_enabled: !!updatesEnabled?.checked,
+      };
       const result = await ctx.api.put("/api/settings/runtime", payload);
       renderUpdateStatus(ctx, updateStatus, result || {});
+      setAlert(ctx.t("settings.saved"), true);
+      await renderRuntime();
+    } catch (error) {
+      setAlert(error?.message || ctx.t("common.error"));
+    }
+  });
+
+  storageSave?.addEventListener("click", async () => {
+    setAlert("");
+    try {
+      const payload = {
+        storage: {
+          logs_days: Number(storageLogs?.value || "14"),
+          activity_days: Number(storageActivity?.value || "30"),
+          events_days: Number(storageEvents?.value || "30"),
+          bans_days: Number(storageBans?.value || "30"),
+        },
+      };
+      await ctx.api.put("/api/settings/runtime", payload);
       setAlert(ctx.t("settings.saved"), true);
       await renderRuntime();
     } catch (error) {

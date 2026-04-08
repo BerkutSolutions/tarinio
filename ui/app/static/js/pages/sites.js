@@ -2429,23 +2429,62 @@ async function deleteServiceWithResources(siteID, ctx, snapshot = null) {
   if (!normalizedSiteID) {
     return;
   }
+  const normalizeIDValue = (value) => String(value || "").trim().toLowerCase();
   const isNotFound = (error) => error?.status === 404;
-  const deleteIgnoreSafe = async (path) => {
+  const includesByID = (items, id) => normalizeArray(items).some((item) => normalizeIDValue(item?.id) === normalizeIDValue(id));
+  const includesBySiteID = (items, id) => normalizeArray(items).some((item) => normalizeIDValue(item?.site_id) === normalizeIDValue(id));
+  const deleteIgnoreSafe = async (path, verifyDeleted = null) => {
     try {
       await ctx.api.delete(path);
     } catch (error) {
-      if (!isNotFound(error) && !isAutoApplyFailureError(error)) {
+      if (isNotFound(error)) {
+        return;
+      }
+      if (isAutoApplyFailureError(error) && typeof verifyDeleted === "function") {
+        const deleted = await verifyDeleted();
+        if (deleted) {
+          return;
+        }
+      }
+      if (!isAutoApplyFailureError(error)) {
         throw error;
       }
     }
   };
+  const sites = Array.isArray(snapshot?.sites) ? snapshot.sites : await ctx.api.get("/api/sites").catch(() => []);
   const upstreams = Array.isArray(snapshot?.upstreams)
     ? snapshot.upstreams
     : await ctx.api.get("/api/upstreams").catch(() => []);
+  const tlsConfigs = Array.isArray(snapshot?.tlsConfigs)
+    ? snapshot.tlsConfigs
+    : await ctx.api.get("/api/tls-configs").catch(() => []);
+  const easyProfiles = Array.isArray(snapshot?.easyProfiles)
+    ? snapshot.easyProfiles
+    : await ctx.api.get("/api/easy-site-profiles").catch(() => []);
   const upstreamsForSite = normalizeArray(upstreams).filter((item) => normalizeSiteID(item?.site_id) === normalizedSiteID);
-  await deleteIgnoreSafe(`/api/tls-configs/${encodeURIComponent(normalizedSiteID)}`);
-  await deleteIgnoreSafe(`/api/access-policies/${encodeURIComponent(`easy-${normalizedSiteID}-access`)}`);
-  await deleteIgnoreSafe(`/api/easy-site-profiles/${encodeURIComponent(normalizedSiteID)}`);
+  const hasSite = includesByID(sites, normalizedSiteID);
+  const hasTLSConfig = includesBySiteID(tlsConfigs, normalizedSiteID);
+  const hasEasyProfile = includesBySiteID(easyProfiles, normalizedSiteID);
+  if (hasTLSConfig) {
+    await deleteIgnoreSafe(`/api/tls-configs/${encodeURIComponent(normalizedSiteID)}`, async () => {
+      const latest = await ctx.api.get("/api/tls-configs").catch(() => []);
+      return !includesBySiteID(latest, normalizedSiteID);
+    });
+  }
+  const easyAccessPolicyID = `easy-${normalizedSiteID}-access`;
+  const hasEasyAccessPolicy = includesByID(snapshot?.accessPolicies, easyAccessPolicyID);
+  if (hasEasyAccessPolicy) {
+    await deleteIgnoreSafe(`/api/access-policies/${encodeURIComponent(easyAccessPolicyID)}`, async () => {
+      const latest = await ctx.api.get("/api/access-policies").catch(() => []);
+      return !includesByID(latest, easyAccessPolicyID);
+    });
+  }
+  if (hasEasyProfile) {
+    await deleteIgnoreSafe(`/api/easy-site-profiles/${encodeURIComponent(normalizedSiteID)}`, async () => {
+      const latest = await ctx.api.get("/api/easy-site-profiles").catch(() => []);
+      return !includesBySiteID(latest, normalizedSiteID);
+    });
+  }
   const [wafPolicies, ratePolicies, accessPolicies] = await Promise.all([
     Array.isArray(snapshot?.wafPolicies) ? snapshot.wafPolicies : ctx.api.get("/api/waf-policies").catch(() => []),
     Array.isArray(snapshot?.ratePolicies) ? snapshot.ratePolicies : ctx.api.get("/api/rate-limit-policies").catch(() => []),
@@ -2456,29 +2495,46 @@ async function deleteServiceWithResources(siteID, ctx, snapshot = null) {
     if (!policyID) {
       continue;
     }
-    await deleteIgnoreSafe(`/api/waf-policies/${encodeURIComponent(policyID)}`);
+    await deleteIgnoreSafe(`/api/waf-policies/${encodeURIComponent(policyID)}`, async () => {
+      const latest = await ctx.api.get("/api/waf-policies").catch(() => []);
+      return !includesByID(latest, policyID);
+    });
   }
   for (const policy of normalizeArray(ratePolicies).filter((item) => normalizeSiteID(item?.site_id) === normalizedSiteID)) {
     const policyID = String(policy?.id || "").trim();
     if (!policyID) {
       continue;
     }
-    await deleteIgnoreSafe(`/api/rate-limit-policies/${encodeURIComponent(policyID)}`);
+    await deleteIgnoreSafe(`/api/rate-limit-policies/${encodeURIComponent(policyID)}`, async () => {
+      const latest = await ctx.api.get("/api/rate-limit-policies").catch(() => []);
+      return !includesByID(latest, policyID);
+    });
   }
   for (const policy of normalizeArray(accessPolicies).filter((item) => normalizeSiteID(item?.site_id) === normalizedSiteID)) {
     const policyID = String(policy?.id || "").trim();
     if (!policyID) {
       continue;
     }
-    await deleteIgnoreSafe(`/api/access-policies/${encodeURIComponent(policyID)}`);
+    await deleteIgnoreSafe(`/api/access-policies/${encodeURIComponent(policyID)}`, async () => {
+      const latest = await ctx.api.get("/api/access-policies").catch(() => []);
+      return !includesByID(latest, policyID);
+    });
   }
-  await deleteIgnoreSafe(`/api/sites/${encodeURIComponent(normalizedSiteID)}`);
+  if (hasSite) {
+    await deleteIgnoreSafe(`/api/sites/${encodeURIComponent(normalizedSiteID)}`, async () => {
+      const latest = await ctx.api.get("/api/sites").catch(() => []);
+      return !includesByID(latest, normalizedSiteID);
+    });
+  }
   for (const upstream of upstreamsForSite) {
     const upstreamID = String(upstream?.id || "").trim();
     if (!upstreamID) {
       continue;
     }
-    await deleteIgnoreSafe(`/api/upstreams/${encodeURIComponent(upstreamID)}`);
+    await deleteIgnoreSafe(`/api/upstreams/${encodeURIComponent(upstreamID)}`, async () => {
+      const latest = await ctx.api.get("/api/upstreams").catch(() => []);
+      return !includesByID(latest, upstreamID);
+    });
   }
 }
 
@@ -3123,16 +3179,28 @@ export async function renderSites(container, ctx) {
       try {
         setLoading(feedback, ctx.t("sites.action.deleting"));
         const sharedSnapshot = {
+          sites: state.sites,
           upstreams: state.upstreams,
+          tlsConfigs: state.tlsConfigs,
+          easyProfiles: await ctx.api.get("/api/easy-site-profiles").catch(() => []),
           wafPolicies: await ctx.api.get("/api/waf-policies").catch(() => []),
           ratePolicies: await ctx.api.get("/api/rate-limit-policies").catch(() => []),
           accessPolicies: await ctx.api.get("/api/access-policies").catch(() => [])
         };
+        let deletedCount = 0;
         for (const siteID of selectedIDs) {
           await deleteServiceWithResources(siteID, ctx, sharedSnapshot);
+          deletedCount += 1;
+          sharedSnapshot.sites = normalizeArray(sharedSnapshot.sites).filter((item) => normalizeSiteID(item?.id) !== normalizeSiteID(siteID));
+          sharedSnapshot.upstreams = normalizeArray(sharedSnapshot.upstreams).filter((item) => normalizeSiteID(item?.site_id) !== normalizeSiteID(siteID));
+          sharedSnapshot.tlsConfigs = normalizeArray(sharedSnapshot.tlsConfigs).filter((item) => normalizeSiteID(item?.site_id) !== normalizeSiteID(siteID));
+          sharedSnapshot.easyProfiles = normalizeArray(sharedSnapshot.easyProfiles).filter((item) => normalizeSiteID(item?.site_id) !== normalizeSiteID(siteID));
+          sharedSnapshot.wafPolicies = normalizeArray(sharedSnapshot.wafPolicies).filter((item) => normalizeSiteID(item?.site_id) !== normalizeSiteID(siteID));
+          sharedSnapshot.ratePolicies = normalizeArray(sharedSnapshot.ratePolicies).filter((item) => normalizeSiteID(item?.site_id) !== normalizeSiteID(siteID));
+          sharedSnapshot.accessPolicies = normalizeArray(sharedSnapshot.accessPolicies).filter((item) => normalizeSiteID(item?.site_id) !== normalizeSiteID(siteID));
         }
         state.selectedSiteIDs = new Set();
-        ctx.notify(ctx.t("sites.toast.servicesDeleted", { count: selectedIDs.length }));
+        ctx.notify(ctx.t("sites.toast.servicesDeleted", { count: deletedCount }));
         await load();
       } catch (error) {
         setError(feedback, `${ctx.t("sites.error.deleteSite")}: ${String(error?.message || error)}`);

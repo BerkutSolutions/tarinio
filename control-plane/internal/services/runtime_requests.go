@@ -39,7 +39,7 @@ func (c *HTTPRuntimeRequestCollector) CollectWithOptions(query url.Values) ([]ma
 	if len(query) > 0 {
 		if parsed, err := url.Parse(targetURL); err == nil {
 			q := parsed.Query()
-			for _, key := range []string{"limit", "offset", "since"} {
+			for _, key := range []string{"limit", "offset", "since", "day", "retention_days"} {
 				value := strings.TrimSpace(query.Get(key))
 				if value == "" {
 					continue

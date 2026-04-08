@@ -1,8 +1,9 @@
-import { escapeHtml, formatDate, setError, setLoading } from "../ui.js";
+import { confirmAction, escapeHtml, formatDate, setError, setLoading } from "../ui.js";
 
 const ICON_PLUS = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M11 5h2v14h-2zM5 11h14v2H5z"/></svg>';
 const ICON_UNLOCK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a5 5 0 0 1 5 5v2h-2V7a3 3 0 1 0-6 0v2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h2V7a5 5 0 0 1 5-5Z"/></svg>';
 const MANUAL_BAN_TIMERS = new Map();
+const DISMISSED_BAN_ROWS = new Set();
 const ALL_SERVICES_SITE_ID = "__all__";
 
 const EXTEND_DURATIONS = [
@@ -218,6 +219,14 @@ function formatRemaining(expiresAt, now, t) {
 
 function manualBanTimerRowKey(siteID, ip) {
   return `${String(siteID || "").trim().toLowerCase()}::${normalizeIP(ip).toLowerCase()}`;
+}
+
+function dismissBanRow(siteID, ip) {
+  DISMISSED_BAN_ROWS.add(manualBanTimerRowKey(siteID, ip));
+}
+
+function clearDismissedBanRow(siteID, ip) {
+  DISMISSED_BAN_ROWS.delete(manualBanTimerRowKey(siteID, ip));
 }
 
 function isStartupSelfTestSite(siteID) {
@@ -546,22 +555,6 @@ async function postBanAction(ctx, siteID, origin, action, ip) {
     return;
   }
   await ctx.api.post(path, { ip });
-}
-
-async function addExceptionForSite(ctx, siteID, ip) {
-  const policies = normalizeList(await ctx.api.get("/api/access-policies"));
-  const existing = policies.find((item) => String(item?.site_id || "").trim() === String(siteID || "").trim()) || null;
-  const allowlist = new Set(normalizeList(existing?.allowlist).map((item) => normalizeIP(item)).filter(Boolean));
-  allowlist.add(normalizeIP(ip));
-  const denylist = normalizeList(existing?.denylist).map((item) => normalizeIP(item)).filter(Boolean);
-  const payload = {
-    id: String(existing?.id || `${siteID}-access`),
-    site_id: String(siteID || "").trim(),
-    enabled: true,
-    allowlist: Array.from(allowlist),
-    denylist
-  };
-  await ctx.api.post("/api/access-policies/upsert", payload);
 }
 
 export async function renderBans(container, ctx) {
@@ -989,7 +982,9 @@ export async function renderBans(container, ctx) {
       await processExpiredManualBanTimers(ctx, manualBanTimers);
       const manualRows = buildManualBanRows(accessPolicies, canonicalSiteID, manualBanTimers);
       const autoRows = buildAutoBanRows(events, canonicalSiteID, siteBanDurationByID);
-      const rows = mergeBanRows(manualRows, autoRows).sort((a, b) => {
+      const rows = mergeBanRows(manualRows, autoRows)
+        .filter((row) => !DISMISSED_BAN_ROWS.has(manualBanTimerRowKey(row.siteID, row.ip)))
+        .sort((a, b) => {
         const left = a.occurredAt ? a.occurredAt.getTime() : 0;
         const right = b.occurredAt ? b.occurredAt.getTime() : 0;
         return right - left;
@@ -1105,8 +1100,21 @@ export async function renderBans(container, ctx) {
             return;
           }
           if (action === "unban") {
-            const site = siteByID.get(row.siteID);
-            openUnbanModal(row, site?.primary_host || row.siteID);
+            if (!confirmAction(ctx.t("bans.confirm.unban", { ip, site: row.siteID }))) {
+              return;
+            }
+            try {
+              await postBanAction(ctx, row.siteID, "primary", "unban", ip);
+              const timers = loadManualBanTimers();
+              removeManualBanTimer(timers, row.siteID, ip);
+              saveManualBanTimers(timers);
+              dismissBanRow(row.siteID, ip);
+              clearRateLimitCookies(row.siteID);
+              ctx.notify(ctx.t("toast.ipUnbanned"));
+              await renderRows();
+            } catch (error) {
+              setError(statusNode, error?.message || ctx.t("bans.error.action"));
+            }
             return;
           }
 
@@ -1174,6 +1182,7 @@ export async function renderBans(container, ctx) {
       await Promise.all(targets.map((targetSiteID) => postBanAction(ctx, targetSiteID, "primary", "ban", ip)));
       const timers = loadManualBanTimers();
       for (const targetSiteID of targets) {
+        clearDismissedBanRow(targetSiteID, ip);
         if (durationSec > 0) {
           upsertManualBanTimer(timers, targetSiteID, ip, new Date(Date.now() + (durationSec * 1000)));
         } else {
@@ -1208,6 +1217,7 @@ export async function renderBans(container, ctx) {
     try {
       extendSubmitNode.disabled = true;
       await postBanAction(ctx, row.siteID, "primary", "ban", ip);
+      clearDismissedBanRow(row.siteID, ip);
       const timers = loadManualBanTimers();
       if (durationSec > 0) {
         const currentTimer = timers.get(manualBanTimerRowKey(row.siteID, ip));
@@ -1237,14 +1247,11 @@ export async function renderBans(container, ctx) {
     const ip = normalizeIP(row.ip);
     try {
       unbanSubmitNode.disabled = true;
-      if (row.source === "manual") {
-        await postBanAction(ctx, row.siteID, "primary", "unban", ip);
-        const timers = loadManualBanTimers();
-        removeManualBanTimer(timers, row.siteID, ip);
-        saveManualBanTimers(timers);
-      } else {
-        await addExceptionForSite(ctx, row.siteID, ip);
-      }
+      await postBanAction(ctx, row.siteID, "primary", "unban", ip);
+      const timers = loadManualBanTimers();
+      removeManualBanTimer(timers, row.siteID, ip);
+      saveManualBanTimers(timers);
+      dismissBanRow(row.siteID, ip);
       clearRateLimitCookies(row.siteID);
       closeUnbanModal();
       ctx.notify(ctx.t("toast.ipUnbanned"));

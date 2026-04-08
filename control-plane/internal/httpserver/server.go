@@ -3,6 +3,7 @@ package httpserver
 import (
 	"context"
 	"net/http"
+	"path/filepath"
 	"time"
 
 	"waf/control-plane/internal/certificatematerials"
@@ -62,14 +63,16 @@ func New(
 	requestCollector services.RuntimeRequestCollector,
 ) *Server {
 	mux := http.NewServeMux()
+	settingsRuntimeHandler := handlers.NewSettingsRuntimeHandler(filepath.Join(revisionStoreDir, "settings"), runtimeHealthURL)
 	mux.Handle("/healthz", handlers.NewHealthHandler(revisionService))
 	mux.Handle("/api/setup/status", handlers.NewSetupHandler(setupService))
 	mux.Handle("/api/app/meta", withAuth(authService, "", handlers.NewAppMetaHandler()))
 	mux.Handle("/api/app/ping", withAuth(authService, rbac.PermissionAuthSelf, handlers.NewAppPingHandler()))
 	mux.Handle("/api/app/compat", withAuth(authService, rbac.PermissionAuthSelf, handlers.NewAppCompatHandler(runtimeRoot, revisionStoreDir)))
 	mux.Handle("/api/app/compat/fix", withAuth(authService, rbac.PermissionAuthSelf, handlers.NewAppCompatHandler(runtimeRoot, revisionStoreDir)))
-	mux.Handle("/api/settings/runtime", withAuth(authService, rbac.PermissionAuthSelf, handlers.NewSettingsRuntimeHandler()))
-	mux.Handle("/api/settings/runtime/check-updates", withAuth(authService, rbac.PermissionAuthSelf, handlers.NewSettingsRuntimeHandler()))
+	mux.Handle("/api/settings/runtime", withAuth(authService, rbac.PermissionAuthSelf, settingsRuntimeHandler))
+	mux.Handle("/api/settings/runtime/check-updates", withAuth(authService, rbac.PermissionAuthSelf, settingsRuntimeHandler))
+	mux.Handle("/api/settings/runtime/storage-indexes", withAuth(authService, rbac.PermissionAuthSelf, settingsRuntimeHandler))
 	mux.Handle("/api/owasp-crs/status", withMethodPermissions(authService, map[string]rbac.Permission{
 		http.MethodGet: rbac.PermissionPoliciesRead,
 	}, handlers.NewOWASPCRSHandler(runtimeCRSService)))

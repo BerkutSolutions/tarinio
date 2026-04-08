@@ -6,6 +6,8 @@ const MIN_HEIGHT = 140;
 const OBSERVATION_WINDOW_MS = 24 * 60 * 60 * 1000;
 let layoutState = null;
 const visibleWidgetsByScope = new Map();
+const DASHBOARD_LAYOUT_STORAGE_KEY = "waf.dashboard.layout.v1";
+const DASHBOARD_WIDGETS_STORAGE_KEY = "waf.dashboard.widgets.v1";
 
 const WIDGETS = [
   { id: "services-up", titleKey: "dashboard.widget.servicesUp", width: 240, height: 180, x: 20, y: 20 },
@@ -48,19 +50,38 @@ function normalizeLayout(raw) {
 
 function loadLayout() {
   if (!layoutState) {
-    layoutState = normalizeLayout([]);
+    let parsed = [];
+    try {
+      parsed = JSON.parse(window.localStorage.getItem(DASHBOARD_LAYOUT_STORAGE_KEY) || "[]");
+    } catch (_error) {
+      parsed = [];
+    }
+    layoutState = normalizeLayout(parsed);
   }
   return normalizeLayout(layoutState);
 }
 
 function saveLayout(layout) {
   layoutState = normalizeLayout(layout);
+  try {
+    window.localStorage.setItem(DASHBOARD_LAYOUT_STORAGE_KEY, JSON.stringify(layoutState));
+  } catch (_error) {
+    // ignore persistence errors
+  }
 }
 
 function loadVisibleWidgetIDs(scopeID = "") {
   const fallback = WIDGETS.map((widget) => widget.id);
   const scope = String(scopeID || "").trim().toLowerCase();
-  const parsed = visibleWidgetsByScope.get(scope);
+  let parsed = visibleWidgetsByScope.get(scope);
+  if (!Array.isArray(parsed)) {
+    try {
+      const allScopes = JSON.parse(window.localStorage.getItem(DASHBOARD_WIDGETS_STORAGE_KEY) || "{}");
+      parsed = Array.isArray(allScopes?.[scope]) ? allScopes[scope] : null;
+    } catch (_error) {
+      parsed = null;
+    }
+  }
   if (!Array.isArray(parsed) || !parsed.length) {
     return fallback;
   }
@@ -78,7 +99,16 @@ function loadVisibleWidgetIDs(scopeID = "") {
 
 function saveVisibleWidgetIDs(ids, scopeID = "") {
   const scope = String(scopeID || "").trim().toLowerCase();
-  visibleWidgetsByScope.set(scope, Array.isArray(ids) ? ids.slice() : []);
+  const next = Array.isArray(ids) ? ids.slice() : [];
+  visibleWidgetsByScope.set(scope, next);
+  try {
+    const raw = window.localStorage.getItem(DASHBOARD_WIDGETS_STORAGE_KEY) || "{}";
+    const allScopes = JSON.parse(raw);
+    allScopes[scope] = next;
+    window.localStorage.setItem(DASHBOARD_WIDGETS_STORAGE_KEY, JSON.stringify(allScopes));
+  } catch (_error) {
+    // ignore persistence errors
+  }
 }
 
 function formatNumber(value) {
@@ -1704,7 +1734,14 @@ export async function renderDashboard(container, ctx) {
           </label>
         `;
       }).join("")}
+      <div class="dashboard-widget-picker-actions">
+        <button type="button" class="btn primary btn-sm" id="dashboard-widgets-save">${escapeHtml(ctx.t("common.save"))}</button>
+      </div>
     `;
+    widgetsMenuNode.querySelector("#dashboard-widgets-save")?.addEventListener("click", () => {
+      persistVisibleWidgets();
+      setWidgetsMenuOpen(false);
+    });
   };
 
   widgetsToggleNode?.addEventListener("click", (event) => {
@@ -1749,7 +1786,6 @@ export async function renderDashboard(container, ctx) {
       unmountWidgetFrame(widgetID);
       applyAllGeometry(boardNode, layout);
     }
-    persistVisibleWidgets();
   });
   renderWidgetsMenu();
 

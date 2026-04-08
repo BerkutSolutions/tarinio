@@ -48,6 +48,9 @@ let currentUser = null;
 let notificationCenter = null;
 let stopNotificationsListener = null;
 let sessionPingTimer = null;
+let activePageAbortController = null;
+let activePageRenderID = 0;
+let activePageCleanup = null;
 
 function sectionPath(value) {
   const section = typeof value === "string" ? sections.find((item) => item.id === value) : value;
@@ -167,6 +170,22 @@ async function loadUser() {
 async function renderPage() {
   const section = currentSection();
   const container = document.getElementById("content-area");
+  const renderID = ++activePageRenderID;
+  if (activePageAbortController) {
+    activePageAbortController.abort();
+  }
+  if (typeof activePageCleanup === "function") {
+    try {
+      activePageCleanup();
+    } catch (_error) {
+      // cleanup is best-effort
+    }
+  }
+  activePageCleanup = null;
+  activePageAbortController = new AbortController();
+  const signal = activePageAbortController.signal;
+  const mount = document.createElement("div");
+  mount.className = "app-page-mount";
   document.title = `Tarinio | ${t(section.labelKey)}`;
   const pageTitleNode = document.getElementById("page-title");
   if (pageTitleNode) pageTitleNode.textContent = "";
@@ -175,26 +194,47 @@ async function renderPage() {
   const pageHeaderNode = document.querySelector(".app-header");
   if (pageHeaderNode) pageHeaderNode.style.display = "none";
   renderMenu();
-  container.innerHTML = `<div class="waf-empty">${escapeHtml(t("app.loading"))}</div>`;
+  mount.innerHTML = `<div class="waf-empty">${escapeHtml(t("app.loading"))}</div>`;
+  container.replaceChildren(mount);
+  const isActive = () => renderID === activePageRenderID && !signal.aborted && mount.isConnected;
   try {
     if (typeof section.__render !== "function") {
       section.__render = await section.load();
     }
-    await section.__render(container, {
+    const cleanup = await section.__render(mount, {
       api,
       notify,
       t,
       setLanguage,
       getLanguage,
       currentUser,
+      signal,
+      isActive,
     });
+    if (!isActive()) {
+      if (typeof cleanup === "function") {
+        try {
+          cleanup();
+        } catch (_error) {
+          // cleanup is best-effort
+        }
+      }
+      return;
+    }
+    activePageCleanup = typeof cleanup === "function" ? cleanup : null;
   } catch (error) {
+    if (!isActive()) {
+      return;
+    }
+    if (error?.name === "AbortError") {
+      return;
+    }
     const message = String(error?.message || "");
     const status = Number(error?.status || 0);
     const tooManyRequests = status === 429 || /429|too many requests/i.test(message);
     const forbidden = status === 403 || /403|forbidden/i.test(message);
     if (tooManyRequests || forbidden) {
-      container.innerHTML = `
+      mount.innerHTML = `
         <div class="waf-card">
           <div class="waf-card-head"><h3>${escapeHtml(tooManyRequests ? "429 Too Many Requests" : "403 Forbidden")}</h3></div>
           <div class="waf-card-body">
@@ -205,7 +245,7 @@ async function renderPage() {
       `;
       return;
     }
-    container.innerHTML = `<div class="alert">${escapeHtml(error.message || t("app.error"))}</div>`;
+    mount.innerHTML = `<div class="alert">${escapeHtml(error.message || t("app.error"))}</div>`;
   }
 }
 
@@ -408,7 +448,7 @@ async function loadMeta() {
     }
     renderUpdateBadge(meta);
   } catch {
-    setVersion("v1.1.11");
+    setVersion("v1.1.12");
     renderUpdateBadge(null);
   }
 }
@@ -439,7 +479,7 @@ function startSessionPing() {
 
 async function bootstrap() {
   await applyTranslations(getLanguage());
-  setVersion("v1.1.11");
+  setVersion("v1.1.12");
 
   const access = await checkEntryAccess("app");
   if (!access.allowed) {

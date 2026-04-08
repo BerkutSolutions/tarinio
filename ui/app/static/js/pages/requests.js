@@ -10,6 +10,10 @@ function normalizeToken(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function normalizeHostLike(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
 function buildPageButtons(totalPages, currentPage, dataAttr) {
   const pages = [];
   for (let page = 1; page <= Math.min(10, totalPages); page += 1) {
@@ -31,7 +35,7 @@ function parseRequestsJSONL(text) {
     try {
       const parsed = JSON.parse(raw);
       return Array.isArray(parsed) ? parsed.filter((row) => row && typeof row === "object") : [];
-    } catch (error) {
+    } catch (_error) {
       return [];
     }
   }
@@ -46,7 +50,7 @@ function parseRequestsJSONL(text) {
       if (parsed && typeof parsed === "object") {
         rows.push(parsed);
       }
-    } catch (error) {
+    } catch (_error) {
       rows.push({ stream: "archive", ingested_at: "", raw: line, entry: {} });
     }
   }
@@ -60,7 +64,35 @@ function compareValues(left, right, mode) {
   return String(left || "").localeCompare(String(right || ""), undefined, { sensitivity: "base" });
 }
 
+function parseTimestamp(value) {
+  const stamp = Date.parse(String(value || ""));
+  return Number.isFinite(stamp) ? new Date(stamp) : null;
+}
+
+function toDateKeyLocal(date) {
+  if (!(date instanceof Date)) {
+    return "";
+  }
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function normalizeTimePreset(value) {
+  const allowed = new Set(["all", "minute", "day", "month", "date", "datetime"]);
+  const preset = String(value || "all").trim().toLowerCase();
+  return allowed.has(preset) ? preset : "all";
+}
+
+function todayDateKeyLocal() {
+  return toDateKeyLocal(new Date());
+}
+
 export async function renderRequests(container, ctx) {
+  const signal = ctx?.signal;
+  const isActive = typeof ctx?.isActive === "function" ? ctx.isActive : () => true;
+
   const state = {
     rows: [],
     filteredRows: [],
@@ -69,11 +101,21 @@ export async function renderRequests(container, ctx) {
     sortDirection: "desc",
     pageSize: 10,
     page: 1,
-    fetchLimit: DEFAULT_REQUESTS_FETCH_LIMIT
+    fetchLimit: DEFAULT_REQUESTS_FETCH_LIMIT,
+    selectedService: "",
+    selectedMethod: "",
+    selectedStatus: "",
+    selectedTimePreset: "date",
+    selectedDate: todayDateKeyLocal(),
+    selectedDateTime: "",
+    storageLogsDays: 14,
+    serviceOptions: [],
+    methodOptions: [],
+    statusOptions: []
   };
 
   const columns = [
-    { id: "service", labelKey: "requests.col.service", mode: "string", value: (row) => String(row?.entry?.site || "") },
+    { id: "service", labelKey: "requests.col.service", mode: "string", value: (row) => String(row?.serviceDisplay || "") },
     { id: "timestamp", labelKey: "requests.col.time", mode: "string", value: (row) => String(row?.entry?.timestamp || row?.ingested_at || "") },
     { id: "request_id", labelKey: "requests.col.requestId", mode: "string", value: (row) => String(row?.entry?.request_id || "") },
     { id: "method", labelKey: "requests.col.method", mode: "string", value: (row) => String(row?.entry?.method || "") },
@@ -97,16 +139,120 @@ export async function renderRequests(container, ctx) {
     return { totalPages, start, end };
   };
 
+  const resolveServiceDisplay = (rawSite, siteHostMap) => {
+    const source = String(rawSite || "").trim();
+    if (!source) {
+      return "-";
+    }
+    const mapped = siteHostMap.get(normalizeHostLike(source));
+    if (mapped) {
+      return mapped;
+    }
+    if (source.includes(".")) {
+      return source;
+    }
+    if (/^[a-z0-9_]+$/i.test(source)) {
+      return source.replace(/_/g, ".");
+    }
+    return source;
+  };
+
+  const rebuildOptions = () => {
+    const services = new Set();
+    const methods = new Set();
+    const statuses = new Set();
+    for (const row of state.rows) {
+      const service = String(row?.serviceDisplay || "").trim();
+      const method = String(row?.entry?.method || "").trim().toUpperCase();
+      const status = String(row?.entry?.status ?? "").trim();
+      if (service && service !== "-") {
+        services.add(service);
+      }
+      if (method) {
+        methods.add(method);
+      }
+      if (status) {
+        statuses.add(status);
+      }
+    }
+    state.serviceOptions = Array.from(services).sort((left, right) => left.localeCompare(right, undefined, { sensitivity: "base" }));
+    state.methodOptions = Array.from(methods).sort((left, right) => left.localeCompare(right, undefined, { sensitivity: "base" }));
+    state.statusOptions = Array.from(statuses).sort((left, right) => Number(left) - Number(right));
+    if (state.selectedService && !state.serviceOptions.includes(state.selectedService)) {
+      state.selectedService = "";
+    }
+    if (state.selectedMethod && !state.methodOptions.includes(state.selectedMethod)) {
+      state.selectedMethod = "";
+    }
+    if (state.selectedStatus && !state.statusOptions.includes(state.selectedStatus)) {
+      state.selectedStatus = "";
+    }
+  };
+
+  const matchTimeFilter = (rowDate) => {
+    const preset = normalizeTimePreset(state.selectedTimePreset);
+    if (preset === "all") {
+      return true;
+    }
+    if (!(rowDate instanceof Date)) {
+      return false;
+    }
+    const now = Date.now();
+    const rowStamp = rowDate.getTime();
+    if (preset === "minute") {
+      return rowStamp >= now - 60 * 1000;
+    }
+    if (preset === "day") {
+      return rowStamp >= now - 24 * 60 * 60 * 1000;
+    }
+    if (preset === "month") {
+      return rowStamp >= now - 30 * 24 * 60 * 60 * 1000;
+    }
+    if (preset === "date") {
+      if (!state.selectedDate) {
+        return true;
+      }
+      return toDateKeyLocal(rowDate) === state.selectedDate;
+    }
+    if (preset === "datetime") {
+      if (!state.selectedDateTime) {
+        return true;
+      }
+      const targetStamp = Date.parse(state.selectedDateTime);
+      if (!Number.isFinite(targetStamp)) {
+        return true;
+      }
+      return rowStamp >= targetStamp && rowStamp < (targetStamp + 60 * 1000);
+    }
+    return true;
+  };
+
   const applyFiltersAndSort = () => {
     const search = normalizeToken(state.search);
     const sortColumn = columns.find((column) => column.id === state.sortBy) || columns[0];
     const factor = state.sortDirection === "asc" ? 1 : -1;
     const filtered = state.rows.filter((row) => {
+      const service = String(row?.serviceDisplay || "").trim();
+      const method = String(row?.entry?.method || "").trim().toUpperCase();
+      const status = String(row?.entry?.status ?? "").trim();
+      const rowDate = row?.timestampDate || null;
+      if (state.selectedService && service !== state.selectedService) {
+        return false;
+      }
+      if (state.selectedMethod && method !== state.selectedMethod) {
+        return false;
+      }
+      if (state.selectedStatus && status !== state.selectedStatus) {
+        return false;
+      }
+      if (!matchTimeFilter(rowDate)) {
+        return false;
+      }
       if (!search) {
         return true;
       }
       const haystack = [
-        row?.entry?.site,
+        row?.serviceDisplay,
         row?.entry?.request_id,
         row?.entry?.method,
         row?.entry?.uri,
@@ -124,6 +270,9 @@ export async function renderRequests(container, ctx) {
   };
 
   const render = () => {
+    if (!isActive()) {
+      return;
+    }
     applyFiltersAndSort();
     const meta = getPaginationMeta(state.filteredRows.length);
     const pageRows = state.filteredRows.slice(meta.start, meta.end);
@@ -132,7 +281,7 @@ export async function renderRequests(container, ctx) {
       const entry = row?.entry && typeof row.entry === "object" ? row.entry : {};
       const fields = [
         ["requests.detail.time", formatDate(String(entry.timestamp || row?.ingested_at || "")) || "-"],
-        ["requests.detail.service", String(entry.site || "-")],
+        ["requests.detail.service", String(row?.serviceDisplay || "-")],
         ["requests.detail.requestId", String(entry.request_id || "-")],
         ["requests.detail.method", String(entry.method || "-")],
         ["requests.detail.uri", String(entry.uri || "-")],
@@ -163,6 +312,7 @@ export async function renderRequests(container, ctx) {
       `;
     };
 
+    const timePreset = normalizeTimePreset(state.selectedTimePreset);
     container.innerHTML = `
       <section class="waf-card no-page-card-head">
         <div class="waf-card-head">
@@ -173,6 +323,50 @@ export async function renderRequests(container, ctx) {
           <button class="btn ghost btn-sm" id="requests-refresh" type="button">${escapeHtml(ctx.t("common.refresh"))}</button>
         </div>
         <div class="waf-card-body waf-stack">
+          <div class="waf-form-grid three">
+            <div class="waf-field">
+              <label for="requests-filter-service">${escapeHtml(ctx.t("requests.filter.service"))}</label>
+              <select id="requests-filter-service">
+                <option value="">${escapeHtml(ctx.t("requests.filter.all"))}</option>
+                ${state.serviceOptions.map((item) => `<option value="${escapeHtml(item)}"${state.selectedService === item ? " selected" : ""}>${escapeHtml(item)}</option>`).join("")}
+              </select>
+            </div>
+            <div class="waf-field">
+              <label for="requests-filter-method">${escapeHtml(ctx.t("requests.filter.method"))}</label>
+              <select id="requests-filter-method">
+                <option value="">${escapeHtml(ctx.t("requests.filter.all"))}</option>
+                ${state.methodOptions.map((item) => `<option value="${escapeHtml(item)}"${state.selectedMethod === item ? " selected" : ""}>${escapeHtml(item)}</option>`).join("")}
+              </select>
+            </div>
+            <div class="waf-field">
+              <label for="requests-filter-status">${escapeHtml(ctx.t("requests.filter.status"))}</label>
+              <select id="requests-filter-status">
+                <option value="">${escapeHtml(ctx.t("requests.filter.all"))}</option>
+                ${state.statusOptions.map((item) => `<option value="${escapeHtml(item)}"${state.selectedStatus === item ? " selected" : ""}>${escapeHtml(item)}</option>`).join("")}
+              </select>
+            </div>
+          </div>
+          <div class="waf-form-grid three">
+            <div class="waf-field">
+              <label for="requests-filter-time">${escapeHtml(ctx.t("requests.filter.time"))}</label>
+              <select id="requests-filter-time">
+                <option value="all"${timePreset === "all" ? " selected" : ""}>${escapeHtml(ctx.t("requests.time.all"))}</option>
+                <option value="minute"${timePreset === "minute" ? " selected" : ""}>${escapeHtml(ctx.t("requests.time.minute"))}</option>
+                <option value="day"${timePreset === "day" ? " selected" : ""}>${escapeHtml(ctx.t("requests.time.day"))}</option>
+                <option value="month"${timePreset === "month" ? " selected" : ""}>${escapeHtml(ctx.t("requests.time.month"))}</option>
+                <option value="date"${timePreset === "date" ? " selected" : ""}>${escapeHtml(ctx.t("requests.time.date"))}</option>
+                <option value="datetime"${timePreset === "datetime" ? " selected" : ""}>${escapeHtml(ctx.t("requests.time.datetime"))}</option>
+              </select>
+            </div>
+            <div class="waf-field${timePreset === "date" ? "" : " waf-hidden"}">
+              <label for="requests-filter-date">${escapeHtml(ctx.t("requests.filter.date"))}</label>
+              <input id="requests-filter-date" type="date" value="${escapeHtml(state.selectedDate)}">
+            </div>
+            <div class="waf-field${timePreset === "datetime" ? "" : " waf-hidden"}">
+              <label for="requests-filter-datetime">${escapeHtml(ctx.t("requests.filter.datetime"))}</label>
+              <input id="requests-filter-datetime" type="datetime-local" value="${escapeHtml(state.selectedDateTime)}">
+            </div>
+          </div>
           <div class="waf-field">
             <label for="requests-search">${escapeHtml(ctx.t("requests.search"))}</label>
             <input id="requests-search" value="${escapeHtml(state.search)}" placeholder="${escapeHtml(ctx.t("requests.searchPlaceholder"))}">
@@ -183,8 +377,8 @@ export async function renderRequests(container, ctx) {
               <thead>
                 <tr>
                   ${columns.map((column) => {
-                    const isActive = state.sortBy === column.id;
-                    const marker = isActive ? (state.sortDirection === "asc" ? " ▲" : " ▼") : "";
+                    const isActiveCol = state.sortBy === column.id;
+                    const marker = isActiveCol ? (state.sortDirection === "asc" ? " ↑" : " ↓") : "";
                     return `<th><button type="button" class="waf-table-sort" data-sort-col="${escapeHtml(column.id)}">${escapeHtml(ctx.t(column.labelKey))}${marker}</button></th>`;
                   }).join("")}
                 </tr>
@@ -193,7 +387,7 @@ export async function renderRequests(container, ctx) {
                 ${pageRows.length
                   ? pageRows.map((row, index) => `
                     <tr class="waf-table-row-clickable" data-request-row="${meta.start + index}" tabindex="0" role="button">
-                      <td>${escapeHtml(String(row?.entry?.site || "-"))}</td>
+                      <td>${escapeHtml(String(row?.serviceDisplay || "-"))}</td>
                       <td>${escapeHtml(formatDate(String(row?.entry?.timestamp || row?.ingested_at || "")))}</td>
                       <td><span class="waf-code">${escapeHtml(String(row?.entry?.request_id || "-"))}</span></td>
                       <td>${escapeHtml(String(row?.entry?.method || "-"))}</td>
@@ -252,6 +446,40 @@ export async function renderRequests(container, ctx) {
         nextInput.focus();
         nextInput.setSelectionRange(cursor, cursor);
       }
+    });
+    container.querySelector("#requests-filter-service")?.addEventListener("change", (event) => {
+      state.selectedService = String(event.target?.value || "");
+      state.page = 1;
+      render();
+    });
+    container.querySelector("#requests-filter-method")?.addEventListener("change", (event) => {
+      state.selectedMethod = String(event.target?.value || "").toUpperCase();
+      state.page = 1;
+      render();
+    });
+    container.querySelector("#requests-filter-status")?.addEventListener("change", (event) => {
+      state.selectedStatus = String(event.target?.value || "");
+      state.page = 1;
+      render();
+    });
+    container.querySelector("#requests-filter-time")?.addEventListener("change", async (event) => {
+      state.selectedTimePreset = normalizeTimePreset(event.target?.value || "all");
+      state.page = 1;
+      if (state.selectedTimePreset === "date") {
+        await load();
+        return;
+      }
+      render();
+    });
+    container.querySelector("#requests-filter-date")?.addEventListener("change", async (event) => {
+      state.selectedDate = String(event.target?.value || "") || todayDateKeyLocal();
+      state.page = 1;
+      await load();
+    });
+    container.querySelector("#requests-filter-datetime")?.addEventListener("change", (event) => {
+      state.selectedDateTime = String(event.target?.value || "");
+      state.page = 1;
+      render();
     });
 
     container.querySelector("#requests-page-size")?.addEventListener("change", (event) => {
@@ -348,18 +576,36 @@ export async function renderRequests(container, ctx) {
   };
 
   const load = async () => {
+    if (!isActive()) {
+      return;
+    }
     try {
       setLoading(container, ctx.t("requests.loading"));
+      const runtimeSettings = await ctx.api.get("/api/settings/runtime", { signal }).catch(() => null);
+      const logsDays = Number(runtimeSettings?.storage?.logs_days || 14);
+      if (Number.isFinite(logsDays) && logsDays > 0) {
+        state.storageLogsDays = logsDays;
+      }
       const params = new URLSearchParams();
       params.set("limit", String(state.fetchLimit));
-      const response = await fetch(`/api/requests?${params.toString()}`, {
-        method: "GET",
-        credentials: "include",
-        headers: { Accept: "text/plain" }
-      });
+      params.set("day", state.selectedDate || todayDateKeyLocal());
+      params.set("retention_days", String(state.storageLogsDays || 14));
+      const [response, sites] = await Promise.all([
+        fetch(`/api/requests?${params.toString()}`, {
+          method: "GET",
+          credentials: "include",
+          headers: { Accept: "text/plain" },
+          signal
+        }),
+        ctx.api.get("/api/sites", { signal }).catch(() => []),
+      ]);
+      if (!isActive()) {
+        return;
+      }
       if (response.status === 404) {
         state.rows = [];
         state.page = 1;
+        rebuildOptions();
         render();
         return;
       }
@@ -367,14 +613,36 @@ export async function renderRequests(container, ctx) {
         throw new Error(`HTTP ${response.status}`);
       }
       const text = await response.text();
-      state.rows = parseRequestsJSONL(text);
+      if (!isActive()) {
+        return;
+      }
+      const siteHostMap = new Map();
+      for (const site of normalizeList(sites)) {
+        const id = normalizeHostLike(site?.id);
+        const host = String(site?.primary_host || "").trim();
+        if (id && host) {
+          siteHostMap.set(id, host);
+        }
+      }
+      state.rows = parseRequestsJSONL(text).map((row) => {
+        const entry = row?.entry && typeof row.entry === "object" ? row.entry : {};
+        const serviceDisplay = resolveServiceDisplay(entry.site, siteHostMap);
+        const timestampDate = parseTimestamp(entry.timestamp || row?.ingested_at);
+        return { ...row, entry, serviceDisplay, timestampDate };
+      });
+      rebuildOptions();
       state.page = 1;
       render();
     } catch (error) {
+      if (!isActive()) {
+        return;
+      }
+      if (error?.name === "AbortError") {
+        return;
+      }
       setError(container, ctx.t("requests.error.load"));
     }
   };
 
   await load();
 }
-
