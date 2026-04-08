@@ -1342,6 +1342,7 @@ function renderListView(state, ctx) {
             <button class="btn primary btn-sm" type="button" id="services-create">${escapeHtml(ctx.t("sites.action.createSite"))}</button>
             <button class="btn ghost btn-sm" type="button" id="services-import">${escapeHtml(ctx.t("sites.action.import"))}</button>
             <button class="btn ghost btn-sm" type="button" id="services-export">${escapeHtml(ctx.t("sites.action.export"))}</button>
+            <button class="btn ghost btn-sm" type="button" id="services-delete-selected">${escapeHtml(ctx.t("sites.action.deleteSelected"))}</button>
             <button class="btn ghost btn-sm" type="button" id="services-refresh">${escapeHtml(ctx.t("common.refresh"))}</button>
           </div>
         </div>
@@ -2011,11 +2012,30 @@ async function upsertAccessPolicy(draft, ctx, existingAccessPolicy) {
     const accessPolicies = normalizeArray(await ctx.api.get("/api/access-policies"));
     return accessPolicies.find((item) => normalizeSiteID(item?.site_id) === siteID) || null;
   };
+  const normalizeListForCompare = (values) => normalizeStringArray(values).slice().sort();
+  const matchesPayload = (policy) => {
+    if (!policy) {
+      return false;
+    }
+    if (normalizeSiteID(policy.site_id) !== siteID) {
+      return false;
+    }
+    const policyAllow = normalizeListForCompare(policy.allowlist);
+    const policyDeny = normalizeListForCompare(policy.denylist);
+    const expectedAllow = normalizeListForCompare(payload.allowlist);
+    const expectedDeny = normalizeListForCompare(payload.denylist);
+    return JSON.stringify(policyAllow) === JSON.stringify(expectedAllow) &&
+      JSON.stringify(policyDeny) === JSON.stringify(expectedDeny);
+  };
   if (!allowlist.length && !denylist.length && existingAccessPolicy) {
     try {
       await ctx.api.delete(`/api/access-policies/${encodeURIComponent(payload.id)}`);
     } catch (error) {
-      if (error?.status !== 404) {
+      if (error?.status !== 404 && !isAutoApplyFailureError(error)) {
+        throw error;
+      }
+      const policyForSite = await resolvePolicyForSite();
+      if (policyForSite) {
         throw error;
       }
     }
@@ -2024,6 +2044,12 @@ async function upsertAccessPolicy(draft, ctx, existingAccessPolicy) {
   try {
     await ctx.api.post("/api/access-policies/upsert", payload);
   } catch (error) {
+    if (isAutoApplyFailureError(error)) {
+      const policyForSite = await resolvePolicyForSite();
+      if (matchesPayload(policyForSite)) {
+        return;
+      }
+    }
     if (error?.status === 404 || error?.status === 405) {
       // Backward compatibility with older backend versions without upsert endpoint.
       if (existingAccessPolicy) {
@@ -2031,22 +2057,46 @@ async function upsertAccessPolicy(draft, ctx, existingAccessPolicy) {
           await ctx.api.put(`/api/access-policies/${encodeURIComponent(payload.id)}`, payload);
           return;
         } catch (putError) {
+          if (isAutoApplyFailureError(putError)) {
+            const policyForSite = await resolvePolicyForSite();
+            if (matchesPayload(policyForSite)) {
+              return;
+            }
+          }
           if (putError?.status !== 404) {
             throw putError;
           }
         }
       }
-      await ctx.api.post("/api/access-policies", payload);
+      try {
+        await ctx.api.post("/api/access-policies", payload);
+      } catch (postError) {
+        if (isAutoApplyFailureError(postError)) {
+          const policyForSite = await resolvePolicyForSite();
+          if (matchesPayload(policyForSite)) {
+            return;
+          }
+        }
+        throw postError;
+      }
       return;
     }
     const message = String(error?.message || "").toLowerCase();
     if (error?.status === 400 && message.includes("already exists")) {
       const policyForSite = await resolvePolicyForSite();
       if (policyForSite?.id) {
-        await ctx.api.put(`/api/access-policies/${encodeURIComponent(String(policyForSite.id))}`, {
-          ...payload,
-          id: String(policyForSite.id)
-        });
+        const upsertPayload = { ...payload, id: String(policyForSite.id) };
+        try {
+          await ctx.api.put(`/api/access-policies/${encodeURIComponent(String(policyForSite.id))}`, upsertPayload);
+        } catch (putError) {
+          if (isAutoApplyFailureError(putError)) {
+            const persistedPolicy = await resolvePolicyForSite();
+            if (matchesPayload(persistedPolicy)) {
+              return;
+            }
+          }
+          throw putError;
+        }
         return;
       }
     }
@@ -2113,6 +2163,21 @@ async function resolveACMEAccountEmail(draft, ctx) {
   return "";
 }
 
+function isAutoApplyFailureError(error) {
+  const message = String(error?.message || "").toLowerCase();
+  return message.includes("apply failed") ||
+    message.includes("reload failed") ||
+    message.includes("health-check failed") ||
+    message.includes("default upstream is required") ||
+    message.includes("revision apply") ||
+    message.includes("limit_req");
+}
+
+function isAlreadyExistsError(error) {
+  const message = String(error?.message || "").toLowerCase();
+  return (error?.status === 400 || error?.status === 409) && message.includes("already exists");
+}
+
 async function upsertSiteResources(draft, ctx, existingSite, existingUpstream, existingTLSConfig) {
   const sitePayload = {
     id: draft.id.trim().toLowerCase(),
@@ -2137,19 +2202,10 @@ async function upsertSiteResources(draft, ctx, existingSite, existingUpstream, e
     }
   };
   const rollbackable = (fn) => cleanupActions.push(fn);
-  const isDefaultUpstreamRequiredError = (error) => {
-    const message = String(error?.message || "").toLowerCase();
-    return message.includes("default upstream is required");
-  };
   const shouldKeepStateOnApplyError = (error) => {
-    const message = String(error?.message || "").toLowerCase();
     // Auto-apply failures may return after resources were persisted in control-plane state.
     // Do not rollback saved entities in this case, otherwise TLS bindings can be silently removed.
-    return message.includes("apply failed") ||
-      message.includes("reload failed") ||
-      message.includes("health-check failed") ||
-      message.includes("default upstream is required") ||
-      message.includes("limit_req");
+    return isAutoApplyFailureError(error);
   };
   const isNotFound = (error) => error?.status === 404;
   const deleteIgnoreNotFound = async (path) => {
@@ -2161,10 +2217,23 @@ async function upsertSiteResources(draft, ctx, existingSite, existingUpstream, e
       }
     }
   };
-    const siteExists = async (siteID) => {
-      const sites = await ctx.api.get("/api/sites");
-      return Array.isArray(sites) && sites.some((site) => normalizeSiteID(site?.id) === normalizeSiteID(siteID));
-    };
+  const siteExists = async (siteID) => {
+    const sites = await ctx.api.get("/api/sites");
+    return Array.isArray(sites) && sites.some((site) => normalizeSiteID(site?.id) === normalizeSiteID(siteID));
+  };
+  const upstreamExists = async (upstreamID) => {
+    const upstreams = await ctx.api.get("/api/upstreams");
+    return Array.isArray(upstreams) && upstreams.some((upstream) => normalizeSiteID(upstream?.id) === normalizeSiteID(upstreamID));
+  };
+  const tlsConfigMatches = async (siteID, certificateID) => {
+    const tlsConfigs = await ctx.api.get("/api/tls-configs");
+    if (!Array.isArray(tlsConfigs)) {
+      return false;
+    }
+    return tlsConfigs.some((item) =>
+      normalizeSiteID(item?.site_id) === normalizeSiteID(siteID) &&
+      String(item?.certificate_id || "").trim().toLowerCase() === String(certificateID || "").trim().toLowerCase());
+  };
   const certificateExists = async (certificateID) => {
     const certificates = await ctx.api.get("/api/certificates");
     return Array.isArray(certificates) && certificates.some((certificate) => String(certificate?.id || "").toLowerCase() === String(certificateID || "").toLowerCase());
@@ -2175,10 +2244,26 @@ async function upsertSiteResources(draft, ctx, existingSite, existingUpstream, e
       try {
         await ctx.api.put(`/api/sites/${encodeURIComponent(sitePayload.id)}`, sitePayload);
       } catch (error) {
-        if (error?.status !== 404) {
+        if (error?.status === 404) {
+          try {
+            await ctx.api.post("/api/sites", sitePayload);
+          } catch (postError) {
+            if (!isAutoApplyFailureError(postError)) {
+              throw postError;
+            }
+            const persisted = await siteExists(sitePayload.id);
+            if (!persisted) {
+              throw postError;
+            }
+          }
+        } else if (isAutoApplyFailureError(error)) {
+          const persisted = await siteExists(sitePayload.id);
+          if (!persisted) {
+            throw error;
+          }
+        } else {
           throw error;
         }
-        await ctx.api.post("/api/sites", sitePayload);
       }
     } else {
       let createdSite = false;
@@ -2186,11 +2271,10 @@ async function upsertSiteResources(draft, ctx, existingSite, existingUpstream, e
         await ctx.api.post("/api/sites", sitePayload);
         createdSite = true;
       } catch (error) {
-        const message = String(error?.message || "").toLowerCase();
-        if (error?.status === 400 && message.includes("already exists")) {
+        if (isAlreadyExistsError(error)) {
           await ctx.api.put(`/api/sites/${encodeURIComponent(sitePayload.id)}`, sitePayload);
           createdSite = false;
-        } else if (!isDefaultUpstreamRequiredError(error)) {
+        } else if (!isAutoApplyFailureError(error)) {
           throw error;
         } else {
           createdSite = await siteExists(sitePayload.id);
@@ -2208,37 +2292,79 @@ async function upsertSiteResources(draft, ctx, existingSite, existingUpstream, e
       try {
         await ctx.api.put(`/api/upstreams/${encodeURIComponent(upstreamPayload.id)}`, upstreamPayload);
       } catch (error) {
-        if (error?.status !== 404) {
+        if (error?.status === 404) {
+          try {
+            await ctx.api.post("/api/upstreams", upstreamPayload);
+          } catch (postError) {
+            if (!isAutoApplyFailureError(postError)) {
+              throw postError;
+            }
+            const persisted = await upstreamExists(upstreamPayload.id);
+            if (!persisted) {
+              throw postError;
+            }
+          }
+        } else if (isAutoApplyFailureError(error)) {
+          const persisted = await upstreamExists(upstreamPayload.id);
+          if (!persisted) {
+            throw error;
+          }
+        } else {
           throw error;
         }
-        await ctx.api.post("/api/upstreams", upstreamPayload);
       }
     } else {
-      await ctx.api.post("/api/upstreams", upstreamPayload);
-      rollbackable(async () => deleteIgnoreNotFound(`/api/upstreams/${encodeURIComponent(upstreamPayload.id)}`));
+      let createdUpstream = false;
+      try {
+        await ctx.api.post("/api/upstreams", upstreamPayload);
+        createdUpstream = true;
+      } catch (error) {
+        if (isAlreadyExistsError(error)) {
+          await ctx.api.put(`/api/upstreams/${encodeURIComponent(upstreamPayload.id)}`, upstreamPayload);
+          createdUpstream = false;
+        } else if (isAutoApplyFailureError(error)) {
+          createdUpstream = await upstreamExists(upstreamPayload.id);
+          if (!createdUpstream) {
+            throw error;
+          }
+        } else {
+          throw error;
+        }
+      }
+      if (createdUpstream) {
+        rollbackable(async () => deleteIgnoreNotFound(`/api/upstreams/${encodeURIComponent(upstreamPayload.id)}`));
+      }
     }
 
     if (draft.tls_enabled) {
       const certificateID = (draft.certificate_id.trim() || `${sitePayload.id}-tls`).toLowerCase();
       const hadCertificateBefore = await certificateExists(certificateID);
       const importMode = String(draft.certificate_authority_server || "").trim().toLowerCase() === "import";
+      const isCurrentTLSCertificate = normalizeSiteID(existingTLSConfig?.site_id) === normalizeSiteID(sitePayload.id) &&
+        String(existingTLSConfig?.certificate_id || "").trim().toLowerCase() === certificateID;
       if (importMode && !hadCertificateBefore) {
         throw new Error(ctx.t("sites.tls.importRequired"));
       }
-      if (!importMode && !hadCertificateBefore) {
+      if (!importMode && !hadCertificateBefore && !isCurrentTLSCertificate) {
         const issueEndpoint = draft.tls_self_signed ? "/api/certificates/self-signed/issue" : "/api/certificates/acme/issue";
         const acmeAccountEmail = draft.tls_self_signed ? "" : await resolveACMEAccountEmail(draft, ctx);
         if (!draft.tls_self_signed && acmeAccountEmail) {
           draft.acme_account_email = acmeAccountEmail;
         }
-        await ctx.api.post(issueEndpoint, {
-          certificate_id: certificateID,
-          common_name: sitePayload.primary_host,
-          san_list: [],
-          certificate_authority_server: draft.certificate_authority_server,
-          use_lets_encrypt_staging: Boolean(draft.use_lets_encrypt_staging),
-          account_email: acmeAccountEmail
-        });
+        try {
+          await ctx.api.post(issueEndpoint, {
+            certificate_id: certificateID,
+            common_name: sitePayload.primary_host,
+            san_list: [],
+            certificate_authority_server: draft.certificate_authority_server,
+            use_lets_encrypt_staging: Boolean(draft.use_lets_encrypt_staging),
+            account_email: acmeAccountEmail
+          });
+        } catch (error) {
+          if (!isAlreadyExistsError(error)) {
+            throw error;
+          }
+        }
       }
       if (!hadCertificateBefore && !importMode) {
         rollbackable(async () => deleteIgnoreNotFound(`/api/certificates/${encodeURIComponent(certificateID)}`));
@@ -2248,10 +2374,26 @@ async function upsertSiteResources(draft, ctx, existingSite, existingUpstream, e
         try {
           await ctx.api.put(`/api/tls-configs/${encodeURIComponent(sitePayload.id)}`, tlsPayload);
         } catch (error) {
-          if (error?.status !== 404) {
+          if (error?.status === 404) {
+            try {
+              await ctx.api.post("/api/tls-configs", tlsPayload);
+            } catch (postError) {
+              if (!isAutoApplyFailureError(postError)) {
+                throw postError;
+              }
+              const persisted = await tlsConfigMatches(sitePayload.id, certificateID);
+              if (!persisted) {
+                throw postError;
+              }
+            }
+          } else if (isAutoApplyFailureError(error)) {
+            const persisted = await tlsConfigMatches(sitePayload.id, certificateID);
+            if (!persisted) {
+              throw error;
+            }
+          } else {
             throw error;
           }
-          await ctx.api.post("/api/tls-configs", tlsPayload);
         }
       } else {
         try {
@@ -2259,10 +2401,16 @@ async function upsertSiteResources(draft, ctx, existingSite, existingUpstream, e
         } catch (error) {
           const message = String(error?.message || "").toLowerCase();
           const hasConflict = error?.status === 409 || message.includes("already exists");
-          if (!hasConflict) {
+          if (hasConflict) {
+            await ctx.api.put(`/api/tls-configs/${encodeURIComponent(sitePayload.id)}`, tlsPayload);
+          } else if (isAutoApplyFailureError(error)) {
+            const persisted = await tlsConfigMatches(sitePayload.id, certificateID);
+            if (!persisted) {
+              throw error;
+            }
+          } else {
             throw error;
           }
-          await ctx.api.put(`/api/tls-configs/${encodeURIComponent(sitePayload.id)}`, tlsPayload);
         }
         rollbackable(async () => deleteIgnoreNotFound(`/api/tls-configs/${encodeURIComponent(sitePayload.id)}`));
       }
@@ -2276,16 +2424,92 @@ async function upsertSiteResources(draft, ctx, existingSite, existingUpstream, e
 
 }
 
-async function putWithPostFallback(ctx, path, payload) {
+async function deleteServiceWithResources(siteID, ctx, snapshot = null) {
+  const normalizedSiteID = normalizeSiteID(siteID);
+  if (!normalizedSiteID) {
+    return;
+  }
+  const isNotFound = (error) => error?.status === 404;
+  const deleteIgnoreSafe = async (path) => {
+    try {
+      await ctx.api.delete(path);
+    } catch (error) {
+      if (!isNotFound(error) && !isAutoApplyFailureError(error)) {
+        throw error;
+      }
+    }
+  };
+  const upstreams = Array.isArray(snapshot?.upstreams)
+    ? snapshot.upstreams
+    : await ctx.api.get("/api/upstreams").catch(() => []);
+  const upstreamsForSite = normalizeArray(upstreams).filter((item) => normalizeSiteID(item?.site_id) === normalizedSiteID);
+  await deleteIgnoreSafe(`/api/tls-configs/${encodeURIComponent(normalizedSiteID)}`);
+  await deleteIgnoreSafe(`/api/access-policies/${encodeURIComponent(`easy-${normalizedSiteID}-access`)}`);
+  await deleteIgnoreSafe(`/api/easy-site-profiles/${encodeURIComponent(normalizedSiteID)}`);
+  const [wafPolicies, ratePolicies, accessPolicies] = await Promise.all([
+    Array.isArray(snapshot?.wafPolicies) ? snapshot.wafPolicies : ctx.api.get("/api/waf-policies").catch(() => []),
+    Array.isArray(snapshot?.ratePolicies) ? snapshot.ratePolicies : ctx.api.get("/api/rate-limit-policies").catch(() => []),
+    Array.isArray(snapshot?.accessPolicies) ? snapshot.accessPolicies : ctx.api.get("/api/access-policies").catch(() => [])
+  ]);
+  for (const policy of normalizeArray(wafPolicies).filter((item) => normalizeSiteID(item?.site_id) === normalizedSiteID)) {
+    const policyID = String(policy?.id || "").trim();
+    if (!policyID) {
+      continue;
+    }
+    await deleteIgnoreSafe(`/api/waf-policies/${encodeURIComponent(policyID)}`);
+  }
+  for (const policy of normalizeArray(ratePolicies).filter((item) => normalizeSiteID(item?.site_id) === normalizedSiteID)) {
+    const policyID = String(policy?.id || "").trim();
+    if (!policyID) {
+      continue;
+    }
+    await deleteIgnoreSafe(`/api/rate-limit-policies/${encodeURIComponent(policyID)}`);
+  }
+  for (const policy of normalizeArray(accessPolicies).filter((item) => normalizeSiteID(item?.site_id) === normalizedSiteID)) {
+    const policyID = String(policy?.id || "").trim();
+    if (!policyID) {
+      continue;
+    }
+    await deleteIgnoreSafe(`/api/access-policies/${encodeURIComponent(policyID)}`);
+  }
+  await deleteIgnoreSafe(`/api/sites/${encodeURIComponent(normalizedSiteID)}`);
+  for (const upstream of upstreamsForSite) {
+    const upstreamID = String(upstream?.id || "").trim();
+    if (!upstreamID) {
+      continue;
+    }
+    await deleteIgnoreSafe(`/api/upstreams/${encodeURIComponent(upstreamID)}`);
+  }
+}
+
+async function putWithPostFallback(ctx, path, payload, options = {}) {
+  const tolerateAutoApplyError = Boolean(options?.tolerateAutoApplyError);
+  const verifyPersisted = typeof options?.verifyPersisted === "function" ? options.verifyPersisted : null;
   try {
     await ctx.api.post(path, payload);
     return;
   } catch (postError) {
+    if (tolerateAutoApplyError && isAutoApplyFailureError(postError) && verifyPersisted) {
+      const persisted = await verifyPersisted();
+      if (persisted) {
+        return;
+      }
+    }
     if (postError?.status !== 404 && postError?.status !== 405) {
       throw postError;
     }
   }
-  await ctx.api.put(path, payload);
+  try {
+    await ctx.api.put(path, payload);
+  } catch (putError) {
+    if (tolerateAutoApplyError && isAutoApplyFailureError(putError) && verifyPersisted) {
+      const persisted = await verifyPersisted();
+      if (persisted) {
+        return;
+      }
+    }
+    throw putError;
+  }
 }
 
 function ensureControlPlaneAccessManagementMethods(draft) {
@@ -2886,6 +3110,34 @@ export async function renderSites(container, ctx) {
         syncDerivedFieldsFromID();
       }
     });
+    container.querySelector("#services-delete-selected")?.addEventListener("click", async () => {
+      feedback.innerHTML = "";
+      const selectedIDs = Array.from(state.selectedSiteIDs).filter((id) => state.sites.some((site) => normalizeSiteID(site.id) === normalizeSiteID(id)));
+      if (!selectedIDs.length) {
+        setError(feedback, ctx.t("sites.error.noServicesSelected"));
+        return;
+      }
+      if (!confirmAction(ctx.t("sites.confirm.deleteSelected", { count: selectedIDs.length }))) {
+        return;
+      }
+      try {
+        setLoading(feedback, ctx.t("sites.action.deleting"));
+        const sharedSnapshot = {
+          upstreams: state.upstreams,
+          wafPolicies: await ctx.api.get("/api/waf-policies").catch(() => []),
+          ratePolicies: await ctx.api.get("/api/rate-limit-policies").catch(() => []),
+          accessPolicies: await ctx.api.get("/api/access-policies").catch(() => [])
+        };
+        for (const siteID of selectedIDs) {
+          await deleteServiceWithResources(siteID, ctx, sharedSnapshot);
+        }
+        state.selectedSiteIDs = new Set();
+        ctx.notify(ctx.t("sites.toast.servicesDeleted", { count: selectedIDs.length }));
+        await load();
+      } catch (error) {
+        setError(feedback, `${ctx.t("sites.error.deleteSite")}: ${String(error?.message || error)}`);
+      }
+    });
     container.querySelector("#service-id")?.addEventListener("input", (event) => {
       const id = event.target.value.trim().toLowerCase();
       const autoID = normalizeAutoSiteID(hostInput?.value || "");
@@ -3255,7 +3507,18 @@ export async function renderSites(container, ctx) {
           await upsertSiteResources(draft, ctx, existingSite, existingUpstream, existingTLSConfig);
         }
         await upsertAccessPolicy(draft, ctx, existingAccessPolicy);
-        await putWithPostFallback(ctx, `/api/easy-site-profiles/${encodeURIComponent(draft.id)}`, draftToEasyProfile(draft));
+        const easyProfilePath = `/api/easy-site-profiles/${encodeURIComponent(draft.id)}`;
+        await putWithPostFallback(ctx, easyProfilePath, draftToEasyProfile(draft), {
+          tolerateAutoApplyError: true,
+          verifyPersisted: async () => {
+            try {
+              const persisted = await ctx.api.get(easyProfilePath);
+              return normalizeSiteID(persisted?.site_id) === normalizeSiteID(draft.id);
+            } catch (_error) {
+              return false;
+            }
+          }
+        });
         ctx.notify(ctx.t("toast.siteSaved"));
         go(`${routeBase()}/${encodeURIComponent(draft.id)}`);
       } catch (error) {
@@ -3274,71 +3537,9 @@ export async function renderSites(container, ctx) {
         return;
       }
       try {
-        const upstreamsForSite = state.upstreams.filter((item) => String(item?.site_id || "") === siteID);
-        // Remove dependents first so a re-create does not fail on stale leftovers.
-        for (const upstream of upstreamsForSite) {
-          await ctx.api.delete(`/api/upstreams/${encodeURIComponent(String(upstream.id || ""))}`).catch((error) => {
-            if (error?.status !== 404) {
-              throw error;
-            }
-          });
-        }
-        await ctx.api.delete(`/api/tls-configs/${encodeURIComponent(siteID)}`).catch((error) => {
-          if (error?.status !== 404) {
-            throw error;
-          }
+        await deleteServiceWithResources(siteID, ctx, {
+          upstreams: state.upstreams
         });
-        await ctx.api.delete(`/api/access-policies/${encodeURIComponent(`easy-${siteID}-access`)}`).catch((error) => {
-          if (error?.status !== 404) {
-            throw error;
-          }
-        });
-        await ctx.api.delete(`/api/easy-site-profiles/${encodeURIComponent(siteID)}`).catch((error) => {
-          if (error?.status !== 404) {
-            throw error;
-          }
-        });
-        const [wafPolicies, ratePolicies, accessPolicies] = await Promise.all([
-          ctx.api.get("/api/waf-policies").catch(() => []),
-          ctx.api.get("/api/rate-limit-policies").catch(() => []),
-          ctx.api.get("/api/access-policies").catch(() => [])
-        ]);
-        for (const policy of normalizeArray(wafPolicies).filter((item) => normalizeSiteID(item?.site_id) === normalizeSiteID(siteID))) {
-          const policyID = String(policy?.id || "").trim();
-          if (!policyID) {
-            continue;
-          }
-          await ctx.api.delete(`/api/waf-policies/${encodeURIComponent(policyID)}`).catch((error) => {
-            if (error?.status !== 404) {
-              throw error;
-            }
-          });
-        }
-        for (const policy of normalizeArray(ratePolicies).filter((item) => normalizeSiteID(item?.site_id) === normalizeSiteID(siteID))) {
-          const policyID = String(policy?.id || "").trim();
-          if (!policyID) {
-            continue;
-          }
-          await ctx.api.delete(`/api/rate-limit-policies/${encodeURIComponent(policyID)}`).catch((error) => {
-            if (error?.status !== 404) {
-              throw error;
-            }
-          });
-        }
-        for (const policy of normalizeArray(accessPolicies).filter((item) => normalizeSiteID(item?.site_id) === normalizeSiteID(siteID))) {
-          const policyID = String(policy?.id || "").trim();
-          if (!policyID) {
-            continue;
-          }
-          await ctx.api.delete(`/api/access-policies/${encodeURIComponent(policyID)}`).catch((error) => {
-            if (error?.status !== 404) {
-              throw error;
-            }
-          });
-        }
-
-        await ctx.api.delete(`/api/sites/${encodeURIComponent(siteID)}`);
-
         ctx.notify(ctx.t("toast.siteDeleted"));
         back();
       } catch (error) {
