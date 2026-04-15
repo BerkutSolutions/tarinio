@@ -99,13 +99,13 @@ func TestManualBanService_UnbanRemovesEntry(t *testing.T) {
 
 func TestManualBanService_BanResolvesSanitizedSiteAlias(t *testing.T) {
 	store := &fakeAccessPolicyStore{}
-	service := NewManualBanService(store, &fakeSiteReader{items: []sites.Site{{ID: "sentry.hantico.ru"}}}, nil)
+	service := NewManualBanService(store, &fakeSiteReader{items: []sites.Site{{ID: "sentry.example.com"}}}, nil)
 
-	policy, err := service.Ban(context.Background(), "sentry_hantico_ru", "10.0.0.1")
+	policy, err := service.Ban(context.Background(), "sentry_example_com", "10.0.0.1")
 	if err != nil {
 		t.Fatalf("ban failed: %v", err)
 	}
-	if policy.SiteID != "sentry.hantico.ru" {
+	if policy.SiteID != "sentry.example.com" {
 		t.Fatalf("expected canonical site id, got %+v", policy)
 	}
 	if len(policy.DenyList) != 1 || policy.DenyList[0] != "10.0.0.1" {
@@ -116,19 +116,19 @@ func TestManualBanService_BanResolvesSanitizedSiteAlias(t *testing.T) {
 func TestManualBanService_UnbanResolvesSanitizedSiteAlias(t *testing.T) {
 	store := &fakeAccessPolicyStore{
 		items: []accesspolicies.AccessPolicy{{
-			ID:       "sentry.hantico.ru-access",
-			SiteID:   "sentry.hantico.ru",
+			ID:       "sentry.example.com-access",
+			SiteID:   "sentry.example.com",
 			Enabled:  true,
 			DenyList: []string{"10.0.0.1"},
 		}},
 	}
-	service := NewManualBanService(store, &fakeSiteReader{items: []sites.Site{{ID: "sentry.hantico.ru"}}}, nil)
+	service := NewManualBanService(store, &fakeSiteReader{items: []sites.Site{{ID: "sentry.example.com"}}}, nil)
 
-	policy, err := service.Unban(context.Background(), "sentry_hantico_ru", "10.0.0.1")
+	policy, err := service.Unban(context.Background(), "sentry_example_com", "10.0.0.1")
 	if err != nil {
 		t.Fatalf("unban failed: %v", err)
 	}
-	if policy.SiteID != "sentry.hantico.ru" {
+	if policy.SiteID != "sentry.example.com" {
 		t.Fatalf("expected canonical site id, got %+v", policy)
 	}
 	if len(policy.DenyList) != 0 {
@@ -138,9 +138,9 @@ func TestManualBanService_UnbanResolvesSanitizedSiteAlias(t *testing.T) {
 
 func TestManualBanService_BanResolvesPrimaryHostAlias(t *testing.T) {
 	store := &fakeAccessPolicyStore{}
-	service := NewManualBanService(store, &fakeSiteReader{items: []sites.Site{{ID: "site-sentry", PrimaryHost: "sentry.hantico.ru"}}}, nil)
+	service := NewManualBanService(store, &fakeSiteReader{items: []sites.Site{{ID: "site-sentry", PrimaryHost: "sentry.example.com"}}}, nil)
 
-	policy, err := service.Ban(context.Background(), "sentry.hantico.ru", "10.0.0.1")
+	policy, err := service.Ban(context.Background(), "sentry.example.com", "10.0.0.1")
 	if err != nil {
 		t.Fatalf("ban failed: %v", err)
 	}

@@ -15,7 +15,7 @@ func TestShouldUseSelfSignedForDevFastStartHost(t *testing.T) {
 		{name: "ipv4 loopback with port", host: "127.0.0.1:443", want: true},
 		{name: "ipv6 loopback", host: "::1", want: true},
 		{name: "ipv6 loopback with port", host: "[::1]:443", want: true},
-		{name: "public host", host: "waf.hantico.ru", want: false},
+		{name: "public host", host: "waf.example.com", want: false},
 		{name: "public ip", host: "178.154.225.93", want: false},
 		{name: "empty", host: "", want: false},
 	}

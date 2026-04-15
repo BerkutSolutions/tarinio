@@ -127,15 +127,15 @@ func TestRenderEasyRateLimitArtifacts_SkipsReservedBaseLocations(t *testing.T) {
 func TestRenderEasyRateLimitArtifacts_WildcardPathSupportsSentryEnvelope(t *testing.T) {
 	artifacts, err := RenderEasyRateLimitArtifacts(
 		[]SiteInput{{
-			ID:                "sentry.hantico.ru",
+			ID:                "sentry.example.com",
 			Enabled:           true,
-			PrimaryHost:       "sentry.hantico.ru",
+			PrimaryHost:       "sentry.example.com",
 			ListenHTTP:        true,
 			DefaultUpstreamID: "sentry-upstream",
 		}},
 		[]UpstreamInput{{
 			ID:             "sentry-upstream",
-			SiteID:         "sentry.hantico.ru",
+			SiteID:         "sentry.example.com",
 			Name:           "sentry-upstream",
 			Scheme:         "http",
 			Host:           "upstream",
@@ -144,7 +144,7 @@ func TestRenderEasyRateLimitArtifacts_WildcardPathSupportsSentryEnvelope(t *test
 			PassHostHeader: true,
 		}},
 		[]EasyProfileInput{{
-			SiteID: "sentry.hantico.ru",
+			SiteID: "sentry.example.com",
 			CustomLimitRules: []CustomRateLimitRuleInput{
 				{Path: "/api/2/envelope/", Rate: "30r/s"},
 			},
@@ -164,7 +164,7 @@ func TestRenderEasyRateLimitArtifacts_WildcardPathSupportsSentryEnvelope(t *test
 		t.Fatalf("expected sentry envelope rate in easy rate limit http conf, got: %s", httpConf)
 	}
 
-	locationsConf := byPath["nginx/easy-locations/sentry.hantico.ru.conf"]
+	locationsConf := byPath["nginx/easy-locations/sentry.example.com.conf"]
 	if !strings.Contains(locationsConf, "location ~* ^/api/.*/envelope/ {") {
 		t.Fatalf("expected wildcard location for sentry envelope path, got: %s", locationsConf)
 	}

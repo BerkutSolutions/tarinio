@@ -574,10 +574,21 @@ function renderListEditor(field, label, values, placeholder = "", options = {}) 
   const emptyLabel = options.emptyLabel || "No values yet";
   const fieldClass = fullWidth ? "waf-field full" : "waf-field";
   const presets = Array.isArray(options.presets) ? options.presets : [];
-  const selectedPreset = String(options.selectedPreset || "");
+  const selectedTemplates = normalizeStringArray(options.selectedTemplates);
   const ctx = options.ctx || null;
   const quickTemplateLabel = ctx?.t ? ctx.t("sites.easy.listTemplates.quick") : "Quick templates";
-  const addTemplateLabel = ctx?.t ? ctx.t("sites.easy.listTemplates.add") : "Add template";
+  const selectedTemplateLabel = ctx?.t ? ctx.t("sites.easy.selectedCount", { count: selectedTemplates.length }) : `Selected: ${selectedTemplates.length}`;
+  const selectedValueLabel = ctx?.t ? ctx.t("sites.easy.selectedCount", { count: safeValues.length }) : `Selected: ${safeValues.length}`;
+  const selectedItemsLabel = ctx?.t ? ctx.t("sites.easy.selectedCount", { count: selectedTemplates.length + safeValues.length }) : `Selected: ${selectedTemplates.length + safeValues.length}`;
+  const selectedTemplateSet = new Set(selectedTemplates);
+  const availablePresets = presets.filter((preset) => {
+    const presetID = String(preset?.id || "").trim();
+    return presetID && !selectedTemplateSet.has(presetID);
+  });
+  const presetByID = new Map(presets.map((preset) => [String(preset?.id || "").trim(), preset]));
+  const resolvePresetLabel = (preset) => String(
+    ctx?.t && preset?.labelKey ? ctx.t(preset.labelKey) : (preset?.label || preset?.id || "")
+  );
   return `
     <div class="${fieldClass}">
       <label>${escapeHtml(label)}</label>
@@ -586,28 +597,67 @@ function renderListEditor(field, label, values, placeholder = "", options = {}) 
         <button class="btn ghost btn-sm" type="button" data-list-add="${escapeHtml(field)}">+</button>
       </div>
       ${presets.length ? `
-        <div class="waf-preset-row">
-          <select id="list-template-${escapeHtml(field)}">
-            <option value="">${escapeHtml(quickTemplateLabel)}</option>
-            ${presets.map((preset) => `
-              <option value="${escapeHtml(preset.id)}"${preset.id === selectedPreset ? " selected" : ""}>${escapeHtml(ctx?.t && preset?.labelKey ? ctx.t(preset.labelKey) : (preset.label || preset.id))}</option>
-            `).join("")}
-          </select>
-          <button class="btn ghost btn-sm" type="button" data-list-template-add="${escapeHtml(field)}">${escapeHtml(addTemplateLabel)}</button>
+        <div class="waf-template-picker">
+          <details class="waf-status-dropdown">
+            <summary>${escapeHtml(`${quickTemplateLabel} (${selectedTemplateLabel})`)}</summary>
+            <div class="waf-status-options">
+              ${availablePresets.map((preset) => `
+                <button
+                  class="btn ghost btn-sm waf-template-option"
+                  type="button"
+                  data-list-template-apply="${escapeHtml(field)}"
+                  data-list-template-id="${escapeHtml(String(preset.id || ""))}">${escapeHtml(resolvePresetLabel(preset))}</button>
+              `).join("") || `<span class="waf-note">${escapeHtml(emptyLabel)}</span>`}
+            </div>
+          </details>
+          <details class="waf-status-dropdown waf-list-selected-dropdown">
+            <summary>${escapeHtml(`${ctx?.t ? ctx.t("sites.easy.listTemplates.add") : "Added"} (${selectedItemsLabel})`)}</summary>
+            <div class="waf-status-options waf-list-selected-options">
+              ${selectedTemplates.map((presetID) => {
+                const preset = presetByID.get(presetID);
+                if (!preset) {
+                  return "";
+                }
+                return `
+                  <div class="waf-list-selected-item">
+                    <span class="waf-list-selected-value">${escapeHtml(resolvePresetLabel(preset))}</span>
+                    <button
+                      class="waf-list-remove"
+                      type="button"
+                      data-list-template-remove="${escapeHtml(field)}"
+                      data-list-template-id="${escapeHtml(presetID)}">x</button>
+                  </div>
+                `;
+              }).join("")}
+              ${safeValues.map((value, index) => `
+                <div class="waf-list-selected-item">
+                  <span class="waf-list-selected-value">${escapeHtml(value)}</span>
+                  <button
+                    class="waf-list-remove"
+                    type="button"
+                    data-list-remove="${escapeHtml(field)}"
+                    data-list-index="${index}">x</button>
+                </div>
+              `).join("") || `<span class="waf-note">${escapeHtml(emptyLabel)}</span>`}
+            </div>
+            <div class="waf-note">${escapeHtml(selectedValueLabel)}</div>
+          </details>
         </div>
       ` : ""}
-      <div class="waf-inline">
-        ${safeValues.map((value, index) => `
-          <span class="badge badge-neutral">
-            ${escapeHtml(value)}
-            <button
-              class="waf-list-remove"
-              type="button"
-              data-list-remove="${escapeHtml(field)}"
-              data-list-index="${index}">x</button>
-          </span>
-        `).join("") || `<span class="waf-note">${escapeHtml(emptyLabel)}</span>`}
-      </div>
+      ${presets.length ? "" : `
+        <div class="waf-inline">
+          ${safeValues.map((value, index) => `
+            <span class="badge badge-neutral">
+              ${escapeHtml(value)}
+              <button
+                class="waf-list-remove"
+                type="button"
+                data-list-remove="${escapeHtml(field)}"
+                data-list-index="${index}">x</button>
+            </span>
+          `).join("") || `<span class="waf-note">${escapeHtml(emptyLabel)}</span>`}
+        </div>
+      `}
     </div>
   `;
 }
@@ -1871,8 +1921,8 @@ function renderDetailView(state, ctx) {
                       ${renderListEditor("blacklist_ip", ctx.t("sites.easy.traffic.blacklistIp"), draft.blacklist_ip, "203.0.113.0/24", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
                       ${renderListEditor("blacklist_rdns", ctx.t("sites.easy.traffic.blacklistRdns"), draft.blacklist_rdns, ".shodan.io", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
                       ${renderListEditor("blacklist_asn", ctx.t("sites.easy.traffic.blacklistAsn"), draft.blacklist_asn, "AS13335", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
-                      ${renderListEditor("blacklist_user_agent", ctx.t("sites.easy.traffic.blacklistUserAgent"), draft.blacklist_user_agent, "curl/*", { full: false, emptyLabel: ctx.t("sites.easy.noValues"), presets: getQuickListTemplates("blacklist_user_agent"), selectedPreset: state.listTemplateSelection.blacklist_user_agent, ctx })}
-                      ${renderListEditor("blacklist_uri", ctx.t("sites.easy.traffic.blacklistUri"), draft.blacklist_uri, "/admin", { full: false, emptyLabel: ctx.t("sites.easy.noValues"), presets: getQuickListTemplates("blacklist_uri"), selectedPreset: state.listTemplateSelection.blacklist_uri, ctx })}
+                      ${renderListEditor("blacklist_user_agent", ctx.t("sites.easy.traffic.blacklistUserAgent"), draft.blacklist_user_agent, "curl/*", { full: false, emptyLabel: ctx.t("sites.easy.noValues"), presets: getQuickListTemplates("blacklist_user_agent"), selectedTemplates: state.listTemplateSelection.blacklist_user_agent, ctx })}
+                      ${renderListEditor("blacklist_uri", ctx.t("sites.easy.traffic.blacklistUri"), draft.blacklist_uri, "/admin", { full: false, emptyLabel: ctx.t("sites.easy.noValues"), presets: getQuickListTemplates("blacklist_uri"), selectedTemplates: state.listTemplateSelection.blacklist_uri, ctx })}
                       ${renderListEditor("blacklist_ip_urls", ctx.t("sites.easy.traffic.blacklistIpUrls"), draft.blacklist_ip_urls, "https://example.com/ip.txt", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
                       ${renderListEditor("blacklist_rdns_urls", ctx.t("sites.easy.traffic.blacklistRdnsUrls"), draft.blacklist_rdns_urls, "https://example.com/rdns.txt", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
                       ${renderListEditor("blacklist_asn_urls", ctx.t("sites.easy.traffic.blacklistAsnUrls"), draft.blacklist_asn_urls, "https://example.com/asn.txt", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
@@ -2806,8 +2856,8 @@ export async function renderSites(container, ctx) {
       whitelist_country: ""
     },
     listTemplateSelection: {
-      blacklist_user_agent: "",
-      blacklist_uri: ""
+      blacklist_user_agent: [],
+      blacklist_uri: []
     },
     draft: defaultSiteDraft()
   };
@@ -2880,6 +2930,8 @@ export async function renderSites(container, ctx) {
     }
     if (state.route.mode === "create") {
       state.draft = defaultSiteDraft();
+      state.listTemplateSelection.blacklist_user_agent = [];
+      state.listTemplateSelection.blacklist_uri = [];
       state.activeTab = "front";
       state.settingsSearch = "";
       state.settingsMatches = [];
@@ -2891,6 +2943,8 @@ export async function renderSites(container, ctx) {
     const tlsConfig = state.tlsBySite.get(state.route.siteID) || null;
     const accessPolicy = state.accessBySite.get(normalizeSiteID(state.route.siteID)) || null;
     state.draft = site ? siteDraftFromData(site, upstream, tlsConfig) : defaultSiteDraft();
+    state.listTemplateSelection.blacklist_user_agent = [];
+    state.listTemplateSelection.blacklist_uri = [];
     if (site?.id) {
       try {
         const profile = await ctx.api.get(`/api/easy-site-profiles/${encodeURIComponent(site.id)}`);
@@ -3470,14 +3524,13 @@ export async function renderSites(container, ctx) {
       });
     });
 
-    container.querySelectorAll("[data-list-template-add]").forEach((button) => {
+    container.querySelectorAll("[data-list-template-apply]").forEach((button) => {
       button.addEventListener("click", () => {
-        const field = button.dataset.listTemplateAdd || "";
+        const field = button.dataset.listTemplateApply || "";
+        const presetID = String(button.dataset.listTemplateId || "").trim();
         if (!LIST_FIELD_SET.has(field)) {
           return;
         }
-        const select = container.querySelector(`#list-template-${field}`);
-        const presetID = String(select?.value || state.listTemplateSelection[field] || "").trim();
         if (!presetID) {
           return;
         }
@@ -3490,19 +3543,47 @@ export async function renderSites(container, ctx) {
         for (const item of normalizeStringArray(preset.items)) {
           current.add(item);
         }
-        state.listTemplateSelection[field] = presetID;
+        const selected = new Set(normalizeStringArray(state.listTemplateSelection[field]));
+        selected.add(presetID);
+        state.listTemplateSelection[field] = Array.from(selected);
         state.draft[field] = Array.from(current);
         render();
       });
     });
 
-    container.querySelectorAll("[id^='list-template-']").forEach((select) => {
-      select.addEventListener("change", () => {
-        const field = String(select.id || "").replace("list-template-", "");
-        if (!field) {
+    container.querySelectorAll("[data-list-template-remove]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const field = button.dataset.listTemplateRemove || "";
+        const presetID = String(button.dataset.listTemplateId || "").trim();
+        if (!LIST_FIELD_SET.has(field) || !presetID) {
           return;
         }
-        state.listTemplateSelection[field] = String(select.value || "");
+        syncStateDraftFromForm();
+        const selected = new Set(normalizeStringArray(state.listTemplateSelection[field]));
+        if (!selected.has(presetID)) {
+          return;
+        }
+        selected.delete(presetID);
+        state.listTemplateSelection[field] = Array.from(selected);
+        const removedPreset = getQuickListTemplates(field).find((item) => item.id === presetID);
+        if (!removedPreset) {
+          render();
+          return;
+        }
+        const remainingTemplateItems = new Set();
+        for (const id of selected) {
+          const preset = getQuickListTemplates(field).find((item) => item.id === id);
+          if (!preset) {
+            continue;
+          }
+          for (const value of normalizeStringArray(preset.items)) {
+            remainingTemplateItems.add(value);
+          }
+        }
+        const removedItems = new Set(normalizeStringArray(removedPreset.items));
+        const current = normalizeStringArray(state.draft[field]);
+        state.draft[field] = current.filter((value) => !removedItems.has(value) || remainingTemplateItems.has(value));
+        render();
       });
     });
 

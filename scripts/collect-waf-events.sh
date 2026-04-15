@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+
+if [[ -z "${BASH_VERSION:-}" ]]; then
+  if command -v bash >/dev/null 2>&1; then
+    exec bash "$0" "$@"
+  fi
+  echo "This script requires bash."
+  exit 1
+fi
+
 set -u
 
 # Interactive diagnostics collector focused on security events and ban/rate-limit issues.
@@ -17,7 +26,7 @@ read -r -p "WAF username: " WAF_USER
 read -r -s -p "WAF password: " WAF_PASS
 echo
 read -r -p "Client IPs (optional, multiple allowed: '1.1.1.1 2.2.2.2'): " FILTER_IP
-read -r -p "Service IDs / hosts (optional, multiple allowed): " FILTER_SITE
+read -r -p "Target site IDs / hosts (optional, multiple allowed, e.g. 'site-a.example.com api.example.com'): " FILTER_SITE
 read -r -p "HTTP status codes (optional, multiple allowed: '403 429 503'): " FILTER_STATUS
 
 if command -v docker-compose >/dev/null 2>&1; then
@@ -31,7 +40,7 @@ OUT="/tmp/waf-events-${TS}"
 mkdir -p "$OUT"
 
 normalize_multi() {
-  printf "%s" "$1" | tr ',;|' '   ' | xargs
+  printf "%s" "$1" | tr ',;|' '   ' | tr -d "\"'" | awk '{$1=$1; print}'
 }
 
 escape_ere() {
@@ -53,11 +62,21 @@ build_ere_pattern() {
   printf "%s" "$out"
 }
 
+redact_sensitive() {
+  local text="$1"
+  if [[ -n "${WAF_PASS:-}" ]]; then
+    text="${text//${WAF_PASS}/***}"
+  fi
+  printf "%s" "$text"
+}
+
 run() {
   local name="$1"
   shift
+  local cmd_str="$*"
+  cmd_str="$(redact_sensitive "$cmd_str")"
   {
-    echo "# cmd: $*"
+    echo "# cmd: $cmd_str"
     "$@"
     rc=$?
     echo
@@ -68,8 +87,10 @@ run() {
 run_sh() {
   local name="$1"
   local cmd="$2"
+  local safe_cmd
+  safe_cmd="$(redact_sensitive "$cmd")"
   {
-    echo "# cmd: $cmd"
+    echo "# cmd: $safe_cmd"
     bash -lc "$cmd"
     rc=$?
     echo
@@ -90,6 +111,7 @@ IP_ERE="$(build_ere_pattern "$N_FILTER_IP")"
 SITE_ERE="$(build_ere_pattern "$N_FILTER_SITE")"
 
 run "app_meta.json" $COMPOSE_BIN --profile tools run --rm cli --username "$WAF_USER" --password "$WAF_PASS" --json api GET /api/app/meta
+run "sites.json" $COMPOSE_BIN --profile tools run --rm cli --username "$WAF_USER" --password "$WAF_PASS" --json api GET /api/sites
 run "events_all.json" $COMPOSE_BIN --profile tools run --rm cli --username "$WAF_USER" --password "$WAF_PASS" --json api GET /api/events
 run "access_policies.json" $COMPOSE_BIN --profile tools run --rm cli --username "$WAF_USER" --password "$WAF_PASS" --json api GET /api/access-policies
 run "antiddos.json" $COMPOSE_BIN --profile tools run --rm cli --username "$WAF_USER" --password "$WAF_PASS" --json antiddos get
@@ -128,7 +150,15 @@ fi
   fi
   echo
   echo "## key-security-patterns"
-  grep -nEi "request burst detected|access blocked|rate limit triggered|blocked|limit_req|too many requests|service unavailable|temporary unavailability|waf fallback|ban" "$OUT/events_all.json" || true
+  if [[ -n "$N_FILTER_SITE" ]]; then
+    for site in $N_FILTER_SITE; do
+      echo
+      echo "### site: $site"
+      grep -nF "$site" "$OUT/events_all.json" | grep -Ei "request burst detected|access blocked|rate limit triggered|blocked|limit_req|too many requests|service unavailable|temporary unavailability|waf fallback|ban" || true
+    done
+  else
+    grep -nEi "request burst detected|access blocked|rate limit triggered|blocked|limit_req|too many requests|service unavailable|temporary unavailability|waf fallback|ban" "$OUT/events_all.json" || true
+  fi
 } >"$OUT/events_focus.txt" 2>&1
 
 {
@@ -203,9 +233,27 @@ if [[ -n "$IP_ERE" ]]; then
 fi
 
 if [[ -n "$SITE_ERE" ]]; then
+  run_sh "runtime_access_site.log" "docker exec '$RUNTIME_CONTAINER' sh -lc \"grep -E '\\\"host\\\":\\\"($SITE_ERE)\\\"' /var/log/nginx/access.log | tail -n 4000\""
+  run_sh "runtime_access_site_block_statuses.log" "docker exec '$RUNTIME_CONTAINER' sh -lc \"grep -E '\\\"host\\\":\\\"($SITE_ERE)\\\"' /var/log/nginx/access.log | grep -E '\\\"status\\\":(403|429|444|500|502|503|504)' | tail -n 2000\""
   run_sh "runtime_nginx_site_lookup.txt" "docker exec '$RUNTIME_CONTAINER' sh -lc \"grep -R --line-number -E 'server_name ($SITE_ERE)' /etc/waf/nginx 2>/dev/null\""
   run_sh "runtime_nginx_site_conf_focus.txt" "docker exec '$RUNTIME_CONTAINER' sh -lc \"nginx -T 2>/tmp/nginxT.txt; grep -nE '($SITE_ERE)|limit_req|waf_rate_limited|blacklist_uri|deny ' /tmp/nginxT.txt | tail -n 1200\""
 fi
+
+{
+  echo "# site diagnostics summary"
+  echo "filters.sites=$N_FILTER_SITE"
+  if [[ -n "$N_FILTER_SITE" ]]; then
+    for site in $N_FILTER_SITE; do
+      echo
+      echo "## $site"
+      echo "events_all.matches=$(grep -cF "$site" "$OUT/events_all.json" || true)"
+      echo "sites.matches=$(grep -cF "$site" "$OUT/sites.json" || true)"
+      echo "runtime_access.matches=$(grep -cE "\\\"host\\\":\\\"$site\\\"" "$OUT/runtime_access_site.log" || true)"
+      echo "runtime_nginx_server_name.matches=$(grep -cF "$site" "$OUT/runtime_nginx_site_lookup.txt" || true)"
+      echo "easy_profile_status=$(grep -Eo 'HTTP [0-9]+' "$OUT/easy_profile_${site//[^a-zA-Z0-9_.-]/_}.json" | tail -n1 || true)"
+    done
+  fi
+} >"$OUT/site_diagnostics_summary.txt" 2>&1
 
 run "runtime_logs_since_30m.log" docker logs --since=30m "$RUNTIME_CONTAINER"
 run "control_plane_logs_since_30m.log" docker logs --since=30m "$CONTROL_PLANE_CONTAINER"

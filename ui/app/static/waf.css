@@ -904,6 +904,41 @@ label,
   flex: 1 1 auto;
 }
 
+.waf-template-picker {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.waf-template-option {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.waf-list-selected-dropdown {
+  margin-top: 0;
+}
+
+.waf-list-selected-options {
+  max-height: 220px;
+}
+
+.waf-list-selected-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(125, 155, 255, 0.18);
+  background: rgba(10, 14, 24, 0.52);
+}
+
+.waf-list-selected-value {
+  overflow-wrap: anywhere;
+}
+
 .waf-country-picker {
   width: 100%;
 }
