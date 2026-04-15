@@ -427,10 +427,21 @@ function deriveModuleFromEvent(item) {
 
 function shouldTreatAsAutoBanEvent(item) {
   const type = String(item?.type || "").trim().toLowerCase();
-  if (type === "security_rate_limit" || type === "security_access") {
+  const summary = String(item?.summary || "").trim().toLowerCase();
+  const details = item?.details && typeof item.details === "object" ? item.details : {};
+  if (summary.includes("not blocked")) {
+    return false;
+  }
+  if (details?.blocked === true) {
     return true;
   }
-  const status = parseSecurityStatus(item?.details?.status);
+  if (summary.includes("access blocked") || summary.includes("rate limit triggered")) {
+    return true;
+  }
+  if (type === "security_access") {
+    return true;
+  }
+  const status = parseSecurityStatus(details?.status);
   return status === 403 || status === 429 || status === 444;
 }
 
@@ -977,6 +988,7 @@ export async function renderBans(container, ctx) {
       const hostSiteMap = buildHostSiteMap(sites);
       const canonicalSiteID = (value, hostHint = "") => resolveCanonicalSiteID(value, siteAliasMap, hostSiteMap, hostHint);
       const allowlistBySite = buildIPSetBySite(accessPolicies, "allowlist", canonicalSiteID);
+      const denylistBySite = buildIPSetBySite(accessPolicies, "denylist", canonicalSiteID);
       const siteBanDurationByID = await loadSiteBanDurations(sites, canonicalSiteID);
       const manualBanTimers = loadManualBanTimers();
       await processExpiredManualBanTimers(ctx, manualBanTimers);
@@ -1021,6 +1033,7 @@ export async function renderBans(container, ctx) {
                 const site = siteByID.get(row.siteID);
                 const siteLabel = site?.primary_host || row.siteID;
                 const allowlisted = (allowlistBySite.get(row.siteID) || new Set()).has(row.ip);
+                const currentlyDenied = (denylistBySite.get(row.siteID) || new Set()).has(row.ip);
                 return `
                   <tr class="waf-table-row-clickable" data-ban-row="${meta.start + index}" tabindex="0" role="button">
                     <td>${escapeHtml(row.ip)}</td>
@@ -1035,7 +1048,7 @@ export async function renderBans(container, ctx) {
                           <span class="waf-ban-btn-icon">${ICON_PLUS}</span>
                           <span>${escapeHtml(ctx.t("bans.action.extend"))}</span>
                         </button>
-                        <button type="button" class="btn danger btn-sm waf-ban-btn" data-action="unban" data-row="${meta.start + index}" title="${escapeHtml(ctx.t("bans.action.unban"))}">
+                        <button type="button" class="btn danger btn-sm waf-ban-btn" data-action="unban" data-row="${meta.start + index}" data-currently-denied="${currentlyDenied ? "1" : "0"}" title="${escapeHtml(ctx.t("bans.action.unban"))}">
                           <span class="waf-ban-btn-icon">${ICON_UNLOCK}</span>
                           <span>${escapeHtml(ctx.t("bans.action.unban"))}</span>
                         </button>
@@ -1101,6 +1114,14 @@ export async function renderBans(container, ctx) {
           }
           if (action === "unban") {
             if (!confirmAction(ctx.t("bans.confirm.unban", { ip, site: row.siteID }))) {
+              return;
+            }
+            const currentlyDenied = (denylistBySite.get(row.siteID) || new Set()).has(ip);
+            if (!currentlyDenied && row.source !== "manual") {
+              dismissBanRow(row.siteID, ip);
+              clearRateLimitCookies(row.siteID);
+              ctx.notify(ctx.t("bans.info.autoProtectionActive"));
+              await renderRows();
               return;
             }
             try {

@@ -11838,7 +11838,7 @@ body.auth-locked #main-screen {
   }
 }
 
-/* Accesses v1.1.14 overrides: compact services column + service filter + improved modal pills */
+/* Accesses v1.1.15 overrides: compact services column + service filter + improved modal pills */
 #accesses-page .accesses-toolbar {
   align-items: flex-end;
   gap: 12px;

@@ -219,6 +219,20 @@ extract_version() {
   fi
 }
 
+extract_latest_changelog_version() {
+  file="$1"
+  if [ ! -f "$file" ]; then
+    printf "unknown"
+    return
+  fi
+  version="$(sed -n 's/^## \[\([^]]*\)\].*/\1/p' "$file" | head -n 1)"
+  if [ -n "$version" ]; then
+    printf "%s" "$version"
+  else
+    printf "unknown"
+  fi
+}
+
 trap on_exit EXIT
 
 mkdir -p "$(dirname "$LOG_FILE")"
@@ -252,7 +266,11 @@ else
 fi
 
 section "Repository"
+CURRENT_VERSION="not_installed"
+CURRENT_COMMIT="-"
 if [ -d "$INSTALL_DIR/.git" ]; then
+  CURRENT_VERSION="$(extract_version "$INSTALL_DIR/control-plane/internal/appmeta/meta.go")"
+  CURRENT_COMMIT="$(git -C "$INSTALL_DIR" rev-parse --short HEAD 2>/dev/null || printf "unknown")"
   section "Safety Snapshot"
   step "Saving pre-upgrade snapshot for rollback"
   safe_snapshot
@@ -272,8 +290,11 @@ fi
 
 TARGET_VERSION="$(extract_version "$INSTALL_DIR/control-plane/internal/appmeta/meta.go")"
 TARGET_COMMIT="$(git -C "$INSTALL_DIR" rev-parse --short HEAD 2>/dev/null || printf "unknown")"
+TARGET_CHANGELOG_VERSION="$(extract_latest_changelog_version "$INSTALL_DIR/CHANGELOG.md")"
 section "Install Plan"
+ok "current version/commit: $CURRENT_VERSION ($CURRENT_COMMIT)"
 ok "target version: $TARGET_VERSION"
+ok "target changelog head: $TARGET_CHANGELOG_VERSION"
 ok "branch/commit: $BRANCH ($TARGET_COMMIT)"
 ok "profile: $PROFILE"
 ok "install path: $INSTALL_DIR"

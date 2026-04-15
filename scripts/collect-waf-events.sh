@@ -16,9 +16,9 @@ CONTROL_PLANE_CONTAINER="${CONTROL_PLANE_CONTAINER:-tarinio-control-plane}"
 read -r -p "WAF username: " WAF_USER
 read -r -s -p "WAF password: " WAF_PASS
 echo
-read -r -p "Client IP (optional): " FILTER_IP
-read -r -p "Service ID / host (optional): " FILTER_SITE
-read -r -p "HTTP status code (optional, e.g. 429): " FILTER_STATUS
+read -r -p "Client IPs (optional, multiple allowed: '1.1.1.1 2.2.2.2'): " FILTER_IP
+read -r -p "Service IDs / hosts (optional, multiple allowed): " FILTER_SITE
+read -r -p "HTTP status codes (optional, multiple allowed: '403 429 503'): " FILTER_STATUS
 
 if command -v docker-compose >/dev/null 2>&1; then
   COMPOSE_BIN="docker-compose"
@@ -29,6 +29,29 @@ fi
 TS="$(date +%Y%m%d_%H%M%S)"
 OUT="/tmp/waf-events-${TS}"
 mkdir -p "$OUT"
+
+normalize_multi() {
+  printf "%s" "$1" | tr ',;|' '   ' | xargs
+}
+
+escape_ere() {
+  printf "%s" "$1" | sed -E 's/[][(){}.^$*+?|\\-]/\\&/g'
+}
+
+build_ere_pattern() {
+  local raw="$1"
+  local normalized token out
+  normalized="$(normalize_multi "$raw")"
+  out=""
+  for token in $normalized; do
+    if [[ -z "$out" ]]; then
+      out="$(escape_ere "$token")"
+    else
+      out="$out|$(escape_ere "$token")"
+    fi
+  done
+  printf "%s" "$out"
+}
 
 run() {
   local name="$1"
@@ -60,42 +83,128 @@ if [[ ! -d "$DEPLOY_DIR" ]]; then
 fi
 cd "$DEPLOY_DIR" || exit 1
 
+N_FILTER_IP="$(normalize_multi "$FILTER_IP")"
+N_FILTER_SITE="$(normalize_multi "$FILTER_SITE")"
+N_FILTER_STATUS="$(normalize_multi "$FILTER_STATUS")"
+IP_ERE="$(build_ere_pattern "$N_FILTER_IP")"
+SITE_ERE="$(build_ere_pattern "$N_FILTER_SITE")"
+
 run "app_meta.json" $COMPOSE_BIN --profile tools run --rm cli --username "$WAF_USER" --password "$WAF_PASS" --json api GET /api/app/meta
 run "events_all.json" $COMPOSE_BIN --profile tools run --rm cli --username "$WAF_USER" --password "$WAF_PASS" --json api GET /api/events
 run "access_policies.json" $COMPOSE_BIN --profile tools run --rm cli --username "$WAF_USER" --password "$WAF_PASS" --json api GET /api/access-policies
 run "antiddos.json" $COMPOSE_BIN --profile tools run --rm cli --username "$WAF_USER" --password "$WAF_PASS" --json antiddos get
 run "bans_list.txt" $COMPOSE_BIN --profile tools run --rm cli --username "$WAF_USER" --password "$WAF_PASS" bans list
+run "audit_ban_actions.txt" $COMPOSE_BIN --profile tools run --rm cli --username "$WAF_USER" --password "$WAF_PASS" audit --action accesspolicy.ban --limit 200
+run "audit_unban_actions.txt" $COMPOSE_BIN --profile tools run --rm cli --username "$WAF_USER" --password "$WAF_PASS" audit --action accesspolicy.unban --limit 200
 
-if [[ -n "${FILTER_SITE}" ]]; then
-  run "easy_profile.json" $COMPOSE_BIN --profile tools run --rm cli --username "$WAF_USER" --password "$WAF_PASS" easy get "$FILTER_SITE"
+if [[ -n "$N_FILTER_SITE" ]]; then
+  for site in $N_FILTER_SITE; do
+    run "easy_profile_${site//[^a-zA-Z0-9_.-]/_}.json" $COMPOSE_BIN --profile tools run --rm cli --username "$WAF_USER" --password "$WAF_PASS" easy get "$site"
+  done
 fi
 
-if [[ -n "${FILTER_IP}" || -n "${FILTER_SITE}" || -n "${FILTER_STATUS}" ]]; then
-  {
-    echo "# filters: ip='${FILTER_IP}' site='${FILTER_SITE}' status='${FILTER_STATUS}'"
-    if [[ -n "${FILTER_IP}" ]]; then
-      grep -n "$FILTER_IP" "$OUT/events_all.json" || true
+{
+  echo "# filters: ips='$N_FILTER_IP' sites='$N_FILTER_SITE' statuses='$N_FILTER_STATUS'"
+  if [[ -n "$N_FILTER_IP" ]]; then
+    for ip in $N_FILTER_IP; do
+      echo
+      echo "## ip: $ip"
+      grep -nF "$ip" "$OUT/events_all.json" || true
+    done
+  fi
+  if [[ -n "$N_FILTER_SITE" ]]; then
+    for site in $N_FILTER_SITE; do
+      echo
+      echo "## site: $site"
+      grep -nF "$site" "$OUT/events_all.json" || true
+    done
+  fi
+  if [[ -n "$N_FILTER_STATUS" ]]; then
+    for status in $N_FILTER_STATUS; do
+      echo
+      echo "## status: $status"
+      grep -n "\"status\":${status}" "$OUT/events_all.json" || true
+    done
+  fi
+  echo
+  echo "## key-security-patterns"
+  grep -nEi "request burst detected|access blocked|rate limit triggered|blocked|limit_req|too many requests|service unavailable|temporary unavailability|waf fallback|ban" "$OUT/events_all.json" || true
+} >"$OUT/events_focus.txt" 2>&1
+
+{
+  echo "# filters: ips='$N_FILTER_IP' sites='$N_FILTER_SITE'"
+  echo
+  echo "## bans-list"
+  if [[ -n "$N_FILTER_IP" || -n "$N_FILTER_SITE" ]]; then
+    if [[ -n "$N_FILTER_IP" ]]; then
+      for ip in $N_FILTER_IP; do
+        echo
+        echo "### bans for ip: $ip"
+        grep -nF "$ip" "$OUT/bans_list.txt" || true
+      done
     fi
-    if [[ -n "${FILTER_SITE}" ]]; then
-      grep -n "$FILTER_SITE" "$OUT/events_all.json" || true
+    if [[ -n "$N_FILTER_SITE" ]]; then
+      for site in $N_FILTER_SITE; do
+        echo
+        echo "### bans for site: $site"
+        grep -nF "$site" "$OUT/bans_list.txt" || true
+      done
     fi
-    if [[ -n "${FILTER_STATUS}" ]]; then
-      grep -n "\"status\":${FILTER_STATUS}" "$OUT/events_all.json" || true
+  else
+    cat "$OUT/bans_list.txt"
+  fi
+
+  echo
+  echo "## audit-ban-actions (why banned)"
+  if [[ -n "$N_FILTER_IP" || -n "$N_FILTER_SITE" ]]; then
+    if [[ -n "$N_FILTER_IP" ]]; then
+      for ip in $N_FILTER_IP; do
+        echo
+        echo "### audit ban entries for ip: $ip"
+        grep -nF "$ip" "$OUT/audit_ban_actions.txt" || true
+      done
     fi
-    grep -n "request burst detected (not blocked)\|request burst detected on path (not blocked)\|access blocked\|rate limit triggered" "$OUT/events_all.json" || true
-  } >"$OUT/events_focus.txt" 2>&1
-else
-  run_sh "events_focus.txt" "grep -n 'request burst detected (not blocked)\\|request burst detected on path (not blocked)\\|access blocked\\|rate limit triggered' '$OUT/events_all.json' || true"
+    if [[ -n "$N_FILTER_SITE" ]]; then
+      for site in $N_FILTER_SITE; do
+        echo
+        echo "### audit ban entries for site: $site"
+        grep -nF "$site" "$OUT/audit_ban_actions.txt" || true
+      done
+    fi
+  else
+    cat "$OUT/audit_ban_actions.txt"
+  fi
+
+  echo
+  echo "## events-ban-related (runtime reason trail)"
+  if [[ -n "$N_FILTER_IP" || -n "$N_FILTER_SITE" ]]; then
+    if [[ -n "$N_FILTER_IP" ]]; then
+      for ip in $N_FILTER_IP; do
+        echo
+        echo "### events for ip: $ip"
+        grep -nF "$ip" "$OUT/events_all.json" | grep -Ei "ban|blocked|burst|rate|limit|deny|403|429|444|503" || true
+      done
+    fi
+    if [[ -n "$N_FILTER_SITE" ]]; then
+      for site in $N_FILTER_SITE; do
+        echo
+        echo "### events for site: $site"
+        grep -nF "$site" "$OUT/events_all.json" | grep -Ei "ban|blocked|burst|rate|limit|deny|403|429|444|503" || true
+      done
+    fi
+  else
+    grep -nEi "ban|blocked|burst|rate limit|limit_req|denylist|accesspolicy\\.ban|403|429|444|503" "$OUT/events_all.json" || true
+  fi
+} >"$OUT/bans_focus.txt" 2>&1
+
+if [[ -n "$IP_ERE" ]]; then
+  run_sh "runtime_access_bad_ip.log" "docker exec '$RUNTIME_CONTAINER' sh -lc \"grep -E '$IP_ERE' /var/log/nginx/access.log | tail -n 2000\""
+  run_sh "runtime_access_bad_ip_block_statuses.log" "docker exec '$RUNTIME_CONTAINER' sh -lc \"grep -E '$IP_ERE' /var/log/nginx/access.log | grep -E '\\\"status\\\":(403|429|444|503)| 403 | 429 | 444 | 503 ' | tail -n 1000\""
 fi
 
-if [[ -n "${FILTER_IP}" ]]; then
-  run_sh "runtime_access_bad_ip.log" "docker exec '$RUNTIME_CONTAINER' sh -lc \"grep '$FILTER_IP' /var/log/nginx/access.log | tail -n 1000\""
-  run_sh "runtime_access_bad_ip_block_statuses.log" "docker exec '$RUNTIME_CONTAINER' sh -lc \"grep '$FILTER_IP' /var/log/nginx/access.log | grep -E '\\\"status\\\":(403|429|444|503)| 403 | 429 | 444 | 503 ' | tail -n 500\""
-fi
-
-if [[ -n "${FILTER_SITE}" ]]; then
-  run_sh "runtime_nginx_site_lookup.txt" "docker exec '$RUNTIME_CONTAINER' sh -lc \"grep -R --line-number 'server_name $FILTER_SITE' /etc/waf/nginx 2>/dev/null\""
-  run_sh "runtime_nginx_site_conf_focus.txt" "docker exec '$RUNTIME_CONTAINER' sh -lc \"nginx -T 2>/tmp/nginxT.txt; grep -n '$FILTER_SITE\\|limit_req\\|waf_rate_limited\\|blacklist_uri\\|deny ' /tmp/nginxT.txt | tail -n 800\""
+if [[ -n "$SITE_ERE" ]]; then
+  run_sh "runtime_nginx_site_lookup.txt" "docker exec '$RUNTIME_CONTAINER' sh -lc \"grep -R --line-number -E 'server_name ($SITE_ERE)' /etc/waf/nginx 2>/dev/null\""
+  run_sh "runtime_nginx_site_conf_focus.txt" "docker exec '$RUNTIME_CONTAINER' sh -lc \"nginx -T 2>/tmp/nginxT.txt; grep -nE '($SITE_ERE)|limit_req|waf_rate_limited|blacklist_uri|deny ' /tmp/nginxT.txt | tail -n 1200\""
 fi
 
 run "runtime_logs_since_30m.log" docker logs --since=30m "$RUNTIME_CONTAINER"
