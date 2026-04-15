@@ -3,9 +3,12 @@ package compiler
 import (
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 )
+
+var sentryEnvelopePathRE = regexp.MustCompile(`^/api/\d+/envelope/?$`)
 
 type easyRateLimitHTTPEntry struct {
 	ZoneName string
@@ -23,6 +26,7 @@ type easyLocationRuleData struct {
 	DisableProxyInterceptErrors bool
 	ZoneName                    string
 	Burst                       int
+	StatusCode                  int
 	PassHostHeader              bool
 	ProxyPassTarget             string
 }
@@ -53,6 +57,7 @@ func RenderEasyRateLimitArtifacts(sites []SiteInput, upstreams []UpstreamInput, 
 		if !ok {
 			profile = EasyProfileInput{SiteID: site.ID}
 		}
+		statusCode := easyCustomLimitStatusCode(profile.BadBehaviorStatusCodes)
 		rules := normalizeCompilerCustomLimitRules(profile.CustomLimitRules)
 		for index, rule := range rules {
 			httpData.Entries = append(httpData.Entries, easyRateLimitHTTPEntry{
@@ -65,12 +70,14 @@ func RenderEasyRateLimitArtifacts(sites []SiteInput, upstreams []UpstreamInput, 
 		upstream := upstreamByID[site.DefaultUpstreamID]
 		locationData := easyLocationData{SiteID: site.ID, Rules: make([]easyLocationRuleData, 0, len(rules))}
 		for index, rule := range rules {
+			canonicalPath := customLimitCanonicalPath(rule.Path)
 			locationData.Rules = append(locationData.Rules, easyLocationRuleData{
 				LocationModifier:            customLimitLocationModifier(rule.Path),
 				LocationPath:                customLimitLocationPath(rule.Path),
-				DisableProxyInterceptErrors: strings.HasPrefix(customLimitLocationPath(rule.Path), "/api/"),
+				DisableProxyInterceptErrors: strings.HasPrefix(canonicalPath, "/api/"),
 				ZoneName:                    easyCustomReqZoneName(site.ID, index),
 				Burst:                       customLimitBurst(rule.Rate),
+				StatusCode:                  statusCode,
 				PassHostHeader:              upstream.PassHostHeader,
 				ProxyPassTarget:             "http://" + upstreamBlockName(site.ID, upstream.ID),
 			})
@@ -106,15 +113,18 @@ func normalizeCompilerCustomLimitRules(values []CustomRateLimitRuleInput) []Cust
 		if path == "" || rate == "" {
 			continue
 		}
-		if isReservedBaseLocationPath(path) {
-			continue
+		expanded := expandCustomLimitRuleAliases(path, rate)
+		for _, rule := range expanded {
+			if isReservedBaseLocationPath(rule.Path) {
+				continue
+			}
+			key := strings.ToLower(rule.Path) + "\x00" + rule.Rate
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			items = append(items, rule)
 		}
-		key := strings.ToLower(path) + "\x00" + rate
-		if _, ok := seen[key]; ok {
-			continue
-		}
-		seen[key] = struct{}{}
-		items = append(items, CustomRateLimitRuleInput{Path: path, Rate: rate})
 	}
 	sort.Slice(items, func(i, j int) bool {
 		leftPriority := customLimitPriority(items[i].Path)
@@ -135,14 +145,20 @@ func normalizeCompilerCustomLimitRules(values []CustomRateLimitRuleInput) []Cust
 
 func customLimitPriority(path string) int {
 	trimmed := strings.TrimSpace(path)
-	if strings.HasSuffix(trimmed, "*") || strings.HasSuffix(trimmed, "/") {
+	if hasComplexWildcard(trimmed) {
 		return 1
 	}
-	return 2
+	if strings.HasSuffix(trimmed, "*") || strings.HasSuffix(trimmed, "/") {
+		return 2
+	}
+	return 3
 }
 
 func customLimitLocationModifier(path string) string {
 	trimmed := strings.TrimSpace(path)
+	if hasComplexWildcard(trimmed) {
+		return "~*"
+	}
 	if strings.HasSuffix(trimmed, "*") || strings.HasSuffix(trimmed, "/") {
 		return "^~"
 	}
@@ -151,6 +167,9 @@ func customLimitLocationModifier(path string) string {
 
 func customLimitLocationPath(path string) string {
 	trimmed := strings.TrimSpace(path)
+	if hasComplexWildcard(trimmed) {
+		return wildcardPathToRegex(trimmed)
+	}
 	if strings.HasSuffix(trimmed, "*") {
 		trimmed = strings.TrimSuffix(trimmed, "*")
 		if trimmed == "" {
@@ -174,6 +193,74 @@ func easyCustomReqZoneName(siteID string, index int) string {
 }
 
 func isReservedBaseLocationPath(path string) bool {
-	canonical := customLimitLocationPath(path)
+	canonical := customLimitCanonicalPath(path)
 	return canonical == "/" || canonical == "/api/"
+}
+
+func customLimitCanonicalPath(path string) string {
+	trimmed := strings.TrimSpace(path)
+	if strings.HasSuffix(trimmed, "*") && !hasComplexWildcard(trimmed) {
+		trimmed = strings.TrimSuffix(trimmed, "*")
+		if trimmed == "" {
+			return "/"
+		}
+	}
+	return trimmed
+}
+
+func hasComplexWildcard(path string) bool {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return false
+	}
+	star := strings.Count(path, "*")
+	qm := strings.Count(path, "?")
+	if qm > 0 {
+		return true
+	}
+	if star == 0 {
+		return false
+	}
+	// Simple trailing * is already supported via prefix location.
+	if star == 1 && strings.HasSuffix(path, "*") {
+		return false
+	}
+	return true
+}
+
+func wildcardPathToRegex(path string) string {
+	quoted := regexp.QuoteMeta(strings.TrimSpace(path))
+	quoted = strings.ReplaceAll(quoted, `\*`, `.*`)
+	quoted = strings.ReplaceAll(quoted, `\?`, `.`)
+	return "^" + quoted
+}
+
+func expandCustomLimitRuleAliases(path, rate string) []CustomRateLimitRuleInput {
+	base := CustomRateLimitRuleInput{Path: path, Rate: rate}
+	normalizedPath := strings.TrimSpace(path)
+	if !sentryEnvelopePathRE.MatchString(normalizedPath) {
+		return []CustomRateLimitRuleInput{base}
+	}
+	// Sentry envelope endpoint uses project id in URL (/api/{project_id}/envelope/).
+	// Keep compatibility for common project ids to avoid accidental throttling by global rules.
+	return []CustomRateLimitRuleInput{
+		{Path: "/api/*/envelope/", Rate: rate},
+		base,
+	}
+}
+
+func easyCustomLimitStatusCode(values []int) int {
+	// Preserve existing ban/escalation behavior when 429 is present.
+	for _, value := range values {
+		if value == 429 {
+			return 429
+		}
+	}
+	// Otherwise allow any explicitly configured valid status code.
+	for _, value := range values {
+		if (value >= 100 && value <= 599) || value == 444 {
+			return value
+		}
+	}
+	return 429
 }

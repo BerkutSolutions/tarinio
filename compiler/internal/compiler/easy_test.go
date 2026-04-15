@@ -190,3 +190,42 @@ func TestRenderEasyArtifacts_UsesSafeTemplateWhenProfileMissing(t *testing.T) {
 		t.Fatalf("expected safe l4guard defaults in template, got: %s", l4guardConfig)
 	}
 }
+
+func TestRenderEasyArtifacts_BlacklistURIWildcardPattern(t *testing.T) {
+	artifacts, err := RenderEasyArtifacts(
+		[]SiteInput{{
+			ID:          "site-a",
+			Enabled:     true,
+			PrimaryHost: "a.example.com",
+			ListenHTTP:  true,
+		}},
+		[]EasyProfileInput{{
+			SiteID:            "site-a",
+			SecurityMode:      "block",
+			AllowedMethods:    []string{"GET"},
+			MaxClientSize:     "50m",
+			UseLimitConn:      true,
+			LimitConnMaxHTTP1: 100,
+			UseLimitReq:       true,
+			LimitReqRate:      "10r/s",
+			BlacklistURI:      []string{"*.php"},
+		}},
+	)
+	if err != nil {
+		t.Fatalf("render easy artifacts: %v", err)
+	}
+
+	var siteConf string
+	for _, item := range artifacts {
+		if item.Path == "nginx/easy/site-a.conf" {
+			siteConf = string(item.Content)
+			break
+		}
+	}
+	if siteConf == "" {
+		t.Fatal("expected easy site conf artifact")
+	}
+	if !strings.Contains(siteConf, `if ($waf_blacklist_uri_guard ~* "^0:.*.*\.php") { return 403; }`) {
+		t.Fatalf("expected wildcard blacklist uri to be rendered as safe regex, got: %s", siteConf)
+	}
+}

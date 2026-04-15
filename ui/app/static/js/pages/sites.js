@@ -358,35 +358,80 @@ const QUICK_LIST_TEMPLATES = {
   blacklist_user_agent: [
     {
       id: "scanner_uas",
-      label: "Aggressive scanners",
+      labelKey: "sites.easy.traffic.template.blacklistUserAgent.scanner_uas",
       items: ["sqlmap", "nikto", "nmap", "masscan", "zgrab", "gobuster", "dirbuster", "wpscan", "acunetix", "nessus"]
     },
     {
       id: "cli_clients",
-      label: "CLI and scripted clients",
+      labelKey: "sites.easy.traffic.template.blacklistUserAgent.cli_clients",
       items: ["curl/.*", "python-requests", "python-httpx", "aiohttp", "Go-http-client", "libwww-perl"]
     },
     {
       id: "headless_tools",
-      label: "Headless automation",
+      labelKey: "sites.easy.traffic.template.blacklistUserAgent.headless_tools",
       items: ["HeadlessChrome", "PhantomJS", "selenium", "playwright"]
+    },
+    {
+      id: "fuzzers_discovery",
+      labelKey: "sites.easy.traffic.template.blacklistUserAgent.fuzzers_discovery",
+      items: ["ffuf", "feroxbuster", "wfuzz", "dirsearch", "gospider", "hakrawler"]
+    },
+    {
+      id: "exploit_frameworks",
+      labelKey: "sites.easy.traffic.template.blacklistUserAgent.exploit_frameworks",
+      items: ["metasploit", "nuclei", "jaeles", "arachni", "w3af", "commix"]
+    },
+    {
+      id: "generic_http_clients",
+      labelKey: "sites.easy.traffic.template.blacklistUserAgent.generic_http_clients",
+      items: ["python-urllib", "python-httplib2", "Java/", "Apache-HttpClient", "okhttp", "restsharp"]
+    },
+    {
+      id: "legacy_scrapers",
+      labelKey: "sites.easy.traffic.template.blacklistUserAgent.legacy_scrapers",
+      items: ["HTTrack", "WebCopier", "WinHTTrack", "MJ12bot", "SemrushBot", "DotBot"]
     }
   ],
   blacklist_uri: [
     {
       id: "common_probe_paths",
-      label: "Common probe paths",
+      labelKey: "sites.easy.traffic.template.blacklistUri.common_probe_paths",
       items: ["/\\.env", "/\\.git", "/\\.svn", "/server-status", "/actuator", "/manager/html", "/cgi-bin", "/boaform", "/phpinfo"]
     },
     {
       id: "wordpress_probes",
-      label: "WordPress probes",
+      labelKey: "sites.easy.traffic.template.blacklistUri.wordpress_probes",
       items: ["/wp-admin", "/wp-login\\.php", "/xmlrpc\\.php", "/wp-content", "/wp-includes"]
     },
     {
       id: "admin_panels",
-      label: "Admin panels and PHP tooling",
+      labelKey: "sites.easy.traffic.template.blacklistUri.admin_panels",
       items: ["/phpmyadmin", "/pma", "/adminer", "/vendor/phpunit"]
+    },
+    {
+      id: "sensitive_files",
+      labelKey: "sites.easy.traffic.template.blacklistUri.sensitive_files",
+      items: ["/\\.DS_Store", "/id_rsa", "/\\.aws/credentials", "/composer\\.(json|lock)", "/package(-lock)?\\.json", "/yarn\\.lock"]
+    },
+    {
+      id: "backup_leaks",
+      labelKey: "sites.easy.traffic.template.blacklistUri.backup_leaks",
+      items: ["/backup", "/backup\\.(zip|tar|tar\\.gz|sql)", "/dump\\.sql", "/\\.git\\.zip", "/\\.bak$", "/\\.old$"]
+    },
+    {
+      id: "framework_debug",
+      labelKey: "sites.easy.traffic.template.blacklistUri.framework_debug",
+      items: ["/_profiler", "/_debugbar", "/debug/default/view", "/console", "/app_dev\\.php", "/server-info"]
+    },
+    {
+      id: "api_docs_admin",
+      labelKey: "sites.easy.traffic.template.blacklistUri.api_docs_admin",
+      items: ["/swagger", "/swagger-ui", "/v2/api-docs", "/v3/api-docs", "/openapi\\.json", "/graphql$"]
+    },
+    {
+      id: "common_shells",
+      labelKey: "sites.easy.traffic.template.blacklistUri.common_shells",
+      items: ["/shell\\.php", "/cmd\\.php", "/r57\\.php", "/c99\\.php", "/wso\\.php", "/mini\\.php"]
     }
   ]
 };
@@ -530,6 +575,9 @@ function renderListEditor(field, label, values, placeholder = "", options = {}) 
   const fieldClass = fullWidth ? "waf-field full" : "waf-field";
   const presets = Array.isArray(options.presets) ? options.presets : [];
   const selectedPreset = String(options.selectedPreset || "");
+  const ctx = options.ctx || null;
+  const quickTemplateLabel = ctx?.t ? ctx.t("sites.easy.listTemplates.quick") : "Quick templates";
+  const addTemplateLabel = ctx?.t ? ctx.t("sites.easy.listTemplates.add") : "Add template";
   return `
     <div class="${fieldClass}">
       <label>${escapeHtml(label)}</label>
@@ -540,12 +588,12 @@ function renderListEditor(field, label, values, placeholder = "", options = {}) 
       ${presets.length ? `
         <div class="waf-preset-row">
           <select id="list-template-${escapeHtml(field)}">
-            <option value="">Quick templates</option>
+            <option value="">${escapeHtml(quickTemplateLabel)}</option>
             ${presets.map((preset) => `
-              <option value="${escapeHtml(preset.id)}"${preset.id === selectedPreset ? " selected" : ""}>${escapeHtml(preset.label)}</option>
+              <option value="${escapeHtml(preset.id)}"${preset.id === selectedPreset ? " selected" : ""}>${escapeHtml(ctx?.t && preset?.labelKey ? ctx.t(preset.labelKey) : (preset.label || preset.id))}</option>
             `).join("")}
           </select>
-          <button class="btn ghost btn-sm" type="button" data-list-template-add="${escapeHtml(field)}">Add template</button>
+          <button class="btn ghost btn-sm" type="button" data-list-template-add="${escapeHtml(field)}">${escapeHtml(addTemplateLabel)}</button>
         </div>
       ` : ""}
       <div class="waf-inline">
@@ -572,6 +620,9 @@ function renderCountryEditor(field, label, values, catalog, options = {}) {
   const fieldClass = fullWidth ? "waf-field full" : "waf-field";
   const search = String(options.search || "").trim().toLowerCase();
   const selected = new Set(safeValues);
+  const ctx = options.ctx || null;
+  const selectedCountLabel = ctx?.t ? ctx.t("sites.easy.selectedCount", { count: safeValues.length }) : `Selected: ${safeValues.length}`;
+  const searchPlaceholder = ctx?.t ? ctx.t("sites.easy.geo.searchPlaceholder") : "Search country or code";
   const filteredOptions = catalogOptions.filter((value) => {
     if (!search) {
       return true;
@@ -584,8 +635,8 @@ function renderCountryEditor(field, label, values, catalog, options = {}) {
     <div class="${fieldClass}">
       <label>${escapeHtml(label)}</label>
       <details class="waf-status-dropdown waf-country-picker" open>
-        <summary>${escapeHtml(`Selected: ${safeValues.length}`)}</summary>
-        <input id="country-search-${escapeHtml(field)}" class="waf-country-search" placeholder="Search country or code" value="${escapeHtml(search)}">
+        <summary>${escapeHtml(selectedCountLabel)}</summary>
+        <input id="country-search-${escapeHtml(field)}" class="waf-country-search" placeholder="${escapeHtml(searchPlaceholder)}" value="${escapeHtml(search)}">
         <div class="waf-status-options waf-country-options">
           ${visibleOptions.map((value) => `
             <label class="waf-checkbox waf-status-option waf-country-option">
@@ -1820,8 +1871,8 @@ function renderDetailView(state, ctx) {
                       ${renderListEditor("blacklist_ip", ctx.t("sites.easy.traffic.blacklistIp"), draft.blacklist_ip, "203.0.113.0/24", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
                       ${renderListEditor("blacklist_rdns", ctx.t("sites.easy.traffic.blacklistRdns"), draft.blacklist_rdns, ".shodan.io", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
                       ${renderListEditor("blacklist_asn", ctx.t("sites.easy.traffic.blacklistAsn"), draft.blacklist_asn, "AS13335", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
-                      ${renderListEditor("blacklist_user_agent", ctx.t("sites.easy.traffic.blacklistUserAgent"), draft.blacklist_user_agent, "curl/*", { full: false, emptyLabel: ctx.t("sites.easy.noValues"), presets: getQuickListTemplates("blacklist_user_agent"), selectedPreset: state.listTemplateSelection.blacklist_user_agent })}
-                      ${renderListEditor("blacklist_uri", ctx.t("sites.easy.traffic.blacklistUri"), draft.blacklist_uri, "/admin", { full: false, emptyLabel: ctx.t("sites.easy.noValues"), presets: getQuickListTemplates("blacklist_uri"), selectedPreset: state.listTemplateSelection.blacklist_uri })}
+                      ${renderListEditor("blacklist_user_agent", ctx.t("sites.easy.traffic.blacklistUserAgent"), draft.blacklist_user_agent, "curl/*", { full: false, emptyLabel: ctx.t("sites.easy.noValues"), presets: getQuickListTemplates("blacklist_user_agent"), selectedPreset: state.listTemplateSelection.blacklist_user_agent, ctx })}
+                      ${renderListEditor("blacklist_uri", ctx.t("sites.easy.traffic.blacklistUri"), draft.blacklist_uri, "/admin", { full: false, emptyLabel: ctx.t("sites.easy.noValues"), presets: getQuickListTemplates("blacklist_uri"), selectedPreset: state.listTemplateSelection.blacklist_uri, ctx })}
                       ${renderListEditor("blacklist_ip_urls", ctx.t("sites.easy.traffic.blacklistIpUrls"), draft.blacklist_ip_urls, "https://example.com/ip.txt", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
                       ${renderListEditor("blacklist_rdns_urls", ctx.t("sites.easy.traffic.blacklistRdnsUrls"), draft.blacklist_rdns_urls, "https://example.com/rdns.txt", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
                       ${renderListEditor("blacklist_asn_urls", ctx.t("sites.easy.traffic.blacklistAsnUrls"), draft.blacklist_asn_urls, "https://example.com/asn.txt", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
@@ -1936,8 +1987,8 @@ function renderDetailView(state, ctx) {
               <section class="waf-subcard waf-stack waf-service-compact-section${state.activeTab === "geo" ? "" : " waf-hidden"}" data-tab-panel="geo">
                 <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.geo.title"))}</div>
                 <div class="waf-form-grid">
-                  ${renderCountryEditor("blacklist_country", ctx.t("sites.easy.geo.countryBlacklist"), draft.blacklist_country, state.geoCatalog, { full: false, emptyLabel: ctx.t("sites.easy.noValues"), search: state.countryFilters.blacklist_country })}
-                  ${renderCountryEditor("whitelist_country", ctx.t("sites.easy.geo.countryWhitelist"), draft.whitelist_country, state.geoCatalog, { full: false, emptyLabel: ctx.t("sites.easy.noValues"), search: state.countryFilters.whitelist_country })}
+                  ${renderCountryEditor("blacklist_country", ctx.t("sites.easy.geo.countryBlacklist"), draft.blacklist_country, state.geoCatalog, { full: false, emptyLabel: ctx.t("sites.easy.noValues"), search: state.countryFilters.blacklist_country, ctx })}
+                  ${renderCountryEditor("whitelist_country", ctx.t("sites.easy.geo.countryWhitelist"), draft.whitelist_country, state.geoCatalog, { full: false, emptyLabel: ctx.t("sites.easy.noValues"), search: state.countryFilters.whitelist_country, ctx })}
                 </div>
               </section>
 
@@ -2028,15 +2079,47 @@ async function upsertAccessPolicy(draft, ctx, existingAccessPolicy) {
       JSON.stringify(policyDeny) === JSON.stringify(expectedDeny);
   };
   if (!allowlist.length && !denylist.length && existingAccessPolicy) {
-    try {
-      await ctx.api.delete(`/api/access-policies/${encodeURIComponent(payload.id)}`);
-    } catch (error) {
-      if (error?.status !== 404 && !isAutoApplyFailureError(error)) {
+    const deleteByID = async (policyID) => {
+      const normalizedID = String(policyID || "").trim();
+      if (!normalizedID) {
+        return false;
+      }
+      try {
+        await ctx.api.delete(`/api/access-policies/${encodeURIComponent(normalizedID)}`);
+      } catch (error) {
+        const policyForSite = await resolvePolicyForSite();
+        if (!policyForSite) {
+          return true;
+        }
+        if (error?.status === 404) {
+          return false;
+        }
+        if (isAutoApplyFailureError(error)) {
+          return false;
+        }
+        if (error?.status === 400 || error?.status === 409 || error?.status === 500) {
+          return false;
+        }
         throw error;
       }
+      return true;
+    };
+    const deletedByPayloadID = await deleteByID(payload.id);
+    if (!deletedByPayloadID) {
       const policyForSite = await resolvePolicyForSite();
-      if (policyForSite) {
-        throw error;
+      if (policyForSite?.id && String(policyForSite.id) !== String(payload.id)) {
+        const deletedBySiteID = await deleteByID(policyForSite.id);
+        if (!deletedBySiteID) {
+          const persisted = await resolvePolicyForSite();
+          if (persisted) {
+            throw new Error(`access policy delete failed for site ${siteID}`);
+          }
+        }
+      } else {
+        const persisted = await resolvePolicyForSite();
+        if (persisted) {
+          throw new Error(`access policy delete failed for site ${siteID}`);
+        }
       }
     }
     return;

@@ -92,6 +92,7 @@ func RenderEasyArtifacts(sites []SiteInput, profiles []EasyProfileInput) ([]Arti
 		profile.BlacklistIP = sortedUnique(profile.BlacklistIP)
 		profile.BlacklistUserAgent = sortedUnique(profile.BlacklistUserAgent)
 		profile.BlacklistURI = sortedUnique(profile.BlacklistURI)
+		profile.BlacklistURI = normalizeBlacklistURIPatterns(profile.BlacklistURI)
 		profile.BlacklistCountry = sortedUniqueUpper(profile.BlacklistCountry)
 		profile.WhitelistCountry = sortedUniqueUpper(profile.WhitelistCountry)
 		profile.MaxClientSize = strings.TrimSpace(profile.MaxClientSize)
@@ -462,4 +463,41 @@ func parseRatePerSecond(value string) int {
 		return 0
 	}
 	return v
+}
+
+func normalizeBlacklistURIPatterns(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		pattern := strings.TrimSpace(value)
+		if pattern == "" {
+			continue
+		}
+		pattern = toSafeBlacklistURIRegex(pattern)
+		if pattern == "" {
+			continue
+		}
+		if _, ok := seen[pattern]; ok {
+			continue
+		}
+		seen[pattern] = struct{}{}
+		out = append(out, pattern)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func toSafeBlacklistURIRegex(pattern string) string {
+	// Keep existing regex behavior when the input is already a valid expression.
+	if _, err := regexp.Compile(pattern); err == nil {
+		return pattern
+	}
+	// Fallback: interpret as wildcard expression (`*`, `?`) and escape everything else.
+	quoted := regexp.QuoteMeta(pattern)
+	quoted = strings.ReplaceAll(quoted, `\*`, `.*`)
+	quoted = strings.ReplaceAll(quoted, `\?`, `.`)
+	return quoted
 }
