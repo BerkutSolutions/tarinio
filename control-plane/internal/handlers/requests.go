@@ -15,6 +15,10 @@ type requestCollectorWithOptions interface {
 	CollectWithOptions(values url.Values) ([]map[string]any, error)
 }
 
+type requestCollectorProber interface {
+	Probe(values url.Values) error
+}
+
 type RequestsHandler struct {
 	collector requestCollector
 }
@@ -30,6 +34,16 @@ func (h *RequestsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if h.collector == nil {
 		writeJSON(w, http.StatusOK, []map[string]any{})
+		return
+	}
+	if isProbeRequest(r.URL.Query()) {
+		if prober, ok := h.collector.(requestCollectorProber); ok {
+			if err := prober.Probe(r.URL.Query()); err != nil {
+				writeJSON(w, http.StatusBadGateway, map[string]any{"error": err.Error()})
+				return
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 		return
 	}
 	var (
@@ -84,4 +98,13 @@ func parsePositiveInt(raw string, fallback int) int {
 		return fallback
 	}
 	return v
+}
+
+func isProbeRequest(query url.Values) bool {
+	switch strings.ToLower(strings.TrimSpace(query.Get("probe"))) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
 }

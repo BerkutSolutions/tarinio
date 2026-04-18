@@ -9,8 +9,9 @@ import (
 )
 
 type fakeEventService struct {
-	items []events.Event
-	err   error
+	items    []events.Event
+	err      error
+	probeErr error
 }
 
 func (f *fakeEventService) List() ([]events.Event, error) {
@@ -18,6 +19,10 @@ func (f *fakeEventService) List() ([]events.Event, error) {
 		return nil, f.err
 	}
 	return append([]events.Event(nil), f.items...), nil
+}
+
+func (f *fakeEventService) Probe() error {
+	return f.probeErr
 }
 
 func TestEventsHandler_Get(t *testing.T) {
@@ -52,3 +57,12 @@ func TestEventsHandler_NotFound(t *testing.T) {
 	}
 }
 
+func TestEventsHandler_Probe(t *testing.T) {
+	handler := NewEventsHandler(&fakeEventService{})
+	req := httptest.NewRequest(http.MethodGet, "/api/events?probe=1", nil)
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+}

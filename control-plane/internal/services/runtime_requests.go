@@ -2,6 +2,7 @@ package services
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -11,6 +12,10 @@ import (
 
 type RuntimeRequestCollector interface {
 	Collect() ([]map[string]any, error)
+}
+
+type RuntimeRequestProber interface {
+	Probe(query url.Values) error
 }
 
 type HTTPRuntimeRequestCollector struct {
@@ -86,6 +91,44 @@ func (c *HTTPRuntimeRequestCollector) CollectWithOptions(query url.Values) ([]ma
 	return []map[string]any{}, nil
 }
 
+func (c *HTTPRuntimeRequestCollector) Probe(query url.Values) error {
+	if c == nil || strings.TrimSpace(c.URL) == "" {
+		return nil
+	}
+	targetURL := deriveRuntimeRequestsProbeURL(c.URL)
+	if len(query) > 0 {
+		if parsed, err := url.Parse(targetURL); err == nil {
+			q := parsed.Query()
+			for _, key := range []string{"retention_days", "day"} {
+				value := strings.TrimSpace(query.Get(key))
+				if value == "" {
+					continue
+				}
+				q.Set(key, value)
+			}
+			parsed.RawQuery = q.Encode()
+			targetURL = parsed.String()
+		}
+	}
+	req, err := http.NewRequest(http.MethodGet, targetURL, nil)
+	if err != nil {
+		return err
+	}
+	client := c.Client
+	if client == nil {
+		client = &http.Client{Timeout: 2 * time.Second}
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("runtime requests probe endpoint returned %d", resp.StatusCode)
+	}
+	return nil
+}
+
 func deriveRuntimeRequestsURL(healthURL string) string {
 	raw := strings.TrimSpace(healthURL)
 	if raw == "" {
@@ -96,6 +139,17 @@ func deriveRuntimeRequestsURL(healthURL string) string {
 		return ""
 	}
 	parsed.Path = "/requests"
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	return parsed.String()
+}
+
+func deriveRuntimeRequestsProbeURL(targetURL string) string {
+	parsed, err := url.Parse(strings.TrimSpace(targetURL))
+	if err != nil {
+		return strings.TrimSpace(targetURL)
+	}
+	parsed.Path = "/requests/probe"
 	parsed.RawQuery = ""
 	parsed.Fragment = ""
 	return parsed.String()

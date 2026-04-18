@@ -11,6 +11,10 @@ type eventService interface {
 	List() ([]events.Event, error)
 }
 
+type eventProbeService interface {
+	Probe() error
+}
+
 type EventsHandler struct {
 	events eventService
 }
@@ -22,6 +26,16 @@ func NewEventsHandler(events eventService) *EventsHandler {
 func (h *EventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/api/events" || r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	if isProbeRequest(r.URL.Query()) {
+		if prober, ok := h.events.(eventProbeService); ok {
+			if err := prober.Probe(); err != nil {
+				writeJSON(w, http.StatusBadGateway, map[string]any{"error": err.Error()})
+				return
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 		return
 	}
 

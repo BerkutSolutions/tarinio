@@ -164,6 +164,17 @@ func (s *requestStreamSource) latest(query url.Values) ([]map[string]any, error)
 	return s.loadArchiveRowsLocked(options)
 }
 
+func (s *requestStreamSource) probe(query url.Values) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	options := parseRequestQueryOptions(query, s.maxItems, s.defaultRetention)
+	if err := s.ensureArchiveRootLocked(); err != nil {
+		return err
+	}
+	return s.ingestLatestLocked(options.RetentionDays)
+}
+
 func (s *requestStreamSource) startBackgroundIngest(interval time.Duration) {
 	if interval <= 0 {
 		interval = 3 * time.Second
@@ -701,6 +712,23 @@ func (s *securityEventSource) next() ([]securityEvent, error) {
 	}
 
 	return out, nil
+}
+
+func (s *securityEventSource) probe() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	file, err := os.Open(s.path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	defer file.Close()
+
+	_, err = file.Stat()
+	return err
 }
 
 type parsedAccess struct {

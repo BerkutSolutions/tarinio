@@ -252,6 +252,17 @@ func (s *runtimeStatus) handlers(process *runtimeProcess, securitySource *securi
 			"events": items,
 		})
 	})
+	mux.HandleFunc("/security-events/probe", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if err := securitySource.probe(); err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	})
 	mux.HandleFunc("/requests", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -263,6 +274,17 @@ func (s *runtimeStatus) handlers(process *runtimeProcess, securitySource *securi
 			return
 		}
 		writeJSON(w, http.StatusOK, items)
+	})
+	mux.HandleFunc("/requests/probe", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if err := requestSource.probe(r.URL.Query()); err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 	})
 	mux.HandleFunc("/requests/indexes", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodDelete {

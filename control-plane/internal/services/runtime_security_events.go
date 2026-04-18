@@ -15,6 +15,10 @@ type RuntimeSecurityEventCollector interface {
 	Collect() ([]events.Event, error)
 }
 
+type RuntimeSecurityEventProber interface {
+	Probe() error
+}
+
 type HTTPRuntimeSecurityEventCollector struct {
 	URL    string
 	Client *http.Client
@@ -103,6 +107,30 @@ func (c *HTTPRuntimeSecurityEventCollector) Collect() ([]events.Event, error) {
 	return out, nil
 }
 
+func (c *HTTPRuntimeSecurityEventCollector) Probe() error {
+	if c == nil || strings.TrimSpace(c.URL) == "" {
+		return nil
+	}
+	targetURL := deriveRuntimeSecurityEventsProbeURL(c.URL)
+	req, err := http.NewRequest(http.MethodGet, targetURL, nil)
+	if err != nil {
+		return err
+	}
+	client := c.Client
+	if client == nil {
+		client = &http.Client{Timeout: 2 * time.Second}
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("runtime security events probe endpoint returned %d", resp.StatusCode)
+	}
+	return nil
+}
+
 func deriveRuntimeSecurityEventsURL(healthURL string) string {
 	raw := strings.TrimSpace(healthURL)
 	if raw == "" {
@@ -113,6 +141,17 @@ func deriveRuntimeSecurityEventsURL(healthURL string) string {
 		return ""
 	}
 	parsed.Path = "/security-events"
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	return parsed.String()
+}
+
+func deriveRuntimeSecurityEventsProbeURL(targetURL string) string {
+	parsed, err := url.Parse(strings.TrimSpace(targetURL))
+	if err != nil {
+		return strings.TrimSpace(targetURL)
+	}
+	parsed.Path = "/security-events/probe"
 	parsed.RawQuery = ""
 	parsed.Fragment = ""
 	return parsed.String()

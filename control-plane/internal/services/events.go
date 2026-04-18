@@ -72,6 +72,16 @@ func (s *EventService) List() ([]events.Event, error) {
 	return s.store.List()
 }
 
+func (s *EventService) Probe() error {
+	if s == nil || s.collector == nil {
+		return nil
+	}
+	if prober, ok := s.collector.(RuntimeSecurityEventProber); ok {
+		return prober.Probe()
+	}
+	return nil
+}
+
 func (s *EventService) SetRetention(policy events.RetentionPolicy) {
 	s.retention = policy
 }

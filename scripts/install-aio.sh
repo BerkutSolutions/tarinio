@@ -32,12 +32,19 @@ else
 fi
 
 reset_screen() {
-  if [ ! -t 1 ]; then
+  target=""
+  if [ -w /dev/tty ]; then
+    target="/dev/tty"
+  elif [ -t 1 ]; then
+    target="/dev/stdout"
+  fi
+  if [ -z "$target" ]; then
     return
   fi
-  clear >/dev/null 2>&1 || true
-  printf '\033[H\033[2J\033[3J'
-  printf '\014'
+  if command -v tput >/dev/null 2>&1; then
+    tput clear >"$target" 2>/dev/null || true
+  fi
+  printf '\033[H\033[2J\033[3J\014' >"$target"
 }
 
 section() {
