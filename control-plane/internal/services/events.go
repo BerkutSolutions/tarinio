@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	"waf/control-plane/internal/events"
@@ -20,6 +21,11 @@ type EventService struct {
 	store     EventStore
 	retention events.RetentionPolicy
 	collector RuntimeSecurityEventCollector
+
+	collectorMu              sync.Mutex
+	collectorNextAttemptAt   time.Time
+	collectorLastError       string
+	collectorLastLoggedError time.Time
 }
 
 type EventServiceOption func(*EventService)
@@ -87,14 +93,51 @@ func (s *EventService) collectRuntimeSecurityEventsBestEffort() {
 	if s.collector == nil {
 		return
 	}
-	items, err := s.collector.Collect()
-	if err != nil {
-		log.Printf("event service runtime security collector failed: %v", err)
+	if !s.shouldCollectRuntimeSecurityEvents() {
 		return
 	}
+	items, err := s.collector.Collect()
+	if err != nil {
+		s.recordCollectorFailure(err)
+		return
+	}
+	s.recordCollectorSuccess()
 	for _, item := range items {
 		if _, err := s.Emit(item); err != nil && !strings.Contains(strings.ToLower(err.Error()), "already exists") {
 			log.Printf("event service security event emit failed: %v", err)
 		}
+	}
+}
+
+func (s *EventService) shouldCollectRuntimeSecurityEvents() bool {
+	s.collectorMu.Lock()
+	defer s.collectorMu.Unlock()
+	now := time.Now()
+	if !s.collectorNextAttemptAt.IsZero() && now.Before(s.collectorNextAttemptAt) {
+		return false
+	}
+	s.collectorNextAttemptAt = now.Add(5 * time.Second)
+	return true
+}
+
+func (s *EventService) recordCollectorSuccess() {
+	s.collectorMu.Lock()
+	defer s.collectorMu.Unlock()
+	s.collectorLastError = ""
+	s.collectorNextAttemptAt = time.Now().Add(5 * time.Second)
+}
+
+func (s *EventService) recordCollectorFailure(err error) {
+	message := strings.TrimSpace(err.Error())
+	now := time.Now()
+
+	s.collectorMu.Lock()
+	defer s.collectorMu.Unlock()
+	s.collectorNextAttemptAt = now.Add(30 * time.Second)
+	shouldLog := message != s.collectorLastError || now.Sub(s.collectorLastLoggedError) >= time.Minute
+	s.collectorLastError = message
+	if shouldLog {
+		s.collectorLastLoggedError = now
+		log.Printf("event service runtime security collector failed: %v", err)
 	}
 }

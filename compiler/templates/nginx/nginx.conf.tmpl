@@ -1,10 +1,13 @@
 worker_processes auto;
+error_log /dev/stderr warn;
 
 events {
     worker_connections 1024;
 }
 
 http {
+    variables_hash_max_size 2048;
+    variables_hash_bucket_size 128;
     include conf.d/*.conf;
     include {{ .SitesIncludeGlob }};
 }

@@ -1784,6 +1784,25 @@
     text-overflow: ellipsis;
   }
 
+  .hc-item.log-issue-item {
+    align-items: flex-start;
+  }
+
+  .hc-item.log-issue-item .hc-item-title,
+  .hc-item.log-issue-item .hc-item-sub {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    word-break: break-word;
+  }
+
+  .hc-item.log-issue-item .hc-item-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 6px;
+  }
+
   .healthcheck-actions {
     display: flex;
     justify-content: center;
@@ -1910,6 +1929,24 @@
   .healthcheck-step-icon[data-status='failed'] {
     border-color: rgba(255, 107, 107, 0.95);
     background: rgba(255, 107, 107, 0.12);
+  }
+
+  .healthcheck-step-icon[data-status='warning'] {
+    border-color: rgba(255, 196, 92, 0.95);
+    background: rgba(255, 196, 92, 0.16);
+  }
+
+  .healthcheck-step-icon[data-status='warning']::after {
+    content: '!';
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 216, 140, 0.98);
+    font-weight: 800;
+    font-size: 12px;
+    animation: none;
   }
 
   .healthcheck-step-icon[data-status='failed']::after {
@@ -11838,7 +11875,7 @@ body.auth-locked #main-screen {
   }
 }
 
-/* Accesses v1.1.16 overrides: compact services column + service filter + improved modal pills */
+/* Accesses v1.1.17 overrides: compact services column + service filter + improved modal pills */
 #accesses-page .accesses-toolbar {
   align-items: flex-end;
   gap: 12px;

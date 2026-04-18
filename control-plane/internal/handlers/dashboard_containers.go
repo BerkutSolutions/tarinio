@@ -11,6 +11,7 @@ import (
 type dashboardContainerService interface {
 	Overview() (services.DashboardContainerOverview, error)
 	Logs(req services.DashboardContainerLogsRequest) (services.DashboardContainerLogs, error)
+	Issues() (services.DashboardContainerIssuesSummary, error)
 }
 
 type DashboardContainersHandler struct {
@@ -31,6 +32,8 @@ func (h *DashboardContainersHandler) ServeHTTP(w http.ResponseWriter, r *http.Re
 		h.handleOverview(w, r)
 	case "/api/dashboard/containers/logs":
 		h.handleLogs(w, r)
+	case "/api/dashboard/containers/issues":
+		h.handleIssues(w, r)
 	default:
 		w.WriteHeader(http.StatusNotFound)
 	}
@@ -68,6 +71,19 @@ func (h *DashboardContainersHandler) handleLogs(w http.ResponseWriter, r *http.R
 		Since:     strings.TrimSpace(r.URL.Query().Get("since")),
 		Tail:      tail,
 	})
+	if err != nil {
+		writeJSON(w, http.StatusBadGateway, map[string]any{"error": strings.TrimSpace(err.Error())})
+		return
+	}
+	writeJSON(w, http.StatusOK, payload)
+}
+
+func (h *DashboardContainersHandler) handleIssues(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	payload, err := h.service.Issues()
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, map[string]any{"error": strings.TrimSpace(err.Error())})
 		return

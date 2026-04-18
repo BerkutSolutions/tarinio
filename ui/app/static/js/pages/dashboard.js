@@ -1604,6 +1604,27 @@ export async function renderDashboard(container, ctx) {
     `;
   };
 
+  const updateLiveLogsModalBody = () => {
+    if (!modalBodyNode) {
+      return;
+    }
+    const prevPreNode = modalBodyNode.querySelector(".dashboard-container-logs-pre");
+    const prevScrollTop = prevPreNode ? prevPreNode.scrollTop : 0;
+    const wasPinnedToBottom = prevPreNode
+      ? (prevPreNode.scrollHeight - prevPreNode.scrollTop - prevPreNode.clientHeight) < 24
+      : true;
+    modalBodyNode.innerHTML = renderLogsBody();
+    const nextPreNode = modalBodyNode.querySelector(".dashboard-container-logs-pre");
+    if (!nextPreNode) {
+      return;
+    }
+    if (wasPinnedToBottom) {
+      nextPreNode.scrollTop = nextPreNode.scrollHeight;
+      return;
+    }
+    nextPreNode.scrollTop = prevScrollTop;
+  };
+
   const pollContainerLogs = async () => {
     if (!liveLogsState || !liveLogsState.container) {
       return;
@@ -1620,11 +1641,7 @@ export async function renderDashboard(container, ctx) {
         liveLogsState.since = lastTs;
       }
     }
-    modal.open({
-      title: `${ctx.t("dashboard.containers.logs.title")} ${liveLogsState.container}`,
-      subtitle: ctx.t("dashboard.containers.logs.subtitle"),
-      body: renderLogsBody()
-    });
+    updateLiveLogsModalBody();
   };
 
   const mountWidgetFrame = (widget) => {

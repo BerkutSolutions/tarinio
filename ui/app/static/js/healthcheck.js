@@ -34,6 +34,7 @@ const TAB_PROBES = [
 const state = {
   checks: new Map(),
   compatItems: [],
+  errorItems: [],
 };
 
 function sleep(ms) {
@@ -43,6 +44,7 @@ function sleep(ms) {
 function iconStatusFor(status) {
   const normalized = String(status || "").trim();
   if (normalized === "ok" || normalized === "done") return "done";
+  if (normalized === "warning") return "warning";
   if (normalized === "running") return "running";
   if (normalized === "skipped") return "skipped";
   if (normalized === "failed" || normalized === "needs_reinit" || normalized === "broken") return "failed";
@@ -329,6 +331,71 @@ function renderCompat(items) {
   }
 }
 
+function renderErrorIssues(items) {
+  const list = document.getElementById("healthcheck-errors");
+  const summary = document.getElementById("hc-errors-summary");
+  if (!list) return;
+  list.innerHTML = "";
+  state.errorItems = Array.isArray(items) ? items : [];
+  setToggleCount("hc-errors-count", state.errorItems.length, state.errorItems.length);
+
+  if (summary) {
+    summary.textContent = state.errorItems.length
+      ? t("healthcheck.errors.summary").replace("{count}", String(state.errorItems.length))
+      : t("healthcheck.errors.empty");
+  }
+
+  if (!state.errorItems.length) {
+    setToggleStatus("hc-errors", "done");
+    return;
+  }
+
+  let hasError = false;
+  state.errorItems.forEach((item, index) => {
+    const severity = String(item?.severity || "").toLowerCase() === "warning" ? "warning" : "error";
+    const severityLabel = t(`events.severity.${severity}`);
+    if (severity === "error") {
+      hasError = true;
+    }
+    const li = document.createElement("li");
+    li.className = "hc-item log-issue-item";
+    li.dataset.itemId = `log-issue-${index}`;
+    li.innerHTML = `
+        <span class="healthcheck-step-icon" aria-hidden="true" data-status="${severity === "warning" ? "warning" : "failed"}"></span>
+      <div class="hc-item-body">
+        <div class="hc-item-title"></div>
+        <div class="muted hc-item-sub"></div>
+        <div class="hc-item-meta muted"></div>
+      </div>
+    `;
+    const titleNode = li.querySelector(".hc-item-title");
+    const subNode = li.querySelector(".hc-item-sub");
+    const metaNode = li.querySelector(".hc-item-meta");
+    if (titleNode) {
+      titleNode.textContent = `${String(item?.container || "-")} | ${severityLabel}`;
+    }
+    if (subNode) {
+      subNode.textContent = String(item?.sample_log || item?.normalized_log || "");
+    }
+    if (metaNode) {
+      const parts = [
+        `${t("healthcheck.errors.severity")}: ${severityLabel}`,
+        `${t("healthcheck.errors.count")}: ${String(item?.count ?? 0)}`,
+      ];
+      if (item?.first_seen) {
+        parts.push(`${t("healthcheck.errors.firstSeen")}: ${String(item.first_seen)}`);
+      }
+      if (item?.last_seen) {
+        parts.push(`${t("healthcheck.errors.lastSeen")}: ${String(item.last_seen)}`);
+      }
+      metaNode.textContent = parts.join(" | ");
+    }
+    list.appendChild(li);
+  });
+
+  setToggleStatus("hc-errors", hasError ? "failed" : "warning");
+}
+
 function bindAccordion() {
   document.querySelectorAll("[data-hc-toggle]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -445,6 +512,26 @@ async function loadCompat() {
   }
 }
 
+async function loadErrorIssues() {
+  setToggleStatus("hc-errors", "running");
+  try {
+    const payload = await api.get("/api/dashboard/containers/issues");
+    renderErrorIssues(Array.isArray(payload?.issues) ? payload.issues : []);
+  } catch (error) {
+    const list = document.getElementById("healthcheck-errors");
+    const summary = document.getElementById("hc-errors-summary");
+    if (list) {
+      list.innerHTML = "";
+      addRow(list, "hc-errors-load", t("healthcheck.section.errors"), String(error?.message || t("healthcheck.errors.loadError")), "failed");
+    }
+    if (summary) {
+      summary.textContent = t("healthcheck.errors.loadError");
+    }
+    setToggleCount("hc-errors-count", 0, 0);
+    setToggleStatus("hc-errors", "failed");
+  }
+}
+
 async function bootstrap() {
   await applyTranslations(getLanguage());
   document.title = t("healthcheck.pageTitle");
@@ -468,6 +555,7 @@ async function bootstrap() {
   });
 
   await runChecks();
+  await loadErrorIssues();
   await loadCompat();
 }
 

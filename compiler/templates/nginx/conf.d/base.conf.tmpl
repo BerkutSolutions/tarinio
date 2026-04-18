@@ -65,6 +65,7 @@ server {
 
     location ^~ /.well-known/acme-challenge/ {
         default_type text/plain;
+        log_not_found off;
         alias /var/lib/waf/control-plane/acme-challenges/;
     }
 

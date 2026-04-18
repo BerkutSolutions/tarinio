@@ -65,6 +65,21 @@ type DashboardContainerLogs struct {
 	Lines     []DashboardContainerLogRow `json:"lines"`
 }
 
+type DashboardContainerIssuesSummary struct {
+	GeneratedAt string                       `json:"generated_at"`
+	Issues      []DashboardContainerLogIssue `json:"issues"`
+}
+
+type DashboardContainerLogIssue struct {
+	Container     string `json:"container"`
+	Severity      string `json:"severity"`
+	Count         int    `json:"count"`
+	FirstSeen     string `json:"first_seen,omitempty"`
+	LastSeen      string `json:"last_seen,omitempty"`
+	NormalizedLog string `json:"normalized_log"`
+	SampleLog     string `json:"sample_log"`
+}
+
 type DashboardContainerLogRow struct {
 	Timestamp string `json:"timestamp,omitempty"`
 	Message   string `json:"message"`
@@ -256,6 +271,106 @@ func (s *ContainerRuntimeService) Logs(req DashboardContainerLogsRequest) (Dashb
 	}, nil
 }
 
+func (s *ContainerRuntimeService) Issues() (DashboardContainerIssuesSummary, error) {
+	if s == nil {
+		return DashboardContainerIssuesSummary{}, errors.New("container runtime service is nil")
+	}
+	psOut, err := s.runDockerPS()
+	if err != nil {
+		return DashboardContainerIssuesSummary{}, err
+	}
+	containers := filterDashboardContainers(parseDockerPS(psOut))
+	if len(containers) == 0 {
+		return DashboardContainerIssuesSummary{
+			GeneratedAt: time.Now().UTC().Format(time.RFC3339Nano),
+			Issues:      []DashboardContainerLogIssue{},
+		}, nil
+	}
+
+	type issueBucket struct {
+		DashboardContainerLogIssue
+		lastSample string
+	}
+	buckets := map[string]*issueBucket{}
+	now := time.Now().UTC()
+	for _, container := range containers {
+		rows, err := s.Logs(DashboardContainerLogsRequest{
+			Container: container.Name,
+			Tail:      4000,
+		})
+		if err != nil {
+			continue
+		}
+		for _, row := range rows.Lines {
+			severity, ok := classifyContainerLogIssue(row.Message)
+			if !ok {
+				continue
+			}
+			normalized := normalizeLogIssueMessage(row.Message)
+			if normalized == "" {
+				continue
+			}
+			key := container.Name + "|" + severity + "|" + normalized
+			bucket, exists := buckets[key]
+			if !exists {
+				bucket = &issueBucket{
+					DashboardContainerLogIssue: DashboardContainerLogIssue{
+						Container:     container.Name,
+						Severity:      severity,
+						Count:         0,
+						FirstSeen:     row.Timestamp,
+						LastSeen:      row.Timestamp,
+						NormalizedLog: normalized,
+						SampleLog:     strings.TrimSpace(row.Message),
+					},
+					lastSample: strings.TrimSpace(row.Message),
+				}
+				if bucket.FirstSeen == "" {
+					bucket.FirstSeen = now.Format(time.RFC3339Nano)
+				}
+				if bucket.LastSeen == "" {
+					bucket.LastSeen = bucket.FirstSeen
+				}
+				buckets[key] = bucket
+			}
+			bucket.Count++
+			if timestampAfter(row.Timestamp, bucket.LastSeen) {
+				bucket.LastSeen = row.Timestamp
+				bucket.SampleLog = strings.TrimSpace(row.Message)
+				bucket.lastSample = bucket.SampleLog
+			}
+			if timestampBefore(row.Timestamp, bucket.FirstSeen) {
+				bucket.FirstSeen = row.Timestamp
+			}
+		}
+	}
+
+	items := make([]DashboardContainerLogIssue, 0, len(buckets))
+	for _, bucket := range buckets {
+		items = append(items, bucket.DashboardContainerLogIssue)
+	}
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].Count == items[j].Count {
+			if items[i].LastSeen == items[j].LastSeen {
+				if items[i].Container == items[j].Container {
+					return items[i].NormalizedLog < items[j].NormalizedLog
+				}
+				return items[i].Container < items[j].Container
+			}
+			return items[i].LastSeen > items[j].LastSeen
+		}
+		return items[i].Count > items[j].Count
+	})
+	if len(items) > 200 {
+		items = items[:200]
+	}
+
+	return DashboardContainerIssuesSummary{
+		GeneratedAt: now.Format(time.RFC3339Nano),
+		Issues:      items,
+	}, nil
+}
+
 func parseDockerPS(out []byte) []DashboardContainerMetrics {
 	scanner := bufio.NewScanner(bytes.NewReader(out))
 	items := make([]DashboardContainerMetrics, 0, 8)
@@ -425,6 +540,10 @@ func parseNetworkField(value string) (string, string, uint64, uint64) {
 }
 
 var sizePattern = regexp.MustCompile(`(?i)^\s*([0-9]+(?:\.[0-9]+)?)\s*([kmgtpe]?i?b)?\s*$`)
+var leadingRFC3339LogPattern = regexp.MustCompile(`^\[[0-9]{4}-[0-9]{2}-[0-9]{2}T[^\]]+\]\s*`)
+var leadingNginxTimePattern = regexp.MustCompile(`^[0-9]{4}/[0-9]{2}/[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\s+`)
+var inlineRFC3339Pattern = regexp.MustCompile(`[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.+\-Z]+`)
+var inlineNginxTimePattern = regexp.MustCompile(`[0-9]{4}/[0-9]{2}/[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}`)
 
 func parseSizeToBytes(value string) uint64 {
 	match := sizePattern.FindStringSubmatch(strings.TrimSpace(value))
@@ -512,4 +631,92 @@ func formatUptime(seconds int64) string {
 	}
 	parts = append(parts, fmt.Sprintf("%dm", minutes))
 	return strings.Join(parts, " ")
+}
+
+func classifyContainerLogIssue(message string) (string, bool) {
+	trimmed := strings.TrimSpace(message)
+	if trimmed == "" {
+		return "", false
+	}
+	lower := strings.ToLower(trimmed)
+	benignPatterns := []string{
+		"warning: no config file specified, using the default config. in order to specify a config file use redis-server /path/to/redis.conf",
+	}
+	for _, pattern := range benignPatterns {
+		if strings.Contains(lower, pattern) {
+			return "", false
+		}
+	}
+	if strings.Contains(lower, "[notice]") {
+		return "", false
+	}
+	if strings.Contains(lower, "[warn]") || strings.Contains(lower, " warning:") || strings.HasPrefix(lower, "warn:") {
+		return "warning", true
+	}
+	errorTokens := []string{
+		"[error]",
+		" failed:",
+		" fatal:",
+		" panic:",
+		"context deadline exceeded",
+		"timeout exceeded",
+		"timed out",
+		"connection refused",
+		"no such file or directory",
+		"segmentation fault",
+		"traceback",
+		"exception",
+		"open() ",
+	}
+	for _, token := range errorTokens {
+		if strings.Contains(lower, token) {
+			return "error", true
+		}
+	}
+	return "", false
+}
+
+func normalizeLogIssueMessage(message string) string {
+	out := strings.TrimSpace(message)
+	out = leadingRFC3339LogPattern.ReplaceAllString(out, "")
+	out = leadingNginxTimePattern.ReplaceAllString(out, "")
+	out = inlineRFC3339Pattern.ReplaceAllString(out, "<time>")
+	out = inlineNginxTimePattern.ReplaceAllString(out, "<time>")
+	out = strings.Join(strings.Fields(out), " ")
+	return strings.TrimSpace(out)
+}
+
+func timestampAfter(left string, right string) bool {
+	leftTime, leftOK := parseFlexibleTimestamp(left)
+	rightTime, rightOK := parseFlexibleTimestamp(right)
+	if leftOK && rightOK {
+		return leftTime.After(rightTime)
+	}
+	return strings.TrimSpace(left) > strings.TrimSpace(right)
+}
+
+func timestampBefore(left string, right string) bool {
+	leftTime, leftOK := parseFlexibleTimestamp(left)
+	rightTime, rightOK := parseFlexibleTimestamp(right)
+	if leftOK && rightOK {
+		return leftTime.Before(rightTime)
+	}
+	if strings.TrimSpace(right) == "" {
+		return true
+	}
+	return strings.TrimSpace(left) < strings.TrimSpace(right)
+}
+
+func parseFlexibleTimestamp(value string) (time.Time, bool) {
+	raw := strings.TrimSpace(value)
+	if raw == "" {
+		return time.Time{}, false
+	}
+	if parsed, err := time.Parse(time.RFC3339Nano, raw); err == nil {
+		return parsed.UTC(), true
+	}
+	if parsed, err := time.Parse(time.RFC3339, raw); err == nil {
+		return parsed.UTC(), true
+	}
+	return time.Time{}, false
 }

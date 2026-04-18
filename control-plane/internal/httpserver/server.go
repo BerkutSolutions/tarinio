@@ -61,6 +61,7 @@ func New(
 	containerRuntimeService *services.ContainerRuntimeService,
 	runtimeCRSService *services.RuntimeCRSService,
 	requestCollector services.RuntimeRequestCollector,
+	adminScriptService *services.AdminScriptService,
 ) *Server {
 	mux := http.NewServeMux()
 	settingsRuntimeHandler := handlers.NewSettingsRuntimeHandler(filepath.Join(revisionStoreDir, "settings"), runtimeHealthURL)
@@ -199,7 +200,15 @@ func New(
 	mux.Handle("/api/dashboard/stats", withAuth(authService, rbac.PermissionReportsRead, handlers.NewDashboardHandler(dashboardService)))
 	mux.Handle("/api/dashboard/containers/overview", withAuth(authService, rbac.PermissionReportsRead, handlers.NewDashboardContainersHandler(containerRuntimeService)))
 	mux.Handle("/api/dashboard/containers/logs", withAuth(authService, rbac.PermissionReportsRead, handlers.NewDashboardContainersHandler(containerRuntimeService)))
+	mux.Handle("/api/dashboard/containers/issues", withAuth(authService, rbac.PermissionReportsRead, handlers.NewDashboardContainersHandler(containerRuntimeService)))
 	mux.Handle("/api/audit", withAuth(authService, rbac.PermissionAdministrationRead, handlers.NewAuditHandler(auditService)))
+	mux.Handle("/api/administration/scripts", withMethodPermissions(authService, map[string]rbac.Permission{
+		http.MethodGet: rbac.PermissionAdministrationRead,
+	}, handlers.NewAdministrationScriptsHandler(adminScriptService)))
+	mux.Handle("/api/administration/scripts/", withMethodPermissions(authService, map[string]rbac.Permission{
+		http.MethodGet:  rbac.PermissionAdministrationRead,
+		http.MethodPost: rbac.PermissionAdministrationWrite,
+	}, handlers.NewAdministrationScriptsHandler(adminScriptService)))
 	mux.Handle("/api/revisions/compile", withAuth(authService, rbac.PermissionRevisionsWrite, handlers.NewRevisionCompileHandler(revisionCompileService)))
 	mux.Handle("/api/revisions/", withAuth(authService, rbac.PermissionRevisionsWrite, handlers.NewRevisionApplyHandler(applyService)))
 

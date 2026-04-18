@@ -29,6 +29,17 @@
             <ul id="healthcheck-steps" class="hc-list"></ul>
           </div>
 
+          <button type="button" class="hc-toggle" data-hc-toggle="hc-errors">
+            <span class="healthcheck-step-icon hc-toggle-icon" aria-hidden="true" data-status="pending"></span>
+            <span id="hc-errors-count" class="muted hc-toggle-count">0/0</span>
+            <span class="hc-toggle-title" data-i18n="healthcheck.section.errors">Ошибки</span>
+            <span class="hc-chevron" aria-hidden="true"></span>
+          </button>
+          <div id="hc-errors" class="hc-panel" hidden>
+            <div id="hc-errors-summary" class="muted hc-summary"></div>
+            <ul id="healthcheck-errors" class="hc-list"></ul>
+          </div>
+
           <button type="button" class="hc-toggle" data-hc-toggle="hc-compat">
             <span class="healthcheck-step-icon hc-toggle-icon" aria-hidden="true" data-status="pending"></span>
             <span id="hc-compat-count" class="muted hc-toggle-count">0/0</span>

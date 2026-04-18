@@ -21,22 +21,53 @@ set -u
 DEPLOY_DIR="${DEPLOY_DIR:-/opt/tarinio/deploy/compose/default}"
 RUNTIME_CONTAINER="${RUNTIME_CONTAINER:-tarinio-runtime}"
 CONTROL_PLANE_CONTAINER="${CONTROL_PLANE_CONTAINER:-tarinio-control-plane}"
+WAF_CLI_BIN="${WAF_CLI_BIN:-waf-cli}"
+NON_INTERACTIVE="${NON_INTERACTIVE:-0}"
 
-read -r -p "WAF username: " WAF_USER
-read -r -s -p "WAF password: " WAF_PASS
-echo
-read -r -p "Client IPs (optional, multiple allowed: '1.1.1.1 2.2.2.2'): " FILTER_IP
-read -r -p "Target site IDs / hosts (optional, multiple allowed, e.g. 'site-a.example.com api.example.com'): " FILTER_SITE
-read -r -p "HTTP status codes (optional, multiple allowed: '403 429 503'): " FILTER_STATUS
+prompt_value() {
+  local var_name="$1"
+  local prompt_text="$2"
+  local secret="${3:-0}"
+  local current_value="${!var_name:-}"
 
-if command -v docker-compose >/dev/null 2>&1; then
+  if [[ -n "$current_value" ]]; then
+    return
+  fi
+  if [[ "$NON_INTERACTIVE" == "1" ]]; then
+    return
+  fi
+  if [[ "$secret" == "1" ]]; then
+    read -r -s -p "$prompt_text" "$var_name"
+    echo
+    return
+  fi
+  read -r -p "$prompt_text" "$var_name"
+}
+
+prompt_value WAF_USER "WAF username: "
+prompt_value WAF_PASS "WAF password: " 1
+prompt_value FILTER_IP "Client IPs (optional, multiple allowed: '1.1.1.1 2.2.2.2'): "
+prompt_value FILTER_SITE "Target site IDs / hosts (optional, multiple allowed, e.g. 'site-a.example.com api.example.com'): "
+prompt_value FILTER_STATUS "HTTP status codes (optional, multiple allowed: '403 429 503'): "
+
+if [[ -z "${WAF_USER:-}" || -z "${WAF_PASS:-}" ]]; then
+  echo "WAF_USER and WAF_PASS are required."
+  exit 1
+fi
+
+if command -v "$WAF_CLI_BIN" >/dev/null 2>&1; then
+  CLI_MODE="local"
+elif command -v docker-compose >/dev/null 2>&1; then
+  CLI_MODE="compose"
   COMPOSE_BIN="docker-compose"
 else
+  CLI_MODE="compose"
   COMPOSE_BIN="docker compose"
 fi
 
 TS="$(date +%Y%m%d_%H%M%S)"
-OUT="/tmp/waf-events-${TS}"
+OUT_BASE_DIR="${OUT_BASE_DIR:-/tmp}"
+OUT="${OUT_BASE_DIR%/}/waf-events-${TS}"
 mkdir -p "$OUT"
 
 normalize_multi() {
@@ -98,11 +129,23 @@ run_sh() {
   } >"$OUT/$name" 2>&1 || true
 }
 
-if [[ ! -d "$DEPLOY_DIR" ]]; then
+run_cli() {
+  local name="$1"
+  shift
+  if [[ "$CLI_MODE" == "local" ]]; then
+    run "$name" "$WAF_CLI_BIN" --username "$WAF_USER" --password "$WAF_PASS" "$@"
+    return
+  fi
+  run "$name" $COMPOSE_BIN --profile tools run --rm cli --username "$WAF_USER" --password "$WAF_PASS" "$@"
+}
+
+if [[ "$CLI_MODE" == "compose" && ! -d "$DEPLOY_DIR" ]]; then
   echo "DEPLOY_DIR not found: $DEPLOY_DIR"
   exit 1
 fi
-cd "$DEPLOY_DIR" || exit 1
+if [[ "$CLI_MODE" == "compose" ]]; then
+  cd "$DEPLOY_DIR" || exit 1
+fi
 
 N_FILTER_IP="$(normalize_multi "$FILTER_IP")"
 N_FILTER_SITE="$(normalize_multi "$FILTER_SITE")"
@@ -110,18 +153,18 @@ N_FILTER_STATUS="$(normalize_multi "$FILTER_STATUS")"
 IP_ERE="$(build_ere_pattern "$N_FILTER_IP")"
 SITE_ERE="$(build_ere_pattern "$N_FILTER_SITE")"
 
-run "app_meta.json" $COMPOSE_BIN --profile tools run --rm cli --username "$WAF_USER" --password "$WAF_PASS" --json api GET /api/app/meta
-run "sites.json" $COMPOSE_BIN --profile tools run --rm cli --username "$WAF_USER" --password "$WAF_PASS" --json api GET /api/sites
-run "events_all.json" $COMPOSE_BIN --profile tools run --rm cli --username "$WAF_USER" --password "$WAF_PASS" --json api GET /api/events
-run "access_policies.json" $COMPOSE_BIN --profile tools run --rm cli --username "$WAF_USER" --password "$WAF_PASS" --json api GET /api/access-policies
-run "antiddos.json" $COMPOSE_BIN --profile tools run --rm cli --username "$WAF_USER" --password "$WAF_PASS" --json antiddos get
-run "bans_list.txt" $COMPOSE_BIN --profile tools run --rm cli --username "$WAF_USER" --password "$WAF_PASS" bans list
-run "audit_ban_actions.txt" $COMPOSE_BIN --profile tools run --rm cli --username "$WAF_USER" --password "$WAF_PASS" audit --action accesspolicy.ban --limit 200
-run "audit_unban_actions.txt" $COMPOSE_BIN --profile tools run --rm cli --username "$WAF_USER" --password "$WAF_PASS" audit --action accesspolicy.unban --limit 200
+run_cli "app_meta.json" --json api GET /api/app/meta
+run_cli "sites.json" --json api GET /api/sites
+run_cli "events_all.json" --json api GET /api/events
+run_cli "access_policies.json" --json api GET /api/access-policies
+run_cli "antiddos.json" --json antiddos get
+run_cli "bans_list.txt" bans list
+run_cli "audit_ban_actions.txt" audit --action accesspolicy.ban --limit 200
+run_cli "audit_unban_actions.txt" audit --action accesspolicy.unban --limit 200
 
 if [[ -n "$N_FILTER_SITE" ]]; then
   for site in $N_FILTER_SITE; do
-    run "easy_profile_${site//[^a-zA-Z0-9_.-]/_}.json" $COMPOSE_BIN --profile tools run --rm cli --username "$WAF_USER" --password "$WAF_PASS" easy get "$site"
+    run_cli "easy_profile_${site//[^a-zA-Z0-9_.-]/_}.json" easy get "$site"
   done
 fi
 
@@ -258,7 +301,7 @@ fi
 run "runtime_logs_since_30m.log" docker logs --since=30m "$RUNTIME_CONTAINER"
 run "control_plane_logs_since_30m.log" docker logs --since=30m "$CONTROL_PLANE_CONTAINER"
 
-tar -C /tmp -czf "${OUT}.tar.gz" "$(basename "$OUT")"
+tar -C "$OUT_BASE_DIR" -czf "${OUT}.tar.gz" "$(basename "$OUT")"
 
 echo
 echo "Done."

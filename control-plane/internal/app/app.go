@@ -2,6 +2,7 @@ package app
 
 import (
 	"net"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -43,6 +44,7 @@ type App struct {
 	ApplyService             *services.ApplyService
 	EventStore               *events.Store
 	EventService             *services.EventService
+	AdminScriptService       *services.AdminScriptService
 	AuditStore               *audits.Store
 	AuditService             *services.AuditService
 	ReportService            *services.ReportService
@@ -243,7 +245,8 @@ func New(cfg config.Config) (*App, error) {
 	dashboardService := services.NewDashboardService(eventService, runtimeRequestCollector, cfg.RuntimeHealthURL)
 	runtimeCRSService := services.NewRuntimeCRSService(services.RuntimeBaseURLFromHealthURL(cfg.RuntimeHealthURL))
 	containerRuntimeService := services.NewContainerRuntimeService()
-	httpServer := httpserver.New(cfg.HTTPAddr, cfg.RuntimeRoot, cfg.RevisionStoreDir, cfg.RuntimeHealthURL, setupService, revisionService, authService, siteService, manualBanService, upstreamService, certificateService, tlsConfigService, tlsAutoRenewService, certificateUploadService, certificateMaterialStore, letsEncryptService, selfSignedCertificateService, wafPolicyService, accessPolicyService, rateLimitPolicyService, easySiteProfileService, antiDDoSService, eventService, revisionCompileService, applyService, auditService, reportService, dashboardService, containerRuntimeService, runtimeCRSService, runtimeRequestCollector)
+	adminScriptService := services.NewAdminScriptService(cfg.RevisionStoreDir, detectScriptsRoot())
+	httpServer := httpserver.New(cfg.HTTPAddr, cfg.RuntimeRoot, cfg.RevisionStoreDir, cfg.RuntimeHealthURL, setupService, revisionService, authService, siteService, manualBanService, upstreamService, certificateService, tlsConfigService, tlsAutoRenewService, certificateUploadService, certificateMaterialStore, letsEncryptService, selfSignedCertificateService, wafPolicyService, accessPolicyService, rateLimitPolicyService, easySiteProfileService, antiDDoSService, eventService, revisionCompileService, applyService, auditService, reportService, dashboardService, containerRuntimeService, runtimeCRSService, runtimeRequestCollector, adminScriptService)
 	var devFastStartBootstrapper *services.DevFastStartBootstrapper
 	if cfg.DevFastStart.Enabled {
 		devFastStartCertificateIssuer := letsEncryptService
@@ -278,6 +281,7 @@ func New(cfg config.Config) (*App, error) {
 		ApplyService:             applyService,
 		EventStore:               eventStore,
 		EventService:             eventService,
+		AdminScriptService:       adminScriptService,
 		AuditStore:               auditStore,
 		AuditService:             auditService,
 		ReportService:            reportService,
@@ -317,6 +321,23 @@ func New(cfg config.Config) (*App, error) {
 		DevFastStartBootstrapper: devFastStartBootstrapper,
 		HTTPServer:               httpServer,
 	}, nil
+}
+
+func detectScriptsRoot() string {
+	if value := strings.TrimSpace(os.Getenv("WAF_SCRIPTS_ROOT")); value != "" {
+		return value
+	}
+	candidates := []string{}
+	if cwd, err := os.Getwd(); err == nil && strings.TrimSpace(cwd) != "" {
+		candidates = append(candidates, filepath.Join(cwd, "scripts"))
+	}
+	candidates = append(candidates, "/src/scripts")
+	for _, candidate := range candidates {
+		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+			return candidate
+		}
+	}
+	return ""
 }
 
 func shouldUseSelfSignedForDevFastStartHost(host string) bool {
