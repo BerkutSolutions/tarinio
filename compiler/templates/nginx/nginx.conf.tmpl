@@ -6,8 +6,8 @@ events {
 }
 
 http {
-    variables_hash_max_size 8192;
-    variables_hash_bucket_size 256;
+    variables_hash_max_size 65536;
+    variables_hash_bucket_size 512;
     include conf.d/*.conf;
     include {{ .SitesIncludeGlob }};
 }

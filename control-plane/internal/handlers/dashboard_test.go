@@ -3,12 +3,15 @@ package handlers
 import (
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"waf/control-plane/internal/services"
 )
 
-type fakeDashboardService struct{}
+type fakeDashboardService struct {
+	probeKind string
+}
 
 func (f *fakeDashboardService) Stats() (services.DashboardStats, error) {
 	return services.DashboardStats{
@@ -20,6 +23,11 @@ func (f *fakeDashboardService) Stats() (services.DashboardStats, error) {
 	}, nil
 }
 
+func (f *fakeDashboardService) Probe(kind string, _ url.Values) error {
+	f.probeKind = kind
+	return nil
+}
+
 func TestDashboardHandler_Stats(t *testing.T) {
 	handler := NewDashboardHandler(&fakeDashboardService{})
 
@@ -28,5 +36,20 @@ func TestDashboardHandler_Stats(t *testing.T) {
 	handler.ServeHTTP(resp, req)
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+}
+
+func TestDashboardHandler_Probe(t *testing.T) {
+	service := &fakeDashboardService{}
+	handler := NewDashboardHandler(service)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/dashboard/stats?probe=requests", nil)
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	if service.probeKind != "requests" {
+		t.Fatalf("expected probe kind requests, got %q", service.probeKind)
 	}
 }

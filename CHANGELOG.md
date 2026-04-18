@@ -2,32 +2,17 @@
 
 Все значимые изменения проекта фиксируются в этом файле.
 
-## [1.1.19] - 2026-04-18
+## [1.1.20] - 2026-04-18
 
-### Healthcheck / API probe
-- Исправлен healthcheck для `API запросов` и `API событий`: проверки больше не выполняют полноразмерные `GET /api/requests` и `GET /api/events` с большими payload.
-- Для runtime и control-plane добавлены отдельные lightweight probe endpoints, которые подтверждают доступность соответствующих API без возврата массивов данных.
-- Это устраняет таймаут `API событий` на инстансах с большим объёмом событий и убирает `proxy_temp` warning, вызванный healthcheck-запросом `API запросов`.
-
-### Версия
-- Версия приложения обновлена до `1.1.19` в backend metadata, UI и пользовательских точках отображения.
-
-## [1.1.18] - 2026-04-18
-
-### Healthcheck / API запросов
-- Исправлен probe вкладки `API запросов` в `Healthcheck`: для проверки больше не запрашивается тяжёлый payload списка запросов, из-за которого UI nginx писал `an upstream response is buffered to a temporary file ... proxy_temp`.
-- Для runtime/control-plane добавлен облегчённый режим `probe=1` у `/api/requests`, который проверяет доступность и ingestion без возврата тяжёлого ответа.
+### Healthcheck / Probes
+- Исправлены healthcheck-пробы `API дашборда`, `API запросов` и `API событий`: они переведены на lightweight probe-режим через `/api/dashboard/stats?probe=...`, без запроса тяжёлых payload и без пересечения со special-case роутом UI nginx для `/api/requests`.
+- Медленные ответы (`needs_attention`) теперь показываются warning-статусом, а не серым neutral-state.
 
 ### Runtime / Nginx
-- Усилены `variables_hash_*` в nginx template (`8192` / `256`), чтобы убрать warning `could not build optimal variables_hash` на runtime.
+- Дополнительно увеличены `variables_hash_max_size` и `variables_hash_bucket_size`, чтобы убрать warning `could not build optimal variables_hash` на инстансах с большим числом переменных.
 
-### Anti-DDoS / Лайв-логи
-- Для контейнера DDoS-модели добавлено стартовое информационное сообщение, чтобы в live logs было сразу видно, что модель запустилась и работает.
-- Логи DDoS-модели переведены на явные severity-префиксы `[info]`, `[warn]`, `[error]` для более корректного отображения и дедупликации.
+### Live Logs
+- Для live logs контейнеров добавлена дедупликация строк по `timestamp + message`, чтобы при polling не появлялись повторяющиеся записи одной и той же строки.
 
 ### Установка / AIO
-- В `scripts/install-aio.sh` добавлена очистка экрана в начале запуска (`clear` + terminal reset), чтобы вывод установки был чище после запуска через `curl | sh`.
-- Улучшено определение текущей версии WAF перед обновлением: версия читается по `meta.go` даже если локальный каталог уже существует, но git-метаданные отсутствуют.
-
-### Логирование / Severity
-- Для runtime security collector в control-plane сообщения ошибок переведены на формат с `[error]`, чтобы они лучше распознавались в агрегаторе проблем.
+- Усилена очистка терминала в `install-aio.sh`: перед выводом теперь выполняется полный terminal reset (`ESC c`) с дополнительной очисткой экрана и scrollback.

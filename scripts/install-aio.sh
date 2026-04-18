@@ -41,10 +41,11 @@ reset_screen() {
   if [ -z "$target" ]; then
     return
   fi
+  printf '\033c' >"$target" 2>/dev/null || true
   if command -v tput >/dev/null 2>&1; then
     tput clear >"$target" 2>/dev/null || true
   fi
-  printf '\033[H\033[2J\033[3J\014' >"$target"
+  printf '\033[3J\033[H\033[2J\014' >"$target"
 }
 
 section() {

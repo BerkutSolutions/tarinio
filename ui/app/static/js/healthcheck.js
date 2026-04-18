@@ -17,13 +17,13 @@ function todayDateKeyLocal() {
 }
 
 const TAB_PROBES = [
-  { id: "tab.dashboard", titleKey: "healthcheck.tab.dashboard", path: "/api/dashboard/stats" },
+  { id: "tab.dashboard", titleKey: "healthcheck.tab.dashboard", path: "/api/dashboard/stats?probe=stats" },
   { id: "tab.sites", titleKey: "healthcheck.tab.sites", path: "/api/sites" },
   { id: "tab.antiddos", titleKey: "healthcheck.tab.antiddos", path: "/api/anti-ddos/settings" },
   { id: "tab.owaspcrs", titleKey: "healthcheck.tab.owaspcrs", path: "/api/owasp-crs/status" },
   { id: "tab.tls", titleKey: "healthcheck.tab.tls", path: "/api/certificates" },
-  { id: "tab.requests", titleKey: "healthcheck.tab.requests", path: () => `/api/requests?probe=1&day=${encodeURIComponent(todayDateKeyLocal())}` },
-  { id: "tab.events", titleKey: "healthcheck.tab.events", path: "/api/events?probe=1" },
+  { id: "tab.requests", titleKey: "healthcheck.tab.requests", path: () => `/api/dashboard/stats?probe=requests&day=${encodeURIComponent(todayDateKeyLocal())}` },
+  { id: "tab.events", titleKey: "healthcheck.tab.events", path: "/api/dashboard/stats?probe=events" },
   { id: "tab.bans", titleKey: "healthcheck.tab.bans", path: "/api/sites" },
   { id: "tab.administration", titleKey: "healthcheck.tab.administration", path: "/api/audit?limit=1" },
   { id: "tab.activity", titleKey: "healthcheck.tab.activity", path: "/api/audit?limit=1" },
@@ -48,7 +48,7 @@ function iconStatusFor(status) {
   if (normalized === "running") return "running";
   if (normalized === "skipped") return "skipped";
   if (normalized === "failed" || normalized === "needs_reinit" || normalized === "broken") return "failed";
-  if (normalized === "needs_attention") return "skipped";
+  if (normalized === "needs_attention") return "warning";
   return "pending";
 }
 

@@ -1632,9 +1632,19 @@ export async function renderDashboard(container, ctx) {
     const payload = await fetchContainerLogs(liveLogsState.container, liveLogsState.since || "", liveLogsState.since ? 0 : 1500);
     const rows = Array.isArray(payload?.lines) ? payload.lines : [];
     if (rows.length) {
-      liveLogsState.lines.push(...rows);
+      rows.forEach((row) => {
+        const key = `${String(row?.timestamp || "")}|${String(row?.message || "")}`;
+        if (liveLogsState.seen?.has(key)) {
+          return;
+        }
+        liveLogsState.seen?.add(key);
+        liveLogsState.lines.push(row);
+      });
       if (liveLogsState.lines.length > 8000) {
         liveLogsState.lines = liveLogsState.lines.slice(liveLogsState.lines.length - 8000);
+        if (liveLogsState.seen) {
+          liveLogsState.seen = new Set(liveLogsState.lines.map((line) => `${String(line?.timestamp || "")}|${String(line?.message || "")}`));
+        }
       }
       const lastTs = rows[rows.length - 1]?.timestamp;
       if (lastTs) {
@@ -1837,7 +1847,7 @@ export async function renderDashboard(container, ctx) {
         return;
       }
       modal.open({ title: `${ctx.t("dashboard.containers.logs.title")} ${name}`, subtitle: ctx.t("dashboard.containers.logs.subtitle"), body: `<div class="waf-empty">${escapeHtml(ctx.t("common.loading"))}</div>` });
-      liveLogsState = { container: name, since: "", lines: [] };
+      liveLogsState = { container: name, since: "", lines: [], seen: new Set() };
       try {
         await pollContainerLogs();
       } catch (error) {

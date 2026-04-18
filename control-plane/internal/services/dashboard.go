@@ -3,6 +3,7 @@ package services
 import (
 	"bufio"
 	"net/http"
+	"net/url"
 	"os"
 	"runtime"
 	"sort"
@@ -15,6 +16,10 @@ import (
 
 type dashboardEventReader interface {
 	List() ([]events.Event, error)
+}
+
+type dashboardEventProber interface {
+	Probe() error
 }
 
 type DashboardService struct {
@@ -129,6 +134,26 @@ func (s *DashboardService) Stats() (DashboardStats, error) {
 	out.PopularErrors = mergeKeyCountsSum(out.PopularErrors, eventErrors, 7)
 	out.System = collectSystemStats()
 	return out, nil
+}
+
+func (s *DashboardService) Probe(kind string, query url.Values) error {
+	switch strings.ToLower(strings.TrimSpace(kind)) {
+	case "", "stats", "dashboard":
+		_ = s.collectServiceStatus(time.Now().UTC())
+		return nil
+	case "requests":
+		if prober, ok := s.requests.(RuntimeRequestProber); ok {
+			return prober.Probe(query)
+		}
+		return nil
+	case "events":
+		if prober, ok := s.events.(dashboardEventProber); ok {
+			return prober.Probe()
+		}
+		return nil
+	default:
+		return nil
+	}
 }
 
 func (s *DashboardService) collectServiceStatus(now time.Time) []DashboardServiceStatus {
