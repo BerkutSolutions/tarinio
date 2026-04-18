@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"waf/control-plane/internal/events"
@@ -74,6 +75,19 @@ type DashboardStats struct {
 	MostAttackedURLs       []DashboardKeyCount      `json:"most_attacked_urls"`
 	System                 DashboardSystemStats     `json:"system"`
 	ObservationWindowHours int                      `json:"observation_window_hours"`
+}
+
+type cpuTimesSample struct {
+	idle     uint64
+	total    uint64
+	captured time.Time
+}
+
+var cpuUsageState struct {
+	mu          sync.Mutex
+	lastSample  cpuTimesSample
+	hasSample   bool
+	lastPercent float64
 }
 
 func NewDashboardService(events dashboardEventReader, requests RuntimeRequestCollector, runtimeReadyURL string) *DashboardService {
@@ -439,31 +453,109 @@ func collectSystemStats() DashboardSystemStats {
 }
 
 func readCPULoadPercent() float64 {
-	load1, ok := readLoadAverage1()
+	current, ok := readCPUTimesSample()
 	if !ok {
 		return 0
 	}
-	cores := runtime.NumCPU()
-	if cores <= 0 {
+
+	cpuUsageState.mu.Lock()
+	if cpuUsageState.hasSample {
+		percent, valid := calculateCPUUsagePercent(cpuUsageState.lastSample, current)
+		cpuUsageState.lastSample = current
+		if valid {
+			cpuUsageState.lastPercent = percent
+			cpuUsageState.mu.Unlock()
+			return percent
+		}
+		lastPercent := cpuUsageState.lastPercent
+		cpuUsageState.mu.Unlock()
+		return lastPercent
+	}
+	cpuUsageState.lastSample = current
+	cpuUsageState.hasSample = true
+	cpuUsageState.mu.Unlock()
+
+	time.Sleep(120 * time.Millisecond)
+
+	next, ok := readCPUTimesSample()
+	if !ok {
 		return 0
 	}
-	return round1(load1 * 100 / float64(cores))
+	percent, valid := calculateCPUUsagePercent(current, next)
+	if !valid {
+		return 0
+	}
+
+	cpuUsageState.mu.Lock()
+	cpuUsageState.lastSample = next
+	cpuUsageState.lastPercent = percent
+	cpuUsageState.hasSample = true
+	cpuUsageState.mu.Unlock()
+	return percent
 }
 
-func readLoadAverage1() (float64, bool) {
-	content, err := os.ReadFile("/proc/loadavg")
+func readCPUTimesSample() (cpuTimesSample, bool) {
+	content, err := os.ReadFile("/proc/stat")
 	if err != nil {
+		return cpuTimesSample{}, false
+	}
+	lines := strings.Split(string(content), "\n")
+	if len(lines) == 0 {
+		return cpuTimesSample{}, false
+	}
+	fields := strings.Fields(strings.TrimSpace(lines[0]))
+	if len(fields) < 5 || fields[0] != "cpu" {
+		return cpuTimesSample{}, false
+	}
+	var total uint64
+	values := make([]uint64, 0, len(fields)-1)
+	for _, field := range fields[1:] {
+		value, err := strconv.ParseUint(field, 10, 64)
+		if err != nil {
+			return cpuTimesSample{}, false
+		}
+		values = append(values, value)
+		total += value
+	}
+	idle := values[3]
+	if len(values) > 4 {
+		idle += values[4]
+	}
+	return cpuTimesSample{
+		idle:     idle,
+		total:    total,
+		captured: time.Now(),
+	}, true
+}
+
+func calculateCPUUsagePercent(previous, current cpuTimesSample) (float64, bool) {
+	if current.total <= previous.total {
 		return 0, false
 	}
-	fields := strings.Fields(string(content))
-	if len(fields) < 1 {
+	totalDelta := current.total - previous.total
+	if totalDelta == 0 {
 		return 0, false
 	}
-	value, err := strconv.ParseFloat(fields[0], 64)
-	if err != nil {
+	idleDelta := uint64(0)
+	if current.idle >= previous.idle {
+		idleDelta = current.idle - previous.idle
+	}
+	busyDelta := totalDelta - minUint64(idleDelta, totalDelta)
+	percent := round1((float64(busyDelta) * 100) / float64(totalDelta))
+	if percent < 0 {
 		return 0, false
 	}
-	return value, true
+	if percent > 100 {
+		percent = 100
+	}
+	return percent, true
+}
+
+func minUint64(left, right uint64) uint64 {
+	if left < right {
+		return left
+	}
+	return right
 }
 
 func readMemoryFromProc() (uint64, uint64) {

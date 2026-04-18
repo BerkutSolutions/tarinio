@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -143,6 +144,7 @@ func (s *ContainerRuntimeService) Overview() (DashboardContainerOverview, error)
 		TotalNetworkInText:  "0 B",
 		TotalNetworkOutText: "0 B",
 	}
+	cpuDivisor := float64(runtimeCPUCount())
 
 	var memoryCount int
 	for _, base := range containers {
@@ -151,7 +153,7 @@ func (s *ContainerRuntimeService) Overview() (DashboardContainerOverview, error)
 			out.RunningContainers++
 		}
 		if stats, ok := statsByName[item.Name]; ok {
-			item.CPUPercent = stats.CPUPercent
+			item.CPUPercent = normalizeContainerCPUPercent(stats.CPUPercent, cpuDivisor)
 			item.MemoryPercent = stats.MemoryPercent
 			item.MemoryUsageText = stats.MemoryUsageText
 			item.MemoryLimitText = stats.MemoryLimitText
@@ -474,6 +476,28 @@ func parseDockerStats(out []byte) map[string]DashboardContainerMetrics {
 		}
 	}
 	return items
+}
+
+func runtimeCPUCount() int {
+	count := runtime.NumCPU()
+	if count <= 0 {
+		return 1
+	}
+	return count
+}
+
+func normalizeContainerCPUPercent(value float64, divisor float64) float64 {
+	if divisor <= 0 {
+		divisor = 1
+	}
+	if value <= 0 {
+		return 0
+	}
+	normalized := round1(value / divisor)
+	if normalized < 0 {
+		return 0
+	}
+	return normalized
 }
 
 func parseDockerLogLines(out []byte) []DashboardContainerLogRow {

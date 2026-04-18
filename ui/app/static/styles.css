@@ -4885,6 +4885,8 @@
   padding: 10px 12px;
   border-radius: 10px;
   background: rgba(120, 140, 180, 0.08);
+  min-width: 0;
+  max-width: 100%;
 }
 
 #dashboard-page button.dashboard-list-row {
@@ -4908,12 +4910,18 @@
 
 #dashboard-page .dashboard-list-label {
   font-weight: 600;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 #dashboard-page .dashboard-list-meta {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
 }
 
 #dashboard-page .dashboard-mini-metrics {
@@ -4931,6 +4939,8 @@
   padding: 12px;
   border-radius: 12px;
   background: rgba(120, 140, 180, 0.1);
+  min-width: 0;
+  max-width: 100%;
 }
 
 #dashboard-page .mini-metric.clickable {
@@ -4944,13 +4954,19 @@
 }
 
 #dashboard-page .mini-metric-value {
-  font-size: 20px;
+  font-size: clamp(18px, 2.6vw, 20px);
   font-weight: 700;
+  line-height: 1.15;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 #dashboard-page .mini-metric-label {
   font-size: 12px;
   margin-top: 4px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 #dashboard-page .dashboard-detail-list {
@@ -5258,6 +5274,10 @@
 #dashboard-page .dashboard-system-main {
   font-size: clamp(28px, 5vw, 42px);
   font-weight: 700;
+  min-width: 0;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 #dashboard-page .dashboard-system {
@@ -5336,6 +5356,20 @@
   gap: 12px;
   font-size: 13px;
   color: rgba(255, 255, 255, 0.72);
+  min-width: 0;
+}
+
+#dashboard-page .dashboard-system-row > span,
+#dashboard-page .dashboard-system-row > strong,
+#dashboard-page .dashboard-list-label > strong,
+#dashboard-page .dashboard-list-label .muted,
+#dashboard-page .dashboard-list-meta .badge,
+.container-status-grid > *,
+.container-status-grid p {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 #dashboard-page .dashboard-ip-main {
@@ -11875,7 +11909,7 @@ body.auth-locked #main-screen {
   }
 }
 
-/* Accesses v1.1.20 overrides: compact services column + service filter + improved modal pills */
+/* Accesses v1.1.21 overrides: compact services column + service filter + improved modal pills */
 #accesses-page .accesses-toolbar {
   align-items: flex-end;
   gap: 12px;
@@ -12251,6 +12285,13 @@ body.auth-locked #main-screen {
 }
 
 :where(th, td, .muted, .label, .badge, .note) {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+:where(.card, .page-card, .panel, .widget, .waf-card-body, .dashboard-widget-content, .dashboard-list-row, .dashboard-system-row, .mini-metric, .container-status-grid > *, .waf-modal-card) > :where(h1, h2, h3, h4, p, span, strong, small, div) {
+  min-width: 0;
+  max-width: 100%;
   overflow-wrap: anywhere;
   word-break: break-word;
 }

@@ -42,10 +42,17 @@ reset_screen() {
     return
   fi
   printf '\033c' >"$target" 2>/dev/null || true
+  printf '\033[H\033[2J\033[3J' >"$target" 2>/dev/null || true
   if command -v tput >/dev/null 2>&1; then
+    tput reset >"$target" 2>/dev/null || true
     tput clear >"$target" 2>/dev/null || true
   fi
-  printf '\033[3J\033[H\033[2J\014' >"$target"
+  i=0
+  while [ "$i" -lt 120 ]; do
+    printf '\n' >"$target" 2>/dev/null || true
+    i=$((i + 1))
+  done
+  printf '\033[H\033[2J\033[3J\014' >"$target" 2>/dev/null || true
 }
 
 section() {
