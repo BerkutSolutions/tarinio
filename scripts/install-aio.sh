@@ -31,6 +31,15 @@ else
   C_RED=""
 fi
 
+reset_screen() {
+  if [ ! -t 1 ]; then
+    return
+  fi
+  clear >/dev/null 2>&1 || true
+  printf '\033[H\033[2J\033[3J'
+  printf '\014'
+}
+
 section() {
   echo
   printf "%s%s== %s ==%s\n" "$C_BOLD" "$C_BLUE" "$1" "$C_RESET"
@@ -237,6 +246,7 @@ trap on_exit EXIT
 
 mkdir -p "$(dirname "$LOG_FILE")"
 : >"$LOG_FILE"
+reset_screen()
 
 section "TARINIO AIO Installer"
 step "Checking required tools"
@@ -266,10 +276,12 @@ else
 fi
 
 section "Repository"
-CURRENT_VERSION="not_installed"
+CURRENT_VERSION="unknown"
 CURRENT_COMMIT="-"
-if [ -d "$INSTALL_DIR/.git" ]; then
+if [ -f "$INSTALL_DIR/control-plane/internal/appmeta/meta.go" ]; then
   CURRENT_VERSION="$(extract_version "$INSTALL_DIR/control-plane/internal/appmeta/meta.go")"
+fi
+if [ -d "$INSTALL_DIR/.git" ]; then
   CURRENT_COMMIT="$(git -C "$INSTALL_DIR" rev-parse --short HEAD 2>/dev/null || printf "unknown")"
   section "Safety Snapshot"
   step "Saving pre-upgrade snapshot for rollback"
@@ -286,6 +298,9 @@ else
   step "Cloning repository to $INSTALL_DIR"
   run_logged git clone --branch "$BRANCH" "$REPO_URL" "$INSTALL_DIR"
   ok "repository cloned"
+  if [ "$CURRENT_VERSION" = "unknown" ]; then
+    CURRENT_VERSION="not_installed"
+  fi
 fi
 
 TARGET_VERSION="$(extract_version "$INSTALL_DIR/control-plane/internal/appmeta/meta.go")"

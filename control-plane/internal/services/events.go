@@ -104,7 +104,7 @@ func (s *EventService) collectRuntimeSecurityEventsBestEffort() {
 	s.recordCollectorSuccess()
 	for _, item := range items {
 		if _, err := s.Emit(item); err != nil && !strings.Contains(strings.ToLower(err.Error()), "already exists") {
-			log.Printf("event service security event emit failed: %v", err)
+			log.Printf("[error] event service security event emit failed: %v", err)
 		}
 	}
 }
@@ -138,6 +138,6 @@ func (s *EventService) recordCollectorFailure(err error) {
 	s.collectorLastError = message
 	if shouldLog {
 		s.collectorLastLoggedError = now
-		log.Printf("event service runtime security collector failed: %v", err)
+		log.Printf("[error] event service runtime security collector failed: %v", err)
 	}
 }

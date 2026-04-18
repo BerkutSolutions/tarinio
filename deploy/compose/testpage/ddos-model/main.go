@@ -125,9 +125,30 @@ type runtimeProfile struct {
 	ModelWeightEmergencySingle float64 `json:"model_weight_emergency_single"`
 }
 
+func logInfof(format string, args ...any) {
+	log.Printf("[info] "+format, args...)
+}
+
+func logWarnf(format string, args ...any) {
+	log.Printf("[warn] "+format, args...)
+}
+
+func logErrorf(format string, args ...any) {
+	log.Printf("[error] "+format, args...)
+}
+
 func main() {
 	cfg := loadConfig()
 	st := loadState(cfg.StatePath)
+	logInfof(
+		"ddos-model: started (enabled=%t poll_interval=%s log_path=%s state_path=%s output_path=%s runtime_root=%s)",
+		cfg.ModelEnabled,
+		cfg.PollInterval,
+		cfg.LogPath,
+		cfg.StatePath,
+		cfg.OutputPath,
+		cfg.RuntimeRoot,
+	)
 	ticker := time.NewTicker(cfg.PollInterval)
 	defer ticker.Stop()
 
@@ -139,16 +160,16 @@ func main() {
 		}
 		next, changed, err := processTick(effective, st, now)
 		if err != nil {
-			log.Printf("ddos-model: tick failed: %v", err)
+			logErrorf("ddos-model: tick failed: %v", err)
 		} else {
 			st = next
 			if changed {
 				if err := saveState(cfg.StatePath, st); err != nil {
-					log.Printf("ddos-model: save state failed: %v", err)
+					logErrorf("ddos-model: save state failed: %v", err)
 				}
 			}
 			if err := saveAdaptive(cfg.OutputPath, effective, st, now); err != nil {
-				log.Printf("ddos-model: save adaptive output failed: %v", err)
+				logErrorf("ddos-model: save adaptive output failed: %v", err)
 			}
 		}
 		<-ticker.C
@@ -363,7 +384,7 @@ func processTick(cfg modelConfig, current state, now time.Time) (state, bool, er
 			ips = append(ips, ip)
 		}
 		sort.Strings(ips)
-		log.Printf("ddos-model: emergency botnet burst detected: rps=%d unique_ips=%d", stat.Count, len(stat.IPs))
+		logWarnf("ddos-model: emergency botnet burst detected: rps=%d unique_ips=%d", stat.Count, len(stat.IPs))
 		emergencyDrop := stat.Count >= emergencyRPS*2 && len(stat.IPs) >= emergencyUniqueIPs*2
 		for _, ip := range ips {
 			if emergencyDrop {
@@ -387,7 +408,7 @@ func processTick(cfg modelConfig, current state, now time.Time) (state, bool, er
 		if err != nil {
 			secondTS = now
 		}
-		log.Printf("ddos-model: emergency single-source flood detected: ip=%s rps=%d", parts[0], count)
+		logWarnf("ddos-model: emergency single-source flood detected: ip=%s rps=%d", parts[0], count)
 		if count >= emergencyPerIPRPS*2 {
 			changed = applyImmediateDrop(&next, cfg, parts[0], secondTS) || changed
 			continue

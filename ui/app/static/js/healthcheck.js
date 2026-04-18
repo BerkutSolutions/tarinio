@@ -22,7 +22,7 @@ const TAB_PROBES = [
   { id: "tab.antiddos", titleKey: "healthcheck.tab.antiddos", path: "/api/anti-ddos/settings" },
   { id: "tab.owaspcrs", titleKey: "healthcheck.tab.owaspcrs", path: "/api/owasp-crs/status" },
   { id: "tab.tls", titleKey: "healthcheck.tab.tls", path: "/api/certificates" },
-  { id: "tab.requests", titleKey: "healthcheck.tab.requests", path: () => `/api/requests?limit=1&day=${encodeURIComponent(todayDateKeyLocal())}` },
+  { id: "tab.requests", titleKey: "healthcheck.tab.requests", path: () => `/api/requests?probe=1&day=${encodeURIComponent(todayDateKeyLocal())}` },
   { id: "tab.events", titleKey: "healthcheck.tab.events", path: "/api/events" },
   { id: "tab.bans", titleKey: "healthcheck.tab.bans", path: "/api/sites" },
   { id: "tab.administration", titleKey: "healthcheck.tab.administration", path: "/api/audit?limit=1" },

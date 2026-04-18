@@ -86,6 +86,7 @@ type requestQueryOptions struct {
 	Since         time.Time
 	Day           string
 	RetentionDays int
+	Probe         bool
 }
 
 func parseRequestQueryOptions(values url.Values, maxItems int, defaultRetention int) requestQueryOptions {
@@ -127,12 +128,20 @@ func parseRequestQueryOptions(values url.Values, maxItems int, defaultRetention 
 	if retentionDays <= 0 {
 		retentionDays = defaultRetention
 	}
+	probe := false
+	if raw := strings.TrimSpace(values.Get("probe")); raw != "" {
+		switch strings.ToLower(raw) {
+		case "1", "true", "yes", "on":
+			probe = true
+		}
+	}
 	return requestQueryOptions{
 		Limit:         limit,
 		Offset:        offset,
 		Since:         since,
 		Day:           day,
 		RetentionDays: retentionDays,
+		Probe:         probe,
 	}
 }
 
@@ -148,6 +157,9 @@ func (s *requestStreamSource) latest(query url.Values) ([]map[string]any, error)
 
 	if err := s.ingestLatestLocked(options.RetentionDays); err != nil {
 		return nil, err
+	}
+	if options.Probe {
+		return []map[string]any{}, nil
 	}
 	return s.loadArchiveRowsLocked(options)
 }
