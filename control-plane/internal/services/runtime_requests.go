@@ -21,14 +21,16 @@ type RuntimeRequestProber interface {
 type HTTPRuntimeRequestCollector struct {
 	URL    string
 	Client *http.Client
+	Token  string
 }
 
-func NewHTTPRuntimeRequestCollector(healthURL string) *HTTPRuntimeRequestCollector {
+func NewHTTPRuntimeRequestCollector(healthURL string, token string) *HTTPRuntimeRequestCollector {
 	return &HTTPRuntimeRequestCollector{
 		URL: deriveRuntimeRequestsURL(healthURL),
 		Client: &http.Client{
 			Timeout: 2 * time.Second,
 		},
+		Token: strings.TrimSpace(token),
 	}
 }
 
@@ -59,6 +61,7 @@ func (c *HTTPRuntimeRequestCollector) CollectWithOptions(query url.Values) ([]ma
 	if err != nil {
 		return nil, err
 	}
+	setRuntimeAuthHeader(req, c.Token)
 	client := c.Client
 	if client == nil {
 		client = &http.Client{Timeout: 2 * time.Second}
@@ -114,6 +117,7 @@ func (c *HTTPRuntimeRequestCollector) Probe(query url.Values) error {
 	if err != nil {
 		return err
 	}
+	setRuntimeAuthHeader(req, c.Token)
 	client := c.Client
 	if client == nil {
 		client = &http.Client{Timeout: 2 * time.Second}

@@ -114,7 +114,7 @@ func TestBootstrap_DockerUserUsesDestinationIP(t *testing.T) {
 }
 
 func TestGuardRules_ContainConnlimitAndHashlimit(t *testing.T) {
-	rules := guardRules("DROP", 40, 25, 50)
+	rules := guardRules("DROP", 40, 25, 50, false)
 	if len(rules) != 3 {
 		t.Fatalf("unexpected rule count: %d", len(rules))
 	}
@@ -123,6 +123,13 @@ func TestGuardRules_ContainConnlimitAndHashlimit(t *testing.T) {
 	}
 	if !strings.Contains(strings.Join(rules[1], " "), "--hashlimit-above 25/second") {
 		t.Fatalf("missing hashlimit rule: %+v", rules[1])
+	}
+}
+
+func TestGuardRules_IPv6Uses128Mask(t *testing.T) {
+	rules := guardRules("DROP", 40, 25, 50, true)
+	if !strings.Contains(strings.Join(rules[0], " "), "--connlimit-mask 128") {
+		t.Fatalf("expected ipv6 connlimit mask, got %+v", rules[0])
 	}
 }
 

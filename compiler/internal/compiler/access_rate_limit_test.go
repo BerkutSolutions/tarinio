@@ -92,7 +92,7 @@ func TestRenderAccessRateLimitArtifacts_RejectsInvalidRatePolicy(t *testing.T) {
 	}
 }
 
-func TestRenderAccessRateLimitArtifacts_AllowlistBypassBuildsGeoAndKeyMap(t *testing.T) {
+func TestRenderAccessRateLimitArtifacts_AllowlistKeepsRateLimitKeying(t *testing.T) {
 	artifacts, err := RenderAccessRateLimitArtifacts(
 		[]SiteInput{
 			{ID: "site-a", Enabled: true, PrimaryHost: "a.example.com", ListenHTTP: true, DefaultUpstreamID: "up-a"},
@@ -124,9 +124,37 @@ func TestRenderAccessRateLimitArtifacts_AllowlistBypassBuildsGeoAndKeyMap(t *tes
 		t.Fatalf("expected allowlist CIDR in bypass geo, got: %s", httpConf)
 	}
 	if !strings.Contains(httpConf, "map $waf_allow_bypass_site_a $waf_rate_limit_key_site_a {") {
-		t.Fatalf("expected allowlist bypass map in ratelimits.conf, got: %s", httpConf)
+		t.Fatalf("expected allowlist rate key map in ratelimits.conf, got: %s", httpConf)
+	}
+	if !strings.Contains(httpConf, "1 \"${binary_remote_addr}:allow\";") {
+		t.Fatalf("expected allowlisted clients to keep dedicated rate-limit key, got: %s", httpConf)
 	}
 	if !strings.Contains(httpConf, "limit_req_zone $waf_rate_limit_key_site_a zone=site_site-a_req:10m rate=120r/m;") {
 		t.Fatalf("expected rate limit key variable in ratelimits.conf, got: %s", httpConf)
+	}
+}
+
+func TestRenderAccessRateLimitArtifacts_ManagementAllowlistDefaultsToDeny(t *testing.T) {
+	artifacts, err := RenderAccessRateLimitArtifacts(
+		[]SiteInput{
+			{ID: "control-plane-access", Enabled: true, PrimaryHost: "waf.example.com", ListenHTTP: true, DefaultUpstreamID: "up-a"},
+		},
+		[]AccessPolicyInput{
+			{ID: "access-a", SiteID: "control-plane-access", DefaultAction: "allow", AllowCIDRs: []string{"10.0.0.0/24"}},
+		},
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("render failed: %v", err)
+	}
+	var accessConf string
+	for _, artifact := range artifacts {
+		if artifact.Path == "nginx/access/control-plane-access.conf" {
+			accessConf = string(artifact.Content)
+			break
+		}
+	}
+	if !strings.Contains(accessConf, "deny all;") {
+		t.Fatalf("expected management site allowlist to imply default deny, got: %s", accessConf)
 	}
 }

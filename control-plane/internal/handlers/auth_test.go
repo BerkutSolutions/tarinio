@@ -112,3 +112,22 @@ func TestAuthHandler_BootstrapSetsCookie(t *testing.T) {
 		t.Fatal("expected bootstrap to return session cookie")
 	}
 }
+
+func TestSetSessionCookieForRequest_UsesForwardedProto(t *testing.T) {
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
+	req.Header.Set("X-Forwarded-Proto", "https")
+
+	SetSessionCookieForRequest(resp, req, "session-1")
+
+	foundSecure := false
+	for _, cookie := range resp.Result().Cookies() {
+		if cookie.Name == SessionCookieName && cookie.Secure {
+			foundSecure = true
+			break
+		}
+	}
+	if !foundSecure {
+		t.Fatal("expected secure session cookie when X-Forwarded-Proto=https")
+	}
+}

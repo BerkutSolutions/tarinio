@@ -138,6 +138,8 @@ type EasyProfileInput struct {
 	AntibotRecaptchaKey   string
 	AntibotHcaptchaKey    string
 	AntibotTurnstileKey   string
+	AntibotCookieName     string
+	AntibotCookieValue    string
 
 	UseLimitConn              bool
 	LimitConnMaxHTTP1         int

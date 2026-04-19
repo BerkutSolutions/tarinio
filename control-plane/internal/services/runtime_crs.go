@@ -28,12 +28,14 @@ type RuntimeCRSStatus struct {
 type RuntimeCRSService struct {
 	BaseURL string
 	Client  *http.Client
+	Token   string
 }
 
-func NewRuntimeCRSService(baseURL string) *RuntimeCRSService {
+func NewRuntimeCRSService(baseURL string, token string) *RuntimeCRSService {
 	return &RuntimeCRSService{
 		BaseURL: strings.TrimRight(strings.TrimSpace(baseURL), "/"),
 		Client:  &http.Client{Timeout: 20 * time.Second},
+		Token:   strings.TrimSpace(token),
 	}
 }
 
@@ -98,6 +100,7 @@ func (s *RuntimeCRSService) requestJSON(ctx context.Context, method, path string
 	if payload != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	setRuntimeAuthHeader(req, s.Token)
 	client := s.Client
 	if client == nil {
 		client = &http.Client{Timeout: 20 * time.Second}
@@ -120,4 +123,3 @@ func (s *RuntimeCRSService) requestJSON(ctx context.Context, method, path string
 	}
 	return json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(out)
 }
-

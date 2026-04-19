@@ -1,33 +1,34 @@
-# Let's Encrypt DNS-01 Operations
+# Эксплуатация Let's Encrypt DNS-01
 
-Date: `2026-04-04`
+Дата: `2026-04-04`
 
-This document describes DNS-01 certificate issuance flow and operational checks.
+Документ описывает выпуск сертификатов через DNS-01 и операционные проверки этого контура.
 
-## 1. Scope
+## Область действия
 
-Let's Encrypt DNS-01:
-- validates domain ownership through DNS TXT records;
-- affects certificate issuance/renewal lifecycle;
-- does not change or update OWASP CRS by itself.
+DNS-01 поток:
+- подтверждает владение доменом через DNS TXT записи;
+- влияет на выпуск и продление сертификатов;
+- не обновляет OWASP CRS и не меняет anti-DDoS настройки сам по себе.
 
-## 2. Typical flow
+## Типовой сценарий
 
-1. Configure DNS provider credentials (for example Cloudflare API token).
-2. Start certificate issuance from UI/certificate workflow.
-3. Ensure TXT challenge records are created and propagated.
-4. Confirm certificate material is issued and bound to target site.
-5. Apply revision and validate HTTPS endpoint.
+1. Настроить учётные данные DNS-провайдера, например Cloudflare API token.
+2. Запустить выпуск сертификата из UI или сертификатного workflow.
+3. Убедиться, что TXT challenge создан и успел распространиться.
+4. Проверить, что certificate material выпущен и связан с целевым сайтом.
+5. Собрать и применить ревизию, затем проверить HTTPS endpoint.
 
-## 3. Operational checks
+## Операционные проверки
 
-- runtime has access to control-plane challenge/material directories;
-- certificate appears in control-plane state and is referenced by TLS config;
-- target host serves expected certificate chain after apply.
+- runtime имеет доступ к challenge/material directories control-plane;
+- сертификат появился в control-plane state;
+- TLS binding ссылается на нужный certificate ID;
+- после apply целевой хост действительно отдаёт ожидаемую certificate chain.
 
-## 4. Recommended sequence with WAF operations
+## Рекомендуемый порядок вместе с WAF-операциями
 
-1. Validate DNS-01 certificate health.
-2. Validate site TLS binding and host routing.
-3. Perform OWASP CRS dry-run/update separately from the `OWASP CRS` page.
-4. Run XSS smoke checks after CRS update.
+1. Проверить здоровье DNS-01 сертификата.
+2. Проверить TLS binding и host routing.
+3. Выполнить обновление или dry-run OWASP CRS отдельно от сертификатного потока.
+4. После изменения CRS выполнить XSS smoke checks.

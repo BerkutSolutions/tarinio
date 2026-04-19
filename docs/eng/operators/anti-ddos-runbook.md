@@ -1,21 +1,44 @@
-# Anti-DDoS Runbook
+# Anti-DDoS Operator Runbook
 
-This runbook describes safe tuning and rollback for the `Anti-DDoS` section (`/anti-ddos`).
+This document describes safe operation of the `Anti-DDoS` section in TARINIO.
 
-## Scope
+The section controls three protection layers:
 
-The current Anti-DDoS workflow controls:
-- L4 guard (`l4guard/config.json` in revision bundle)
-- optional global L7 rate-limit override (applied to all enabled sites during compile)
+- baseline L4 protection at the `iptables` level;
+- a global L7 rate-limit override that is compiled into revisions;
+- an adaptive anti-DDoS model that analyzes runtime access logs and publishes temporary throttle/drop rules.
 
-Settings source of truth:
-- control-plane state: `anti_ddos_settings.json`
-- revision snapshot field: `anti_ddos_settings`
-- runtime apply target: compiled revision artifacts after `compile + apply`
+Source of truth:
 
-## Safe Defaults
+- control-plane storage: `anti_ddos_settings.json`;
+- revision snapshot field: `anti_ddos_settings`;
+- runtime state: artifacts of the currently active revision after `compile -> validate -> apply`.
 
-Default profile is conservative-high to avoid false bans on first rollout:
+## What The Operator Changes
+
+On `/anti-ddos`, the operator configures:
+
+- `use_l4_guard`, `chain_mode`, `conn_limit`, `rate_per_second`, `rate_burst`, `ports`, `target`;
+- `enforce_l7_rate_limit`, `l7_requests_per_second`, `l7_burst`, `l7_status_code`;
+- adaptive model values such as poll interval, throttle/drop thresholds, hold time, signal weights, and emergency thresholds.
+
+Every change to these parameters is a configuration change and should flow into a new revision.
+
+## Safe Workflow
+
+1. Change the parameters in `Anti-DDoS`.
+2. Compile a new revision in `Revisions`.
+3. Apply the revision.
+4. Verify:
+   - `GET /healthz` and `/healthcheck`;
+   - revision status and recent rollout events;
+   - absence of false blocking on legitimate traffic;
+   - `security_rate_limit`, `security_access`, and `security_waf` events.
+
+## Recommended Starting Values
+
+For the first production-like activation, use a conservative profile:
+
 - `conn_limit`: `200`
 - `rate_per_second`: `100`
 - `rate_burst`: `200`
@@ -26,37 +49,61 @@ Default profile is conservative-high to avoid false bans on first rollout:
 - `l7_burst`: `200`
 - `l7_status_code`: `429`
 
-## Recommended Change Procedure
+Typical adaptive model baseline:
 
-1. Save changes in `/anti-ddos`.
-2. Create a new revision (`/revisions` -> compile).
-3. Apply the revision.
-4. Verify:
-   - recent apply status is `succeeded`;
-   - runtime remains healthy (`readyz`);
-   - expected traffic is not blocked unexpectedly.
+- `model_poll_interval_seconds`: `2`
+- `model_decay_lambda`: `0.08`
+- `model_throttle_threshold`: `2.5`
+- `model_drop_threshold`: `6.0`
+- `model_hold_seconds`: `60`
+- `model_throttle_rate_per_second`: `3`
+- `model_throttle_burst`: `6`
+- `model_throttle_target`: `REJECT`
 
-## Safe Ranges
+## Safe Tuning Practice
 
-For production-like ramp-up:
-- `conn_limit`: start from `200-500`, reduce gradually.
-- `rate_per_second`: start from `100-300`.
-- `rate_burst`: keep at least `2x rate_per_second`.
-- L7 global override: enable only after baseline traffic profile is understood.
+- Tighten one block at a time.
+- Do not reduce `conn_limit`, `rate_per_second`, and `l7_requests_per_second` all at once.
+- Build a baseline of normal traffic before enabling stricter emergency thresholds.
+- For the management site (`control-plane-access`), make sure you are not creating self-lockout conditions.
 
-Avoid:
-- lowering all limits at once;
-- enabling strict L7 override during unknown peak windows.
+## Symptoms And Actions
+
+If legitimate traffic starts getting `429`:
+
+- inspect the L7 override values;
+- increase `l7_burst`;
+- verify trusted proxies and real client IP visibility;
+- confirm that the source is the Anti-DDoS layer rather than a local per-site rate-limit.
+
+If new connections fail before reaching NGINX:
+
+- inspect the L4 guard chain placement;
+- inspect `DOCKER-USER` versus `INPUT`;
+- verify `destination_ip` in Docker bridge / DNAT scenarios;
+- confirm that `ports` matches the real runtime exposure.
+
+If the adaptive model starts throttling or dropping too aggressively:
+
+- inspect fresh access-log lines and security events;
+- review emergency burst detection;
+- increase `model_drop_threshold` and/or reduce `403/444` weights;
+- re-apply a known-good revision if the degradation is substantial.
 
 ## Rollback
 
-If change is too aggressive:
-1. Open `/revisions`.
-2. Re-apply the previous known-good revision.
-3. Confirm `apply succeeded` and health restored.
-4. Return to `/anti-ddos`, relax values, then re-run compile/apply.
+If the configuration proves too aggressive:
 
-Rollback is revision-based and does not require manual runtime file edits.
+1. Open `Revisions`.
+2. Find the previous known-good revision.
+3. Run `apply`.
+4. Wait for successful apply and `/healthz` recovery.
+5. Return to `Anti-DDoS`, relax the parameters, and repeat compile/apply.
 
+Rollback should always be revision-based. Manual runtime filesystem edits or ad hoc `iptables` changes outside the revision flow are not considered a normal operating mode.
 
+## Related Documents
 
+- `docs/eng/operators/anti-ddos-model.md`
+- `docs/eng/operators/runtime-l4-guard.md`
+- `docs/eng/runbook.md`

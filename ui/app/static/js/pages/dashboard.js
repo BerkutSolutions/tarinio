@@ -10,11 +10,11 @@ const DASHBOARD_LAYOUT_STORAGE_KEY = "waf.dashboard.layout.v1";
 const DASHBOARD_WIDGETS_STORAGE_KEY = "waf.dashboard.widgets.v1";
 
 const WIDGETS = [
-  { id: "services-up", titleKey: "dashboard.widget.servicesUp", width: 240, height: 180, x: 20, y: 20 },
-  { id: "services-down", titleKey: "dashboard.widget.servicesDown", width: 240, height: 180, x: 280, y: 20 },
-  { id: "requests-day", titleKey: "dashboard.widget.requestsDay", width: 300, height: 200, x: 540, y: 20 },
-  { id: "attacks-day", titleKey: "dashboard.widget.attacksDay", width: 240, height: 200, x: 860, y: 20 },
-  { id: "blocked-attacks", titleKey: "dashboard.widget.blockedAttacks", width: 240, height: 200, x: 1120, y: 20 },
+  { id: "services-up", titleKey: "dashboard.widget.servicesUp", width: 280, height: 200, x: 20, y: 20 },
+  { id: "services-down", titleKey: "dashboard.widget.servicesDown", width: 280, height: 200, x: 320, y: 20 },
+  { id: "requests-day", titleKey: "dashboard.widget.requestsDay", width: 340, height: 220, x: 620, y: 20 },
+  { id: "attacks-day", titleKey: "dashboard.widget.attacksDay", width: 280, height: 220, x: 980, y: 20 },
+  { id: "blocked-attacks", titleKey: "dashboard.widget.blockedAttacks", width: 280, height: 220, x: 1280, y: 20 },
   { id: "unique-attackers", titleKey: "dashboard.widget.uniqueAttackers", width: 300, height: 240, x: 1380, y: 20 },
   { id: "requests-series", titleKey: "dashboard.widget.requestsSeries", width: 1240, height: 340, x: 20, y: 280 },
   { id: "popular-errors", titleKey: "dashboard.widget.popularErrors", width: 360, height: 300, x: 20, y: 640 },

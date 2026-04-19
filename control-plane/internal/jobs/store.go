@@ -148,6 +148,69 @@ func (s *Store) List() ([]Job, error) {
 	return items, nil
 }
 
+func (s *Store) DeleteByRevision(revisionID string) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	revisionID = normalizeID(revisionID)
+	if revisionID == "" {
+		return 0, errors.New("revision id is required")
+	}
+
+	current, err := s.loadLocked()
+	if err != nil {
+		return 0, err
+	}
+	filtered := make([]Job, 0, len(current.Jobs))
+	deleted := 0
+	for _, job := range current.Jobs {
+		if job.TargetRevisionID == revisionID {
+			deleted++
+			continue
+		}
+		filtered = append(filtered, job)
+	}
+	current.Jobs = filtered
+	sortJobs(current.Jobs)
+	if err := s.saveLocked(current); err != nil {
+		return 0, err
+	}
+	return deleted, nil
+}
+
+func (s *Store) DeleteByTypes(types []Type) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if len(types) == 0 {
+		return 0, nil
+	}
+	allowed := make(map[Type]struct{}, len(types))
+	for _, item := range types {
+		allowed[item] = struct{}{}
+	}
+
+	current, err := s.loadLocked()
+	if err != nil {
+		return 0, err
+	}
+	filtered := make([]Job, 0, len(current.Jobs))
+	deleted := 0
+	for _, job := range current.Jobs {
+		if _, ok := allowed[job.Type]; ok {
+			deleted++
+			continue
+		}
+		filtered = append(filtered, job)
+	}
+	current.Jobs = filtered
+	sortJobs(current.Jobs)
+	if err := s.saveLocked(current); err != nil {
+		return 0, err
+	}
+	return deleted, nil
+}
+
 func (s *Store) update(jobID string, mutate func(*Job)) (Job, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

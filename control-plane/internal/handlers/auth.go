@@ -488,7 +488,7 @@ func SetSessionCookie(w http.ResponseWriter, sessionID string) {
 }
 
 func SetSessionCookieForRequest(w http.ResponseWriter, r *http.Request, sessionID string) {
-	secure := r != nil && r.TLS != nil
+	secure := requestIsSecure(r)
 	SetSessionCookieWithOptions(w, sessionID, secure)
 }
 
@@ -579,4 +579,21 @@ func generateSessionBootToken() string {
 		return "boot-token-fallback"
 	}
 	return base64.RawURLEncoding.EncodeToString(buf)
+}
+
+func requestIsSecure(r *http.Request) bool {
+	if r == nil {
+		return false
+	}
+	if r.TLS != nil {
+		return true
+	}
+	for _, header := range []string{"X-Forwarded-Proto", "X-Forwarded-Scheme", "X-Scheme", "Front-End-Https", "X-Forwarded-Ssl"} {
+		value := strings.TrimSpace(strings.ToLower(r.Header.Get(header)))
+		switch value {
+		case "https", "on":
+			return true
+		}
+	}
+	return false
 }

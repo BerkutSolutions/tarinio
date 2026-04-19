@@ -370,10 +370,9 @@ export async function renderAntiDDoS(container, ctx) {
             <div class="waf-actions">
               <button class="btn primary" type="submit">${escapeHtml(ctx.t("common.save"))}</button>
             </div>
-          </form>
-          <div class="waf-note">${escapeHtml(ctx.t("antiddos.note"))}</div>
-        </div>
-      </section>
+            </form>
+          </div>
+        </section>
 
       <section class="waf-card waf-antiddos-live-feed-card">
         <div class="waf-card-head">

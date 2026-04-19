@@ -2,7 +2,6 @@ package services
 
 import (
 	"bufio"
-	"net/http"
 	"net/url"
 	"os"
 	"runtime"
@@ -24,10 +23,9 @@ type dashboardEventProber interface {
 }
 
 type DashboardService struct {
-	events          dashboardEventReader
-	requests        RuntimeRequestCollector
-	runtimeReadyURL string
-	httpClient      *http.Client
+	events       dashboardEventReader
+	requests     RuntimeRequestCollector
+	runtimeReady dashboardEventProber
 }
 
 type DashboardServiceStatus struct {
@@ -90,14 +88,11 @@ var cpuUsageState struct {
 	lastPercent float64
 }
 
-func NewDashboardService(events dashboardEventReader, requests RuntimeRequestCollector, runtimeReadyURL string) *DashboardService {
+func NewDashboardService(events dashboardEventReader, requests RuntimeRequestCollector, runtimeReady dashboardEventProber) *DashboardService {
 	return &DashboardService{
-		events:          events,
-		requests:        requests,
-		runtimeReadyURL: strings.TrimSpace(runtimeReadyURL),
-		httpClient: &http.Client{
-			Timeout: 1500 * time.Millisecond,
-		},
+		events:       events,
+		requests:     requests,
+		runtimeReady: runtimeReady,
 	}
 }
 
@@ -175,27 +170,14 @@ func (s *DashboardService) collectServiceStatus(now time.Time) []DashboardServic
 	statuses := []DashboardServiceStatus{
 		{Name: "control-plane", Up: true, CheckedAt: checkedAt},
 	}
-	if s.runtimeReadyURL != "" {
+	if s.runtimeReady != nil {
 		statuses = append(statuses, DashboardServiceStatus{
 			Name:      "runtime",
-			Up:        s.urlHealthy(s.runtimeReadyURL),
+			Up:        s.runtimeReady.Probe() == nil,
 			CheckedAt: checkedAt,
 		})
 	}
 	return statuses
-}
-
-func (s *DashboardService) urlHealthy(rawURL string) bool {
-	req, err := http.NewRequest(http.MethodGet, rawURL, nil)
-	if err != nil {
-		return false
-	}
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		return false
-	}
-	defer resp.Body.Close()
-	return resp.StatusCode >= 200 && resp.StatusCode < 300
 }
 
 func (s *DashboardService) collectRequests() ([]map[string]any, error) {

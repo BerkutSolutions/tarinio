@@ -93,11 +93,9 @@ modsecurity_rules_file /etc/waf/modsecurity/easy/{{ .SiteID }}.conf;
 {{- end }}
 
 {{- if .AntibotEnabled }}
-# Easy antibot guard: requests are challenged unless a token/cookie is present.
+# Easy antibot guard: requests are challenged unless a site-scoped challenge cookie is present.
 set $waf_antibot_verified 0;
-if ($arg_waf_antibot = "ok") { set $waf_antibot_verified 1; }
-if ($cookie_waf_antibot = "ok") { set $waf_antibot_verified 1; }
-if ($request_uri = "{{ .AntibotURI }}") { set $waf_antibot_verified 1; }
+if ($cookie_{{ .AntibotCookieName }} = "{{ .AntibotCookieValue }}") { set $waf_antibot_verified 1; }
 set $waf_antibot_guard "$waf_easy_exception_guard:$waf_antibot_verified";
 if ($waf_antibot_guard = "0:0") { return 403; }
 add_header X-WAF-Antibot-Mode "{{ .AntibotChallenge }}" always;

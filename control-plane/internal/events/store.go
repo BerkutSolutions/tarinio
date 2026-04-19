@@ -149,6 +149,39 @@ func (s *Store) Prune(policy RetentionPolicy) (int, error) {
 	return originalCount - len(items), nil
 }
 
+func (s *Store) DeleteByTypes(types []Type) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	current, err := s.loadLocked()
+	if err != nil {
+		return 0, err
+	}
+	if len(types) == 0 {
+		return 0, nil
+	}
+	allowed := make(map[Type]struct{}, len(types))
+	for _, item := range types {
+		allowed[item] = struct{}{}
+	}
+
+	filtered := make([]Event, 0, len(current.Events))
+	deleted := 0
+	for _, item := range current.Events {
+		if _, ok := allowed[item.Type]; ok {
+			deleted++
+			continue
+		}
+		filtered = append(filtered, item)
+	}
+	current.Events = filtered
+	sortEvents(current.Events)
+	if err := s.saveLocked(current); err != nil {
+		return 0, err
+	}
+	return deleted, nil
+}
+
 func (s *Store) loadLocked() (*state, error) {
 	content, err := os.ReadFile(s.path)
 	if err != nil {

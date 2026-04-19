@@ -26,6 +26,8 @@ const (
 	defaultEnabled      = true
 	defaultConfigPath   = "/etc/waf/l4guard/config.json"
 	defaultAdaptivePath = "/etc/waf/l4guard-adaptive/adaptive.json"
+	iptablesIPv4        = "iptables"
+	iptablesIPv6        = "ip6tables"
 )
 
 type config struct {
@@ -168,10 +170,10 @@ func loadConfig() (config, error) {
 	}
 	if value := strings.TrimSpace(os.Getenv("WAF_L4_GUARD_DESTINATION_IP")); value != "" {
 		ip := net.ParseIP(value)
-		if ip == nil || ip.To4() == nil {
-			return config{}, errors.New("WAF_L4_GUARD_DESTINATION_IP must be a valid IPv4 address")
+		if ip == nil {
+			return config{}, errors.New("WAF_L4_GUARD_DESTINATION_IP must be a valid IP address")
 		}
-		cfg.DestinationIP = ip.To4().String()
+		cfg.DestinationIP = ip.String()
 	}
 	if value := strings.TrimSpace(os.Getenv("WAF_L4_GUARD_PORTS")); value != "" {
 		ports, err := parsePorts(value)
@@ -280,7 +282,8 @@ func applyAdaptiveFileConfig(cfg *config) error {
 	seen := make(map[string]struct{}, len(item.Entries))
 	for _, entry := range item.Entries {
 		ip := strings.TrimSpace(entry.IP)
-		if net.ParseIP(ip) == nil || strings.Contains(ip, ":") {
+		parsedIP := net.ParseIP(ip)
+		if parsedIP == nil {
 			continue
 		}
 		action := strings.ToLower(strings.TrimSpace(entry.Action))
@@ -315,42 +318,68 @@ func applyAdaptiveFileConfig(cfg *config) error {
 }
 
 func bootstrap(exec executor, cfg config) error {
-	parentChain, destinationIP, err := resolveParentChain(exec, cfg)
-	if err != nil {
-		return err
+	var errs []string
+	if err := bootstrapFamily(exec, cfg, iptablesIPv4, false); err != nil {
+		errs = append(errs, err.Error())
 	}
-	if err := ensureChain(exec, customChainName); err != nil {
-		return err
+	if err := bootstrapFamily(exec, cfg, iptablesIPv6, true); err != nil && !errors.Is(err, errFamilyNotConfigured) {
+		errs = append(errs, err.Error())
 	}
-	if err := flushChain(exec, customChainName); err != nil {
-		return err
-	}
-	for _, rule := range adaptiveRules(cfg) {
-		if err := exec.Run("iptables", append([]string{"-w", "-A", customChainName}, rule...)...); err != nil {
-			return fmt.Errorf("append adaptive guard rule: %w", err)
-		}
-	}
-	for _, rule := range guardRules(cfg.Target, cfg.ConnLimit, cfg.RatePerSec, cfg.RateBurst) {
-		if err := exec.Run("iptables", append([]string{"-w", "-A", customChainName}, rule...)...); err != nil {
-			return fmt.Errorf("append guard rule: %w", err)
-		}
-	}
-	jumpRule := parentJumpRule(parentChain, destinationIP, cfg.Ports)
-	if err := deleteJumpRule(exec, parentChain, jumpRule); err != nil {
-		return err
-	}
-	if err := exec.Run("iptables", append([]string{"-w", "-I", parentChain, "1"}, jumpRule...)...); err != nil {
-		return fmt.Errorf("insert jump rule into %s: %w", parentChain, err)
+	if len(errs) > 0 {
+		return errors.New(strings.Join(errs, "; "))
 	}
 	return nil
 }
 
-func adaptiveRules(cfg config) [][]string {
+var errFamilyNotConfigured = errors.New("ip family not configured")
+
+func bootstrapFamily(exec executor, cfg config, table string, ipv6 bool) error {
+	parentChain, destinationIP, err := resolveParentChain(exec, cfg, table, ipv6)
+	if err != nil {
+		return err
+	}
+	if parentChain == "" {
+		return errFamilyNotConfigured
+	}
+	if err := ensureChain(exec, table, customChainName); err != nil {
+		return err
+	}
+	if err := flushChain(exec, table, customChainName); err != nil {
+		return err
+	}
+	for _, rule := range adaptiveRules(cfg, ipv6) {
+		if err := exec.Run(table, append([]string{"-w", "-A", customChainName}, rule...)...); err != nil {
+			return fmt.Errorf("append adaptive guard rule (%s): %w", table, err)
+		}
+	}
+	for _, rule := range guardRules(cfg.Target, cfg.ConnLimit, cfg.RatePerSec, cfg.RateBurst, ipv6) {
+		if err := exec.Run(table, append([]string{"-w", "-A", customChainName}, rule...)...); err != nil {
+			return fmt.Errorf("append guard rule (%s): %w", table, err)
+		}
+	}
+	jumpRule := parentJumpRule(parentChain, destinationIP, cfg.Ports)
+	if err := deleteJumpRule(exec, table, parentChain, jumpRule); err != nil {
+		return err
+	}
+	if err := exec.Run(table, append([]string{"-w", "-I", parentChain, "1"}, jumpRule...)...); err != nil {
+		return fmt.Errorf("insert jump rule into %s via %s: %w", parentChain, table, err)
+	}
+	return nil
+}
+
+func adaptiveRules(cfg config, ipv6 bool) [][]string {
 	if len(cfg.Adaptive.Entries) == 0 {
 		return nil
 	}
 	rules := make([][]string, 0, len(cfg.Adaptive.Entries))
 	for _, entry := range cfg.Adaptive.Entries {
+		parsedIP := net.ParseIP(entry.IP)
+		if parsedIP == nil {
+			continue
+		}
+		if ipv6 != (parsedIP.To4() == nil) {
+			continue
+		}
 		switch entry.Action {
 		case "drop":
 			rules = append(rules, []string{"-p", "tcp", "-s", entry.IP, "-j", cfg.Target})
@@ -379,22 +408,25 @@ func adaptiveHashlimitName(ip string) string {
 	return "waf-l4-ad-" + fmt.Sprintf("%x", sum[:4])
 }
 
-func resolveParentChain(exec executor, cfg config) (string, string, error) {
+func resolveParentChain(exec executor, cfg config, table string, ipv6 bool) (string, string, error) {
 	switch cfg.ChainMode {
 	case "docker-user":
-		ip, err := resolveDestinationIPv4(cfg.DestinationIP)
+		ip, err := resolveDestinationIP(cfg.DestinationIP, ipv6)
 		if err != nil {
+			if errors.Is(err, errFamilyNotConfigured) {
+				return "", "", errFamilyNotConfigured
+			}
 			return "", "", err
 		}
-		if !chainExists(exec, "DOCKER-USER") {
+		if !chainExists(exec, table, "DOCKER-USER") {
 			return "", "", errors.New("DOCKER-USER chain not found in current namespace")
 		}
 		return "DOCKER-USER", ip, nil
 	case "input":
 		return "INPUT", "", nil
 	default:
-		if chainExists(exec, "DOCKER-USER") {
-			ip, err := resolveDestinationIPv4(cfg.DestinationIP)
+		if chainExists(exec, table, "DOCKER-USER") {
+			ip, err := resolveDestinationIP(cfg.DestinationIP, ipv6)
 			if err == nil && ip != "" {
 				return "DOCKER-USER", ip, nil
 			}
@@ -403,43 +435,63 @@ func resolveParentChain(exec executor, cfg config) (string, string, error) {
 	}
 }
 
-func resolveDestinationIPv4(override string) (string, error) {
-	if strings.TrimSpace(override) != "" {
-		return strings.TrimSpace(override), nil
+func resolveDestinationIP(override string, ipv6 bool) (string, error) {
+	if value := strings.TrimSpace(override); value != "" {
+		ip := net.ParseIP(value)
+		if ip == nil {
+			return "", errors.New("invalid destination ip")
+		}
+		if ipv6 {
+			if ip.To4() != nil {
+				return "", errFamilyNotConfigured
+			}
+			return ip.String(), nil
+		}
+		if ip.To4() == nil {
+			return "", errFamilyNotConfigured
+		}
+		return ip.To4().String(), nil
+	}
+	if ipv6 {
+		ip, err := primaryIPv6()
+		if err != nil {
+			return "", errFamilyNotConfigured
+		}
+		return ip, nil
 	}
 	return primaryIPv4()
 }
 
-func chainExists(exec executor, chain string) bool {
-	_, err := exec.Output("iptables", "-w", "-S", chain)
+func chainExists(exec executor, table string, chain string) bool {
+	_, err := exec.Output(table, "-w", "-S", chain)
 	return err == nil
 }
 
-func ensureChain(exec executor, chain string) error {
-	if chainExists(exec, chain) {
+func ensureChain(exec executor, table string, chain string) error {
+	if chainExists(exec, table, chain) {
 		return nil
 	}
-	if err := exec.Run("iptables", "-w", "-N", chain); err != nil {
+	if err := exec.Run(table, "-w", "-N", chain); err != nil {
 		return fmt.Errorf("create chain %s: %w", chain, err)
 	}
 	return nil
 }
 
-func flushChain(exec executor, chain string) error {
-	if err := exec.Run("iptables", "-w", "-F", chain); err != nil {
+func flushChain(exec executor, table string, chain string) error {
+	if err := exec.Run(table, "-w", "-F", chain); err != nil {
 		return fmt.Errorf("flush chain %s: %w", chain, err)
 	}
 	return nil
 }
 
-func deleteJumpRule(exec executor, parentChain string, rule []string) error {
+func deleteJumpRule(exec executor, table string, parentChain string, rule []string) error {
 	checkArgs := append([]string{"-w", "-C", parentChain}, rule...)
 	deleteArgs := append([]string{"-w", "-D", parentChain}, rule...)
 	for {
-		if err := exec.Run("iptables", checkArgs...); err != nil {
+		if err := exec.Run(table, checkArgs...); err != nil {
 			return nil
 		}
-		if err := exec.Run("iptables", deleteArgs...); err != nil {
+		if err := exec.Run(table, deleteArgs...); err != nil {
 			return fmt.Errorf("delete stale jump rule from %s: %w", parentChain, err)
 		}
 	}
@@ -454,12 +506,16 @@ func parentJumpRule(parentChain, destinationIP string, ports []int) []string {
 	return rule
 }
 
-func guardRules(target string, connLimit int, ratePerSec int, rateBurst int) [][]string {
+func guardRules(target string, connLimit int, ratePerSec int, rateBurst int, ipv6 bool) [][]string {
+	connlimitMask := "32"
+	if ipv6 {
+		connlimitMask = "128"
+	}
 	return [][]string{
 		{
 			"-p", "tcp",
 			"-m", "connlimit",
-			"--connlimit-mask", "32",
+			"--connlimit-mask", connlimitMask,
 			"--connlimit-above", strconv.Itoa(connLimit),
 			"-j", target,
 		},
@@ -503,6 +559,34 @@ func primaryIPv4() (string, error) {
 		}
 	}
 	return "", errors.New("no non-loopback ipv4 address found")
+}
+
+func primaryIPv6() (string, error) {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return "", err
+	}
+	for _, iface := range interfaces {
+		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		addresses, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, address := range addresses {
+			ipNet, ok := address.(*net.IPNet)
+			if !ok || ipNet.IP == nil || ipNet.IP.IsLoopback() {
+				continue
+			}
+			ip := ipNet.IP
+			if ip.To4() != nil || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+				continue
+			}
+			return ip.String(), nil
+		}
+	}
+	return "", errors.New("no non-loopback ipv6 address found")
 }
 
 func parsePorts(raw string) ([]int, error) {

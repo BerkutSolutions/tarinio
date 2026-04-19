@@ -142,6 +142,9 @@ func RenderAccessRateLimitArtifacts(
 				DefaultAction: "allow",
 			}
 		}
+		if shouldDefaultDenySite(site.ID, accessPolicy) {
+			accessPolicy.DefaultAction = "deny"
+		}
 
 		accessContent, err := renderTemplate(filepath.Join(templatesRoot(), "access", "site.conf.tmpl"), accessSiteData{
 			TrustedProxyCIDRs: accessPolicy.TrustedProxyCIDRs,
@@ -197,6 +200,17 @@ func normalizeDefaultAction(value string) string {
 	default:
 		return "allow"
 	}
+}
+
+func shouldDefaultDenySite(siteID string, policy AccessPolicyInput) bool {
+	normalizedSiteID := strings.ToLower(strings.TrimSpace(siteID))
+	if normalizedSiteID != "control-plane-access" && normalizedSiteID != "control-plane" && normalizedSiteID != "ui" {
+		return false
+	}
+	if normalizeDefaultAction(policy.DefaultAction) == "deny" {
+		return true
+	}
+	return len(policy.AllowCIDRs) > 0
 }
 
 func reqZoneName(siteID string) string {

@@ -1,71 +1,80 @@
-# Backups (EN)
+# TARINIO 2.0.0 Backups And Restore
 
-Documentation baseline: `1.1.8`
+Wiki baseline: `2.0.0`
 
-## Goal
+This document describes what must be backed up and how restore readiness should be validated for TARINIO.
 
-Define an operational backup and restore baseline for single-node deployments.
-This page is written for operators who use Docker Compose and local volumes.
+## What Counts As Critical Data
 
-## What to back up
+Critical data includes:
 
-- PostgreSQL data volume (system state, users, policy entities, revisions metadata).
-- Runtime/state volumes used by the deployment profile.
-- Certificate/state volumes if TLS material is generated and stored locally.
-- `.env` and any external secret files (outside the repository, encrypted at rest).
+- PostgreSQL data;
+- runtime state and revision store data;
+- TLS and certificate materials;
+- `.env`, secrets, and external override configuration;
+- the recorded application version and active revision context.
 
-## Backup policy (minimum)
+## What Must Be Backed Up
 
-- Before every upgrade: mandatory full backup.
-- During normal operations: at least daily backup.
-- Keep at least 7 recent restore points.
-- Store at least one copy outside the host (remote storage or encrypted off-host disk).
+- database volumes;
+- runtime and state volumes used by the deployment profile;
+- certificate-related volumes when materials are stored locally;
+- secrets and deployment overrides stored outside the repository.
 
-## Pre-backup checklist
+## Minimum Policy
 
-1. Confirm stack health (`/healthz` and dashboard access).
-2. Confirm no active incident or ongoing rollback.
-3. Record current active revision id.
-4. Record current release/build version.
+- full backup before every upgrade;
+- at least daily backups in normal operation;
+- keep at least 7 restore points;
+- store at least one copy off the primary host;
+- validate restore procedures regularly in a separate environment.
 
-## Example workflow (Compose)
+## Pre-Backup Checklist
 
-1. Stop write-heavy administrative changes in UI.
-2. Snapshot database and runtime volumes.
-3. Archive `.env` and deployment-level overrides.
-4. Save backup metadata:
-   - timestamp (UTC)
-   - host
-   - app version
-   - active revision id
-   - operator name
+1. Check `/healthz`.
+2. Make sure there is no active incident or stuck apply flow.
+3. Record the application version.
+4. Record the active revision.
+5. Record the operator and backup timestamp.
 
-## Restore drill (required)
+## Metadata To Store Alongside The Backup
 
-At least once per month, validate restore on a separate environment:
+- timestamp;
+- hostname;
+- application version;
+- active revision ID;
+- compose profile;
+- a short reason for the backup: scheduled, pre-upgrade, emergency.
 
-1. Deploy the same app version.
-2. Restore database and required volumes.
-3. Start stack.
-4. Validate:
-   - login works,
-   - sites and policies are present,
-   - active revision can be applied,
-   - runtime serves expected host(s).
+## Restore Drill
 
-If restore is not tested, backup quality is unknown.
+At least monthly, restore should be validated:
 
-## Recovery priorities
+1. Deploy the same TARINIO version.
+2. Restore the database and required volumes.
+3. Start the stack.
+4. Verify login and `/healthz`.
+5. Confirm that sites, certificates, and policies are present.
+6. Verify compile/apply.
+7. Verify that runtime serves the expected host.
 
-- Priority 1: recover control-plane state (database + secrets).
-- Priority 2: recover runtime artifacts and certificate state.
-- Priority 3: re-run compile/apply and validate traffic.
+If restore is never tested, backup quality is unknown.
 
-## Related documents
+## Restore Priorities
 
-- `docs/eng/upgrade.md` (mandatory pre-upgrade flow)
-- `docs/eng/runbook.md` (incident and rollback operations)
+1. Control-plane state and secrets.
+2. TLS materials and runtime state.
+3. Re-establish the active configuration through compile/apply and revisions.
 
+## When Full Restore Is Needed
 
+- host loss;
+- database corruption;
+- failed upgrade that damaged state integrity;
+- compromise requiring redeployment onto a clean platform.
 
+## Related Documents
 
+- `docs/eng/upgrade.md`
+- `docs/eng/runbook.md`
+- `docs/eng/security.md`

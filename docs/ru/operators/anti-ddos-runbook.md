@@ -1,62 +1,100 @@
-# Anti-DDoS Runbook
+# Руководство Оператора: Anti-DDoS
 
-This runbook describes safe tuning and rollback for the `Anti-DDoS` section (`/anti-ddos`).
+Этот документ описывает безопасную эксплуатацию раздела `Anti-DDoS` в TARINIO.
 
-## Scope
+Раздел управляет тремя уровнями защиты:
+- базовой L4-защитой на уровне `iptables`;
+- глобальным L7 rate-limit override, который компилируется в ревизию;
+- адаптивной anti-DDoS моделью, которая анализирует runtime access log и публикует временные throttle/drop-правила.
 
-The current Anti-DDoS workflow controls:
-- L4 guard (`l4guard/config.json` in revision bundle)
-- optional global L7 rate-limit override (applied to all enabled sites during compile)
+Источник истины для настроек:
+- control-plane storage: `anti_ddos_settings.json`;
+- snapshot ревизии: поле `anti_ddos_settings`;
+- runtime: артефакты текущей активной ревизии после `compile -> validate -> apply`.
 
-Settings source of truth:
-- control-plane state: `anti_ddos_settings.json`
-- revision snapshot field: `anti_ddos_settings`
-- runtime apply target: compiled revision artifacts after `compile + apply`
+## Что меняет оператор
 
-## Safe Defaults
+На странице `/anti-ddos` оператор настраивает:
+- `use_l4_guard`, `chain_mode`, `conn_limit`, `rate_per_second`, `rate_burst`, `ports`, `target`;
+- `enforce_l7_rate_limit`, `l7_requests_per_second`, `l7_burst`, `l7_status_code`;
+- adaptive-модель: интервалы опроса, пороги throttle/drop, время удержания, веса сигналов, emergency thresholds.
 
-Default profile is conservative-high to avoid false bans on first rollout:
-- `conn_limit`: `200`
-- `rate_per_second`: `100`
-- `rate_burst`: `200`
-- `ports`: `80,443`
-- `target`: `DROP`
-- `enforce_l7_rate_limit`: `true`
-- `l7_requests_per_second`: `100`
-- `l7_burst`: `200`
-- `l7_status_code`: `429`
+Любое изменение этих параметров считается конфигурационным изменением и должно попадать в новую ревизию.
 
-## Recommended Change Procedure
+## Безопасный рабочий порядок
 
-1. Save changes in `/anti-ddos`.
-2. Create a new revision (`/revisions` -> compile).
-3. Apply the revision.
-4. Verify:
-   - recent apply status is `succeeded`;
-   - runtime remains healthy (`readyz`);
-   - expected traffic is not blocked unexpectedly.
+1. Изменить параметры на странице `Anti-DDoS`.
+2. Собрать новую ревизию в разделе `Ревизии`.
+3. Применить ревизию.
+4. Проверить:
+   - `GET /healthz` и страницу `/healthcheck`;
+   - статус ревизии и последние rollout events;
+   - отсутствие ложных блокировок на боевом трафике;
+   - события `security_rate_limit`, `security_access`, `security_waf`.
 
-## Safe Ranges
+## Рекомендуемые стартовые значения
 
-For production-like ramp-up:
-- `conn_limit`: start from `200-500`, reduce gradually.
-- `rate_per_second`: start from `100-300`.
-- `rate_burst`: keep at least `2x rate_per_second`.
-- L7 global override: enable only after baseline traffic profile is understood.
+Для первой боевой активации используйте консервативный профиль:
+- `conn_limit`: `200`;
+- `rate_per_second`: `100`;
+- `rate_burst`: `200`;
+- `ports`: `80,443`;
+- `target`: `DROP`;
+- `enforce_l7_rate_limit`: `true`;
+- `l7_requests_per_second`: `100`;
+- `l7_burst`: `200`;
+- `l7_status_code`: `429`.
 
-Avoid:
-- lowering all limits at once;
-- enabling strict L7 override during unknown peak windows.
+Для адаптивной модели типовой baseline:
+- `model_poll_interval_seconds`: `2`;
+- `model_decay_lambda`: `0.08`;
+- `model_throttle_threshold`: `2.5`;
+- `model_drop_threshold`: `6.0`;
+- `model_hold_seconds`: `60`;
+- `model_throttle_rate_per_second`: `3`;
+- `model_throttle_burst`: `6`;
+- `model_throttle_target`: `REJECT`.
 
-## Rollback
+## Практика безопасного тюнинга
 
-If change is too aggressive:
-1. Open `/revisions`.
-2. Re-apply the previous known-good revision.
-3. Confirm `apply succeeded` and health restored.
-4. Return to `/anti-ddos`, relax values, then re-run compile/apply.
+- Ужесточайте защиту по одному блоку за раз.
+- Не уменьшайте одновременно и `conn_limit`, и `rate_per_second`, и `l7_requests_per_second`.
+- Сначала соберите baseline нормального трафика, затем включайте более строгие emergency thresholds.
+- Для management site (`control-plane-access`) проверяйте, что не создаёте условий для само-блокировки операторов.
 
-Rollback is revision-based and does not require manual runtime file edits.
+## Симптомы и действия
 
+Если легитимный трафик получает `429`:
+- проверить L7 override;
+- увеличить `l7_burst`;
+- проверить trusted proxies и реальный client IP;
+- убедиться, что это не локальный per-site rate-limit, а именно anti-DDoS слой.
 
+Если падают новые соединения до NGINX:
+- проверить L4 guard chain placement;
+- проверить `DOCKER-USER` / `INPUT`;
+- проверить `destination_ip` для docker bridge / DNAT сценария;
+- сверить `ports` с реальным runtime exposure.
 
+Если adaptive-модель начала агрессивно throttle/drop:
+- посмотреть свежие записи access log и security events;
+- проверить emergency burst detector;
+- увеличить `model_drop_threshold` и/или уменьшить веса сигналов `403/444`;
+- переприменить известную стабильную ревизию при сильной деградации.
+
+## Откат
+
+Если настройка оказалась слишком агрессивной:
+1. Открыть раздел `Ревизии`.
+2. Найти предыдущую known-good revision.
+3. Выполнить `apply`.
+4. Дождаться успешного применения и восстановления `/healthz`.
+5. Вернуться в `Anti-DDoS`, смягчить параметры и повторить compile/apply.
+
+Откат всегда выполняется через ревизии. Ручное редактирование runtime filesystem или `iptables` в обход ревизии не считается штатным сценарием.
+
+## Связанные документы
+
+- `docs/ru/operators/anti-ddos-model.md`
+- `docs/ru/operators/runtime-l4-guard.md`
+- `docs/ru/runbook.md`

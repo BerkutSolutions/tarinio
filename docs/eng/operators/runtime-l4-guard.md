@@ -1,117 +1,141 @@
-﻿# Runtime L4 Guard
+# Runtime L4 Guard
 
-This document defines the MVP L4 anti-DDoS baseline for the runtime container.
+This document describes the baseline L4 anti-DDoS layer of the runtime container.
 
 ## Purpose
 
-The L4 guard protects the runtime before traffic reaches NGINX, TLS parsing, or ModSecurity processing.
+The L4 guard protects runtime before traffic reaches:
 
-The guard is an infrastructure layer. It is not part of WAF rule logic.
+- NGINX;
+- TLS handshake;
+- ModSecurity;
+- the HTTP parser and higher-level policies.
 
-## What It Does
+This is an infrastructure layer. It does not replace WAF logic and does not depend on request content.
 
-The bootstrap applies deterministic `iptables` rules that:
+## What The Guard Does
 
-- limit concurrent TCP connections per source IP with `connlimit`
-- limit new TCP connection rate per source IP with `hashlimit`
-- drop or reject excess traffic before NGINX handles it
+During runtime bootstrap, deterministic `iptables` rules are applied that:
 
-This baseline mitigates high-concurrency floods and high-rate connection floods, including keep-alive abuse where one source tries to pin too many open sockets and force expensive HTTP/TLS work.
+- limit concurrent TCP connections per source IP via `connlimit`;
+- limit the rate of new TCP connections via `hashlimit`;
+- apply `DROP` or `REJECT` when thresholds are exceeded.
 
-## Canonical Bootstrap Flow
+The guard can also read adaptive output and apply temporary per-IP rules:
 
-The runtime image starts through `runtime/image/entrypoint.sh`.
+- `throttle`
+- `drop`
 
-Bootstrap order:
+## Startup Order
 
-1. run `waf-runtime-l4-guard bootstrap`
-2. apply or refresh the deterministic firewall chain
+Normal bootstrap flow:
+
+1. `waf-runtime-l4-guard bootstrap`
+2. create or update the firewall chain
 3. start `waf-runtime-launcher`
 4. launcher reads `active/current.json` and starts NGINX
 
-No manual post-start firewall step is required.
+No separate manual step after runtime startup is required.
 
-## Chain Placement
+## Parent Chains
 
-The guard supports these parent chains:
+The guard can install its jump rule into:
 
 - `DOCKER-USER`
 - `INPUT`
 
-`WAF_L4_GUARD_CHAIN_MODE=auto` is the default.
+`auto` is the default mode:
 
-Behavior:
+- if `DOCKER-USER` is present in the namespace, it is preferred;
+- otherwise `INPUT` is used.
 
-- if `DOCKER-USER` exists in the current namespace, the guard uses it
-- otherwise it falls back to `INPUT`
+`DOCKER-USER` is generally preferable in Docker-aware deployments where traffic reaches runtime through DNAT.
 
-`DOCKER-USER` is preferred when the runtime firewall is applied from a Docker-aware network namespace and traffic reaches the container through DNAT.
+## Docker, DNAT, And Destination IP
 
-## Docker and DNAT
+In Docker bridge mode, filtering in `DOCKER-USER` should account for the container destination IP after DNAT.
 
-For Docker bridge networking, filtering in `DOCKER-USER` should target the runtime container destination IP after DNAT.
-
-Use:
+For that purpose:
 
 - `WAF_L4_GUARD_DESTINATION_IP=<runtime-container-ip>`
 
-When this variable is set, the jump rule in `DOCKER-USER` is bound to that destination IP and the configured protected ports.
+If the value is not set:
 
-If the variable is not set, the guard falls back to the first non-loopback IPv4 address visible in the current namespace.
+- the guard tries to detect the first non-loopback IPv4 address in the current namespace.
 
 ## Protected Ports
 
-Protected ports are defined by:
+Ports are configured through:
 
 - `WAF_L4_GUARD_PORTS`
 
-Default:
+Default value:
 
 - `80,443`
 
-The same canonical ports must be used consistently across publish rules and runtime exposure.
+The list must match the real runtime exposure, otherwise some traffic will remain outside protection.
 
-## Environment Variables
+## Configuration Parameters
 
 - `WAF_L4_GUARD_ENABLED`
   Default: `true`
 - `WAF_L4_GUARD_CHAIN_MODE`
-  Allowed: `auto`, `docker-user`, `input`
+  Allowed values: `auto`, `docker-user`, `input`
 - `WAF_L4_GUARD_CONN_LIMIT`
-  Default: `50`
+  Baseline concurrent TCP connection limit
 - `WAF_L4_GUARD_RATE_PER_SECOND`
-  Default: `30`
+  Baseline rate of new TCP connections per second
 - `WAF_L4_GUARD_RATE_BURST`
-  Default: `60`
-- `WAF_L4_GUARD_PORTS`
-  Default: `80,443`
+  Allowed burst for new TCP connections
 - `WAF_L4_GUARD_TARGET`
-  Allowed: `DROP`, `REJECT`
-  Default: `DROP`
+  `DROP` or `REJECT`
 - `WAF_L4_GUARD_DESTINATION_IP`
-  Optional IPv4 destination for `DOCKER-USER` placement
+  Explicit runtime IPv4 address used for `DOCKER-USER`
+- `WAF_L4_GUARD_ADAPTIVE_PATH`
+  Path to `adaptive.json` with dynamic throttle/drop rules
+
+## Adaptive Integration
+
+The guard reads:
+
+- baseline config from `l4guard/config.json`;
+- adaptive output from `l4guard-adaptive/adaptive.json`.
+
+If an adaptive entry is:
+
+- `drop`, a direct per-IP rule is created;
+- `throttle`, a dedicated hashlimit rule is created for the IP.
+
+This results in:
+
+- the revision defining the baseline;
+- the adaptive model adding temporary escalations;
+- the L4 guard performing the actual enforcement.
 
 ## Runtime Contract
 
-The guard does not read control-plane state, bundle contents, or domain entities.
+The guard must not read:
 
-It depends only on:
+- control-plane storage;
+- domain objects;
+- revision metadata outside the runtime bundle.
 
-- fixed runtime env configuration
-- fixed runtime port exposure
-- kernel packet filtering availability
+It should depend only on:
 
-It must run before NGINX starts, but it does not change launcher logic or bundle layout.
+- env/runtime config;
+- `iptables` availability;
+- the active revision artifacts;
+- the adaptive output file.
 
 ## Required Privileges
 
-The runtime environment must allow firewall rule management for the selected namespace.
+Runtime must be able to manage firewall rules in the selected namespace.
 
 Typical requirement:
 
 - `NET_ADMIN`
 
-If the process cannot manage `iptables`, bootstrap fails and the runtime container does not continue as if protection were active.
+If `iptables` is unavailable:
 
-
-
+- bootstrap should fail;
+- runtime should not continue startup as if protection had been applied successfully.

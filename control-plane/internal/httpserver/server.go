@@ -3,6 +3,7 @@ package httpserver
 import (
 	"context"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"time"
 
@@ -10,7 +11,10 @@ import (
 	"waf/control-plane/internal/handlers"
 	"waf/control-plane/internal/jobs"
 	"waf/control-plane/internal/rbac"
+	"waf/control-plane/internal/roles"
 	"waf/control-plane/internal/services"
+	"waf/control-plane/internal/sessions"
+	"waf/control-plane/internal/users"
 )
 
 type Server struct {
@@ -27,6 +31,9 @@ func New(
 	},
 	revisionService *services.RevisionService,
 	authService *services.AuthService,
+	sessionStore *sessions.Store,
+	userStore *users.Store,
+	roleStore *roles.Store,
 	siteService *services.SiteService,
 	siteBanService *services.ManualBanService,
 	upstreamService *services.UpstreamService,
@@ -55,33 +62,48 @@ func New(
 	eventService *services.EventService,
 	revisionCompileService *services.RevisionCompileService,
 	applyService *services.ApplyService,
+	revisionCatalogService *services.RevisionCatalogService,
 	auditService *services.AuditService,
 	reportService *services.ReportService,
 	dashboardService *services.DashboardService,
 	containerRuntimeService *services.ContainerRuntimeService,
 	runtimeCRSService *services.RuntimeCRSService,
 	requestCollector services.RuntimeRequestCollector,
+	runtimeReadyProbe interface{ Probe() error },
+	runtimeSecurityProbe interface{ Probe() error },
+	runtimeRequestProbe interface{ Probe(url.Values) error },
 	adminScriptService *services.AdminScriptService,
 ) *Server {
 	mux := http.NewServeMux()
 	settingsRuntimeHandler := handlers.NewSettingsRuntimeHandler(filepath.Join(revisionStoreDir, "settings"), runtimeHealthURL)
-	mux.Handle("/healthz", handlers.NewHealthHandler(revisionService))
+	administrationUsersHandler := handlers.NewAdministrationUsersHandlerWithSessions(userStore, roleStore, sessionStore)
+	administrationRolesHandler := handlers.NewAdministrationRolesHandler(roleStore, userStore)
+	zeroTrustHealthHandler := handlers.NewZeroTrustHealthHandler(userStore, roleStore)
+	mux.Handle("/healthz", handlers.NewHealthHandler(revisionService, revisionCatalogService, setupService, sessionStore, userStore, roleStore, revisionCompileService, runtimeReadyProbe, runtimeSecurityProbe, runtimeRequestProbe, runtimeCRSService))
 	mux.Handle("/api/setup/status", handlers.NewSetupHandler(setupService))
 	mux.Handle("/api/app/meta", withAuth(authService, "", handlers.NewAppMetaHandler()))
 	mux.Handle("/api/app/ping", withAuth(authService, rbac.PermissionAuthSelf, handlers.NewAppPingHandler()))
 	mux.Handle("/api/app/compat", withAuth(authService, rbac.PermissionAuthSelf, handlers.NewAppCompatHandler(runtimeRoot, revisionStoreDir)))
 	mux.Handle("/api/app/compat/fix", withAuth(authService, rbac.PermissionAuthSelf, handlers.NewAppCompatHandler(runtimeRoot, revisionStoreDir)))
-	mux.Handle("/api/settings/runtime", withAuth(authService, rbac.PermissionAuthSelf, settingsRuntimeHandler))
-	mux.Handle("/api/settings/runtime/check-updates", withAuth(authService, rbac.PermissionAuthSelf, settingsRuntimeHandler))
-	mux.Handle("/api/settings/runtime/storage-indexes", withAuth(authService, rbac.PermissionAuthSelf, settingsRuntimeHandler))
-	mux.Handle("/api/owasp-crs/status", withMethodPermissions(authService, map[string]rbac.Permission{
-		http.MethodGet: rbac.PermissionPoliciesRead,
+	mux.Handle("/api/settings/runtime", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodGet: {rbac.PermissionSettingsGeneralRead},
+		http.MethodPut: {rbac.PermissionSettingsGeneralWrite},
+	}, settingsRuntimeHandler))
+	mux.Handle("/api/settings/runtime/check-updates", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodPost: {rbac.PermissionSettingsGeneralWrite},
+	}, settingsRuntimeHandler))
+	mux.Handle("/api/settings/runtime/storage-indexes", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodGet:    {rbac.PermissionSettingsStorageRead},
+		http.MethodDelete: {rbac.PermissionSettingsStorageWrite},
+	}, settingsRuntimeHandler))
+	mux.Handle("/api/owasp-crs/status", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodGet: {rbac.PermissionOWASPCRSRead, rbac.PermissionPoliciesRead},
 	}, handlers.NewOWASPCRSHandler(runtimeCRSService)))
-	mux.Handle("/api/owasp-crs/check-updates", withMethodPermissions(authService, map[string]rbac.Permission{
-		http.MethodPost: rbac.PermissionPoliciesRead,
+	mux.Handle("/api/owasp-crs/check-updates", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodPost: {rbac.PermissionOWASPCRSRead, rbac.PermissionPoliciesRead},
 	}, handlers.NewOWASPCRSHandler(runtimeCRSService)))
-	mux.Handle("/api/owasp-crs/update", withMethodPermissions(authService, map[string]rbac.Permission{
-		http.MethodPost: rbac.PermissionPoliciesWrite,
+	mux.Handle("/api/owasp-crs/update", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodPost: {rbac.PermissionOWASPCRSWrite, rbac.PermissionPoliciesWrite},
 	}, handlers.NewOWASPCRSHandler(runtimeCRSService)))
 	mux.Handle("/api/auth/bootstrap", handlers.NewAuthHandler(authService))
 	mux.Handle("/api/auth/login", handlers.NewAuthHandler(authService))
@@ -101,15 +123,15 @@ func New(
 	mux.Handle("/api/auth/passkeys/register/begin", withAuth(authService, rbac.PermissionAuthSelf, handlers.NewAuthHandler(authService)))
 	mux.Handle("/api/auth/passkeys/register/finish", withAuth(authService, rbac.PermissionAuthSelf, handlers.NewAuthHandler(authService)))
 	mux.Handle("/api/auth/passkeys/", withAuth(authService, rbac.PermissionAuthSelf, handlers.NewAuthHandler(authService)))
-	mux.Handle("/api/sites", withMethodPermissions(authService, map[string]rbac.Permission{
-		http.MethodGet:  rbac.PermissionSitesRead,
-		http.MethodPost: rbac.PermissionSitesWrite,
+	mux.Handle("/api/sites", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodGet:  {rbac.PermissionSitesRead},
+		http.MethodPost: {rbac.PermissionSitesWrite},
 	}, handlers.NewSitesHandler(siteService, siteBanService)))
-	mux.Handle("/api/sites/", withMethodPermissions(authService, map[string]rbac.Permission{
-		http.MethodGet:    rbac.PermissionSitesRead,
-		http.MethodPost:   rbac.PermissionAccessWrite,
-		http.MethodPut:    rbac.PermissionSitesWrite,
-		http.MethodDelete: rbac.PermissionSitesWrite,
+	mux.Handle("/api/sites/", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodGet:    {rbac.PermissionSitesRead},
+		http.MethodPost:   {rbac.PermissionAccessWrite},
+		http.MethodPut:    {rbac.PermissionSitesWrite},
+		http.MethodDelete: {rbac.PermissionSitesWrite},
 	}, handlers.NewSitesHandler(siteService, siteBanService)))
 	mux.Handle("/api/upstreams", withMethodPermissions(authService, map[string]rbac.Permission{
 		http.MethodGet:  rbac.PermissionUpstreamsRead,
@@ -120,27 +142,27 @@ func New(
 		http.MethodPut:    rbac.PermissionUpstreamsWrite,
 		http.MethodDelete: rbac.PermissionUpstreamsWrite,
 	}, handlers.NewUpstreamsHandler(upstreamService)))
-	mux.Handle("/api/certificates", withMethodPermissions(authService, map[string]rbac.Permission{
-		http.MethodGet:  rbac.PermissionCertificatesRead,
-		http.MethodPost: rbac.PermissionCertificatesWrite,
+	mux.Handle("/api/certificates", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodGet:  {rbac.PermissionTLSRead, rbac.PermissionCertificatesRead},
+		http.MethodPost: {rbac.PermissionTLSWrite, rbac.PermissionCertificatesWrite},
 	}, handlers.NewCertificatesHandler(certificateService)))
-	mux.Handle("/api/certificates/", withMethodPermissions(authService, map[string]rbac.Permission{
-		http.MethodGet:    rbac.PermissionCertificatesRead,
-		http.MethodPut:    rbac.PermissionCertificatesWrite,
-		http.MethodDelete: rbac.PermissionCertificatesWrite,
+	mux.Handle("/api/certificates/", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodGet:    {rbac.PermissionTLSRead, rbac.PermissionCertificatesRead},
+		http.MethodPut:    {rbac.PermissionTLSWrite, rbac.PermissionCertificatesWrite},
+		http.MethodDelete: {rbac.PermissionTLSWrite, rbac.PermissionCertificatesWrite},
 	}, handlers.NewCertificatesHandler(certificateService)))
-	mux.Handle("/api/tls-configs", withMethodPermissions(authService, map[string]rbac.Permission{
-		http.MethodGet:  rbac.PermissionTLSRead,
-		http.MethodPost: rbac.PermissionTLSWrite,
+	mux.Handle("/api/tls-configs", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodGet:  {rbac.PermissionTLSRead},
+		http.MethodPost: {rbac.PermissionTLSWrite},
 	}, handlers.NewTLSConfigsHandler(tlsConfigService)))
-	mux.Handle("/api/tls-configs/", withMethodPermissions(authService, map[string]rbac.Permission{
-		http.MethodGet:    rbac.PermissionTLSRead,
-		http.MethodPut:    rbac.PermissionTLSWrite,
-		http.MethodDelete: rbac.PermissionTLSWrite,
+	mux.Handle("/api/tls-configs/", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodGet:    {rbac.PermissionTLSRead},
+		http.MethodPut:    {rbac.PermissionTLSWrite},
+		http.MethodDelete: {rbac.PermissionTLSWrite},
 	}, handlers.NewTLSConfigsHandler(tlsConfigService)))
-	mux.Handle("/api/tls/auto-renew", withMethodPermissions(authService, map[string]rbac.Permission{
-		http.MethodGet: rbac.PermissionTLSRead,
-		http.MethodPut: rbac.PermissionTLSWrite,
+	mux.Handle("/api/tls/auto-renew", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodGet: {rbac.PermissionTLSRead},
+		http.MethodPut: {rbac.PermissionTLSWrite},
 	}, handlers.NewTLSAutoRenewHandler(tlsAutoRenewService)))
 	certificateACMEHandler := handlers.NewCertificateACMEHandler(certificateACMEService, certificateSelfSignedService)
 	mux.Handle("/api/certificate-materials/upload", withAuth(authService, rbac.PermissionCertificatesWrite, handlers.NewCertificateUploadHandler(certificateUploadService)))
@@ -189,28 +211,65 @@ func New(
 	mux.Handle("/api/easy-site-profiles/catalog/countries", withMethodPermissions(authService, map[string]rbac.Permission{
 		http.MethodGet: rbac.PermissionSitesRead,
 	}, handlers.NewEasySiteProfileCatalogHandler()))
-	mux.Handle("/api/anti-ddos/settings", withMethodPermissions(authService, map[string]rbac.Permission{
-		http.MethodGet:  rbac.PermissionPoliciesRead,
-		http.MethodPut:  rbac.PermissionPoliciesWrite,
-		http.MethodPost: rbac.PermissionPoliciesWrite,
+	mux.Handle("/api/anti-ddos/settings", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodGet:  {rbac.PermissionAntiDDoSRead, rbac.PermissionPoliciesRead},
+		http.MethodPut:  {rbac.PermissionAntiDDoSWrite, rbac.PermissionPoliciesWrite},
+		http.MethodPost: {rbac.PermissionAntiDDoSWrite, rbac.PermissionPoliciesWrite},
 	}, handlers.NewAntiDDoSHandler(antiDDoSService)))
-	mux.Handle("/api/events", withAuth(authService, rbac.PermissionReportsRead, handlers.NewEventsHandler(eventService)))
-	mux.Handle("/api/requests", withAuth(authService, rbac.PermissionReportsRead, handlers.NewRequestsHandler(requestCollector)))
+	mux.Handle("/api/events", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodGet:  {rbac.PermissionEventsRead, rbac.PermissionReportsRead},
+		http.MethodPost: {rbac.PermissionEventsRead, rbac.PermissionReportsRead},
+	}, handlers.NewEventsHandler(eventService)))
+	mux.Handle("/api/requests", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodGet:  {rbac.PermissionRequestsRead, rbac.PermissionReportsRead},
+		http.MethodPost: {rbac.PermissionRequestsRead, rbac.PermissionReportsRead},
+	}, handlers.NewRequestsHandler(requestCollector)))
 	mux.Handle("/api/reports/revisions", withAuth(authService, rbac.PermissionReportsRead, handlers.NewReportsHandler(reportService)))
-	mux.Handle("/api/dashboard/stats", withAuth(authService, rbac.PermissionReportsRead, handlers.NewDashboardHandler(dashboardService)))
-	mux.Handle("/api/dashboard/containers/overview", withAuth(authService, rbac.PermissionReportsRead, handlers.NewDashboardContainersHandler(containerRuntimeService)))
-	mux.Handle("/api/dashboard/containers/logs", withAuth(authService, rbac.PermissionReportsRead, handlers.NewDashboardContainersHandler(containerRuntimeService)))
-	mux.Handle("/api/dashboard/containers/issues", withAuth(authService, rbac.PermissionReportsRead, handlers.NewDashboardContainersHandler(containerRuntimeService)))
-	mux.Handle("/api/audit", withAuth(authService, rbac.PermissionAdministrationRead, handlers.NewAuditHandler(auditService)))
-	mux.Handle("/api/administration/scripts", withMethodPermissions(authService, map[string]rbac.Permission{
-		http.MethodGet: rbac.PermissionAdministrationRead,
+	mux.Handle("/api/revisions", withAuth(authService, rbac.PermissionRevisionsRead, handlers.NewRevisionCatalogHandler(revisionCatalogService)))
+	mux.Handle("/api/revisions/statuses", withAuth(authService, rbac.PermissionRevisionsWrite, handlers.NewRevisionStatusHandler(revisionCatalogService)))
+	mux.Handle("/api/dashboard/stats", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodGet: {rbac.PermissionDashboardRead, rbac.PermissionReportsRead},
+	}, handlers.NewDashboardHandler(dashboardService)))
+	mux.Handle("/api/dashboard/containers/overview", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodGet: {rbac.PermissionDashboardRead, rbac.PermissionReportsRead},
+	}, handlers.NewDashboardContainersHandler(containerRuntimeService)))
+	mux.Handle("/api/dashboard/containers/logs", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodGet: {rbac.PermissionDashboardRead, rbac.PermissionReportsRead},
+	}, handlers.NewDashboardContainersHandler(containerRuntimeService)))
+	mux.Handle("/api/dashboard/containers/issues", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodGet: {rbac.PermissionDashboardRead, rbac.PermissionReportsRead},
+	}, handlers.NewDashboardContainersHandler(containerRuntimeService)))
+	mux.Handle("/api/audit", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodGet: {rbac.PermissionActivityRead},
+	}, handlers.NewAuditHandler(auditService)))
+	mux.Handle("/api/administration/users", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodGet:  {rbac.PermissionAdministrationRead, rbac.PermissionAdministrationUsersRead},
+		http.MethodPost: {rbac.PermissionAdministrationWrite, rbac.PermissionAdministrationUsersWrite},
+	}, administrationUsersHandler))
+	mux.Handle("/api/administration/users/", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodGet: {rbac.PermissionAdministrationRead, rbac.PermissionAdministrationUsersRead},
+		http.MethodPut: {rbac.PermissionAdministrationWrite, rbac.PermissionAdministrationUsersWrite},
+	}, administrationUsersHandler))
+	mux.Handle("/api/administration/roles", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodGet:  {rbac.PermissionAdministrationRead, rbac.PermissionAdministrationRolesRead},
+		http.MethodPost: {rbac.PermissionAdministrationWrite, rbac.PermissionAdministrationRolesWrite},
+	}, administrationRolesHandler))
+	mux.Handle("/api/administration/roles/", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodGet: {rbac.PermissionAdministrationRead, rbac.PermissionAdministrationRolesRead},
+		http.MethodPut: {rbac.PermissionAdministrationWrite, rbac.PermissionAdministrationRolesWrite},
+	}, administrationRolesHandler))
+	mux.Handle("/api/administration/zero-trust/health", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodGet: {rbac.PermissionHealthcheckRead},
+	}, zeroTrustHealthHandler))
+	mux.Handle("/api/administration/scripts", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodGet: {rbac.PermissionAdministrationRead},
 	}, handlers.NewAdministrationScriptsHandler(adminScriptService)))
-	mux.Handle("/api/administration/scripts/", withMethodPermissions(authService, map[string]rbac.Permission{
-		http.MethodGet:  rbac.PermissionAdministrationRead,
-		http.MethodPost: rbac.PermissionAdministrationWrite,
+	mux.Handle("/api/administration/scripts/", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodGet:  {rbac.PermissionAdministrationRead},
+		http.MethodPost: {rbac.PermissionAdministrationWrite},
 	}, handlers.NewAdministrationScriptsHandler(adminScriptService)))
 	mux.Handle("/api/revisions/compile", withAuth(authService, rbac.PermissionRevisionsWrite, handlers.NewRevisionCompileHandler(revisionCompileService)))
-	mux.Handle("/api/revisions/", withAuth(authService, rbac.PermissionRevisionsWrite, handlers.NewRevisionApplyHandler(applyService)))
+	mux.Handle("/api/revisions/", withAuth(authService, rbac.PermissionRevisionsWrite, handlers.NewRevisionApplyHandler(applyService, revisionCatalogService)))
 
 	return &Server{
 		httpServer: &http.Server{

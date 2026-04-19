@@ -399,6 +399,10 @@ func parseVersionParts(value string) []int {
 func (h *SettingsRuntimeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
+		if r.URL.Path == "/api/settings/runtime/storage-indexes" {
+			writeJSON(w, http.StatusOK, runtimeIndexesFromQuery(r.URL.Query()))
+			return
+		}
 		indexes := runtimeIndexesFromQuery(r.URL.Query())
 		runtimeSettingsState.mu.RLock()
 		payload := responsePayloadLocked(indexes)

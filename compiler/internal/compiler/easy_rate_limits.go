@@ -32,8 +32,12 @@ type easyLocationRuleData struct {
 }
 
 type easyLocationData struct {
-	SiteID string
-	Rules  []easyLocationRuleData
+	SiteID             string
+	AntibotEnabled     bool
+	AntibotURI         string
+	AntibotCookieName  string
+	AntibotCookieValue string
+	Rules              []easyLocationRuleData
 }
 
 func RenderEasyRateLimitArtifacts(sites []SiteInput, upstreams []UpstreamInput, profiles []EasyProfileInput) ([]ArtifactOutput, error) {
@@ -68,7 +72,14 @@ func RenderEasyRateLimitArtifacts(sites []SiteInput, upstreams []UpstreamInput, 
 		}
 
 		upstream := upstreamByID[site.DefaultUpstreamID]
-		locationData := easyLocationData{SiteID: site.ID, Rules: make([]easyLocationRuleData, 0, len(rules))}
+		locationData := easyLocationData{
+			SiteID:             site.ID,
+			AntibotEnabled:     profile.AntibotChallenge != "" && profile.AntibotChallenge != "no",
+			AntibotURI:         profile.AntibotURI,
+			AntibotCookieName:  antibotCookieName(site.ID),
+			AntibotCookieValue: antibotCookieValue(site.ID, profile),
+			Rules:              make([]easyLocationRuleData, 0, len(rules)),
+		}
 		for index, rule := range rules {
 			canonicalPath := customLimitCanonicalPath(rule.Path)
 			locationData.Rules = append(locationData.Rules, easyLocationRuleData{

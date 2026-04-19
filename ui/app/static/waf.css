@@ -131,6 +131,10 @@ body {
   min-width: 0;
 }
 
+.waf-card-head + .waf-card-body {
+  padding-top: 18px;
+}
+
 .waf-stat {
   display: grid;
   gap: 4px;
@@ -430,6 +434,47 @@ label,
 .waf-dashboard-stack {
   display: grid;
   gap: 24px;
+}
+
+#profile-page .profile-overview-grid {
+  gap: 12px;
+}
+
+#profile-page .profile-overview-item {
+  padding: 12px 14px;
+  min-width: 0;
+}
+
+#profile-page .profile-overview-inline-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+#profile-page .profile-overview-label {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: rgba(209, 220, 247, 0.74);
+  overflow-wrap: anywhere;
+}
+
+#profile-page .profile-overview-item strong {
+  display: inline;
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.35;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  #profile-page .profile-overview-inline-row {
+    flex-wrap: wrap;
+  }
 }
 
 .waf-actions-between {
@@ -1094,6 +1139,167 @@ canvas {
   height: 18px;
 }
 
+.administration-table-actions {
+  justify-content: flex-end;
+  min-width: 92px;
+}
+
+.administration-role-pill-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.administration-script-file-note {
+  margin-top: 8px;
+}
+
+.administration-modal-body {
+  width: min(860px, 96vw);
+}
+
+.administration-modal-body.administration-modal-body-wide {
+  width: min(1180px, 98vw);
+}
+
+.administration-modal-grid {
+  align-items: start;
+}
+
+.administration-modal-note {
+  margin-top: 2px;
+}
+
+.administration-role-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.administration-role-option {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid rgba(125, 155, 255, 0.22);
+  border-radius: 12px;
+  background: rgba(12, 17, 27, 0.72);
+}
+
+.administration-role-option-title {
+  display: block;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.administration-role-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.administration-role-group {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid rgba(125, 155, 255, 0.2);
+  border-radius: 14px;
+  background: rgba(12, 17, 27, 0.78);
+  min-width: 0;
+}
+
+.administration-role-group-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.administration-role-group-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #f2f6ff;
+}
+
+.administration-role-group-note {
+  margin-top: 4px;
+  color: rgba(220, 232, 255, 0.68);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.administration-permission-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.administration-permission-item {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 12px 13px;
+  border: 1px solid rgba(125, 155, 255, 0.16);
+  border-radius: 12px;
+  background: rgba(7, 11, 19, 0.72);
+  min-width: 0;
+}
+
+.administration-permission-text {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.administration-permission-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #eef3ff;
+  overflow-wrap: anywhere;
+}
+
+.administration-permission-code {
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+  color: rgba(220, 232, 255, 0.66);
+  overflow-wrap: anywhere;
+}
+
+.administration-modal-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.administration-modal-meta-item {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid rgba(125, 155, 255, 0.18);
+  border-radius: 12px;
+  background: rgba(12, 17, 27, 0.62);
+}
+
+.administration-modal-meta-item span {
+  font-size: 12px;
+  color: rgba(220, 232, 255, 0.68);
+}
+
+.administration-modal-meta-item strong {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.settings-version-note {
+  margin-top: 10px;
+}
+
+.settings-update-status-note {
+  margin-top: 10px;
+}
+
 #sidebar {
   width: 240px;
   overflow: visible;
@@ -1347,6 +1553,12 @@ canvas {
     width: 100%;
     min-width: 0;
     max-width: none;
+  }
+
+  .administration-role-groups,
+  .administration-permission-grid,
+  .administration-role-picker {
+    grid-template-columns: 1fr;
   }
 }
 

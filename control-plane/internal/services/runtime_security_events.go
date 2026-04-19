@@ -22,14 +22,16 @@ type RuntimeSecurityEventProber interface {
 type HTTPRuntimeSecurityEventCollector struct {
 	URL    string
 	Client *http.Client
+	Token  string
 }
 
-func NewHTTPRuntimeSecurityEventCollector(healthURL string) *HTTPRuntimeSecurityEventCollector {
+func NewHTTPRuntimeSecurityEventCollector(healthURL string, token string) *HTTPRuntimeSecurityEventCollector {
 	return &HTTPRuntimeSecurityEventCollector{
 		URL: deriveRuntimeSecurityEventsURL(healthURL),
 		Client: &http.Client{
 			Timeout: 2 * time.Second,
 		},
+		Token: strings.TrimSpace(token),
 	}
 }
 
@@ -41,6 +43,7 @@ func (c *HTTPRuntimeSecurityEventCollector) Collect() ([]events.Event, error) {
 	if err != nil {
 		return nil, err
 	}
+	setRuntimeAuthHeader(req, c.Token)
 	client := c.Client
 	if client == nil {
 		client = &http.Client{Timeout: 2 * time.Second}
@@ -116,6 +119,7 @@ func (c *HTTPRuntimeSecurityEventCollector) Probe() error {
 	if err != nil {
 		return err
 	}
+	setRuntimeAuthHeader(req, c.Token)
 	client := c.Client
 	if client == nil {
 		client = &http.Client{Timeout: 2 * time.Second}

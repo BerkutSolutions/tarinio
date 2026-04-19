@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -17,6 +18,7 @@ import (
 
 const defaultRuntimeRoot = "/var/lib/waf"
 const defaultHealthAddr = "127.0.0.1:8081"
+const runtimeAuthHeader = "X-WAF-Runtime-Token"
 
 var errActivePointerMissing = errors.New("active/current.json is required")
 
@@ -211,6 +213,15 @@ func (p *runtimeProcess) waitForExit(cmd *exec.Cmd) {
 
 func (s *runtimeStatus) handlers(process *runtimeProcess, securitySource *securityEventSource, requestSource *requestStreamSource) http.Handler {
 	mux := http.NewServeMux()
+	requireRuntimeAccess := func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			if !runtimeRequestAuthorized(r) {
+				http.Error(w, "forbidden", http.StatusForbidden)
+				return
+			}
+			next(w, r)
+		}
+	}
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		if !s.live() {
 			http.Error(w, "not live", http.StatusServiceUnavailable)
@@ -219,15 +230,15 @@ func (s *runtimeStatus) handlers(process *runtimeProcess, securitySource *securi
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok\n"))
 	})
-	mux.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/readyz", requireRuntimeAccess(func(w http.ResponseWriter, r *http.Request) {
 		if !s.ready() {
 			http.Error(w, "not ready", http.StatusServiceUnavailable)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok\n"))
-	})
-	mux.HandleFunc("/reload", func(w http.ResponseWriter, r *http.Request) {
+	}))
+	mux.HandleFunc("/reload", requireRuntimeAccess(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -237,8 +248,8 @@ func (s *runtimeStatus) handlers(process *runtimeProcess, securitySource *securi
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
-	})
-	mux.HandleFunc("/security-events", func(w http.ResponseWriter, r *http.Request) {
+	}))
+	mux.HandleFunc("/security-events", requireRuntimeAccess(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -251,8 +262,8 @@ func (s *runtimeStatus) handlers(process *runtimeProcess, securitySource *securi
 		writeJSON(w, http.StatusOK, map[string]any{
 			"events": items,
 		})
-	})
-	mux.HandleFunc("/security-events/probe", func(w http.ResponseWriter, r *http.Request) {
+	}))
+	mux.HandleFunc("/security-events/probe", requireRuntimeAccess(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -262,8 +273,8 @@ func (s *runtimeStatus) handlers(process *runtimeProcess, securitySource *securi
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
-	})
-	mux.HandleFunc("/requests", func(w http.ResponseWriter, r *http.Request) {
+	}))
+	mux.HandleFunc("/requests", requireRuntimeAccess(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -274,8 +285,8 @@ func (s *runtimeStatus) handlers(process *runtimeProcess, securitySource *securi
 			return
 		}
 		writeJSON(w, http.StatusOK, items)
-	})
-	mux.HandleFunc("/requests/probe", func(w http.ResponseWriter, r *http.Request) {
+	}))
+	mux.HandleFunc("/requests/probe", requireRuntimeAccess(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -285,8 +296,8 @@ func (s *runtimeStatus) handlers(process *runtimeProcess, securitySource *securi
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
-	})
-	mux.HandleFunc("/requests/indexes", func(w http.ResponseWriter, r *http.Request) {
+	}))
+	mux.HandleFunc("/requests/indexes", requireRuntimeAccess(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodDelete {
 			if err := requestSource.deleteIndex(r.URL.Query()); err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
@@ -305,8 +316,8 @@ func (s *runtimeStatus) handlers(process *runtimeProcess, securitySource *securi
 			return
 		}
 		writeJSON(w, http.StatusOK, payload)
-	})
-	mux.HandleFunc("/crs/status", func(w http.ResponseWriter, r *http.Request) {
+	}))
+	mux.HandleFunc("/crs/status", requireRuntimeAccess(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -316,8 +327,8 @@ func (s *runtimeStatus) handlers(process *runtimeProcess, securitySource *securi
 			return
 		}
 		writeJSON(w, http.StatusOK, process.crsManager.Status())
-	})
-	mux.HandleFunc("/crs/check-updates", func(w http.ResponseWriter, r *http.Request) {
+	}))
+	mux.HandleFunc("/crs/check-updates", requireRuntimeAccess(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -338,8 +349,8 @@ func (s *runtimeStatus) handlers(process *runtimeProcess, securitySource *securi
 			return
 		}
 		writeJSON(w, http.StatusOK, status)
-	})
-	mux.HandleFunc("/crs/update", func(w http.ResponseWriter, r *http.Request) {
+	}))
+	mux.HandleFunc("/crs/update", requireRuntimeAccess(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -377,8 +388,39 @@ func (s *runtimeStatus) handlers(process *runtimeProcess, securitySource *securi
 			}
 		}
 		writeJSON(w, http.StatusOK, status)
-	})
+	}))
 	return mux
+}
+
+func runtimeRequestAuthorized(r *http.Request) bool {
+	if r == nil {
+		return false
+	}
+	expectedToken := strings.TrimSpace(os.Getenv("WAF_RUNTIME_API_TOKEN"))
+	if expectedToken != "" {
+		return subtleConstantTimeEqual(strings.TrimSpace(r.Header.Get(runtimeAuthHeader)), expectedToken)
+	}
+	return requestFromLoopback(r)
+}
+
+func subtleConstantTimeEqual(left, right string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	var diff byte
+	for i := 0; i < len(left); i++ {
+		diff |= left[i] ^ right[i]
+	}
+	return diff == 0
+}
+
+func requestFromLoopback(r *http.Request) bool {
+	host, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr))
+	if err != nil {
+		host = strings.TrimSpace(r.RemoteAddr)
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 func main() {

@@ -23,6 +23,18 @@ func withAuth(authService authenticator, permission rbac.Permission, next http.H
 }
 
 func withMethodPermissions(authService authenticator, permissions map[string]rbac.Permission, next http.Handler) http.Handler {
+	methodRequirements := make(map[string][]rbac.Permission, len(permissions))
+	for method, permission := range permissions {
+		if permission == "" {
+			methodRequirements[method] = nil
+			continue
+		}
+		methodRequirements[method] = []rbac.Permission{permission}
+	}
+	return withMethodAllPermissions(authService, methodRequirements, next)
+}
+
+func withMethodAllPermissions(authService authenticator, permissions map[string][]rbac.Permission, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie(handlers.SessionCookieName)
 		if err != nil || cookie.Value == "" {
@@ -42,10 +54,14 @@ func withMethodPermissions(authService authenticator, permissions map[string]rba
 			handlers.WriteJSON(w, http.StatusUnauthorized, map[string]any{"error": "authentication required"})
 			return
 		}
-		permission := permissions[r.Method]
-		if permission != "" && !authService.RequirePermission(session, permission) {
-			handlers.WriteJSON(w, http.StatusForbidden, map[string]any{"error": "permission denied"})
-			return
+		for _, permission := range permissions[r.Method] {
+			if permission == "" {
+				continue
+			}
+			if !authService.RequirePermission(session, permission) {
+				handlers.WriteJSON(w, http.StatusForbidden, map[string]any{"error": "permission denied"})
+				return
+			}
 		}
 		handlers.SetSessionCookieForRequest(w, r, cookie.Value)
 		next.ServeHTTP(w, r.WithContext(auth.ContextWithSession(r.Context(), session)))

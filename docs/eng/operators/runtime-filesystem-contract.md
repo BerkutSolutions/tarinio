@@ -1,56 +1,62 @@
-﻿# Runtime Filesystem Contract
+# Runtime Filesystem Contract
 
-Status: Stage 1 runtime contract for `S1-17`
+Status: Stage 1 runtime contract for single-node deployment.
 
 ## Purpose
 
-This file fixes the single-node MVP filesystem contract between:
-- compiled revision bundles
-- candidate staging
-- active pointer selection
-- runtime-visible `/etc/waf/...` paths
+This document defines the contract between:
 
-It does not add runtime behavior.
-It only aligns already implemented paths and ownership boundaries.
+- compiled revision bundles;
+- staged candidates;
+- active revision selection;
+- runtime-visible paths under `/etc/waf/...`.
+
+It does not add new runtime logic. It formalizes the ownership boundaries already assumed by the system.
 
 ## Single Source Of Truth
 
-The only source of truth for runtime bundle selection is:
+The only authoritative source for active revision selection is:
+
 - `<runtime-root>/active/current.json`
 
 In the runtime image this is typically:
+
 - `/var/lib/waf/active/current.json`
 
-The runtime must use this file to determine:
-- which revision is active
-- which staged candidate bundle must be exposed
+Runtime must use this file to determine:
 
-The runtime must not select the active revision by reading:
-- `/etc/waf/current`
-- individual symlink targets
-- inferred directory names
+- which revision is active;
+- which candidate bundle should be exposed as current.
 
-`/etc/waf/current` is derived only.
+Runtime must not infer the active revision from:
 
-## Staging And Activation Paths
+- `/etc/waf/current`;
+- symlink targets;
+- guessed directory names.
 
-Canonical paths:
+`/etc/waf/current` is a derived representation only.
+
+## Canonical Staging And Activation Paths
+
+Main paths:
+
 - staged bundle root: `<runtime-root>/candidates/<revision-id>/`
 - active pointer: `<runtime-root>/active/current.json`
 
 Example:
+
 - `/var/lib/waf/candidates/rev-001/`
 - `/var/lib/waf/active/current.json`
 
 `current.json` stores:
+
 - `revision_id`
 - `candidate_path`
 
-The `candidate_path` points to the selected staged bundle root.
+## Paths Inside A Bundle
 
-## Bundle-Relative Paths
+Inside a staged bundle, stable relative paths must be used:
 
-Inside one staged bundle, the canonical artifact paths are:
 - `manifest.json`
 - `nginx/nginx.conf`
 - `nginx/conf.d/*.conf`
@@ -63,20 +69,25 @@ Inside one staged bundle, the canonical artifact paths are:
 - `modsecurity/crs-overrides/*.conf`
 - `tls/*.conf`
 - `errors/...`
+- `ddos-model/config.json`
+- `l4guard/config.json`
 
-These paths are the same:
-- in compiler output
-- in staged bundle directories
-- in the `candidate_path` bundle referenced by `current.json`
+These paths must remain identical:
+
+- in compiler output;
+- in staged candidates;
+- in the bundle referenced by `current.json`.
 
 ## Runtime-Visible Canonical Paths
 
-Runtime exposes the selected bundle under:
+Runtime exposes the selected bundle through:
+
 - `/etc/waf/current`
 
-This is a derived symlink to the selected `candidate_path`.
+This is a symlink or equivalent derived projection to `candidate_path`.
 
-Runtime also exposes stable canonical paths for NGINX and ModSecurity:
+Runtime also provides stable paths such as:
+
 - `/etc/waf/nginx/nginx.conf`
 - `/etc/waf/nginx/conf.d/`
 - `/etc/waf/nginx/access/`
@@ -88,38 +99,44 @@ Runtime also exposes stable canonical paths for NGINX and ModSecurity:
 - `/etc/waf/modsecurity/crs-overrides/`
 - `/etc/waf/tls/`
 - `/etc/waf/errors/`
+- `/etc/waf/l4guard/config.json`
+- `/etc/waf/ddos-model/config.json`
 
-These runtime-visible paths must map 1:1 to the same artifact paths inside the selected bundle.
+These runtime-visible paths must reflect the selected bundle contents one-to-one.
 
-## CRS Path Rule
+## OWASP CRS Rule
 
-The installed OWASP CRS is not stored in the compiled bundle.
+Installed OWASP CRS content is not stored inside the compiled bundle.
 
-Runtime exposes the installed CRS tree at:
+Runtime exposes it separately at:
+
 - `/etc/waf/modsecurity/coreruleset/`
 
-This path is runtime-provided and remains outside bundle ownership.
-The bundle references it but does not redefine or mutate it.
+This directory:
 
-## Ownership Rules
+- is provided by runtime;
+- remains outside bundle ownership;
+- can be referenced by the bundle, but must not be overwritten by the bundle.
 
-- compiler owns bundle-relative artifact paths
-- staging owns materialization into `candidates/<revision-id>/`
-- activation owns only `active/current.json`
-- runtime owns only the derived `/etc/waf/...` view
+## Ownership Boundaries
+
+- the compiler owns only bundle-relative artifact paths;
+- staging owns materialization into `candidates/<revision-id>/`;
+- activation owns only `active/current.json`;
+- runtime owns only the derived `/etc/waf/...` view.
 
 Runtime does not own:
-- bundle selection policy
-- revision history
-- revision metadata beyond the active pointer file
 
-## Resulting Rule
+- revision selection policy;
+- revision history;
+- revision metadata beyond the active pointer;
+- control-plane state.
 
-For single-node MVP:
-- `active/current.json` is authoritative
-- `/etc/waf/current` is derived
-- bundle-relative paths stay stable from compiler through runtime
-- identical artifacts must keep identical relative paths at every stage
+## Final Rule
 
+For the single-node MVP:
 
-
+- `active/current.json` is authoritative;
+- `/etc/waf/current` is derived;
+- relative artifact paths must not change between compile, stage, and runtime;
+- the same artifact must have the same relative path at every stage.

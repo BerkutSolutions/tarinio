@@ -25,7 +25,9 @@ func TestRenderEasyRateLimitArtifacts_GeneratesRouteSpecificArtifacts(t *testing
 			PassHostHeader: true,
 		}},
 		[]EasyProfileInput{{
-			SiteID: "control-plane-access",
+			SiteID:           "control-plane-access",
+			AntibotChallenge: "turnstile",
+			AntibotURI:       "/challenge",
 			CustomLimitRules: []CustomRateLimitRuleInput{
 				{Path: "/login", Rate: "6r/s"},
 				{Path: "/api/auth/", Rate: "12r/s"},
@@ -50,6 +52,9 @@ func TestRenderEasyRateLimitArtifacts_GeneratesRouteSpecificArtifacts(t *testing
 	}
 
 	locationsConf := byPath["nginx/easy-locations/control-plane-access.conf"]
+	if !strings.Contains(locationsConf, "location = /challenge") || !strings.Contains(locationsConf, "Set-Cookie \"waf_antibot_") {
+		t.Fatalf("expected antibot challenge location in easy locations conf, got: %s", locationsConf)
+	}
 	if !strings.Contains(locationsConf, "location = /login {") {
 		t.Fatalf("expected exact location for /login, got: %s", locationsConf)
 	}

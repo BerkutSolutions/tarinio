@@ -2,9 +2,9 @@ import { loadPreferences, savePreferences } from "../preferences.js";
 import { escapeHtml } from "../ui.js";
 
 const SETTINGS_TABS = [
-  { id: "general", path: "/settings/general", labelKey: "settings.tabs.general" },
-  { id: "storage", path: "/settings/storage", labelKey: "settings.tabs.storage" },
-  { id: "about", path: "/settings/about", labelKey: "settings.tabs.about" },
+  { id: "general", path: "/settings/general", labelKey: "settings.tabs.general", permissions: ["settings.general.read", "settings.general.write"] },
+  { id: "storage", path: "/settings/storage", labelKey: "settings.tabs.storage", permissions: ["settings.storage.read", "settings.storage.write"] },
+  { id: "about", path: "/settings/about", labelKey: "settings.tabs.about", permissions: ["settings.about.read"] },
 ];
 
 let runtimeAutoCheckTimer = null;
@@ -20,6 +20,15 @@ function activeTabFromPath() {
   const path = (window.location.pathname || "").replace(/\/+$/, "") || "/";
   const matched = SETTINGS_TABS.find((tab) => path === tab.path || path.startsWith(`${tab.path}/`));
   return matched?.id || "general";
+}
+
+function permissionSet(ctx) {
+  return new Set(Array.isArray(ctx?.currentUser?.permissions) ? ctx.currentUser.permissions.map((item) => String(item || "").trim()) : []);
+}
+
+function availableTabs(ctx) {
+  const permissions = permissionSet(ctx);
+  return SETTINGS_TABS.filter((tab) => (tab.permissions || []).some((permission) => permissions.has(permission)));
 }
 
 function showTab(root, tabID) {
@@ -80,6 +89,12 @@ export async function renderSettings(container, ctx) {
   clearRuntimeAutoCheckTimer();
   let storageIndexesOffset = 0;
   const storageIndexesLimit = 10;
+  const tabs = availableTabs(ctx);
+  const currentTab = tabs.find((tab) => tab.id === activeTabFromPath()) || tabs[0] || SETTINGS_TABS.find((tab) => tab.id === "about");
+  if (!currentTab) {
+    container.innerHTML = "";
+    return;
+  }
 
   container.innerHTML = `
     <div class="waf-page-stack" id="settings-page">
@@ -88,7 +103,7 @@ export async function renderSettings(container, ctx) {
       <section class="waf-card settings-tabs-card">
         <div class="waf-card-body">
           <div class="tabs browser-tabs settings-tabs" id="settings-tabs" role="tablist" aria-label="${escapeHtml(ctx.t("settings.title"))}">
-            ${SETTINGS_TABS.map((tab) => `
+            ${tabs.map((tab) => `
               <a
                 class="tab-btn"
                 href="${escapeHtml(tab.path)}"
@@ -128,7 +143,7 @@ export async function renderSettings(container, ctx) {
                   <div class="waf-list-title">${escapeHtml(ctx.t("settings.runtime.title"))}</div>
                 </div>
                 <div class="waf-note" id="settings-runtime-status">${escapeHtml(ctx.t("settings.runtime.shell"))}</div>
-                <div class="waf-note" id="settings-about-version-inline">${escapeHtml(ctx.t("about.version"))}: -</div>
+                <div class="waf-note settings-version-note" id="settings-about-version-inline">${escapeHtml(ctx.t("about.version"))}: -</div>
               </div>
 
               <div class="waf-list-item">
@@ -143,7 +158,7 @@ export async function renderSettings(container, ctx) {
                 <div class="waf-actions" style="margin-top:10px;">
                   <button id="settings-runtime-save" class="btn primary btn-sm" type="button">${escapeHtml(ctx.t("common.save"))}</button>
                 </div>
-                <div class="waf-note" id="settings-update-status">${escapeHtml(ctx.t("settings.updates.notChecked"))}</div>
+                <div class="waf-note settings-update-status-note" id="settings-update-status">${escapeHtml(ctx.t("settings.updates.notChecked"))}</div>
               </div>
             </div>
           </div>
@@ -349,49 +364,55 @@ export async function renderSettings(container, ctx) {
   };
 
   const renderRuntime = async () => {
+    const canReadGeneral = permissionSet(ctx).has("settings.general.read") || permissionSet(ctx).has("settings.general.write");
+    const canReadStorage = permissionSet(ctx).has("settings.storage.read") || permissionSet(ctx).has("settings.storage.write");
     try {
-      const runtime = await ctx.api.get(`/api/settings/runtime?storage_indexes_limit=${storageIndexesLimit}&storage_indexes_offset=${storageIndexesOffset}`);
-      const mode = String(runtime?.deployment_mode || "-");
-      runtimeStatus.textContent = ctx.t("settings.runtime.loaded", { mode });
-      if (updatesEnabled) {
-        updatesEnabled.checked = !!runtime?.update_checks_enabled;
+      let runtime = null;
+      if (canReadGeneral) {
+        runtime = await ctx.api.get("/api/settings/runtime");
+        const mode = String(runtime?.deployment_mode || "-");
+        runtimeStatus.textContent = ctx.t("settings.runtime.loaded", { mode });
+        if (updatesEnabled) {
+          updatesEnabled.checked = !!runtime?.update_checks_enabled;
+        }
+        renderUpdateStatus(ctx, updateStatus, runtime || {});
+        const currentVersion = String(runtime?.app_version || runtime?.version || "").trim();
+        if (currentVersion) {
+          const text = `${ctx.t("about.version")}: ${currentVersion}`;
+          aboutVersion.textContent = currentVersion;
+          aboutVersionInline.textContent = text;
+        }
+        if (runtime?.update_checks_enabled) {
+          clearRuntimeAutoCheckTimer();
+          runtimeAutoCheckTimer = window.setInterval(async () => {
+            try {
+              const result = await ctx.api.post("/api/settings/runtime/check-updates", { update_checks_enabled: true, manual: false });
+              renderUpdateStatus(ctx, updateStatus, result || {});
+            } catch {
+              // keep last known status silently
+            }
+          }, 60 * 60 * 1000);
+        } else {
+          clearRuntimeAutoCheckTimer();
+        }
       }
-      const storage = runtime?.storage || {};
-      if (storageLogs) {
-        storageLogs.value = String(Number(storage?.logs_days || 14));
-      }
-      if (storageActivity) {
-        storageActivity.value = String(Number(storage?.activity_days || 30));
-      }
-      if (storageEvents) {
-        storageEvents.value = String(Number(storage?.events_days || 30));
-      }
-      if (storageBans) {
-        storageBans.value = String(Number(storage?.bans_days || 30));
-      }
-      const indexesPayload = runtime?.storage_indexes || {};
-      storageIndexesOffset = Number(indexesPayload?.offset || 0);
-      renderStorageIndexes(indexesPayload);
-      renderUpdateStatus(ctx, updateStatus, runtime || {});
-      const currentVersion = String(runtime?.app_version || runtime?.version || "").trim();
-      if (currentVersion) {
-        const text = `${ctx.t("about.version")}: ${currentVersion}`;
-        aboutVersion.textContent = currentVersion;
-        aboutVersionInline.textContent = text;
-      }
-
-      if (runtime?.update_checks_enabled) {
-        clearRuntimeAutoCheckTimer();
-        runtimeAutoCheckTimer = window.setInterval(async () => {
-          try {
-            const result = await ctx.api.post("/api/settings/runtime/check-updates", { update_checks_enabled: true, manual: false });
-            renderUpdateStatus(ctx, updateStatus, result || {});
-          } catch {
-            // keep last known status silently
-          }
-        }, 60 * 60 * 1000);
-      } else {
-        clearRuntimeAutoCheckTimer();
+      if (canReadStorage) {
+        const storage = runtime?.storage || {};
+        if (storageLogs) {
+          storageLogs.value = String(Number(storage?.logs_days || 14));
+        }
+        if (storageActivity) {
+          storageActivity.value = String(Number(storage?.activity_days || 30));
+        }
+        if (storageEvents) {
+          storageEvents.value = String(Number(storage?.events_days || 30));
+        }
+        if (storageBans) {
+          storageBans.value = String(Number(storage?.bans_days || 30));
+        }
+        const indexesPayload = await ctx.api.get(`/api/settings/runtime/storage-indexes?storage_indexes_limit=${storageIndexesLimit}&storage_indexes_offset=${storageIndexesOffset}`).catch(() => ({ items: [], total: 0, limit: storageIndexesLimit, offset: storageIndexesOffset }));
+        storageIndexesOffset = Number(indexesPayload?.offset || 0);
+        renderStorageIndexes(indexesPayload);
       }
     } catch {
       runtimeStatus.textContent = ctx.t("settings.runtime.shell");
@@ -458,7 +479,7 @@ export async function renderSettings(container, ctx) {
     }
   });
 
-  const selectedTab = activeTabFromPath();
+  const selectedTab = currentTab.id;
   showTab(container, selectedTab);
 
   try {

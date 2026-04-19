@@ -26,6 +26,13 @@ type fakeRevisionStoreForApply struct {
 	revision revisions.Revision
 	active   string
 	failed   string
+	apply    struct {
+		revisionID string
+		jobID      string
+		status     string
+		result     string
+		appliedAt  string
+	}
 }
 
 func (f *fakeRevisionStoreForApply) Get(revisionID string) (revisions.Revision, bool, error) {
@@ -42,6 +49,15 @@ func (f *fakeRevisionStoreForApply) MarkActive(revisionID string) error {
 
 func (f *fakeRevisionStoreForApply) MarkFailed(revisionID string) error {
 	f.failed = revisionID
+	return nil
+}
+
+func (f *fakeRevisionStoreForApply) RecordApplyResult(revisionID string, jobID string, status string, result string, appliedAt string) error {
+	f.apply.revisionID = revisionID
+	f.apply.jobID = jobID
+	f.apply.status = status
+	f.apply.result = result
+	f.apply.appliedAt = appliedAt
 	return nil
 }
 
@@ -141,6 +157,9 @@ func TestApplyService_ApplyUsesRevisionSnapshotAndMarksActive(t *testing.T) {
 	if revisionStore.active != "rev-000001" {
 		t.Fatalf("expected active revision to be updated, got %s", revisionStore.active)
 	}
+	if revisionStore.apply.revisionID != "rev-000001" || revisionStore.apply.status != string(jobs.StatusSucceeded) || revisionStore.apply.result != "revision applied" || revisionStore.apply.appliedAt == "" {
+		t.Fatalf("expected apply metadata to be recorded, got %+v", revisionStore.apply)
+	}
 	if exec.syntaxCalls != 1 || exec.reloadCalls != 1 || health.calls != 1 {
 		t.Fatalf("unexpected pipeline call counts: syntax=%d reload=%d health=%d", exec.syntaxCalls, exec.reloadCalls, health.calls)
 	}
@@ -204,6 +223,9 @@ func TestApplyService_RollsBackToKnownGoodOnHealthFailure(t *testing.T) {
 	}
 	if revisionStore.failed != "rev-bad" {
 		t.Fatalf("expected failed revision mark, got %s", revisionStore.failed)
+	}
+	if revisionStore.apply.revisionID != "rev-bad" || revisionStore.apply.status != string(jobs.StatusFailed) || revisionStore.apply.appliedAt == "" {
+		t.Fatalf("expected failed apply metadata to be recorded, got %+v", revisionStore.apply)
 	}
 	content, err := os.ReadFile(filepath.Join(root, "active", "current.json"))
 	if err != nil {

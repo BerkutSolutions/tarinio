@@ -1,117 +1,125 @@
-﻿# Runtime L4 Guard
+# Runtime L4 Guard
 
-This document defines the MVP L4 anti-DDoS baseline for the runtime container.
+Документ фиксирует базовый L4 anti-DDoS слой runtime-контейнера.
 
-## Purpose
+## Назначение
 
-The L4 guard protects the runtime before traffic reaches NGINX, TLS parsing, or ModSecurity processing.
+L4 guard защищает runtime до того, как трафик дойдёт до:
+- NGINX;
+- TLS handshake;
+- ModSecurity;
+- HTTP parser и пользовательских политик.
 
-The guard is an infrastructure layer. It is not part of WAF rule logic.
+Это инфраструктурный слой. Он не заменяет WAF-правила и не зависит от содержимого запросов.
 
-## What It Does
+## Что делает guard
 
-The bootstrap applies deterministic `iptables` rules that:
+При bootstrap runtime применяет детерминированные `iptables` правила, которые:
+- ограничивают число одновременных TCP-соединений на один source IP через `connlimit`;
+- ограничивают скорость новых TCP-соединений через `hashlimit`;
+- выполняют `DROP` или `REJECT`, если лимиты превышены.
 
-- limit concurrent TCP connections per source IP with `connlimit`
-- limit new TCP connection rate per source IP with `hashlimit`
-- drop or reject excess traffic before NGINX handles it
+Дополнительно guard читает adaptive output и применяет временные per-IP правила:
+- `throttle`;
+- `drop`.
 
-This baseline mitigates high-concurrency floods and high-rate connection floods, including keep-alive abuse where one source tries to pin too many open sockets and force expensive HTTP/TLS work.
+## Порядок запуска
 
-## Canonical Bootstrap Flow
+Штатный bootstrap flow:
 
-The runtime image starts through `runtime/image/entrypoint.sh`.
+1. `waf-runtime-l4-guard bootstrap`
+2. создание или обновление firewall chain
+3. запуск `waf-runtime-launcher`
+4. launcher читает `active/current.json` и стартует NGINX
 
-Bootstrap order:
+Отдельный ручной шаг после старта runtime не требуется.
 
-1. run `waf-runtime-l4-guard bootstrap`
-2. apply or refresh the deterministic firewall chain
-3. start `waf-runtime-launcher`
-4. launcher reads `active/current.json` and starts NGINX
+## Родительские цепочки
 
-No manual post-start firewall step is required.
+Guard умеет размещать jump rule в:
+- `DOCKER-USER`;
+- `INPUT`.
 
-## Chain Placement
+Режим `auto` является дефолтным:
+- если в namespace есть `DOCKER-USER`, guard предпочитает её;
+- иначе используется `INPUT`.
 
-The guard supports these parent chains:
+`DOCKER-USER` предпочтительнее в docker-aware сценариях, где трафик приходит к runtime через DNAT.
 
-- `DOCKER-USER`
-- `INPUT`
+## Docker, DNAT и destination IP
 
-`WAF_L4_GUARD_CHAIN_MODE=auto` is the default.
+В docker bridge режиме фильтрация в `DOCKER-USER` должна учитывать destination IP контейнера после DNAT.
 
-Behavior:
-
-- if `DOCKER-USER` exists in the current namespace, the guard uses it
-- otherwise it falls back to `INPUT`
-
-`DOCKER-USER` is preferred when the runtime firewall is applied from a Docker-aware network namespace and traffic reaches the container through DNAT.
-
-## Docker and DNAT
-
-For Docker bridge networking, filtering in `DOCKER-USER` should target the runtime container destination IP after DNAT.
-
-Use:
-
+Для этого используется:
 - `WAF_L4_GUARD_DESTINATION_IP=<runtime-container-ip>`
 
-When this variable is set, the jump rule in `DOCKER-USER` is bound to that destination IP and the configured protected ports.
+Если значение не задано:
+- guard пытается определить первый non-loopback IPv4 в текущем namespace.
 
-If the variable is not set, the guard falls back to the first non-loopback IPv4 address visible in the current namespace.
+## Защищаемые порты
 
-## Protected Ports
-
-Protected ports are defined by:
-
+Порты задаются через:
 - `WAF_L4_GUARD_PORTS`
 
-Default:
-
+Значение по умолчанию:
 - `80,443`
 
-The same canonical ports must be used consistently across publish rules and runtime exposure.
+Список должен совпадать с реальным runtime exposure, иначе часть трафика останется вне защиты.
 
-## Environment Variables
+## Конфигурационные параметры
 
 - `WAF_L4_GUARD_ENABLED`
-  Default: `true`
+  По умолчанию: `true`
 - `WAF_L4_GUARD_CHAIN_MODE`
-  Allowed: `auto`, `docker-user`, `input`
+  Допустимые значения: `auto`, `docker-user`, `input`
 - `WAF_L4_GUARD_CONN_LIMIT`
-  Default: `50`
+  Базовый лимит одновременных TCP-соединений
 - `WAF_L4_GUARD_RATE_PER_SECOND`
-  Default: `30`
+  Базовый лимит новых TCP-соединений в секунду
 - `WAF_L4_GUARD_RATE_BURST`
-  Default: `60`
-- `WAF_L4_GUARD_PORTS`
-  Default: `80,443`
+  Разрешённый burst для новых TCP-соединений
 - `WAF_L4_GUARD_TARGET`
-  Allowed: `DROP`, `REJECT`
-  Default: `DROP`
+  `DROP` или `REJECT`
 - `WAF_L4_GUARD_DESTINATION_IP`
-  Optional IPv4 destination for `DOCKER-USER` placement
+  Явный IPv4-адрес runtime container для `DOCKER-USER`
+- `WAF_L4_GUARD_ADAPTIVE_PATH`
+  Путь к `adaptive.json` с динамическими throttle/drop-правилами
 
-## Runtime Contract
+## Adaptive integration
 
-The guard does not read control-plane state, bundle contents, or domain entities.
+Guard читает:
+- базовый конфиг из `l4guard/config.json`;
+- adaptive output из `l4guard-adaptive/adaptive.json`.
 
-It depends only on:
+Если в adaptive output есть запись:
+- `drop` — создаётся прямое правило на IP;
+- `throttle` — создаётся отдельное hashlimit-правило для конкретного IP.
 
-- fixed runtime env configuration
-- fixed runtime port exposure
-- kernel packet filtering availability
+Таким образом:
+- ревизия задаёт baseline;
+- adaptive-модель добавляет временные меры;
+- enforcement выполняет именно L4 guard.
 
-It must run before NGINX starts, but it does not change launcher logic or bundle layout.
+## Контракт runtime
 
-## Required Privileges
+Guard не должен читать:
+- control-plane storage;
+- доменные объекты;
+- revision metadata вне runtime bundle.
 
-The runtime environment must allow firewall rule management for the selected namespace.
+Он зависит только от:
+- env/runtime config;
+- доступности `iptables`;
+- активной ревизии и её артефактов;
+- adaptive output файла.
 
-Typical requirement:
+## Требуемые привилегии
 
+Runtime должен иметь возможность управлять firewall rules в выбранном namespace.
+
+Типичное требование:
 - `NET_ADMIN`
 
-If the process cannot manage `iptables`, bootstrap fails and the runtime container does not continue as if protection were active.
-
-
-
+Если `iptables` недоступен:
+- bootstrap должен завершиться ошибкой;
+- runtime не должен продолжать запуск так, будто защита была успешно активирована.

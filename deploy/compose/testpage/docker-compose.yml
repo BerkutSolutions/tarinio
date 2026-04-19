@@ -16,6 +16,7 @@ services:
       CONTROL_PLANE_ACME_USE_DEVELOPMENT_CLIENT: "true"
       WAF_RUNTIME_HEALTH_URL: http://runtime:8081/readyz
       WAF_RUNTIME_RELOAD_URL: http://runtime:8081/reload
+      WAF_RUNTIME_API_TOKEN: ${WAF_RUNTIME_API_TOKEN:-default-runtime-shared-token}
       POSTGRES_DSN: ${MGMT_POSTGRES_DSN:-postgres://waf:waf@postgres-mgmt:5432/waf?sslmode=disable}
       WAF_DEFAULT_LIMIT_REQ_RATE: ${MGMT_WAF_DEFAULT_LIMIT_REQ_RATE:-20r/s}
       WAF_DEFAULT_BAD_BEHAVIOR_BAN_TIME_SECONDS: ${MGMT_WAF_DEFAULT_BAD_BEHAVIOR_BAN_TIME_SECONDS:-10}
@@ -63,6 +64,7 @@ services:
     environment:
       WAF_RUNTIME_ROOT: /var/lib/waf
       WAF_RUNTIME_HEALTH_ADDR: 0.0.0.0:8081
+      WAF_RUNTIME_API_TOKEN: ${WAF_RUNTIME_API_TOKEN:-default-runtime-shared-token}
       # L4 thresholds are sourced from runtime bundle (/etc/waf/l4guard/config.json),
       # compiled from control-plane anti-DDoS settings.
       WAF_L4_GUARD_ADAPTIVE_PATH: /etc/waf/l4guard-adaptive/adaptive.json
@@ -149,6 +151,7 @@ services:
       CONTROL_PLANE_ACME_USE_DEVELOPMENT_CLIENT: "true"
       WAF_RUNTIME_HEALTH_URL: http://runtime-test:8081/readyz
       WAF_RUNTIME_RELOAD_URL: http://runtime-test:8081/reload
+      WAF_RUNTIME_API_TOKEN: ${WAF_RUNTIME_API_TOKEN:-default-runtime-shared-token}
       POSTGRES_DSN: ${TEST_POSTGRES_DSN:-postgres://waf:waf@postgres-app:5432/waf?sslmode=disable}
       WAF_DEFAULT_LIMIT_REQ_RATE: ${TEST_WAF_DEFAULT_LIMIT_REQ_RATE:-5r/s}
       WAF_DEFAULT_BAD_BEHAVIOR_BAN_TIME_SECONDS: ${TEST_WAF_DEFAULT_BAD_BEHAVIOR_BAN_TIME_SECONDS:-10}
@@ -198,6 +201,7 @@ services:
     environment:
       WAF_RUNTIME_ROOT: /var/lib/waf
       WAF_RUNTIME_HEALTH_ADDR: 0.0.0.0:8081
+      WAF_RUNTIME_API_TOKEN: ${WAF_RUNTIME_API_TOKEN:-default-runtime-shared-token}
       # L4 thresholds are sourced from runtime bundle (/etc/waf/l4guard/config.json),
       # compiled from control-plane anti-DDoS settings.
       WAF_L4_GUARD_ADAPTIVE_PATH: /etc/waf/l4guard-adaptive/adaptive.json

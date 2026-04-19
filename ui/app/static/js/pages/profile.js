@@ -55,143 +55,195 @@ async function refreshPasskeys(ctx) {
 
 export async function renderProfile(container, ctx) {
   container.innerHTML = `
-    <div class="page" id="profile-page">
-      <div class="card">
-        <div class="card-body">
-          <div class="alert" id="profile-alert" hidden></div>
+    <div class="waf-page-stack" id="profile-page">
+      <div class="alert" id="profile-alert" hidden></div>
 
-          <div class="profile-overview card nested-card">
-            <div class="card-header">
-              <div>
-                <h3>${escapeHtml(ctx.t("profile.title"))}</h3>
-                <p class="muted">${escapeHtml(ctx.t("profile.subtitle"))}</p>
-              </div>
-            </div>
-            <div class="card-body profile-overview-grid">
-              <div><span class="muted">${escapeHtml(ctx.t("profile.field.username"))}</span><strong id="profile-username">-</strong></div>
-              <div><span class="muted">${escapeHtml(ctx.t("profile.fullName"))}</span><strong id="profile-fullname">-</strong></div>
-              <div><span class="muted">${escapeHtml(ctx.t("profile.department"))}</span><strong id="profile-department">-</strong></div>
-              <div><span class="muted">${escapeHtml(ctx.t("profile.position"))}</span><strong id="profile-position">-</strong></div>
-              <div><span class="muted">${escapeHtml(ctx.t("profile.sessionStarted"))}</span><strong id="profile-session-start">-</strong></div>
-              <div><span class="muted">${escapeHtml(ctx.t("profile.sessionExpires"))}</span><strong id="profile-session-expire">-</strong></div>
-              <div><span class="muted">${escapeHtml(ctx.t("profile.lastLoginIp"))}</span><strong id="profile-last-login-ip">-</strong></div>
-              <div><span class="muted">${escapeHtml(ctx.t("profile.trustedIp"))}</span><strong id="profile-trusted-ip">-</strong></div>
-            </div>
+      <section class="waf-card">
+        <div class="waf-card-head">
+          <div>
+            <h3>${escapeHtml(ctx.t("profile.title"))}</h3>
+            <div class="muted">${escapeHtml(ctx.t("profile.subtitle"))}</div>
           </div>
-
-          <div class="card nested-card" id="password-change-card">
-            <div class="card-header">
-              <div>
-                <h3>${escapeHtml(ctx.t("accounts.passwordChange"))}</h3>
-                <p class="muted" id="password-last-changed"></p>
+        </div>
+        <div class="waf-card-body waf-stack">
+          <div class="waf-grid two profile-overview-grid">
+            <div class="waf-list-item profile-overview-item">
+              <div class="profile-overview-inline-row">
+                <span class="profile-overview-label">${escapeHtml(ctx.t("profile.field.username"))}:</span>
+                <strong id="profile-username">-</strong>
               </div>
             </div>
-            <div class="card-body">
-              <form id="password-change-form" class="form-grid two-column profile-password-grid">
-                <div class="form-field required">
-                  <label>${escapeHtml(ctx.t("accounts.currentPassword"))}</label>
-                  <input type="password" name="current_password" autocomplete="current-password" required>
-                </div>
-                <div class="form-field required">
-                  <label>${escapeHtml(ctx.t("accounts.newPassword"))}</label>
-                  <input type="password" name="password" autocomplete="new-password" required>
-                </div>
-                <div class="form-field required">
-                  <label>${escapeHtml(ctx.t("accounts.passwordConfirm"))}</label>
-                  <input type="password" name="password_confirm" autocomplete="new-password" required>
-                </div>
-                <div class="form-actions profile-password-actions">
-                  <button type="submit" class="btn primary btn-sm">${escapeHtml(ctx.t("accounts.passwordChange"))}</button>
-                </div>
-              </form>
-            </div>
-          </div>
-
-          <div class="profile-security-row">
-            <div class="card nested-card" id="twofa-card">
-              <div class="card-header">
-                <div>
-                  <h3>${escapeHtml(ctx.t("auth.2fa.title"))}</h3>
-                  <p class="muted">${escapeHtml(ctx.t("auth.2fa.subtitle"))}</p>
-                </div>
-                <div class="icon-actions">
-                  <button class="btn primary" id="twofa-enable-btn">${escapeHtml(ctx.t("auth.2fa.enable"))}</button>
-                  <button class="btn ghost danger" id="twofa-disable-btn" hidden>${escapeHtml(ctx.t("auth.2fa.disable"))}</button>
-                </div>
-              </div>
-              <div class="card-body">
-                <div class="muted" id="twofa-status-text">${escapeHtml(ctx.t("auth.2fa.status.unknown"))}</div>
-                <div class="muted small" id="twofa-recovery-remaining" hidden></div>
+            <div class="waf-list-item profile-overview-item">
+              <div class="profile-overview-inline-row">
+                <span class="profile-overview-label">${escapeHtml(ctx.t("profile.fullName"))}:</span>
+                <strong id="profile-fullname">-</strong>
               </div>
             </div>
-
-            <div class="card nested-card" id="passkeys-card">
-              <div class="card-header">
-                <div>
-                  <h3>${escapeHtml(ctx.t("auth.passkeys.title"))}</h3>
-                  <p class="muted">${escapeHtml(ctx.t("auth.passkeys.subtitle"))}</p>
-                </div>
-                <div class="icon-actions">
-                  <button class="btn primary" id="passkeys-add-btn">${escapeHtml(ctx.t("auth.passkeys.add"))}</button>
-                </div>
+            <div class="waf-list-item profile-overview-item">
+              <div class="profile-overview-inline-row">
+                <span class="profile-overview-label">${escapeHtml(ctx.t("profile.department"))}:</span>
+                <strong id="profile-department">-</strong>
               </div>
-              <div class="card-body">
-                <div class="muted" id="passkeys-status-text">${escapeHtml(ctx.t("auth.passkeys.status.loading"))}</div>
-                <div class="muted small" id="passkeys-unsupported" hidden>${escapeHtml(ctx.t("auth.passkeys.unsupported"))}</div>
-                <div class="table-wrap" id="passkeys-table-wrap" hidden>
-                  <table class="table">
-                    <thead>
-                      <tr>
-                        <th>${escapeHtml(ctx.t("auth.passkeys.table.name"))}</th>
-                        <th>${escapeHtml(ctx.t("auth.passkeys.table.created"))}</th>
-                        <th>${escapeHtml(ctx.t("auth.passkeys.table.lastUsed"))}</th>
-                        <th></th>
-                      </tr>
-                    </thead>
-                    <tbody id="passkeys-table-body"></tbody>
-                  </table>
-                </div>
+            </div>
+            <div class="waf-list-item profile-overview-item">
+              <div class="profile-overview-inline-row">
+                <span class="profile-overview-label">${escapeHtml(ctx.t("profile.position"))}:</span>
+                <strong id="profile-position">-</strong>
+              </div>
+            </div>
+            <div class="waf-list-item profile-overview-item">
+              <div class="profile-overview-inline-row">
+                <span class="profile-overview-label">${escapeHtml(ctx.t("profile.sessionStarted"))}:</span>
+                <strong id="profile-session-start">-</strong>
+              </div>
+            </div>
+            <div class="waf-list-item profile-overview-item">
+              <div class="profile-overview-inline-row">
+                <span class="profile-overview-label">${escapeHtml(ctx.t("profile.sessionExpires"))}:</span>
+                <strong id="profile-session-expire">-</strong>
+              </div>
+            </div>
+            <div class="waf-list-item profile-overview-item">
+              <div class="profile-overview-inline-row">
+                <span class="profile-overview-label">${escapeHtml(ctx.t("profile.lastLoginIp"))}:</span>
+                <strong id="profile-last-login-ip">-</strong>
+              </div>
+            </div>
+            <div class="waf-list-item profile-overview-item">
+              <div class="profile-overview-inline-row">
+                <span class="profile-overview-label">${escapeHtml(ctx.t("profile.trustedIp"))}:</span>
+                <strong id="profile-trusted-ip">-</strong>
               </div>
             </div>
           </div>
+        </div>
+      </section>
 
-          <form id="settings-form" class="settings-form card nested-card">
-            <div class="card-header">
-              <div>
-                <h3>${escapeHtml(ctx.t("settings.language"))}</h3>
-                <p class="muted">${escapeHtml(ctx.t("settings.languageHint"))}</p>
+      <section class="waf-card" id="password-change-card">
+        <div class="waf-card-head">
+          <div>
+            <h3>${escapeHtml(ctx.t("accounts.passwordChange"))}</h3>
+            <div class="muted" id="password-last-changed"></div>
+          </div>
+        </div>
+        <div class="waf-card-body waf-stack">
+          <form id="password-change-form" class="waf-form">
+            <div class="waf-form-grid two profile-password-grid">
+              <div class="waf-field required">
+                <label>${escapeHtml(ctx.t("accounts.currentPassword"))}</label>
+                <input type="password" name="current_password" autocomplete="current-password" required>
+              </div>
+              <div class="waf-field required">
+                <label>${escapeHtml(ctx.t("accounts.newPassword"))}</label>
+                <input type="password" name="password" autocomplete="new-password" required>
+              </div>
+              <div class="waf-field required">
+                <label>${escapeHtml(ctx.t("accounts.passwordConfirm"))}</label>
+                <input type="password" name="password_confirm" autocomplete="new-password" required>
               </div>
             </div>
-            <div class="card-body">
-              <div class="form-grid two-column">
-                <div class="form-field">
+            <div class="waf-actions profile-actions-row">
+              <button type="submit" class="btn primary btn-sm">${escapeHtml(ctx.t("accounts.passwordChange"))}</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <div class="waf-grid two profile-security-row">
+        <section class="waf-card" id="twofa-card">
+          <div class="waf-card-head">
+            <div>
+              <h3>${escapeHtml(ctx.t("auth.2fa.title"))}</h3>
+              <div class="muted">${escapeHtml(ctx.t("auth.2fa.subtitle"))}</div>
+            </div>
+            <div class="waf-actions">
+              <button class="btn primary btn-sm" id="twofa-enable-btn">${escapeHtml(ctx.t("auth.2fa.enable"))}</button>
+              <button class="btn ghost danger btn-sm" id="twofa-disable-btn" hidden>${escapeHtml(ctx.t("auth.2fa.disable"))}</button>
+            </div>
+          </div>
+          <div class="waf-card-body waf-stack">
+            <div class="waf-note" id="twofa-status-text">${escapeHtml(ctx.t("auth.2fa.status.unknown"))}</div>
+            <div class="waf-note" id="twofa-recovery-remaining" hidden></div>
+          </div>
+        </section>
+
+        <section class="waf-card" id="passkeys-card">
+          <div class="waf-card-head">
+            <div>
+              <h3>${escapeHtml(ctx.t("auth.passkeys.title"))}</h3>
+              <div class="muted">${escapeHtml(ctx.t("auth.passkeys.subtitle"))}</div>
+            </div>
+            <div class="waf-actions">
+              <button class="btn primary btn-sm" id="passkeys-add-btn">${escapeHtml(ctx.t("auth.passkeys.add"))}</button>
+            </div>
+          </div>
+          <div class="waf-card-body waf-stack">
+            <div class="waf-note" id="passkeys-status-text">${escapeHtml(ctx.t("auth.passkeys.status.loading"))}</div>
+            <div class="waf-note" id="passkeys-unsupported" hidden>${escapeHtml(ctx.t("auth.passkeys.unsupported"))}</div>
+            <div class="waf-table-wrap" id="passkeys-table-wrap" hidden>
+              <table class="waf-table">
+                <thead>
+                  <tr>
+                    <th>${escapeHtml(ctx.t("auth.passkeys.table.name"))}</th>
+                    <th>${escapeHtml(ctx.t("auth.passkeys.table.created"))}</th>
+                    <th>${escapeHtml(ctx.t("auth.passkeys.table.lastUsed"))}</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="passkeys-table-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <section class="waf-card">
+        <div class="waf-card-head">
+          <div>
+            <h3>${escapeHtml(ctx.t("settings.language"))}</h3>
+            <div class="muted">${escapeHtml(ctx.t("settings.languageHint"))}</div>
+          </div>
+        </div>
+        <div class="waf-card-body waf-stack">
+          <form id="settings-form" class="waf-form">
+            <div class="waf-grid two">
+              <div class="waf-list-item">
+                <div class="waf-list-head">
+                  <div class="waf-list-title">${escapeHtml(ctx.t("settings.language"))}</div>
+                </div>
+                <div class="waf-field">
                   <label for="settings-language">${escapeHtml(ctx.t("settings.language"))}</label>
                   <select id="settings-language" name="language">
                     <option value="ru">RU</option>
                     <option value="en">EN</option>
                   </select>
                 </div>
-                <div class="form-field">
+              </div>
+              <div class="waf-list-item">
+                <div class="waf-list-head">
+                  <div class="waf-list-title">${escapeHtml(ctx.t("settings.timezone.label"))}</div>
+                </div>
+                <div class="waf-field">
                   <label for="settings-timezone">${escapeHtml(ctx.t("settings.timezone.label"))}</label>
                   <select id="settings-timezone" class="select"></select>
                 </div>
               </div>
-              <div class="settings-section">
-                <h3>${escapeHtml(ctx.t("settings.general"))}</h3>
-                <div class="checkbox-list">
-                  <label class="checkbox">
-                    <input type="checkbox" id="settings-auto-logout">
-                    <span>${escapeHtml(ctx.t("settings.autoLogout"))}</span>
-                  </label>
-                </div>
-              </div>
             </div>
-            <div class="form-actions">
-              <button type="submit" class="btn primary">${escapeHtml(ctx.t("common.save"))}</button>
+            <div class="waf-list-item">
+              <div class="waf-list-head">
+                <div class="waf-list-title">${escapeHtml(ctx.t("settings.general"))}</div>
+              </div>
+              <label class="waf-checkbox">
+                <input type="checkbox" id="settings-auto-logout">
+                <span>${escapeHtml(ctx.t("settings.autoLogout"))}</span>
+              </label>
+            </div>
+            <div class="waf-actions profile-actions-row">
+              <button type="submit" class="btn primary btn-sm">${escapeHtml(ctx.t("common.save"))}</button>
             </div>
           </form>
         </div>
-      </div>
+      </section>
 
       <div class="modal" id="twofa-setup-modal" hidden>
         <div class="modal-backdrop" data-close="#twofa-setup-modal"></div>

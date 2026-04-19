@@ -68,3 +68,37 @@ func TestStore_PruneByCountAndAge(t *testing.T) {
 		t.Fatalf("unexpected retained events: %+v", items)
 	}
 }
+
+func TestStore_DeleteByTypes(t *testing.T) {
+	store, err := NewStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+
+	inputs := []Event{
+		{ID: "evt-1", Type: TypeApplyStarted, Severity: SeverityInfo, SourceComponent: "apply-runner", OccurredAt: "2026-04-01T10:00:00Z", Summary: "started"},
+		{ID: "evt-2", Type: TypeApplySucceeded, Severity: SeverityInfo, SourceComponent: "apply-runner", OccurredAt: "2026-04-01T10:01:00Z", Summary: "succeeded"},
+		{ID: "evt-3", Type: TypeSecurityWAF, Severity: SeverityWarning, SourceComponent: "runtime", OccurredAt: "2026-04-01T10:02:00Z", Summary: "waf"},
+	}
+	for _, item := range inputs {
+		if _, err := store.Create(item); err != nil {
+			t.Fatalf("create failed: %v", err)
+		}
+	}
+
+	deleted, err := store.DeleteByTypes([]Type{TypeApplyStarted, TypeApplySucceeded})
+	if err != nil {
+		t.Fatalf("delete by types failed: %v", err)
+	}
+	if deleted != 2 {
+		t.Fatalf("expected 2 deleted events, got %d", deleted)
+	}
+
+	items, err := store.List()
+	if err != nil {
+		t.Fatalf("list failed: %v", err)
+	}
+	if len(items) != 1 || items[0].Type != TypeSecurityWAF {
+		t.Fatalf("unexpected retained items: %+v", items)
+	}
+}

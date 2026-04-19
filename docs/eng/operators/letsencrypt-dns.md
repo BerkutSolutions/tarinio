@@ -1,33 +1,46 @@
 # Let's Encrypt DNS-01 Operations
 
-Date: `2026-04-04`
+This document describes the DNS-01 certificate issuance flow and the operational checks around it.
 
-This document describes DNS-01 certificate issuance flow and operational checks.
+## Scope
 
-## 1. Scope
+DNS-01:
 
-Let's Encrypt DNS-01:
 - validates domain ownership through DNS TXT records;
-- affects certificate issuance/renewal lifecycle;
-- does not change or update OWASP CRS by itself.
+- affects certificate issuance and renewal lifecycle;
+- does not update OWASP CRS or WAF behavior by itself.
 
-## 2. Typical flow
+## Typical Flow
 
-1. Configure DNS provider credentials (for example Cloudflare API token).
-2. Start certificate issuance from UI/certificate workflow.
-3. Ensure TXT challenge records are created and propagated.
-4. Confirm certificate material is issued and bound to target site.
-5. Apply revision and validate HTTPS endpoint.
+1. Configure DNS provider credentials such as a Cloudflare API token.
+2. Start certificate issuance from the TLS workflow.
+3. Verify that TXT challenge records are created and have propagated.
+4. Confirm that certificate materials are issued and bound to the target site.
+5. Apply the resulting runtime configuration and validate the HTTPS endpoint.
 
-## 3. Operational checks
+## Runtime And Control-Plane Expectations
 
-- runtime has access to control-plane challenge/material directories;
-- certificate appears in control-plane state and is referenced by TLS config;
-- target host serves expected certificate chain after apply.
+- runtime must have access to the challenge and certificate material paths it needs;
+- the certificate should appear in control-plane state;
+- the site should reference it through TLS config;
+- after apply, the host should present the expected certificate chain.
 
-## 4. Recommended sequence with WAF operations
+## Recommended Sequence With Other Security Operations
 
 1. Validate DNS-01 certificate health.
 2. Validate site TLS binding and host routing.
-3. Perform OWASP CRS dry-run/update separately from the `OWASP CRS` page.
-4. Run XSS smoke checks after CRS update.
+3. Perform OWASP CRS checks or updates separately from the `OWASP CRS` page.
+4. Run HTTP/TLS smoke validation after certificate issuance or renewal.
+
+## Operational Notes
+
+- treat DNS provider tokens as secrets;
+- document resolver, propagation, and provider-specific requirements;
+- validate renewal before the expiration window becomes critical;
+- keep a known-good fallback path for certificate import when ACME automation is not sufficient.
+
+## Related Documents
+
+- `docs/eng/ui.md`
+- `docs/eng/runbook.md`
+- `docs/eng/security.md`

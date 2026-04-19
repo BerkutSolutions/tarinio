@@ -108,6 +108,22 @@ func (s *Store) GetSession(id string) (Session, bool, error) {
 	return Session{}, false, nil
 }
 
+func (s *Store) Count() (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	current, err := s.loadLocked()
+	if err != nil {
+		return 0, err
+	}
+	now := time.Now().UTC()
+	pruneExpired(current, now)
+	if err := s.saveLocked(current); err != nil {
+		return 0, err
+	}
+	return len(current.Sessions), nil
+}
+
 func (s *Store) TouchSession(id string, ttl time.Duration) (Session, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -149,6 +165,35 @@ func (s *Store) DeleteSession(id string) error {
 		if item.ID != strings.TrimSpace(id) {
 			filtered = append(filtered, item)
 		}
+	}
+	current.Sessions = filtered
+	return s.saveLocked(current)
+}
+
+func (s *Store) DeleteSessionsByUser(userID string) error {
+	return s.deleteSessionsByUser(userID, "")
+}
+
+func (s *Store) DeleteSessionsByUserExcept(userID, exceptSessionID string) error {
+	return s.deleteSessionsByUser(userID, exceptSessionID)
+}
+
+func (s *Store) deleteSessionsByUser(userID, exceptSessionID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	current, err := s.loadLocked()
+	if err != nil {
+		return err
+	}
+	normalizedUserID := normalize(userID)
+	trimmedExceptSessionID := strings.TrimSpace(exceptSessionID)
+	filtered := current.Sessions[:0]
+	for _, item := range current.Sessions {
+		if item.UserID == normalizedUserID && item.ID != trimmedExceptSessionID {
+			continue
+		}
+		filtered = append(filtered, item)
 	}
 	current.Sessions = filtered
 	return s.saveLocked(current)

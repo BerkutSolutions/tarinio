@@ -70,8 +70,8 @@ func TestRenderEasyArtifacts_GeneratesSiteAndAuthBasicFiles(t *testing.T) {
 	if !strings.Contains(siteConf, "auth_basic \"Restricted area\";") {
 		t.Fatalf("expected auth_basic realm, got: %s", siteConf)
 	}
-	if !strings.Contains(siteConf, "if ($request_uri = \"/challenge\") { set $waf_antibot_verified 1; }") {
-		t.Fatalf("expected antibot challenge uri rule, got: %s", siteConf)
+	if !strings.Contains(siteConf, "if ($cookie_waf_antibot_") {
+		t.Fatalf("expected site-scoped antibot cookie rule, got: %s", siteConf)
 	}
 	if !strings.Contains(siteConf, "if ($waf_allow_bypass_site_a = 1)") {
 		t.Fatalf("expected allowlist bypass guard in easy template, got: %s", siteConf)

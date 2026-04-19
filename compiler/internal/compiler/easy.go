@@ -44,6 +44,8 @@ type easySiteData struct {
 	AntibotEnabled       bool
 	AntibotChallenge     string
 	AntibotURI           string
+	AntibotCookieName    string
+	AntibotCookieValue   string
 	AntibotRecaptchaHint string
 	AntibotHcaptchaHint  string
 	AntibotTurnstileHint string
@@ -219,6 +221,8 @@ func RenderEasyArtifacts(sites []SiteInput, profiles []EasyProfileInput) ([]Arti
 			AntibotEnabled:               profile.AntibotChallenge != "" && profile.AntibotChallenge != "no",
 			AntibotChallenge:             profile.AntibotChallenge,
 			AntibotURI:                   profile.AntibotURI,
+			AntibotCookieName:            antibotCookieName(site.ID),
+			AntibotCookieValue:           antibotCookieValue(site.ID, profile),
 			AntibotRecaptchaHint:         strings.TrimSpace(profile.AntibotRecaptchaKey),
 			AntibotHcaptchaHint:          strings.TrimSpace(profile.AntibotHcaptchaKey),
 			AntibotTurnstileHint:         strings.TrimSpace(profile.AntibotTurnstileKey),
@@ -311,6 +315,26 @@ func rateLimitBanSeconds(profile EasyProfileInput) int {
 		}
 	}
 	return 0
+}
+
+func antibotCookieName(siteID string) string {
+	return "waf_antibot_" + shortStableHash(siteID)
+}
+
+func antibotCookieValue(siteID string, profile EasyProfileInput) string {
+	return shortStableHash(strings.Join([]string{
+		siteID,
+		profile.AntibotChallenge,
+		profile.AntibotURI,
+		profile.AntibotRecaptchaKey,
+		profile.AntibotHcaptchaKey,
+		profile.AntibotTurnstileKey,
+	}, "|"))
+}
+
+func shortStableHash(value string) string {
+	sum := sha1.Sum([]byte(strings.TrimSpace(value)))
+	return fmt.Sprintf("%x", sum[:6])
 }
 
 func rateLimitCookieVar(siteID string) string {

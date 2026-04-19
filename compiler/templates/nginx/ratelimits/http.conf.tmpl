@@ -7,7 +7,7 @@ geo ${{ .ExceptionVar }} {
 }
 map ${{ .ExceptionVar }} ${{ .KeyVar }} {
     default $binary_remote_addr;
-    1 "";
+    1 "${binary_remote_addr}:allow";
 }
 {{- end }}
 {{- range .Entries }}

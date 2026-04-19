@@ -1,57 +1,56 @@
-# OWASP CRS Operations
+# Эксплуатация OWASP CRS
 
-Date: `2026-04-04`
+Дата: `2026-04-04`
 
-This document explains how TARINIO manages OWASP CRS versions and service-level CRS behavior.
+Документ описывает, как TARINIO управляет версиями OWASP CRS и поведением CRS на уровне сервисов.
 
-## 1. Update model
+## Модель обновления
 
-Runtime behavior:
-- On first runtime start, TARINIO performs a one-time automatic pull of the latest OWASP CRS release from GitHub.
-- After first start, CRS is not silently auto-updated from page open.
-- Further updates are operator-driven from UI `OWASP CRS` page (manual button).
+Поведение runtime:
+- при первом старте runtime может один раз подтянуть последнюю версию CRS;
+- после этого CRS не обновляется “тихо” просто от открытия страницы;
+- дальнейшие обновления выполняются оператором вручную или по расписанию.
 
-Optional scheduled mode:
-- Operator can enable `hourly auto-update` on the `OWASP CRS` page.
-- When enabled, runtime checks once per hour and updates automatically if a newer release exists.
-- When disabled, runtime keeps the current active CRS version.
+Опциональный режим:
+- оператор может включить почасовую автопроверку и автообновление;
+- если режим выключен, runtime остаётся на текущей активной версии CRS.
 
-## 2. Runtime/API controls
+## API и управление
 
-Control-plane endpoints:
+Основные endpoints:
 - `GET /api/owasp-crs/status`
-- `POST /api/owasp-crs/check-updates` (`dry_run` support)
+- `POST /api/owasp-crs/check-updates`
 - `POST /api/owasp-crs/update`
 
-Notes:
-- `check-updates` is non-destructive and returns latest metadata.
-- `update` applies latest release and triggers runtime reload.
-- `update` accepts `enable_hourly_auto_update` to toggle periodic updates.
+Особенности:
+- `check-updates` неразрушающий, может использоваться как dry-run;
+- `update` подтягивает актуальный релиз и инициирует runtime reload;
+- `update` также принимает переключение hourly auto-update.
 
-## 3. Service-level behavior
+## Поведение на уровне сервиса
 
-Easy profile controls:
+Easy profile управляет CRS через:
 - `use_modsecurity`
 - `use_modsecurity_crs_plugins`
 - `use_modsecurity_custom_configuration`
-- `custom_configuration.path/content`
+- `custom_configuration.path`
+- `custom_configuration.content`
 
-Defaults:
-- CRS is enabled by default for Easy profiles when ModSecurity is enabled.
-- Custom configuration is optional and injected only when checkbox is enabled.
+Значения по умолчанию:
+- если ModSecurity включён, CRS обычно тоже включён;
+- custom configuration подключается только по явному флагу.
 
-Security modes:
+Режимы:
 - `block` -> `SecRuleEngine On`
 - `monitor` -> `SecRuleEngine DetectionOnly`
 - `transparent` -> `SecRuleEngine Off`
 
-## 4. Smoke validation
+## Проверка после обновления
 
-Use:
+Используйте:
 - `deploy/compose/default/test-xss.ps1`
 
-Capabilities:
-- sends 5 XSS probes (query/body/header vectors),
-- supports container mode (avoids host TLS `schannel` issues),
-- verifies CRS rules are loaded from runtime logs (`local > 0`),
-- checks blocked ratio threshold.
+Сценарий проверки должен подтвердить:
+- что CRS действительно загружен;
+- что XSS smoke-пробы отрабатывают корректно;
+- что блокировки не стали массово ложноположительными.

@@ -173,3 +173,36 @@ func TestStore_ListOrdersRevisionsByVersion(t *testing.T) {
 		t.Fatalf("unexpected order: %+v", revisions)
 	}
 }
+
+func TestStore_RecordApplyResultPersistsApplyMetadata(t *testing.T) {
+	store, err := NewStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("create store failed: %v", err)
+	}
+
+	revision := Revision{
+		ID:         "rev-001",
+		Version:    1,
+		CreatedAt:  "2026-03-31T12:00:00Z",
+		Checksum:   "abc123",
+		BundlePath: "bundles/rev-001",
+	}
+	if err := store.SavePending(revision); err != nil {
+		t.Fatalf("save pending failed: %v", err)
+	}
+
+	if err := store.RecordApplyResult("rev-001", "apply-rev-001", "succeeded", "revision applied", "2026-04-19T10:00:00Z"); err != nil {
+		t.Fatalf("record apply result failed: %v", err)
+	}
+
+	reloaded, ok, err := store.Get("rev-001")
+	if err != nil {
+		t.Fatalf("get failed: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected revision to exist")
+	}
+	if reloaded.LastApplyJobID != "apply-rev-001" || reloaded.LastApplyStatus != "succeeded" || reloaded.LastApplyResult != "revision applied" || reloaded.LastApplyAt != "2026-04-19T10:00:00Z" {
+		t.Fatalf("expected apply metadata to be persisted, got %+v", reloaded)
+	}
+}

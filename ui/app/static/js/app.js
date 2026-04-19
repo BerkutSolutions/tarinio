@@ -15,6 +15,7 @@ const icons = {
   owaspcrs: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 1 4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5l-8-4Zm0 3.2L17 6.7v4.2c0 3.8-2.2 7.2-5 8.5-2.8-1.3-5-4.7-5-8.5V6.7l5-2.5Zm-3 4.8h6v2H9v-2Zm0 4h6v2H9v-2Z"/></svg>',
   tls: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 1 4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5l-8-4Zm0 10.2a2.3 2.3 0 1 1 0 4.6 2.3 2.3 0 0 1 0-4.6Zm4 6.8H8v-1.2c0-1.8 1.8-2.8 4-2.8s4 1 4 2.8V18Z"/></svg>',
   requests: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2H3V5Zm0 4h18v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Zm4 3v2h4v-2H7Zm6 0v2h4v-2h-4Z"/></svg>',
+  revisions: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M5 3h14a2 2 0 0 1 2 2v4H3V5a2 2 0 0 1 2-2Zm-2 8h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-8Zm4 2v2h4v-2H7Zm6 0h4v2h-4v-2Zm-6 4v2h10v-2H7Z"/></svg>',
   events: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg>',
   bans: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 1 4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5l-8-4Zm0 3.2L17 6.7v4.2c0 3.8-2.2 7.2-5 8.5-2.8-1.3-5-4.7-5-8.5V6.7l5-2.5Zm-3 4.8h6v2H9V9Zm0 4h6v2H9v-2Z"/></svg>',
   administration: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.4 0-8 2.2-8 5v1h16v-1c0-2.8-3.6-5-8-5Z"/></svg>',
@@ -36,6 +37,7 @@ const sections = [
   { id: "tls", labelKey: "app.tls", descriptionKey: "app.section.tls.desc", load: () => import("./pages/tls.js").then((m) => m.renderTLS) },
   // contract marker: render: renderRequests
   { id: "requests", labelKey: "app.requests", descriptionKey: "app.section.requests.desc", load: () => import("./pages/requests.js").then((m) => m.renderRequests) },
+  { id: "revisions", labelKey: "app.revisions", descriptionKey: "app.section.revisions.desc", load: () => import("./pages/revisions.js").then((m) => m.renderRevisions) },
   { id: "events", labelKey: "app.events", descriptionKey: "app.section.events.desc", load: () => import("./pages/events.js").then((m) => m.renderEvents) },
   { id: "bans", labelKey: "app.bans", descriptionKey: "app.section.bans.desc", load: () => import("./pages/bans.js").then((m) => m.renderBans) },
   { id: "administration", labelKey: "app.administration", descriptionKey: "app.section.administration.desc", load: () => import("./pages/administration.js").then((m) => m.renderAdministration) },
@@ -43,6 +45,22 @@ const sections = [
   { id: "settings", labelKey: "app.settings", descriptionKey: "app.section.settings.desc", load: () => import("./pages/settings.js").then((m) => m.renderSettings) },
   { id: "profile", labelKey: "app.profile", descriptionKey: "app.section.profile.desc", load: () => import("./pages/profile.js").then((m) => m.renderProfile), hiddenInMenu: true },
 ];
+
+const sectionAccessRules = {
+  dashboard: ["dashboard.read"],
+  sites: ["sites.read", "sites.write"],
+  antiddos: ["antiddos.read", "antiddos.write"],
+  owaspcrs: ["owaspcrs.read", "owaspcrs.write"],
+  tls: ["tls.read", "tls.write", "certificates.read", "certificates.write"],
+  requests: ["requests.read"],
+  revisions: ["revisions.read", "revisions.write"],
+  events: ["events.read"],
+  bans: ["bans.read"],
+  administration: ["administration.read", "administration.write", "administration.users.read", "administration.roles.read"],
+  activity: ["activity.read"],
+  settings: ["settings.general.read", "settings.storage.read", "settings.about.read"],
+  profile: ["profile.read", "auth.self"],
+};
 
 let currentUser = null;
 let notificationCenter = null;
@@ -107,7 +125,7 @@ function renderMenu() {
   const menu = document.getElementById("menu");
   const active = currentSection();
   menu.innerHTML = sections
-    .filter((section) => !section.hiddenInMenu)
+    .filter((section) => !section.hiddenInMenu && canAccessSection(section.id))
     .map((section) => `
       <a class="sidebar-link ${section.id === active.id ? "active" : ""}" href="${sectionPath(section)}" data-path="${section.id}" title="${t(section.labelKey)}">
         <span class="sidebar-link-icon">${icons[section.id] || ""}</span>
@@ -124,6 +142,23 @@ function renderRBAC(user) {
   }
   badge.hidden = true;
   badge.textContent = "";
+}
+
+function currentPermissionSet() {
+  return new Set(Array.isArray(currentUser?.permissions) ? currentUser.permissions.map((item) => String(item || "").trim()) : []);
+}
+
+function canAccessSection(sectionID) {
+  const required = sectionAccessRules[sectionID];
+  if (!required || !required.length) {
+    return true;
+  }
+  const permissions = currentPermissionSet();
+  return required.some((permission) => permissions.has(permission));
+}
+
+function firstAccessibleSection() {
+  return sections.find((section) => !section.hiddenInMenu && canAccessSection(section.id)) || sections.find((section) => section.id === "profile") || sections[0];
 }
 
 function setVersion(value) {
@@ -168,7 +203,11 @@ async function loadUser() {
 }
 
 async function renderPage() {
-  const section = currentSection();
+  let section = currentSection();
+  if (!canAccessSection(section.id)) {
+    section = firstAccessibleSection();
+    navigate(sectionPath(section), { replaceHistory: true });
+  }
   const container = document.getElementById("content-area");
   const renderID = ++activePageRenderID;
   if (activePageAbortController) {
@@ -448,7 +487,7 @@ async function loadMeta() {
     }
     renderUpdateBadge(meta);
   } catch {
-    setVersion("v1.1.21");
+    setVersion("v2.0.0");
     renderUpdateBadge(null);
   }
 }
@@ -479,7 +518,7 @@ function startSessionPing() {
 
 async function bootstrap() {
   await applyTranslations(getLanguage());
-  setVersion("v1.1.21");
+  setVersion("v2.0.0");
 
   const access = await checkEntryAccess("app");
   if (!access.allowed) {

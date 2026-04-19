@@ -73,12 +73,24 @@ func (s *Store) PermissionsForRoleIDs(roleIDs []string) []rbac.Permission {
 	}
 	set := map[rbac.Permission]struct{}{}
 	for _, roleID := range roleIDs {
-		role, ok := byID[rbac.NormalizeRoleID(roleID)]
+		normalizedID := rbac.NormalizeRoleID(roleID)
+		role, ok := byID[normalizedID]
 		if !ok {
+			if normalizedID != "admin" {
+				continue
+			}
+			for _, permission := range rbac.AllPermissions() {
+				set[permission] = struct{}{}
+			}
 			continue
 		}
 		for _, permission := range role.Permissions {
 			set[permission] = struct{}{}
+		}
+		if normalizedID == "admin" {
+			for _, permission := range rbac.AllPermissions() {
+				set[permission] = struct{}{}
+			}
 		}
 	}
 	out := make([]rbac.Permission, 0, len(set))
@@ -87,6 +99,81 @@ func (s *Store) PermissionsForRoleIDs(roleIDs []string) []rbac.Permission {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
 	return out
+}
+
+func (s *Store) Create(role Role) (Role, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	current, err := s.loadLocked()
+	if err != nil {
+		return Role{}, err
+	}
+	role, err = normalizeRole(role)
+	if err != nil {
+		return Role{}, err
+	}
+	for _, item := range current.Roles {
+		if item.ID == role.ID {
+			return Role{}, fmt.Errorf("role %s already exists", role.ID)
+		}
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	role.CreatedAt = now
+	role.UpdatedAt = now
+	current.Roles = append(current.Roles, role)
+	sortRoles(current.Roles)
+	if err := s.saveLocked(current); err != nil {
+		return Role{}, err
+	}
+	return role, nil
+}
+
+func (s *Store) Update(role Role) (Role, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	current, err := s.loadLocked()
+	if err != nil {
+		return Role{}, err
+	}
+	role, err = normalizeRole(role)
+	if err != nil {
+		return Role{}, err
+	}
+	for i := range current.Roles {
+		if current.Roles[i].ID != role.ID {
+			continue
+		}
+		role.CreatedAt = current.Roles[i].CreatedAt
+		role.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+		current.Roles[i] = role
+		sortRoles(current.Roles)
+		if err := s.saveLocked(current); err != nil {
+			return Role{}, err
+		}
+		return role, nil
+	}
+	return Role{}, fmt.Errorf("role %s not found", role.ID)
+}
+
+func (s *Store) Delete(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	current, err := s.loadLocked()
+	if err != nil {
+		return err
+	}
+	normalizedID := rbac.NormalizeRoleID(id)
+	for i := range current.Roles {
+		if current.Roles[i].ID != normalizedID {
+			continue
+		}
+		current.Roles = append(current.Roles[:i], current.Roles[i+1:]...)
+		return s.saveLocked(current)
+	}
+	return fmt.Errorf("role %s not found", normalizedID)
 }
 
 func (s *Store) List() ([]Role, error) {
@@ -110,21 +197,40 @@ func (s *Store) seedDefaults() error {
 	if err != nil {
 		return err
 	}
-	if len(current.Roles) > 0 {
-		return nil
-	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	defaults := rbac.DefaultRolePermissions()
-	for _, roleID := range []string{"admin", "operator", "viewer"} {
+	updated := false
+	for _, definition := range rbac.DefaultRoleDefinitions() {
+		found := false
+		for i := range current.Roles {
+			if current.Roles[i].ID != definition.ID {
+				continue
+			}
+			found = true
+			mergedPermissions := mergePermissions(current.Roles[i].Permissions, definition.Permissions)
+			if current.Roles[i].Name != definition.Name || !equalPermissions(current.Roles[i].Permissions, mergedPermissions) {
+				current.Roles[i].Name = definition.Name
+				current.Roles[i].Permissions = mergedPermissions
+				current.Roles[i].UpdatedAt = now
+				updated = true
+			}
+			break
+		}
+		if found {
+			continue
+		}
+		updated = true
 		current.Roles = append(current.Roles, Role{
-			ID:          roleID,
-			Name:        roleID,
-			Permissions: rbac.SortedPermissions(defaults[roleID]),
+			ID:          definition.ID,
+			Name:        definition.Name,
+			Permissions: rbac.SortedPermissions(definition.Permissions),
 			CreatedAt:   now,
 			UpdatedAt:   now,
 		})
 	}
 	sortRoles(current.Roles)
+	if !updated {
+		return nil
+	}
 	return s.saveLocked(current)
 }
 
@@ -158,4 +264,60 @@ func (s *Store) saveLocked(current *state) error {
 
 func sortRoles(items []Role) {
 	sort.Slice(items, func(i, j int) bool { return items[i].ID < items[j].ID })
+}
+
+func normalizeRole(role Role) (Role, error) {
+	role.ID = rbac.NormalizeRoleID(role.ID)
+	role.Name = strings.TrimSpace(role.Name)
+	if role.ID == "" {
+		return Role{}, errors.New("role id is required")
+	}
+	if role.Name == "" {
+		role.Name = role.ID
+	}
+	role.Permissions = rbac.SortedPermissions(role.Permissions)
+	for _, permission := range role.Permissions {
+		if !rbac.IsKnownPermission(permission) {
+			return Role{}, fmt.Errorf("unknown permission %s", permission)
+		}
+	}
+	if role.ID == "admin" {
+		role.Permissions = rbac.SortedPermissions(rbac.AllPermissions())
+	}
+	return role, nil
+}
+
+func mergePermissions(current []rbac.Permission, required []rbac.Permission) []rbac.Permission {
+	merged := make([]rbac.Permission, 0, len(current)+len(required))
+	seen := make(map[rbac.Permission]struct{}, len(current)+len(required))
+	for _, permission := range current {
+		if !rbac.IsKnownPermission(permission) {
+			continue
+		}
+		if _, ok := seen[permission]; ok {
+			continue
+		}
+		seen[permission] = struct{}{}
+		merged = append(merged, permission)
+	}
+	for _, permission := range required {
+		if _, ok := seen[permission]; ok {
+			continue
+		}
+		seen[permission] = struct{}{}
+		merged = append(merged, permission)
+	}
+	return rbac.SortedPermissions(merged)
+}
+
+func equalPermissions(left []rbac.Permission, right []rbac.Permission) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for i := range left {
+		if left[i] != right[i] {
+			return false
+		}
+	}
+	return true
 }

@@ -13,6 +13,7 @@ services:
       CONTROL_PLANE_REDIS_ADDR: redis:6379
       WAF_RUNTIME_HEALTH_URL: http://runtime:8081/readyz
       WAF_RUNTIME_RELOAD_URL: http://runtime:8081/reload
+      WAF_RUNTIME_API_TOKEN: ${WAF_RUNTIME_API_TOKEN:-default-runtime-shared-token}
       WAF_DEFAULT_BAD_BEHAVIOR_BAN_TIME_SECONDS: ${WAF_DEFAULT_BAD_BEHAVIOR_BAN_TIME_SECONDS:-300}
       WAF_DEFAULT_BAD_BEHAVIOR_THRESHOLD: ${WAF_DEFAULT_BAD_BEHAVIOR_THRESHOLD:-20}
       WAF_DEFAULT_BAD_BEHAVIOR_COUNT_TIME_SECONDS: ${WAF_DEFAULT_BAD_BEHAVIOR_COUNT_TIME_SECONDS:-30}
@@ -79,6 +80,7 @@ services:
     environment:
       WAF_RUNTIME_ROOT: /var/lib/waf
       WAF_RUNTIME_HEALTH_ADDR: 0.0.0.0:8081
+      WAF_RUNTIME_API_TOKEN: ${WAF_RUNTIME_API_TOKEN:-default-runtime-shared-token}
       # L4 thresholds are sourced from runtime bundle (/etc/waf/l4guard/config.json),
       # compiled from control-plane anti-DDoS settings.
       WAF_L4_GUARD_ADAPTIVE_PATH: /etc/waf/l4guard-adaptive/adaptive.json

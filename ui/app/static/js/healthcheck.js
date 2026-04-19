@@ -6,7 +6,7 @@ const MIN_STEP_MS = 150;
 const CHECKS_CONCURRENCY = 4;
 const PROBE_TIMEOUT_MS = 8000;
 const PROBE_SLOW_MS = 2500;
-const CONTRACT_VERSION = "2026-04-08-healthcheck-v2";
+const CONTRACT_VERSION = "2026-04-19-healthcheck-v3";
 
 function todayDateKeyLocal() {
   const now = new Date();
@@ -19,13 +19,14 @@ function todayDateKeyLocal() {
 const TAB_PROBES = [
   { id: "tab.dashboard", titleKey: "healthcheck.tab.dashboard", path: "/api/dashboard/stats?probe=stats" },
   { id: "tab.sites", titleKey: "healthcheck.tab.sites", path: "/api/sites" },
+  { id: "tab.revisions", titleKey: "healthcheck.tab.revisions", path: "/api/revisions" },
   { id: "tab.antiddos", titleKey: "healthcheck.tab.antiddos", path: "/api/anti-ddos/settings" },
   { id: "tab.owaspcrs", titleKey: "healthcheck.tab.owaspcrs", path: "/api/owasp-crs/status" },
   { id: "tab.tls", titleKey: "healthcheck.tab.tls", path: "/api/certificates" },
   { id: "tab.requests", titleKey: "healthcheck.tab.requests", path: () => `/api/dashboard/stats?probe=requests&day=${encodeURIComponent(todayDateKeyLocal())}` },
   { id: "tab.events", titleKey: "healthcheck.tab.events", path: "/api/dashboard/stats?probe=events" },
   { id: "tab.bans", titleKey: "healthcheck.tab.bans", path: "/api/sites" },
-  { id: "tab.administration", titleKey: "healthcheck.tab.administration", path: "/api/audit?limit=1" },
+  { id: "tab.administration", titleKey: "healthcheck.tab.administration", path: "/api/administration/zero-trust/health" },
   { id: "tab.activity", titleKey: "healthcheck.tab.activity", path: "/api/audit?limit=1" },
   { id: "tab.settings", titleKey: "healthcheck.tab.settings", path: "/api/settings/runtime" },
   { id: "tab.profile", titleKey: "healthcheck.tab.profile", path: "/api/auth/me" },

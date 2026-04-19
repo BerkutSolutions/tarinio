@@ -1,44 +1,102 @@
-# Deploy (EN)
+# TARINIO 2.0.0 Deployment
 
-Documentation baseline: `1.1.8`
+Wiki baseline: `2.0.0`
 
-## AIO Quick Start (one command)
+This document describes practical deployment paths for TARINIO across local, test, and production-like environments.
 
-You can start the full TARINIO stack (auto-start profile) with a single command:
+## What Gets Deployed
+
+The minimal stack includes:
+
+- `control-plane`
+- `runtime`
+- `postgres`
+- related volumes, networks, and compose profile configuration
+
+Depending on the profile, additional supporting services may exist.
+
+## Deployment Options
+
+### AIO One-Command Install
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/BerkutSolutions/tarinio/main/scripts/install-aio.sh | sh
 ```
 
-By default, the script:
-- clones/updates the repo into `/opt/tarinio`
-- uses branch `main`
-- starts `deploy/compose/default`
+This path is useful for:
 
-After startup:
-- `http://<server-ip>:8080/login` (Admin UI)
-- `http://<server-ip>/` (WAF HTTP ingress)
-- `https://<server-ip>/` (WAF ingress)
+- quick proof-of-concept environments;
+- labs and test stands;
+- first contact with the product.
 
-## Manual Docker Compose run
+### Docker Compose
 
-1. Review `.env.example` and create `.env`.
-2. Start the profile:
+The main compose profile documentation lives in:
+
+- `deploy/compose/README.md`
+- `deploy/compose/default/README.md`
+- `deploy/compose/auto-start/README.md`
+
+Base startup command:
 
 ```bash
 docker compose -f deploy/compose/default/docker-compose.yml up -d --build
 ```
 
-## Notes
+## After Startup
 
-- Use `auto-start` for quick local bootstrap.
-- Use `default` for a no-switch setup (`ui` on `8080`, `runtime` on `80/443`).
-- For production, use non-default secrets and HTTPS.
+Typical post-start checks:
 
+- administrative UI: `/login`
+- health endpoint: `/healthz`
+- runtime ingress on the HTTP/HTTPS ports exposed by the profile
 
+If bootstrap has not been completed yet, the product can redirect into onboarding.
 
+## Production Checklist
 
+- use non-default secrets;
+- restrict network access to the control-plane;
+- enable HTTPS;
+- configure trusted proxies correctly;
+- ensure volume and secret backup coverage;
+- verify that retention and update-check behavior match your operational policy;
+- predefine rollback ownership and rollback order.
 
+## What To Prepare Before Production
 
+- DNS and network rules;
+- a log/event retention policy;
+- a TLS strategy: import, self-signed, ACME, or DNS-01;
+- an operator access model;
+- a backup/restore process;
+- a compile/apply/rollback operating model.
 
+## Initial Steps After Deployment
 
+1. Open `/login`.
+2. If the system is not initialized, complete onboarding.
+3. Create the first administrator.
+4. Create the first site and upstream.
+5. Configure TLS.
+6. Verify that healthcheck passes.
+7. Run the first compile/apply cycle.
+
+## What Counts As A Successful Deployment
+
+The deployment should be considered complete only when:
+
+- `/healthz` is stable;
+- login and onboarding work;
+- `GET /api/app/meta` returns `2.0.0`;
+- a site can be created and turned into a working revision;
+- runtime serves the expected host after apply;
+- events, requests, and audit entries appear in the UI.
+
+## Related Documents
+
+- `docs/eng/security.md`
+- `docs/eng/runbook.md`
+- `docs/eng/upgrade.md`
+- `docs/eng/backups.md`
+- `docs/eng/ui.md`

@@ -30,6 +30,7 @@ type Config struct {
 	ACME             ACMEConfig
 	RuntimeHealthURL string
 	RuntimeReloadURL string
+	RuntimeAPIToken  string
 	BootstrapAdmin   BootstrapAdminConfig
 	DevFastStart     DevFastStartConfig
 	Redis            redis.Config
@@ -99,6 +100,7 @@ func LoadFromEnv() (Config, error) {
 		},
 		RuntimeHealthURL: defaultRuntimeHealthURL,
 		RuntimeReloadURL: defaultRuntimeReloadURL,
+		RuntimeAPIToken:  "",
 		BootstrapAdmin: BootstrapAdminConfig{
 			Enabled:  false,
 			ID:       "admin",
@@ -184,6 +186,9 @@ func LoadFromEnv() (Config, error) {
 	}
 	if value := strings.TrimSpace(os.Getenv("WAF_RUNTIME_RELOAD_URL")); value != "" {
 		cfg.RuntimeReloadURL = value
+	}
+	if value := strings.TrimSpace(os.Getenv("WAF_RUNTIME_API_TOKEN")); value != "" {
+		cfg.RuntimeAPIToken = value
 	}
 	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_BOOTSTRAP_ADMIN_ID")); value != "" {
 		cfg.BootstrapAdmin.ID = value

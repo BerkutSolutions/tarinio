@@ -32,38 +32,54 @@ function renderStatusCard(status, ctx, uiState) {
   const busy = pendingAction !== "";
   const canSaveHourly = !busy && hourlyAuto !== currentHourlyAuto;
   return `
-    <div class="waf-subcard waf-stack">
-      <div class="waf-crs-status-head">
-        <div class="waf-list-title">${escapeHtml(ctx.t("owaspCrs.status.title"))}</div>
-        ${releaseURL ? `<a class="btn ghost btn-sm waf-crs-release-link" href="${escapeHtml(releaseURL)}" target="_blank" rel="noopener noreferrer">${escapeHtml(ctx.t("owaspCrs.status.releaseLink"))}</a>` : ""}
+    <div class="waf-crs-status-head">
+      <div class="waf-list-title">${escapeHtml(ctx.t("owaspCrs.status.title"))}</div>
+      ${releaseURL ? `<a class="btn ghost btn-sm waf-crs-release-link" href="${escapeHtml(releaseURL)}" target="_blank" rel="noopener noreferrer">${escapeHtml(ctx.t("owaspCrs.status.releaseLink"))}</a>` : ""}
+    </div>
+    <div class="waf-crs-status-grid">
+      <div class="waf-crs-status-tile">
+        <span>${escapeHtml(ctx.t("owaspCrs.status.activeVersion"))}</span>
+        <strong>${escapeHtml(active)}</strong>
       </div>
-      <div class="waf-stack">
-        <div><strong>${escapeHtml(ctx.t("owaspCrs.status.activeVersion"))}</strong>: ${escapeHtml(active)}</div>
-        <div><strong>${escapeHtml(ctx.t("owaspCrs.status.latestVersion"))}</strong>: ${escapeHtml(latest)}</div>
-        <div><strong>${escapeHtml(ctx.t("owaspCrs.status.lastChecked"))}</strong>: ${escapeHtml(checkedAt)}</div>
-        <div><strong>${escapeHtml(ctx.t("owaspCrs.status.activePath"))}</strong>: <code>${escapeHtml(activePath)}</code></div>
-        <div><strong>${escapeHtml(ctx.t("owaspCrs.status.hasUpdate"))}</strong>: ${escapeHtml(ctx.t(hasUpdate ? "owaspCrs.status.yes" : "owaspCrs.status.no"))}</div>
-        <div><strong>${escapeHtml(ctx.t("owaspCrs.status.firstStart"))}</strong>: ${escapeHtml(ctx.t(firstStartPending ? "owaspCrs.status.pending" : "owaspCrs.status.done"))}</div>
+      <div class="waf-crs-status-tile">
+        <span>${escapeHtml(ctx.t("owaspCrs.status.latestVersion"))}</span>
+        <strong>${escapeHtml(latest)}</strong>
       </div>
-      ${lastError ? `<div class="alert">${escapeHtml(lastError)}</div>` : ""}
-      <div class="waf-stack">
-        <label class="waf-checkbox">
-          <input id="owasp-crs-hourly-auto" type="checkbox"${hourlyAuto ? " checked" : ""}${busy ? " disabled" : ""}>
-          <span>${escapeHtml(ctx.t("owaspCrs.hourlyAuto"))}</span>
-        </label>
-        <div class="waf-actions">
-          <button class="btn btn-sm" id="owasp-crs-save-hourly" type="button"${canSaveHourly ? "" : " disabled"}>${escapeHtml(ctx.t("owaspCrs.actions.save"))}</button>
-        </div>
+      <div class="waf-crs-status-tile">
+        <span>${escapeHtml(ctx.t("owaspCrs.status.lastChecked"))}</span>
+        <strong>${escapeHtml(checkedAt)}</strong>
       </div>
+      <div class="waf-crs-status-tile">
+        <span>${escapeHtml(ctx.t("owaspCrs.status.hasUpdate"))}</span>
+        <strong>${escapeHtml(ctx.t(hasUpdate ? "owaspCrs.status.yes" : "owaspCrs.status.no"))}</strong>
+      </div>
+      <div class="waf-crs-status-tile">
+        <span>${escapeHtml(ctx.t("owaspCrs.status.firstStart"))}</span>
+        <strong>${escapeHtml(ctx.t(firstStartPending ? "owaspCrs.status.pending" : "owaspCrs.status.done"))}</strong>
+      </div>
+      <div class="waf-crs-status-tile waf-crs-status-path">
+        <span>${escapeHtml(ctx.t("owaspCrs.status.activePath"))}</span>
+        <code>${escapeHtml(activePath)}</code>
+      </div>
+    </div>
+    ${lastError ? `<div class="alert">${escapeHtml(lastError)}</div>` : ""}
+    <div class="waf-stack">
+      <label class="waf-checkbox">
+        <input id="owasp-crs-hourly-auto" type="checkbox"${hourlyAuto ? " checked" : ""}${busy ? " disabled" : ""}>
+        <span>${escapeHtml(ctx.t("owaspCrs.hourlyAuto"))}</span>
+      </label>
       <div class="waf-actions">
-        <button class="btn ghost btn-sm" id="owasp-crs-check" type="button"${busy ? " disabled" : ""}>${escapeHtml(ctx.t("owaspCrs.actions.check"))}</button>
-        <button class="btn primary btn-sm" id="owasp-crs-update" type="button"${busy ? " disabled" : ""}>${escapeHtml(ctx.t("owaspCrs.actions.update"))}</button>
+        <button class="btn btn-sm" id="owasp-crs-save-hourly" type="button"${canSaveHourly ? "" : " disabled"}>${escapeHtml(ctx.t("owaspCrs.actions.save"))}</button>
       </div>
-      <div class="waf-crs-console-wrap">
-        <div class="waf-list-title">${escapeHtml(ctx.t("owaspCrs.console.title"))}</div>
-        <div class="waf-note">${escapeHtml(pendingAction || ctx.t("owaspCrs.console.idle"))}</div>
-        <div class="waf-crs-console">${consoleLines.length > 0 ? consoleLines.map((item) => toConsoleLine(item, ctx)).join("") : `<div class="waf-crs-console-line is-muted">${escapeHtml(ctx.t("owaspCrs.console.empty"))}</div>`}</div>
-      </div>
+    </div>
+    <div class="waf-actions">
+      <button class="btn ghost btn-sm" id="owasp-crs-check" type="button"${busy ? " disabled" : ""}>${escapeHtml(ctx.t("owaspCrs.actions.check"))}</button>
+      <button class="btn primary btn-sm" id="owasp-crs-update" type="button"${busy ? " disabled" : ""}>${escapeHtml(ctx.t("owaspCrs.actions.update"))}</button>
+    </div>
+    <div class="waf-crs-console-wrap">
+      <div class="waf-list-title">${escapeHtml(ctx.t("owaspCrs.console.title"))}</div>
+      <div class="waf-note">${escapeHtml(pendingAction || ctx.t("owaspCrs.console.idle"))}</div>
+      <div class="waf-crs-console">${consoleLines.length > 0 ? consoleLines.map((item) => toConsoleLine(item, ctx)).join("") : `<div class="waf-crs-console-line is-muted">${escapeHtml(ctx.t("owaspCrs.console.empty"))}</div>`}</div>
     </div>
   `;
 }

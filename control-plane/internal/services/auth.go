@@ -30,6 +30,9 @@ type AuthUser struct {
 	ID                     string   `json:"id"`
 	Username               string   `json:"username"`
 	Email                  string   `json:"email"`
+	FullName               string   `json:"full_name,omitempty"`
+	Department             string   `json:"department,omitempty"`
+	Position               string   `json:"position,omitempty"`
 	RoleIDs                []string `json:"role_ids"`
 	Permissions            []string `json:"permissions"`
 	TOTPEnabled            bool     `json:"totp_enabled"`
@@ -115,6 +118,8 @@ type AuthSessionStore interface {
 	GetSession(id string) (sessions.Session, bool, error)
 	TouchSession(id string, ttl time.Duration) (sessions.Session, bool, error)
 	DeleteSession(id string) error
+	DeleteSessionsByUser(userID string) error
+	DeleteSessionsByUserExcept(userID, exceptSessionID string) error
 	CreateLoginChallenge(userID string, ttl time.Duration) (sessions.LoginChallenge, error)
 	ConsumeLoginChallenge(id string) (sessions.LoginChallenge, bool, error)
 	GetLoginChallenge(id string) (sessions.LoginChallenge, bool, error)
@@ -185,7 +190,11 @@ func (s *AuthService) Login(ctx context.Context, username, password string) (res
 	if !ok || !user.IsActive {
 		return LoginResult{}, errors.New("invalid credentials")
 	}
-	if !users.VerifyPassword(password, user.PasswordHash) {
+	user, verified, err := s.verifyAndUpgradePassword(user, password)
+	if err != nil {
+		return LoginResult{}, err
+	}
+	if !verified {
 		return LoginResult{}, errors.New("invalid credentials")
 	}
 	if user.TOTPEnabled {
@@ -845,7 +854,11 @@ func (s *AuthService) ChangePassword(ctx context.Context, sessionID, currentPass
 	if !ok {
 		return errors.New("user not found")
 	}
-	if !users.VerifyPassword(currentPassword, user.PasswordHash) {
+	user, verified, err := s.verifyAndUpgradePassword(user, currentPassword)
+	if err != nil {
+		return err
+	}
+	if !verified {
 		return errors.New("current password is invalid")
 	}
 	password = strings.TrimSpace(password)
@@ -857,8 +870,10 @@ func (s *AuthService) ChangePassword(ctx context.Context, sessionID, currentPass
 		return err
 	}
 	user.PasswordHash = passwordHash
-	_, err = s.users.Update(user)
-	return err
+	if _, err = s.users.Update(user); err != nil {
+		return err
+	}
+	return s.sessions.DeleteSessionsByUserExcept(user.ID, sessionID)
 }
 
 func (s *AuthService) Logout(ctx context.Context, sessionID string) (err error) {
@@ -882,12 +897,20 @@ func (s *AuthService) Authenticate(sessionID string) (auth.SessionView, error) {
 	if !ok {
 		return auth.SessionView{}, errors.New("session not found")
 	}
+	user, ok, err := s.users.Get(session.UserID)
+	if err != nil {
+		return auth.SessionView{}, err
+	}
+	if !ok || !user.IsActive {
+		_ = s.sessions.DeleteSession(session.ID)
+		return auth.SessionView{}, errors.New("session not found")
+	}
 	return auth.SessionView{
 		SessionID:   session.ID,
-		UserID:      session.UserID,
-		Username:    session.Username,
-		RoleIDs:     append([]string(nil), session.RoleIDs...),
-		Permissions: s.policy.Permissions(session.RoleIDs),
+		UserID:      user.ID,
+		Username:    user.Username,
+		RoleIDs:     append([]string(nil), user.RoleIDs...),
+		Permissions: s.policy.Permissions(user.RoleIDs),
 	}, nil
 }
 
@@ -1040,7 +1063,11 @@ func (s *AuthService) DisableTOTP(ctx context.Context, sessionID, password, reco
 	if !user.TOTPEnabled {
 		return s.userByID(user.ID)
 	}
-	if !users.VerifyPassword(password, user.PasswordHash) {
+	user, verified, err := s.verifyAndUpgradePassword(user, password)
+	if err != nil {
+		return AuthUser{}, err
+	}
+	if !verified {
 		return AuthUser{}, errors.New("invalid current password")
 	}
 	if !consumeRecoveryCode(&user, recoveryCode, s.security.Pepper, time.Now().UTC()) {
@@ -1085,11 +1112,33 @@ func (s *AuthService) userByID(userID string) (AuthUser, error) {
 		ID:                     user.ID,
 		Username:               user.Username,
 		Email:                  user.Email,
+		FullName:               user.FullName,
+		Department:             user.Department,
+		Position:               user.Position,
 		RoleIDs:                append([]string(nil), user.RoleIDs...),
 		Permissions:            s.policy.Permissions(user.RoleIDs),
 		TOTPEnabled:            user.TOTPEnabled,
 		RecoveryCodesRemaining: countUnusedRecoveryCodes(user),
 	}, nil
+}
+
+func (s *AuthService) verifyAndUpgradePassword(user users.User, password string) (users.User, bool, error) {
+	if !users.VerifyPassword(password, user.PasswordHash) {
+		return user, false, nil
+	}
+	if !users.NeedsPasswordRehash(user.PasswordHash) {
+		return user, true, nil
+	}
+	passwordHash, err := users.HashPassword(password)
+	if err != nil {
+		return user, true, err
+	}
+	user.PasswordHash = passwordHash
+	updated, err := s.users.Update(user)
+	if err != nil {
+		return user, true, err
+	}
+	return updated, true, nil
 }
 
 func normalizeAuditResource(value string) string {

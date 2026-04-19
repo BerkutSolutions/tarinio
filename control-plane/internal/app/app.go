@@ -42,6 +42,7 @@ type App struct {
 	RevisionService          *services.RevisionService
 	RevisionCompileService   *services.RevisionCompileService
 	ApplyService             *services.ApplyService
+	RevisionCatalogService   *services.RevisionCatalogService
 	EventStore               *events.Store
 	EventService             *services.EventService
 	AdminScriptService       *services.AdminScriptService
@@ -181,9 +182,11 @@ func New(cfg config.Config) (*App, error) {
 	setupService := services.NewSetupService(userStore, siteStore, revisionStore)
 	auditService := services.NewAuditService(auditStore)
 	revisionCompileService := services.NewRevisionCompileService(revisionStore, revisionSnapshotStore, jobStore, siteStore, upstreamStore, certificateStore, tlsConfigStore, wafPolicyStore, accessPolicyStore, rateLimitPolicyStore, easySiteProfileStore, antiDDoSStore, certificateMaterialStore, auditService)
+	revisionCatalogService := services.NewRevisionCatalogService(revisionStore, revisionSnapshotStore, jobStore, eventStore, siteStore)
+	runtimeSecurityCollector := services.NewHTTPRuntimeSecurityEventCollector(cfg.RuntimeHealthURL, cfg.RuntimeAPIToken)
 	eventService := services.NewEventService(
 		eventStore,
-		services.WithRuntimeSecurityCollector(services.NewHTTPRuntimeSecurityEventCollector(cfg.RuntimeHealthURL)),
+		services.WithRuntimeSecurityCollector(runtimeSecurityCollector),
 	)
 	jobService := services.NewJobService(jobStore)
 	authService := services.NewAuthService(userStore, roleStore, sessionStore, passkeyStore, cfg.AuthIssuer, services.AuthSecurityConfig{
@@ -233,20 +236,21 @@ func New(cfg config.Config) (*App, error) {
 		jobStore,
 		eventService,
 		services.NoopCommandExecutor{},
-		services.HTTPReloadExecutor{URL: cfg.RuntimeReloadURL},
-		services.HTTPHealthChecker{URL: cfg.RuntimeHealthURL},
+		services.HTTPReloadExecutor{URL: cfg.RuntimeReloadURL, Token: cfg.RuntimeAPIToken},
+		services.HTTPHealthChecker{URL: cfg.RuntimeHealthURL, Token: cfg.RuntimeAPIToken},
 		auditService,
 	)
 	easySiteProfileService := services.NewEasySiteProfileService(easySiteProfileStore, siteStore, wafPolicyStore, accessPolicyStore, rateLimitPolicyStore, revisionCompileService, applyService, auditService)
 	antiDDoSService := services.NewAntiDDoSService(antiDDoSStore, revisionCompileService, applyService, auditService)
 	services.ConfigureAutoApply(revisionCompileService, applyService)
 	reportService := services.NewReportService(eventStore, jobStore, revisionStore)
-	runtimeRequestCollector := services.NewHTTPRuntimeRequestCollector(cfg.RuntimeHealthURL)
-	dashboardService := services.NewDashboardService(eventService, runtimeRequestCollector, cfg.RuntimeHealthURL)
-	runtimeCRSService := services.NewRuntimeCRSService(services.RuntimeBaseURLFromHealthURL(cfg.RuntimeHealthURL))
+	runtimeRequestCollector := services.NewHTTPRuntimeRequestCollector(cfg.RuntimeHealthURL, cfg.RuntimeAPIToken)
+	runtimeReadyProbe := services.NewHTTPRuntimeReadyProbe(cfg.RuntimeHealthURL, cfg.RuntimeAPIToken)
+	dashboardService := services.NewDashboardService(eventService, runtimeRequestCollector, runtimeReadyProbe)
+	runtimeCRSService := services.NewRuntimeCRSService(services.RuntimeBaseURLFromHealthURL(cfg.RuntimeHealthURL), cfg.RuntimeAPIToken)
 	containerRuntimeService := services.NewContainerRuntimeService()
 	adminScriptService := services.NewAdminScriptService(cfg.RevisionStoreDir, detectScriptsRoot())
-	httpServer := httpserver.New(cfg.HTTPAddr, cfg.RuntimeRoot, cfg.RevisionStoreDir, cfg.RuntimeHealthURL, setupService, revisionService, authService, siteService, manualBanService, upstreamService, certificateService, tlsConfigService, tlsAutoRenewService, certificateUploadService, certificateMaterialStore, letsEncryptService, selfSignedCertificateService, wafPolicyService, accessPolicyService, rateLimitPolicyService, easySiteProfileService, antiDDoSService, eventService, revisionCompileService, applyService, auditService, reportService, dashboardService, containerRuntimeService, runtimeCRSService, runtimeRequestCollector, adminScriptService)
+	httpServer := httpserver.New(cfg.HTTPAddr, cfg.RuntimeRoot, cfg.RevisionStoreDir, cfg.RuntimeHealthURL, setupService, revisionService, authService, sessionStore, userStore, roleStore, siteService, manualBanService, upstreamService, certificateService, tlsConfigService, tlsAutoRenewService, certificateUploadService, certificateMaterialStore, letsEncryptService, selfSignedCertificateService, wafPolicyService, accessPolicyService, rateLimitPolicyService, easySiteProfileService, antiDDoSService, eventService, revisionCompileService, applyService, revisionCatalogService, auditService, reportService, dashboardService, containerRuntimeService, runtimeCRSService, runtimeRequestCollector, runtimeReadyProbe, runtimeSecurityCollector, runtimeRequestCollector, adminScriptService)
 	var devFastStartBootstrapper *services.DevFastStartBootstrapper
 	if cfg.DevFastStart.Enabled {
 		devFastStartCertificateIssuer := letsEncryptService
@@ -279,6 +283,7 @@ func New(cfg config.Config) (*App, error) {
 		RevisionService:          revisionService,
 		RevisionCompileService:   revisionCompileService,
 		ApplyService:             applyService,
+		RevisionCatalogService:   revisionCatalogService,
 		EventStore:               eventStore,
 		EventService:             eventService,
 		AdminScriptService:       adminScriptService,

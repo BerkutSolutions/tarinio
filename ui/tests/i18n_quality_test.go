@@ -19,6 +19,7 @@ var (
 // Technical terms allowed in RU localization values.
 var englishWordExceptionsQuality = map[string]struct{}{
 	"acme":          {},
+	"anti-ddos":     {},
 	"api":           {},
 	"auth":          {},
 	"autostart":     {},
@@ -29,16 +30,19 @@ var englishWordExceptionsQuality = map[string]struct{}{
 	"available":     {},
 	"behavior":      {},
 	"berkut":        {},
+	"basic":         {},
 	"blacklist":     {},
 	"botnet":        {},
 	"burst":         {},
 	"cdn":           {},
 	"challenge":     {},
 	"check":         {},
+	"cli":           {},
 	"cidr":          {},
 	"codes":         {},
 	"cloudflare":    {},
 	"compile":       {},
+	"compose":       {},
 	"content":       {},
 	"control-plane": {},
 	"cors":          {},
@@ -48,7 +52,9 @@ var englishWordExceptionsQuality = map[string]struct{}{
 	"ddos":          {},
 	"denylist":      {},
 	"dns":           {},
+	"docker":        {},
 	"drop":          {},
+	"dry-run":       {},
 	"eab":           {},
 	"easy":          {},
 	"encrypt":       {},
@@ -57,6 +63,7 @@ var englishWordExceptionsQuality = map[string]struct{}{
 	"geoip":         {},
 	"github":        {},
 	"headers":       {},
+	"hcaptcha":      {},
 	"http":          {},
 	"https":         {},
 	"id":            {},
@@ -73,18 +80,22 @@ var englishWordExceptionsQuality = map[string]struct{}{
 	"manual":        {},
 	"material":      {},
 	"metadata":      {},
+	"ms":            {},
 	"mode":          {},
 	"modsec":        {},
 	"modsecurity":   {},
 	"nginx":         {},
 	"no":            {},
 	"owasp":         {},
+	"passkeys":      {},
 	"policy":        {},
 	"proxy":         {},
 	"rate":          {},
+	"recaptcha":     {},
 	"reject":        {},
 	"required":      {},
 	"revision":      {},
+	"revisionid":    {},
 	"rule":          {},
 	"rps":           {},
 	"runtime":       {},
@@ -101,6 +112,7 @@ var englishWordExceptionsQuality = map[string]struct{}{
 	"snapshot":      {},
 	"status":        {},
 	"succeeded":     {},
+	"threshold":     {},
 	"tcp":           {},
 	"tarinio":       {},
 	"throttle":      {},
@@ -112,11 +124,14 @@ var englishWordExceptionsQuality = map[string]struct{}{
 	"updates":       {},
 	"upload":        {},
 	"uploaded":      {},
+	"host":          {},
 	"upstream":      {},
 	"username":      {},
 	"url":           {},
 	"version":       {},
 	"waf":           {},
+	"keypass":       {},
+	"turnstile":     {},
 	"xss":           {},
 	"zerossl":       {},
 }
@@ -139,8 +154,8 @@ func TestI18NNoArtifacts(t *testing.T) {
 		if lang == "ru" && containsForbiddenRuCyrillicQuality(value) {
 			issues = append(issues, lang+":"+key+": contains suspicious Cyrillic letters (likely mojibake)")
 		}
-		if lang == "ru" && countEnglishWordsQuality(value) > 2 {
-			issues = append(issues, lang+":"+key+": contains more than 2 english words")
+		if lang == "ru" && countEnglishWordsQuality(value) > 1 {
+			issues = append(issues, lang+":"+key+": contains more than 1 english word")
 		}
 		if reMojibakeMarkersQuality.MatchString(value) {
 			issues = append(issues, lang+":"+key+": contains mojibake marker sequence")

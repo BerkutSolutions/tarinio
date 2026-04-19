@@ -1,3 +1,11 @@
+{{- if .AntibotEnabled }}
+location = {{ .AntibotURI }} {
+    proxy_intercept_errors off;
+    modsecurity off;
+    add_header Set-Cookie "{{ .AntibotCookieName }}={{ .AntibotCookieValue }}; Max-Age=600; Path=/; SameSite=Lax; Secure; HttpOnly" always;
+    return 204;
+}
+{{- end }}
 {{- range .Rules }}
 location {{ .LocationModifier }} {{ .LocationPath }} {
 {{- if .DisableProxyInterceptErrors }}

@@ -129,6 +129,27 @@ func (s *Store) ReadMaterial(ref string) ([]byte, error) {
 	return content, nil
 }
 
+func (s *Store) Delete(snapshotPath string) error {
+	relative := strings.TrimSpace(snapshotPath)
+	if relative == "" {
+		return errors.New("snapshot path is required")
+	}
+	revisionID := strings.TrimSuffix(strings.TrimPrefix(filepath.ToSlash(relative), "snapshots/"), ".json")
+	if revisionID == "" {
+		return errors.New("snapshot path is invalid")
+	}
+
+	fullPath := filepath.Join(s.root, filepath.FromSlash(strings.TrimPrefix(filepath.ToSlash(relative), "snapshots/")))
+	if err := os.Remove(fullPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("delete revision snapshot: %w", err)
+	}
+	materialsRoot := filepath.Join(s.root, "files", normalizeID(revisionID))
+	if err := os.RemoveAll(materialsRoot); err != nil {
+		return fmt.Errorf("delete revision snapshot materials: %w", err)
+	}
+	return nil
+}
+
 func (s *Store) writeMaterials(revisionID string, materials []MaterialContent) ([]CertificateMaterialSnapshot, error) {
 	if len(materials) == 0 {
 		return nil, nil

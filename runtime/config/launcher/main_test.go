@@ -144,3 +144,48 @@ func TestRuntimeStatusReadinessRequiresRunningNginx(t *testing.T) {
 	}
 	_ = resp.Body.Close()
 }
+
+func TestRuntimeHandlers_RequireTokenWhenConfigured(t *testing.T) {
+	t.Setenv("WAF_RUNTIME_API_TOKEN", "runtime-secret")
+	status := &runtimeStatus{}
+	status.setActiveBundle(&activePointer{
+		RevisionID:    "rev-001",
+		CandidatePath: "/var/lib/waf/candidates/rev-001",
+	}, "/var/lib/waf/candidates/rev-001")
+	status.setNginxRunning(true)
+
+	logPath := filepath.Join(t.TempDir(), "access.log")
+	server := httptest.NewServer(status.handlers(
+		newRuntimeProcess(t.TempDir(), "/tmp/crs", status, nil, "/tmp/module.so"),
+		newSecurityEventSource(logPath),
+		newRequestStreamSource(logPath, 100, filepath.Join(t.TempDir(), "requests-archive"), 30),
+	))
+	defer server.Close()
+
+	req, err := http.NewRequest(http.MethodGet, server.URL+"/readyz", nil)
+	if err != nil {
+		t.Fatalf("new request failed: %v", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("expected 403 without runtime token, got %d", resp.StatusCode)
+	}
+	_ = resp.Body.Close()
+
+	req, err = http.NewRequest(http.MethodGet, server.URL+"/readyz", nil)
+	if err != nil {
+		t.Fatalf("new request failed: %v", err)
+	}
+	req.Header.Set(runtimeAuthHeader, "runtime-secret")
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request with token failed: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 with runtime token, got %d", resp.StatusCode)
+	}
+	_ = resp.Body.Close()
+}

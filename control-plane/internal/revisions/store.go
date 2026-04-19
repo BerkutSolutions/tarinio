@@ -14,19 +14,24 @@ import (
 type Status string
 
 const (
-	StatusPending Status = "pending"
-	StatusActive  Status = "active"
-	StatusFailed  Status = "failed"
+	StatusPending  Status = "pending"
+	StatusInactive Status = "inactive"
+	StatusActive   Status = "active"
+	StatusFailed   Status = "failed"
 )
 
 // Revision stores the minimal control-plane metadata for one compiled bundle.
 type Revision struct {
-	ID         string `json:"id"`
-	Version    int    `json:"version"`
-	CreatedAt  string `json:"created_at"`
-	Checksum   string `json:"checksum"`
-	BundlePath string `json:"bundle_path"`
-	Status     Status `json:"status"`
+	ID              string `json:"id"`
+	Version         int    `json:"version"`
+	CreatedAt       string `json:"created_at"`
+	Checksum        string `json:"checksum"`
+	BundlePath      string `json:"bundle_path"`
+	Status          Status `json:"status"`
+	LastApplyJobID  string `json:"last_apply_job_id,omitempty"`
+	LastApplyStatus string `json:"last_apply_status,omitempty"`
+	LastApplyResult string `json:"last_apply_result,omitempty"`
+	LastApplyAt     string `json:"last_apply_at,omitempty"`
 }
 
 type state struct {
@@ -92,7 +97,7 @@ func (s *Store) MarkActive(revisionID string) error {
 
 	for i := range current.Revisions {
 		if current.Revisions[i].Status == StatusActive {
-			current.Revisions[i].Status = StatusPending
+			current.Revisions[i].Status = StatusInactive
 		}
 	}
 	current.Revisions[index].Status = StatusActive
@@ -139,6 +144,46 @@ func (s *Store) Get(revisionID string) (Revision, bool, error) {
 	return Revision{}, false, nil
 }
 
+func (s *Store) ResetStatuses() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	current, err := s.loadLocked()
+	if err != nil {
+		return err
+	}
+	for i := range current.Revisions {
+		if current.Revisions[i].Status == StatusActive {
+			continue
+		}
+		current.Revisions[i].Status = StatusInactive
+	}
+	sortRevisions(current.Revisions)
+	return s.saveLocked(current)
+}
+
+func (s *Store) RecordApplyResult(revisionID string, jobID string, status string, result string, appliedAt string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	current, err := s.loadLocked()
+	if err != nil {
+		return err
+	}
+
+	index := indexByID(current.Revisions, revisionID)
+	if index == -1 {
+		return fmt.Errorf("revision %s not found", revisionID)
+	}
+
+	current.Revisions[index].LastApplyJobID = strings.TrimSpace(jobID)
+	current.Revisions[index].LastApplyStatus = strings.TrimSpace(status)
+	current.Revisions[index].LastApplyResult = strings.TrimSpace(result)
+	current.Revisions[index].LastApplyAt = strings.TrimSpace(appliedAt)
+	sortRevisions(current.Revisions)
+	return s.saveLocked(current)
+}
+
 func (s *Store) List() ([]Revision, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -169,6 +214,33 @@ func (s *Store) CurrentActive() (Revision, bool, error) {
 		}
 	}
 	return Revision{}, false, nil
+}
+
+func (s *Store) Delete(revisionID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	revisionID = strings.ToLower(strings.TrimSpace(revisionID))
+	if revisionID == "" {
+		return errors.New("revision id is required")
+	}
+
+	current, err := s.loadLocked()
+	if err != nil {
+		return err
+	}
+	if current.CurrentActiveRevisionID == revisionID {
+		return fmt.Errorf("revision %s is active and cannot be deleted", revisionID)
+	}
+	for i := range current.Revisions {
+		if current.Revisions[i].ID != revisionID {
+			continue
+		}
+		current.Revisions = append(current.Revisions[:i], current.Revisions[i+1:]...)
+		sortRevisions(current.Revisions)
+		return s.saveLocked(current)
+	}
+	return fmt.Errorf("revision %s not found", revisionID)
 }
 
 func (s *Store) loadLocked() (*state, error) {

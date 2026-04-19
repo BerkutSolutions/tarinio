@@ -9,7 +9,8 @@ import (
 
 // HTTPReloadExecutor delegates runtime reload execution to the isolated runtime container.
 type HTTPReloadExecutor struct {
-	URL string
+	URL   string
+	Token string
 }
 
 func (e HTTPReloadExecutor) Run(name string, args []string, workdir string) error {
@@ -22,6 +23,7 @@ func (e HTTPReloadExecutor) Run(name string, args []string, workdir string) erro
 	if err != nil {
 		return err
 	}
+	setRuntimeAuthHeader(req, strings.TrimSpace(e.Token))
 
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
@@ -35,4 +37,3 @@ func (e HTTPReloadExecutor) Run(name string, args []string, workdir string) erro
 	}
 	return nil
 }
-

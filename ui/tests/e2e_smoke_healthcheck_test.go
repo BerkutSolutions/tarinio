@@ -78,8 +78,8 @@ func TestE2ESmoke_LoginHealthcheckDashboard(t *testing.T) {
 		t.Fatalf("healthcheck page failed: status=%d", healthcheckPage.StatusCode)
 	}
 	healthcheckBody := mustReadBody(t, healthcheckPage.Body)
-	if !strings.Contains(healthcheckBody, "Проверка системы") {
-		t.Fatalf("healthcheck page contract mismatch: missing title marker")
+	if !strings.Contains(healthcheckBody, `id="healthcheck-steps"`) || !strings.Contains(healthcheckBody, `id="healthcheck-error"`) {
+		t.Fatalf("healthcheck page contract mismatch: missing current page markers")
 	}
 
 	compatResp := getWithAuth(t, client, baseURL+"/api/app/compat")
@@ -119,6 +119,20 @@ func TestE2ESmoke_LoginHealthcheckDashboard(t *testing.T) {
 	dashboardBody := mustReadBody(t, dashboardPage.Body)
 	if !strings.Contains(dashboardBody, `id="content-area"`) {
 		t.Fatalf("dashboard page contract mismatch: missing content area marker")
+	}
+
+	dashboardStatsResp := getWithAuth(t, client, baseURL+"/api/dashboard/stats")
+	if dashboardStatsResp.StatusCode != http.StatusOK {
+		t.Fatalf("dashboard stats failed: status=%d body=%s", dashboardStatsResp.StatusCode, mustReadBody(t, dashboardStatsResp.Body))
+	}
+	var dashboardStats map[string]any
+	if err := json.NewDecoder(dashboardStatsResp.Body).Decode(&dashboardStats); err != nil {
+		t.Fatalf("decode dashboard stats response: %v", err)
+	}
+	for _, key := range []string{"services_up", "services_down", "requests_day", "attacks_day", "blocked_attacks_day", "services"} {
+		if _, ok := dashboardStats[key]; !ok {
+			t.Fatalf("dashboard stats contract mismatch: missing %s", key)
+		}
 	}
 }
 

@@ -1,61 +1,86 @@
-# Security (EN)
+# TARINIO 2.0.0 Security
 
-Documentation baseline: `1.1.8`
+Wiki baseline: `2.0.0`
 
-## Production baseline
+This document defines the minimum production baseline and the main secure-operation practices for TARINIO.
+
+## Security Baseline
 
 - `APP_ENV=prod`
-- default secrets are forbidden
-- HTTPS is required (built-in TLS or trusted reverse-proxy TLS)
-- explicitly restrict `BERKUT_SECURITY_TRUSTED_PROXIES`
-- enable tamper-evident audit with `BERKUT_AUDIT_SIGNING_KEY`
+- default secrets are unacceptable;
+- control-plane access should be restricted to trusted networks;
+- administrative access should run over HTTPS;
+- trusted proxies must be configured explicitly;
+- audit and secret storage must be protected at the platform level.
 
-## Secrets handling
+## Authentication And Access
 
-- Keep `.env` outside public repositories.
-- Rotate admin and integration secrets on a fixed schedule.
-- Never log secret values in tickets or chat.
-- Limit host-level access to secret files.
+In version `2.0.0`, the platform supports:
 
-## Network baseline
+- session-based login;
+- `2FA` through TOTP;
+- passkeys for login and as a second factor;
+- server-side permission checks on every endpoint.
 
-- Expose only required public ports.
-- Restrict admin/control-plane access to trusted networks.
-- Keep Docker network isolation enabled.
-- Use host firewall + runtime L4 guard together.
+Recommendations:
 
-## TLS and certificates
+- use named operator accounts only;
+- enable a second factor for privileged operators;
+- remove unused passkeys;
+- review the roles and permissions granted to operators regularly.
 
-- Enforce HTTPS for all operator and site traffic.
-- Monitor certificate expiration.
-- Test renewal flow before expiry windows.
-- Treat failed issuance as an operational incident.
+## Secrets And Sensitive Data
 
-## Access control
+- do not store `.env` in public repositories;
+- keep secrets in a dedicated protected store;
+- restrict access to keys and certificate materials;
+- do not paste EAB values, DNS API tokens, or private keys into tickets or chats.
 
-- Use named operator accounts only.
-- Remove stale admin accounts promptly.
-- Review audit events for privileged actions.
-- Enforce least privilege on host and CI/CD users.
+## Network Model
 
-## Change security
+- publish only the ports you actually need;
+- separate runtime ingress from administrative access;
+- restrict PostgreSQL and internal network access;
+- use host firewall controls together with the runtime L4 guard.
 
-- Every security-relevant change must go through revision compile/apply.
-- Avoid manual edits inside runtime filesystem.
-- Keep rollback path ready before enforcement changes.
+## TLS And Certificates
 
-## Incident readiness
+Recommended baseline:
 
-- Keep backup/restore process validated.
-- Keep a known-good revision ready for emergency rollback.
-- Document incident timeline and remediation actions.
+- use HTTPS for the administrative boundary;
+- monitor certificate expiration dates;
+- test certificate renewal flows before they are needed;
+- treat exported certificate archives as sensitive artifacts;
+- document which mode is in use: import, self-signed, ACME `http-01`, or ACME `dns-01`.
 
-## Related documents
+## Change Safety
+
+- do not edit runtime manually;
+- push risk-sensitive changes through compile/apply;
+- keep a known-good revision available before tightening protection;
+- validate `Dashboard`, `Events`, `Requests`, and `Bans` after every security-impacting change.
+
+## Audit And Investigation
+
+Use the following for investigation:
+
+- `Activity` for administrative actions;
+- `Events` for security detections;
+- `Requests` for request-level detail;
+- `Revisions` to correlate incidents with rollout history.
+
+## Backup And Restore As A Security Capability
+
+Secure operation also requires:
+
+- regular backups;
+- at least one off-host copy;
+- a tested restore drill;
+- a clear rollback path for failed or unsafe changes.
+
+## Related Documents
 
 - `docs/eng/backups.md`
-- `docs/eng/upgrade.md`
 - `docs/eng/runbook.md`
-
-
-
-
+- `docs/eng/upgrade.md`
+- `docs/eng/ui.md`

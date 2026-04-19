@@ -1,51 +1,72 @@
-# Berkut Solutions - TARINIO Documentation (EN)
+# TARINIO 2.0.0 Wiki
 
-Documentation baseline: `1.1.8`
+Wiki baseline: `2.0.0`
 
-## Sections
+This is the main English index for TARINIO documentation. It is structured as an operator wiki for the real `2.0.0` product and is meant to complement the Russian branch, not lag behind it.
 
-1. Architecture (overview): `docs/eng/architecture.md`
-2. API: `docs/eng/api.md`
-3. Security: `docs/eng/security.md`
-4. Deploy: `docs/eng/deploy.md`
-5. Runbook (start and recovery): `docs/eng/runbook.md`
-6. Upgrade and rollback: `docs/eng/upgrade.md`
-7. Backups: `docs/eng/backups.md`
-8. CLI commands: `docs/CLI_COMMANDS.md`
-9. Operator docs:
-   - Anti-DDoS: `docs/eng/operators/anti-ddos-runbook.md`
-   - L4 guard: `docs/eng/operators/runtime-l4-guard.md`
-   - Runtime filesystem: `docs/eng/operators/runtime-filesystem-contract.md`
-   - WAF tuning: `docs/eng/operators/waf-tuning-guide.md`
-   - OWASP CRS: `docs/eng/operators/owasp-crs.md`
-   - Let's Encrypt DNS-01: `docs/eng/operators/letsencrypt-dns.md`
-   - E2E validation: `docs/eng/operators/stage-1-e2e-validation.md`
-10. Stage 0 architecture documents: `docs/architecture/`
-11. OSS docs (EN):
-   - `docs/eng/oss/SECURITY.md`
-   - `docs/eng/oss/CONTRIBUTING.md`
-   - `docs/eng/oss/CODE_OF_CONDUCT.md`
-   - `docs/eng/oss/SUPPORT.md`
+## Start Here
 
-## Release context for 1.1.8
+- Product overview: `README.en.md`
+- Full UI and workflow guide: `docs/eng/ui.md`
+- Architecture and product boundaries: `docs/eng/architecture.md`
+- API catalog: `docs/eng/api.md`
 
-- Product branding unified as `Berkut Solutions - TARINIO`.
-- Application version source centralized via `control-plane/internal/appmeta/meta.go`.
-- UI and i18n dictionaries aligned for Easy site validation and Anti-DDoS flows.
-- Global Anti-DDoS settings added and integrated into the revision apply pipeline.
-- Documentation synced with the current standalone WAF runtime model.
+## Core Documents
 
-## Important
+1. Architecture: `docs/eng/architecture.md`
+2. UI and operator workflows: `docs/eng/ui.md`
+3. API: `docs/eng/api.md`
+4. Security: `docs/eng/security.md`
+5. Deployment: `docs/eng/deploy.md`
+6. Runbook: `docs/eng/runbook.md`
+7. Upgrade and rollback: `docs/eng/upgrade.md`
+8. Backups and restore: `docs/eng/backups.md`
+9. CLI commands: `docs/CLI_COMMANDS.md`
 
-Stage 0 architecture decisions are frozen and are the source of truth:
+## Operator Guides
+
+- Anti-DDoS runbook: `docs/eng/operators/anti-ddos-runbook.md`
+- Anti-DDoS model: `docs/eng/operators/anti-ddos-model.md`
+- Runtime L4 guard: `docs/eng/operators/runtime-l4-guard.md`
+- Runtime filesystem contract: `docs/eng/operators/runtime-filesystem-contract.md`
+- WAF tuning guide: `docs/eng/operators/waf-tuning-guide.md`
+- Stage 1 E2E validation: `docs/eng/operators/stage-1-e2e-validation.md`
+- OWASP CRS operations: `docs/eng/operators/owasp-crs.md`
+- Let's Encrypt DNS-01 operations: `docs/eng/operators/letsencrypt-dns.md`
+
+## What Matters In 2.0.0
+
+- Documentation is aligned with the application version from `control-plane/internal/appmeta/meta.go`.
+- The wiki covers the real UI sections: `Dashboard`, `Sites`, `Anti-DDoS`, `OWASP CRS`, `TLS`, `Requests`, `Revisions`, `Events`, `Bans`, `Administration`, `Activity`, `Settings`, and `Profile`.
+- The new revision catalog API `GET /api/revisions` and revision status cleanup flow are documented.
+- Onboarding, login, `2FA`, passkeys, and healthcheck are covered as first-class product flows.
+
+## Recommended Reading Paths
+
+### For First Product Familiarization
+
+1. `README.en.md`
+2. `docs/eng/architecture.md`
+3. `docs/eng/ui.md`
+
+### For Deployment And Adoption
+
+1. `docs/eng/deploy.md`
+2. `docs/eng/security.md`
+3. `docs/eng/runbook.md`
+4. `docs/eng/backups.md`
+
+### For Daily Operations
+
+1. `docs/eng/ui.md`
+2. `docs/eng/runbook.md`
+3. `docs/eng/api.md`
+4. `docs/eng/operators/`
+
+## Source Of Truth
+
+Stage 0 architecture decisions remain the binding foundation:
+
 - `docs/architecture/`
 
-
-
-
-
-
-
-
-
-
+Those documents define product boundaries, revision semantics, compilation, and deployment assumptions.

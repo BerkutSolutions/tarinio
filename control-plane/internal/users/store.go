@@ -1,6 +1,7 @@
 package users
 
 import (
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -14,12 +15,17 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/crypto/argon2"
 )
 
 type User struct {
 	ID                 string             `json:"id"`
 	Username           string             `json:"username"`
 	Email              string             `json:"email"`
+	FullName           string             `json:"full_name,omitempty"`
+	Department         string             `json:"department,omitempty"`
+	Position           string             `json:"position,omitempty"`
 	PasswordHash       string             `json:"password_hash"`
 	IsActive           bool               `json:"is_active"`
 	RoleIDs            []string           `json:"role_ids"`
@@ -102,6 +108,19 @@ func (s *Store) FindByUsername(username string) (User, bool, error) {
 		}
 	}
 	return User{}, false, nil
+}
+
+func (s *Store) List() ([]User, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	current, err := s.loadLocked()
+	if err != nil {
+		return nil, err
+	}
+	items := append([]User(nil), current.Users...)
+	sortUsers(items)
+	return items, nil
 }
 
 func (s *Store) Update(user User) (User, error) {
@@ -262,11 +281,41 @@ func HashPassword(password string) (string, error) {
 	if _, err := rand.Read(salt); err != nil {
 		return "", err
 	}
-	sum := deriveKey([]byte(password), salt)
-	return base64.RawStdEncoding.EncodeToString(salt) + "$" + base64.RawStdEncoding.EncodeToString(sum), nil
+	sum := deriveArgon2idKey([]byte(password), salt)
+	return fmt.Sprintf(
+		"argon2id$v=19$m=%d,t=%d,p=%d$%s$%s",
+		argonMemoryKiB,
+		argonTimeCost,
+		argonParallelism,
+		base64.RawStdEncoding.EncodeToString(salt),
+		base64.RawStdEncoding.EncodeToString(sum),
+	), nil
 }
 
 func VerifyPassword(password, encoded string) bool {
+	return verifyPasswordDetails(password, encoded)
+}
+
+func NeedsPasswordRehash(encoded string) bool {
+	return !strings.HasPrefix(strings.TrimSpace(encoded), "argon2id$")
+}
+
+const (
+	argonTimeCost    uint32 = 3
+	argonMemoryKiB   uint32 = 64 * 1024
+	argonParallelism uint8  = 2
+	argonKeyLength   uint32 = 32
+)
+
+func verifyPasswordDetails(password, encoded string) bool {
+	encoded = strings.TrimSpace(encoded)
+	if strings.HasPrefix(encoded, "argon2id$") {
+		return verifyArgon2idPassword(password, encoded)
+	}
+	return verifyLegacyPassword(password, encoded)
+}
+
+func verifyLegacyPassword(password, encoded string) bool {
 	parts := strings.Split(encoded, "$")
 	if len(parts) != 2 {
 		return false
@@ -283,6 +332,40 @@ func VerifyPassword(password, encoded string) bool {
 	return subtle.ConstantTimeCompare(actual, expected) == 1
 }
 
+func verifyArgon2idPassword(password, encoded string) bool {
+	parts := strings.Split(encoded, "$")
+	if len(parts) != 5 {
+		return false
+	}
+	if parts[0] != "argon2id" || parts[1] != "v=19" {
+		return false
+	}
+	var memory uint32
+	var timeCost uint32
+	var parallelism uint8
+	if _, err := fmt.Sscanf(parts[2], "m=%d,t=%d,p=%d", &memory, &timeCost, &parallelism); err != nil {
+		return false
+	}
+	salt, err := base64.RawStdEncoding.DecodeString(parts[3])
+	if err != nil {
+		return false
+	}
+	expected, err := base64.RawStdEncoding.DecodeString(parts[4])
+	if err != nil {
+		return false
+	}
+	keyLength := uint32(len(expected))
+	if keyLength == 0 {
+		return false
+	}
+	actual := argon2.IDKey([]byte(password), salt, timeCost, memory, parallelism, keyLength)
+	return hmac.Equal(actual, expected)
+}
+
+func deriveArgon2idKey(password, salt []byte) []byte {
+	return argon2.IDKey(password, salt, argonTimeCost, argonMemoryKiB, argonParallelism, argonKeyLength)
+}
+
 func deriveKey(password, salt []byte) []byte {
 	sum := sha256.Sum256(append(append([]byte(nil), password...), salt...))
 	for i := 0; i < 120000; i++ {
@@ -296,6 +379,9 @@ func normalizeUser(user User) User {
 	user.ID = normalizeID(user.ID)
 	user.Username = normalizeUsername(user.Username)
 	user.Email = strings.ToLower(strings.TrimSpace(user.Email))
+	user.FullName = strings.TrimSpace(user.FullName)
+	user.Department = strings.TrimSpace(user.Department)
+	user.Position = strings.TrimSpace(user.Position)
 	user.RoleIDs = normalizeValues(user.RoleIDs)
 	user.TOTPSecret = strings.TrimSpace(user.TOTPSecret)
 	user.TOTPSecretEnc = strings.TrimSpace(user.TOTPSecretEnc)

@@ -32,6 +32,7 @@ type revisionStoreForApply interface {
 	Get(revisionID string) (revisions.Revision, bool, error)
 	MarkActive(revisionID string) error
 	MarkFailed(revisionID string) error
+	RecordApplyResult(revisionID string, jobID string, status string, result string, appliedAt string) error
 }
 
 type revisionSnapshotReader interface {
@@ -133,7 +134,14 @@ func (s *ApplyService) Apply(ctx context.Context, revisionID string) (job jobs.J
 			Details:           map[string]any{"error": err.Error()},
 		})
 		_ = s.revisions.MarkFailed(revisionID)
-		return s.jobs.MarkFailed(job.ID, err.Error())
+		failedJob, markErr := s.jobs.MarkFailed(job.ID, err.Error())
+		if markErr != nil {
+			return jobs.Job{}, markErr
+		}
+		if recordErr := s.revisions.RecordApplyResult(revisionID, failedJob.ID, string(failedJob.Status), failedJob.Result, coalesceJobTime(failedJob)); recordErr != nil {
+			return failedJob, recordErr
+		}
+		return failedJob, nil
 	}
 
 	if err := s.revisions.MarkActive(revisionID); err != nil {
@@ -147,7 +155,14 @@ func (s *ApplyService) Apply(ctx context.Context, revisionID string) (job jobs.J
 			Details:           map[string]any{"error": err.Error()},
 		})
 		_ = s.revisions.MarkFailed(revisionID)
-		return s.jobs.MarkFailed(job.ID, err.Error())
+		failedJob, markErr := s.jobs.MarkFailed(job.ID, err.Error())
+		if markErr != nil {
+			return jobs.Job{}, markErr
+		}
+		if recordErr := s.revisions.RecordApplyResult(revisionID, failedJob.ID, string(failedJob.Status), failedJob.Result, coalesceJobTime(failedJob)); recordErr != nil {
+			return failedJob, recordErr
+		}
+		return failedJob, nil
 	}
 	s.emitEvent(events.Event{
 		Type:              events.TypeApplySucceeded,
@@ -157,7 +172,14 @@ func (s *ApplyService) Apply(ctx context.Context, revisionID string) (job jobs.J
 		RelatedRevisionID: revisionID,
 		RelatedJobID:      job.ID,
 	})
-	return s.jobs.MarkSucceeded(job.ID, "revision applied")
+	succeededJob, markErr := s.jobs.MarkSucceeded(job.ID, "revision applied")
+	if markErr != nil {
+		return jobs.Job{}, markErr
+	}
+	if recordErr := s.revisions.RecordApplyResult(revisionID, succeededJob.ID, string(succeededJob.Status), succeededJob.Result, coalesceJobTime(succeededJob)); recordErr != nil {
+		return succeededJob, recordErr
+	}
+	return succeededJob, nil
 }
 
 func (s *ApplyService) runApply(ctx context.Context, revision revisions.Revision, jobID string) error {
@@ -629,10 +651,18 @@ func mapAccessInputs(items []accesspolicies.AccessPolicy) []pipeline.AccessPolic
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].ID < sorted[j].ID })
 	out := make([]pipeline.AccessPolicyInput, 0, len(sorted))
 	for _, item := range sorted {
+		defaultAction := "allow"
+		if strings.EqualFold(strings.TrimSpace(item.SiteID), "control-plane-access") ||
+			strings.EqualFold(strings.TrimSpace(item.SiteID), "control-plane") ||
+			strings.EqualFold(strings.TrimSpace(item.SiteID), "ui") {
+			if len(item.AllowList) > 0 {
+				defaultAction = "deny"
+			}
+		}
 		out = append(out, pipeline.AccessPolicyInput{
 			ID:            item.ID,
 			SiteID:        item.SiteID,
-			DefaultAction: "allow",
+			DefaultAction: defaultAction,
 			AllowCIDRs:    append([]string(nil), item.AllowList...),
 			DenyCIDRs:     append([]string(nil), item.DenyList...),
 		})
@@ -759,7 +789,8 @@ func (NoopCommandExecutor) Run(name string, args []string, workdir string) error
 }
 
 type HTTPHealthChecker struct {
-	URL string
+	URL   string
+	Token string
 }
 
 func (h HTTPHealthChecker) Check(active *pipeline.ActivePointer) error {
@@ -768,8 +799,13 @@ func (h HTTPHealthChecker) Check(active *pipeline.ActivePointer) error {
 		url = "http://127.0.0.1:8081/readyz"
 	}
 
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	setRuntimeAuthHeader(req, strings.TrimSpace(h.Token))
 	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Get(url)
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
