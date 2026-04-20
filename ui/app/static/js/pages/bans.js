@@ -453,7 +453,7 @@ function renderReasonList(values) {
   return list.join(", ");
 }
 
-function buildAutoBanRows(events, resolveSiteID, siteBanDurationByID) {
+function buildAutoBanRows(events, resolveSiteID, siteBanDurationByID, unbanMarkersBySite) {
   const grouped = new Map();
   for (const item of normalizeList(events)) {
     if (!shouldTreatAsAutoBanEvent(item)) {
@@ -478,6 +478,10 @@ function buildAutoBanRows(events, resolveSiteID, siteBanDurationByID) {
     }
     const durationSec = parsePositiveNumber(siteBanDurationByID.get(siteID), 300);
     const key = `${siteID}::${ip}`;
+    const latestUnbanAt = unbanMarkersBySite.get(key);
+    if (latestUnbanAt instanceof Date && latestUnbanAt.getTime() >= occurredAt.getTime()) {
+      continue;
+    }
     const current = grouped.get(key) || {
       siteID,
       ip,
@@ -541,6 +545,39 @@ function buildAutoBanRows(events, resolveSiteID, siteBanDurationByID) {
     grouped.set(key, current);
   }
   return Array.from(grouped.values());
+}
+
+function buildLatestUnbanMarkers(auditItems, resolveSiteID) {
+  const out = new Map();
+  for (const item of normalizeList(auditItems)) {
+    const action = String(item?.action || "").trim().toLowerCase();
+    const status = String(item?.status || "").trim().toLowerCase();
+    if (action !== "accesspolicy.unban" || status !== "succeeded") {
+      continue;
+    }
+    const details = item?.details_json && typeof item.details_json === "object"
+      ? item.details_json
+      : (item?.details && typeof item.details === "object" ? item.details : {});
+    const ip = normalizeIP(details?.ip);
+    if (!ip) {
+      continue;
+    }
+    const rawSiteID = String(item?.site_id || item?.resource_id || "").trim();
+    const siteID = resolveSiteID(rawSiteID);
+    if (!siteID) {
+      continue;
+    }
+    const occurredAt = asDate(item?.occurred_at);
+    if (!occurredAt) {
+      continue;
+    }
+    const key = `${siteID}::${ip}`;
+    const existing = out.get(key);
+    if (!(existing instanceof Date) || occurredAt.getTime() >= existing.getTime()) {
+      out.set(key, occurredAt);
+    }
+  }
+  return out;
 }
 
 function renderModules(modules, t) {
@@ -963,10 +1000,11 @@ export async function renderBans(container, ctx) {
   const renderRows = async () => {
     setLoading(statusNode, ctx.t("bans.loading"));
     try {
-      const [sitesResponse, accessResponse, eventsResponse, sitesSecondary, accessSecondary, eventsSecondary] = await Promise.all([
+      const [sitesResponse, accessResponse, eventsResponse, auditResponse, sitesSecondary, accessSecondary, eventsSecondary] = await Promise.all([
         ctx.api.get("/api/sites"),
         ctx.api.get("/api/access-policies"),
         ctx.api.get("/api/events"),
+        tryGetJSON("/api/audit?action=accesspolicy.unban&status=succeeded&limit=500"),
         tryGetJSON("/api-app/sites"),
         tryGetJSON("/api-app/access-policies"),
         tryGetJSON("/api-app/events")
@@ -990,10 +1028,11 @@ export async function renderBans(container, ctx) {
       const allowlistBySite = buildIPSetBySite(accessPolicies, "allowlist", canonicalSiteID);
       const denylistBySite = buildIPSetBySite(accessPolicies, "denylist", canonicalSiteID);
       const siteBanDurationByID = await loadSiteBanDurations(sites, canonicalSiteID);
+      const unbanMarkersBySite = buildLatestUnbanMarkers(unwrapList(auditResponse, ["items"]), canonicalSiteID);
       const manualBanTimers = loadManualBanTimers();
       await processExpiredManualBanTimers(ctx, manualBanTimers);
       const manualRows = buildManualBanRows(accessPolicies, canonicalSiteID, manualBanTimers);
-      const autoRows = buildAutoBanRows(events, canonicalSiteID, siteBanDurationByID);
+      const autoRows = buildAutoBanRows(events, canonicalSiteID, siteBanDurationByID, unbanMarkersBySite);
       const rows = mergeBanRows(manualRows, autoRows)
         .filter((row) => !DISMISSED_BAN_ROWS.has(manualBanTimerRowKey(row.siteID, row.ip)))
         .sort((a, b) => {
@@ -1114,14 +1153,6 @@ export async function renderBans(container, ctx) {
           }
           if (action === "unban") {
             if (!confirmAction(ctx.t("bans.confirm.unban", { ip, site: row.siteID }))) {
-              return;
-            }
-            const currentlyDenied = (denylistBySite.get(row.siteID) || new Set()).has(ip);
-            if (!currentlyDenied && row.source !== "manual") {
-              dismissBanRow(row.siteID, ip);
-              clearRateLimitCookies(row.siteID);
-              ctx.notify(ctx.t("bans.info.autoProtectionActive"));
-              await renderRows();
               return;
             }
             try {

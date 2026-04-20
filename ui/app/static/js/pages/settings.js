@@ -1,3 +1,4 @@
+import { availableLanguages } from "../i18n.js";
 import { loadPreferences, savePreferences } from "../preferences.js";
 import { escapeHtml } from "../ui.js";
 
@@ -8,6 +9,12 @@ const SETTINGS_TABS = [
 ];
 
 let runtimeAutoCheckTimer = null;
+
+function renderLanguageOptions() {
+  return availableLanguages()
+    .map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.label)}</option>`)
+    .join("");
+}
 
 function clearRuntimeAutoCheckTimer() {
   if (runtimeAutoCheckTimer) {
@@ -132,8 +139,7 @@ export async function renderSettings(container, ctx) {
                 <div class="waf-field">
                   <label for="settings-language-select">${escapeHtml(ctx.t("settings.languageHint"))}</label>
                   <select id="settings-language-select">
-                    <option value="ru">RU</option>
-                    <option value="en">EN</option>
+                    ${renderLanguageOptions()}
                   </select>
                 </div>
               </div>
@@ -247,7 +253,7 @@ export async function renderSettings(container, ctx) {
   const runtimeSave = container.querySelector("#settings-runtime-save");
   const prefs = loadPreferences();
   if (languageSelect) {
-    languageSelect.value = String(prefs?.language || ctx.getLanguage?.() || "ru");
+    languageSelect.value = String(prefs?.language || ctx.getLanguage?.() || "en");
   }
 
   const setAlert = (message, success = false) => {
@@ -441,9 +447,9 @@ export async function renderSettings(container, ctx) {
   runtimeSave?.addEventListener("click", async () => {
     setAlert("");
     try {
-      const nextLanguage = String(languageSelect?.value || "ru");
+      const nextLanguage = String(languageSelect?.value || "en");
       savePreferences({ language: nextLanguage });
-      const currentLanguage = String(ctx.getLanguage?.() || "ru");
+      const currentLanguage = String(ctx.getLanguage?.() || "en");
       const languageChanged = nextLanguage !== currentLanguage;
       if (languageChanged && typeof ctx.setLanguage === "function") {
         await ctx.setLanguage(nextLanguage);

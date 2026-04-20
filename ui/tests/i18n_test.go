@@ -97,6 +97,41 @@ func TestI18NValuesNonEmpty(t *testing.T) {
 	}
 }
 
+func TestI18NAdditionalLocalesContainAllEnKeysAndNoArtifacts(t *testing.T) {
+	en := mustLoadLang(t, filepath.Join("..", "app", "static", "i18n", "en.json"))
+	locales := []string{"de", "sr", "zh"}
+
+	for _, locale := range locales {
+		lang := mustLoadLang(t, filepath.Join("..", "app", "static", "i18n", locale+".json"))
+		if missing := diffKeys(en, lang); len(missing) > 0 {
+			t.Fatalf("%s.json is missing keys present in en.json: %v", locale, sample(missing))
+		}
+		if extra := diffKeys(lang, en); len(extra) > 0 {
+			t.Fatalf("%s.json contains keys missing in en.json: %v", locale, sample(extra))
+		}
+
+		var broken []string
+		for key, value := range lang {
+			trimmed := strings.TrimSpace(value)
+			if trimmed == "" {
+				broken = append(broken, key+": empty")
+				continue
+			}
+			if hasMojibakeMarker(value) {
+				broken = append(broken, key+": mojibake")
+				continue
+			}
+			if strings.Contains(value, "???") || strings.Contains(value, "????") {
+				broken = append(broken, key+": question-mark artifact")
+			}
+		}
+		if len(broken) > 0 {
+			sort.Strings(broken)
+			t.Fatalf("%s.json contains localization artifacts: %v", locale, sample(broken))
+		}
+	}
+}
+
 func TestI18NRuFileNoEscapedUnicodeAndValidUTF8(t *testing.T) {
 	path := filepath.Join("..", "app", "static", "i18n", "ru.json")
 	raw, err := os.ReadFile(path)

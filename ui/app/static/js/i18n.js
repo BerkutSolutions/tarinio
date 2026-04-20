@@ -1,10 +1,66 @@
-const defaultLanguage = "ru";
+const defaultLanguage = "en";
 const languageChangedEvent = "app:language-changed";
+const languageStorageKey = "waf.language";
 const dictionaries = new Map();
-let currentLanguage = defaultLanguage;
+const supportedLanguages = ["en", "ru", "de", "sr", "zh"];
+const languageCatalog = [
+  { id: "en", label: "English" },
+  { id: "ru", label: "Русский" },
+  { id: "de", label: "Deutsch" },
+  { id: "sr", label: "Српски" },
+  { id: "zh", label: "中文" },
+];
+let currentLanguage = loadInitialLanguage();
 
 function normalizeLanguage(language) {
-  return language === "en" ? "en" : defaultLanguage;
+  const value = String(language || "").trim().toLowerCase();
+  if (!value) {
+    return defaultLanguage;
+  }
+  const primary = value.split(/[-_]/)[0];
+  return supportedLanguages.includes(primary) ? primary : defaultLanguage;
+}
+
+function detectBrowserLanguage() {
+  const candidates = [];
+  try {
+    if (Array.isArray(navigator.languages)) {
+      candidates.push(...navigator.languages);
+    }
+    if (navigator.language) {
+      candidates.push(navigator.language);
+    }
+  } catch {
+    return defaultLanguage;
+  }
+  for (const candidate of candidates) {
+    const normalized = normalizeLanguage(candidate);
+    if (supportedLanguages.includes(normalized)) {
+      return normalized;
+    }
+  }
+  return defaultLanguage;
+}
+
+function loadStoredLanguage() {
+  try {
+    return normalizeLanguage(window.localStorage.getItem(languageStorageKey) || "");
+  } catch {
+    return "";
+  }
+}
+
+function loadInitialLanguage() {
+  const stored = loadStoredLanguage();
+  return stored || detectBrowserLanguage();
+}
+
+function persistLanguage(language) {
+  try {
+    window.localStorage.setItem(languageStorageKey, normalizeLanguage(language));
+  } catch {
+    // ignore storage failures
+  }
 }
 
 function interpolate(template, params = {}) {
@@ -53,6 +109,10 @@ export function getLanguage() {
   return normalizeLanguage(currentLanguage);
 }
 
+export function availableLanguages() {
+  return languageCatalog.map((item) => ({ ...item }));
+}
+
 export async function preloadTranslations(language = getLanguage()) {
   await loadDictionary(defaultLanguage);
   const normalized = normalizeLanguage(language);
@@ -97,6 +157,7 @@ export async function setLanguage(language) {
   const normalized = normalizeLanguage(language);
   const previous = getLanguage();
   currentLanguage = normalized;
+  persistLanguage(normalized);
   await applyTranslations(normalized);
   if (previous !== normalized) {
     window.dispatchEvent(new CustomEvent(languageChangedEvent, { detail: { language: normalized } }));

@@ -34,6 +34,11 @@ type securityEventSource struct {
 	offset int64
 }
 
+const (
+	defaultBurstRequestsPerSecondThreshold     = 25
+	defaultBurstPathRequestsPerSecondThreshold = 10
+)
+
 func newSecurityEventSource(path string) *securityEventSource {
 	return &securityEventSource{path: path}
 }
@@ -581,6 +586,8 @@ func (s *securityEventSource) next() ([]securityEvent, error) {
 	burstBySecond := make(map[string]int)
 	burstBySecondAndPath := make(map[string]int)
 	burstMeta := make(map[string]map[string]string)
+	burstThreshold := burstThresholdFromEnv("WAF_SECURITY_EVENT_BURST_RPS_THRESHOLD", defaultBurstRequestsPerSecondThreshold)
+	burstPathThreshold := burstThresholdFromEnv("WAF_SECURITY_EVENT_BURST_PATH_RPS_THRESHOLD", defaultBurstPathRequestsPerSecondThreshold)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" {
@@ -590,14 +597,16 @@ func (s *securityEventSource) next() ([]securityEvent, error) {
 		if !ok {
 			continue
 		}
-		if shouldSkipInternalSite(item.siteID) {
+		if !shouldTrackRequestBurst(item) {
 			continue
 		}
 
 		second := item.when.UTC().Format("2006-01-02T15:04:05Z")
-		burstKey := item.ip + "|" + second
+		scopeKey := burstScopeKey(item)
+		burstKey := item.ip + "|" + scopeKey + "|" + second
 		burstBySecond[burstKey]++
-		burstPathKey := item.ip + "|" + item.path + "|" + second
+		burstPath := normalizeBurstPath(item.path)
+		burstPathKey := item.ip + "|" + scopeKey + "|" + burstPath + "|" + second
 		burstBySecondAndPath[burstPathKey]++
 		if _, exists := burstMeta[burstKey]; !exists {
 			burstMeta[burstKey] = map[string]string{
@@ -611,7 +620,7 @@ func (s *securityEventSource) next() ([]securityEvent, error) {
 		if _, exists := burstMeta[burstPathKey]; !exists {
 			burstMeta[burstPathKey] = map[string]string{
 				"ip":      item.ip,
-				"path":    item.path,
+				"path":    burstPath,
 				"ts":      second,
 				"site_id": item.siteID,
 				"host":    item.host,
@@ -668,7 +677,7 @@ func (s *securityEventSource) next() ([]securityEvent, error) {
 	}
 
 	for key, count := range burstBySecond {
-		if count < 8 {
+		if count < burstThreshold {
 			continue
 		}
 		meta := burstMeta[key]
@@ -689,7 +698,7 @@ func (s *securityEventSource) next() ([]securityEvent, error) {
 		})
 	}
 	for key, count := range burstBySecondAndPath {
-		if count < 4 {
+		if count < burstPathThreshold {
 			continue
 		}
 		meta := burstMeta[key]
@@ -824,4 +833,103 @@ func sanitizeSiteID(value string) string {
 		return ""
 	}
 	return value
+}
+
+func burstThresholdFromEnv(name string, fallback int) int {
+	raw := strings.TrimSpace(os.Getenv(name))
+	if raw == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(raw)
+	if err != nil || parsed <= 0 {
+		return fallback
+	}
+	return parsed
+}
+
+func burstScopeKey(item parsedAccess) string {
+	if siteID := sanitizeSiteID(item.siteID); siteID != "" {
+		return siteID
+	}
+	if host := strings.ToLower(strings.TrimSpace(item.host)); host != "" {
+		return host
+	}
+	return "_global"
+}
+
+func normalizeBurstPath(path string) string {
+	trimmed := strings.TrimSpace(path)
+	if trimmed == "" || trimmed == "-" {
+		return ""
+	}
+	parsed, err := url.Parse(trimmed)
+	if err == nil && strings.TrimSpace(parsed.Path) != "" {
+		trimmed = parsed.Path
+	}
+	return strings.ToLower(strings.TrimSpace(trimmed))
+}
+
+func shouldTrackRequestBurst(item parsedAccess) bool {
+	if shouldSkipInternalSite(item.siteID) {
+		return false
+	}
+	if item.status == 429 || item.status == 403 || item.status == 444 {
+		return false
+	}
+	if strings.EqualFold(strings.TrimSpace(item.method), "OPTIONS") {
+		return false
+	}
+	return !shouldIgnoreBurstPath(item.path)
+}
+
+func shouldIgnoreBurstPath(path string) bool {
+	normalized := normalizeBurstPath(path)
+	if normalized == "" {
+		return false
+	}
+	for _, prefix := range []string{
+		"/_static/",
+		"/static/",
+		"/assets/",
+		"/build/",
+		"/dist/",
+		"/favicon",
+		"/robots.txt",
+		"/manifest",
+		"/site.webmanifest",
+		"/browserconfig.xml",
+		"/apple-touch-icon",
+		"/sitemap",
+	} {
+		if strings.HasPrefix(normalized, prefix) {
+			return true
+		}
+	}
+	for _, suffix := range []string{
+		".css",
+		".js",
+		".mjs",
+		".map",
+		".png",
+		".jpg",
+		".jpeg",
+		".gif",
+		".svg",
+		".ico",
+		".webp",
+		".avif",
+		".woff",
+		".woff2",
+		".ttf",
+		".otf",
+		".eot",
+		".json",
+		".xml",
+		".txt",
+	} {
+		if strings.HasSuffix(normalized, suffix) {
+			return true
+		}
+	}
+	return false
 }

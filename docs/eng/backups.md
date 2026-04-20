@@ -1,6 +1,6 @@
-# TARINIO 2.0.0 Backups And Restore
+# TARINIO 2.0.1 Backups And Restore
 
-Wiki baseline: `2.0.0`
+Wiki baseline: `2.0.1`
 
 This document describes what must be backed up and how restore readiness should be validated for TARINIO.
 

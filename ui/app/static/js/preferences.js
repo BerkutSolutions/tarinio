@@ -1,7 +1,8 @@
 import { getLanguage } from "./i18n.js";
 
+const preferencesStorageKey = "waf.preferences";
 const defaults = {
-  language: "ru",
+  language: "en",
   timeZone: "Europe/Moscow",
   autoLogout: false,
 };
@@ -15,12 +16,36 @@ function detectTimeZone() {
   }
 }
 
+function readStoredPreferences() {
+  try {
+    const raw = window.localStorage.getItem(preferencesStorageKey);
+    if (!raw) {
+      return {};
+    }
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeStoredPreferences(value) {
+  try {
+    window.localStorage.setItem(preferencesStorageKey, JSON.stringify(value));
+  } catch {
+    // ignore storage failures
+  }
+}
+
 export function loadPreferences() {
   if (!memoryPreferences) {
+    const stored = readStoredPreferences();
     memoryPreferences = {
       ...defaults,
+      ...(stored || {}),
       timeZone: detectTimeZone(),
-      language: getLanguage(),
+      language: String(stored?.language || getLanguage() || defaults.language),
+      autoLogout: Boolean(stored?.autoLogout),
     };
   }
   return { ...memoryPreferences };
@@ -32,6 +57,7 @@ export function savePreferences(next) {
     ...(next || {}),
   };
   memoryPreferences = { ...merged };
+  writeStoredPreferences(memoryPreferences);
   return merged;
 }
 

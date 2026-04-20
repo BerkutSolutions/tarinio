@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -15,9 +15,33 @@
 </head>
 <body>
   <article class="card">
-    <h1 class="title">429 Too Many Requests</h1>
-    <p class="sub">Сработала защита от флуда. Подождите, пока завершится окно ограничения, и повторите попытку.</p>
-    <span class="badge">WAF Anti-DDoS Active</span>
+    <h1 class="title" id="status-title">429 Too Many Requests</h1>
+    <p class="sub" id="status-sub">Flood protection is active. Wait for the cooldown window to end and try again.</p>
+    <span class="badge" id="status-badge">Protection active</span>
   </article>
+  <script>
+    (function () {
+      var messages = {"en":{"title":"429 Too Many Requests","sub":"Flood protection is active. Wait for the cooldown window to end and try again.","badge":"Protection active"},"ru":{"title":"429 \u0421\u043b\u0438\u0448\u043a\u043e\u043c \u043c\u043d\u043e\u0433\u043e \u0437\u0430\u043f\u0440\u043e\u0441\u043e\u0432","sub":"\u0421\u0440\u0430\u0431\u043e\u0442\u0430\u043b\u0430 \u0437\u0430\u0449\u0438\u0442\u0430 \u043e\u0442 \u0444\u043b\u0443\u0434\u0430. \u041f\u043e\u0434\u043e\u0436\u0434\u0438\u0442\u0435, \u043f\u043e\u043a\u0430 \u0437\u0430\u0432\u0435\u0440\u0448\u0438\u0442\u0441\u044f \u043e\u043a\u043d\u043e \u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u043a\u0438, \u0438 \u043f\u043e\u0432\u0442\u043e\u0440\u0438\u0442\u0435 \u043f\u043e\u043f\u044b\u0442\u043a\u0443.","badge":"\u0417\u0430\u0449\u0438\u0442\u0430 \u0430\u043a\u0442\u0438\u0432\u043d\u0430"},"de":{"title":"429 Zu viele Anfragen","sub":"Der Flutschutz ist aktiv. Warten Sie, bis das Sperrfenster endet, und versuchen Sie es erneut.","badge":"Schutz aktiv"},"sr":{"title":"429 \u041f\u0440\u0435\u0432\u0438\u0448\u0435 \u0437\u0430\u0445\u0442\u0435\u0432\u0430","sub":"\u0417\u0430\u0448\u0442\u0438\u0442\u0430 \u043e\u0434 \u0444\u043b\u0443\u0434\u0430 \u0458\u0435 \u0430\u043a\u0442\u0438\u0432\u043d\u0430. \u0421\u0430\u0447\u0435\u043a\u0430\u0458\u0442\u0435 \u0434\u0430 \u0441\u0435 \u043f\u0440\u043e\u0437\u043e\u0440 \u0431\u043b\u043e\u043a\u0430\u0434\u0435 \u0437\u0430\u0432\u0440\u0448\u0438 \u0438 \u043f\u043e\u043a\u0443\u0448\u0430\u0458\u0442\u0435 \u043f\u043e\u043d\u043e\u0432\u043e.","badge":"\u0417\u0430\u0448\u0442\u0438\u0442\u0430 \u0430\u043a\u0442\u0438\u0432\u043d\u0430"},"zh":{"title":"429 \u8bf7\u6c42\u8fc7\u591a","sub":"\u9632\u6d2a\u4fdd\u62a4\u5df2\u542f\u7528\u3002\u8bf7\u7b49\u5f85\u5c01\u9501\u7a97\u53e3\u7ed3\u675f\u540e\u518d\u8bd5\u3002","badge":"\u4fdd\u62a4\u5df2\u542f\u7528"}}
+      var candidates = [];
+      try {
+        if (Array.isArray(navigator.languages)) candidates = candidates.concat(navigator.languages);
+        if (navigator.language) candidates.push(navigator.language);
+      } catch (_error) {}
+      var lang = 'en';
+      for (var i = 0; i < candidates.length; i += 1) {
+        var value = String(candidates[i] || '').toLowerCase().split(/[-_]/)[0];
+        if (messages[value]) {
+          lang = value;
+          break;
+        }
+      }
+      var copy = messages[lang] || messages.en;
+      document.documentElement.lang = lang;
+      document.title = copy.title;
+      document.getElementById('status-title').textContent = copy.title;
+      document.getElementById('status-sub').textContent = copy.sub;
+      document.getElementById('status-badge').textContent = copy.badge;
+    })();
+  </script>
 </body>
 </html>

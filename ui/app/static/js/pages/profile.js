@@ -1,6 +1,12 @@
-import { applyTranslations } from "../i18n.js";
+import { applyTranslations, availableLanguages } from "../i18n.js";
 import { availableTimeZones, formatDateTimeInZone, loadPreferences, savePreferences } from "../preferences.js";
 import { escapeHtml } from "../ui.js";
+
+function renderLanguageOptions() {
+  return availableLanguages()
+    .map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.label)}</option>`)
+    .join("");
+}
 
 function showAlert(el, msg, success = false) {
   if (!el) return;
@@ -214,8 +220,7 @@ export async function renderProfile(container, ctx) {
                 <div class="waf-field">
                   <label for="settings-language">${escapeHtml(ctx.t("settings.language"))}</label>
                   <select id="settings-language" name="language">
-                    <option value="ru">RU</option>
-                    <option value="en">EN</option>
+                    ${renderLanguageOptions()}
                   </select>
                 </div>
               </div>
@@ -386,7 +391,7 @@ export async function renderProfile(container, ctx) {
   const lang = container.querySelector("#settings-language");
   const tz = container.querySelector("#settings-timezone");
   const autoLogout = container.querySelector("#settings-auto-logout");
-  lang.value = prefs.language || "ru";
+  lang.value = prefs.language || "en";
   autoLogout.checked = !!prefs.autoLogout;
   tz.innerHTML = availableTimeZones().map((zone) => `<option value="${escapeHtml(zone)}">${escapeHtml(zone)}</option>`).join("");
   tz.value = prefs.timeZone || "Europe/Moscow";
@@ -394,11 +399,11 @@ export async function renderProfile(container, ctx) {
   container.querySelector("#settings-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const next = savePreferences({
-      language: lang.value || "ru",
+      language: lang.value || "en",
       timeZone: tz.value || "Europe/Moscow",
       autoLogout: !!autoLogout.checked,
     });
-    await ctx.setLanguage(next.language || "ru");
+    await ctx.setLanguage(next.language || "en");
     showAlert(alertEl, ctx.t("settings.saved"), true);
     ctx.notify(ctx.t("settings.saved"));
   });

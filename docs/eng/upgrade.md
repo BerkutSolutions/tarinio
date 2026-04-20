@@ -1,6 +1,6 @@
-# TARINIO 2.0.0 Upgrade And Rollback
+# TARINIO 2.0.1 Upgrade And Rollback
 
-Wiki baseline: `2.0.0`
+Wiki baseline: `2.0.1`
 
 This document describes the recommended upgrade lifecycle and rollback criteria for TARINIO.
 

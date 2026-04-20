@@ -1,6 +1,6 @@
-# TARINIO 2.0.0 Deployment
+# TARINIO 2.0.1 Deployment
 
-Wiki baseline: `2.0.0`
+Wiki baseline: `2.0.1`
 
 This document describes practical deployment paths for TARINIO across local, test, and production-like environments.
 
@@ -88,7 +88,7 @@ The deployment should be considered complete only when:
 
 - `/healthz` is stable;
 - login and onboarding work;
-- `GET /api/app/meta` returns `2.0.0`;
+- `GET /api/app/meta` returns `2.0.1`;
 - a site can be created and turned into a working revision;
 - runtime serves the expected host after apply;
 - events, requests, and audit entries appear in the UI.

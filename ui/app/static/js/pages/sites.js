@@ -1562,9 +1562,9 @@ function renderWizardNav(activeTab, ctx) {
           aria-selected="${activeTab === item.id ? "true" : "false"}"
           data-wizard-tab="${item.id}">
           <div class="waf-service-step-index">${index + 1}</div>
-          <div>
-            <div class="waf-list-title">${escapeHtml(item.title)}</div>
-            <div class="waf-note">${escapeHtml(item.subtitle)}</div>
+          <div class="waf-service-wizard-copy">
+            <div class="waf-service-wizard-title">${escapeHtml(item.title)}</div>
+            <div class="waf-service-wizard-subtitle">${escapeHtml(item.subtitle)}</div>
           </div>
         </button>
       `).join("")}
@@ -1622,7 +1622,7 @@ function renderDetailView(state, ctx) {
           <div class="waf-card-body waf-stack">
             <div id="sites-feedback"></div>
             <form id="service-editor-form" class="waf-form waf-stack">
-              <section class="waf-subcard waf-stack waf-service-compact-section${state.activeTab === "front" ? "" : " waf-hidden"}" data-tab-panel="front">
+              <section class="waf-stack waf-service-compact-section${state.activeTab === "front" ? "" : " waf-hidden"}" data-tab-panel="front">
                 <div class="waf-list-title">${escapeHtml(ctx.t("sites.wizard.front.title"))}</div>
                 <div class="waf-form-grid">
                   <div class="waf-field">
@@ -1702,7 +1702,7 @@ function renderDetailView(state, ctx) {
                 </div>
               </section>
 
-              <section class="waf-subcard waf-stack${state.activeTab === "upstream" ? "" : " waf-hidden"}" data-tab-panel="upstream">
+              <section class="waf-stack${state.activeTab === "upstream" ? "" : " waf-hidden"}" data-tab-panel="upstream">
                 <div class="waf-list-title">${escapeHtml(ctx.t("sites.wizard.upstream.title"))}</div>
                 <input id="service-upstream-id" type="hidden" value="${escapeHtml(draft.upstream_id)}">
                 <div class="waf-form-grid three waf-upstream-toggle-row">
@@ -1786,7 +1786,7 @@ function renderDetailView(state, ctx) {
                 </div>
               </section>
 
-              <section class="waf-subcard waf-stack waf-service-compact-section${state.activeTab === "http" ? "" : " waf-hidden"}" data-tab-panel="http">
+              <section class="waf-stack waf-service-compact-section${state.activeTab === "http" ? "" : " waf-hidden"}" data-tab-panel="http">
                 <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.http.title"))}</div>
                 <div class="waf-form-grid">
                   ${renderListEditor("allowed_methods", ctx.t("sites.easy.http.allowedMethods"), draft.allowed_methods, "GET", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
@@ -1806,7 +1806,7 @@ function renderDetailView(state, ctx) {
                 </div>
               </section>
 
-              <section class="waf-subcard waf-stack waf-service-compact-section${state.activeTab === "headers" ? "" : " waf-hidden"}" data-tab-panel="headers">
+              <section class="waf-stack waf-service-compact-section${state.activeTab === "headers" ? "" : " waf-hidden"}" data-tab-panel="headers">
                 <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.headers.title"))}</div>
                 <div class="waf-form-grid">
                   <div class="waf-field">
@@ -1831,7 +1831,7 @@ function renderDetailView(state, ctx) {
                 </div>
               </section>
 
-              <section class="waf-subcard waf-stack waf-service-compact-section${state.activeTab === "traffic" ? "" : " waf-hidden"}" data-tab-panel="traffic">
+              <section class="waf-stack waf-service-compact-section${state.activeTab === "traffic" ? "" : " waf-hidden"}" data-tab-panel="traffic">
                 <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.traffic.title"))}</div>
                 <div class="waf-traffic-layout">
                   <div class="waf-stack">
@@ -1933,7 +1933,7 @@ function renderDetailView(state, ctx) {
                 </div>
               </section>
 
-              <section class="waf-subcard waf-stack waf-service-compact-section${state.activeTab === "blocking" ? "" : " waf-hidden"}" data-tab-panel="blocking">
+              <section class="waf-stack waf-service-compact-section${state.activeTab === "blocking" ? "" : " waf-hidden"}" data-tab-panel="blocking">
                 <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.blocking.title"))}</div>
                 <div class="waf-note">${escapeHtml(ctx.t("sites.easy.blocking.baseHint"))}</div>
                 <div class="waf-form-grid">
@@ -1970,7 +1970,7 @@ function renderDetailView(state, ctx) {
                 </div>
               </section>
 
-              <section class="waf-subcard waf-stack waf-service-compact-section${state.activeTab === "antibot" ? "" : " waf-hidden"}" data-tab-panel="antibot">
+              <section class="waf-stack waf-service-compact-section${state.activeTab === "antibot" ? "" : " waf-hidden"}" data-tab-panel="antibot">
                 <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.antibot.title"))}</div>
                 <div class="waf-form-grid">
                   <div class="waf-field">
@@ -2034,7 +2034,7 @@ function renderDetailView(state, ctx) {
                 </div>
               </section>
 
-              <section class="waf-subcard waf-stack waf-service-compact-section${state.activeTab === "geo" ? "" : " waf-hidden"}" data-tab-panel="geo">
+              <section class="waf-stack waf-service-compact-section${state.activeTab === "geo" ? "" : " waf-hidden"}" data-tab-panel="geo">
                 <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.geo.title"))}</div>
                 <div class="waf-form-grid">
                   ${renderCountryEditor("blacklist_country", ctx.t("sites.easy.geo.countryBlacklist"), draft.blacklist_country, state.geoCatalog, { full: false, emptyLabel: ctx.t("sites.easy.noValues"), search: state.countryFilters.blacklist_country, ctx })}
@@ -2042,7 +2042,7 @@ function renderDetailView(state, ctx) {
                 </div>
               </section>
 
-              <section class="waf-subcard waf-stack waf-service-compact-section${state.activeTab === "modsec" ? "" : " waf-hidden"}" data-tab-panel="modsec">
+              <section class="waf-stack waf-service-compact-section${state.activeTab === "modsec" ? "" : " waf-hidden"}" data-tab-panel="modsec">
                 <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.modsec.title"))}</div>
                 <div class="waf-form-grid">
                   <label class="waf-checkbox">

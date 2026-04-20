@@ -811,25 +811,23 @@ label,
   grid-template-columns: 38px minmax(0, 1fr);
   gap: 12px;
   align-items: start;
-  padding: 14px;
-  border: 1px solid rgba(125, 155, 255, 0.22);
-  border-radius: 14px;
-  background: rgba(18, 24, 36, 0.88);
+  padding: 10px 8px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
   width: 100%;
   text-align: left;
   color: #eef3ff;
   cursor: pointer;
+  transition: background-color 0.2s ease;
 }
 
 .waf-service-wizard-item:hover {
-  border-color: rgba(125, 155, 255, 0.45);
-  background: rgba(28, 38, 58, 0.92);
+  background: rgba(24, 32, 48, 0.56);
 }
 
 .waf-service-wizard-item.is-active {
-  border-color: rgba(125, 155, 255, 0.65);
-  box-shadow: 0 0 0 1px rgba(125, 155, 255, 0.24);
-  background: linear-gradient(135deg, rgba(125, 155, 255, 0.2), rgba(20, 28, 43, 0.92));
+  background: rgba(38, 52, 82, 0.42);
 }
 
 .waf-service-step-index {
@@ -842,6 +840,44 @@ label,
   background: rgba(125, 155, 255, 0.16);
   border: 1px solid rgba(125, 155, 255, 0.28);
   font-weight: 700;
+}
+
+.waf-service-wizard-item.is-active .waf-service-step-index {
+  background: rgba(125, 155, 255, 0.26);
+  border-color: rgba(125, 155, 255, 0.52);
+  box-shadow: 0 0 0 1px rgba(125, 155, 255, 0.18);
+}
+
+.waf-service-wizard-copy {
+  min-width: 0;
+}
+
+.waf-service-wizard-title,
+.waf-service-wizard-subtitle {
+  display: block;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  white-space: normal;
+}
+
+.waf-service-wizard-title {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: #f3f6ff;
+}
+
+.waf-service-wizard-subtitle {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.66);
+  overflow-wrap: anywhere;
 }
 
 .waf-mode-switch {
@@ -1418,7 +1454,7 @@ canvas {
   font-weight: 500;
   letter-spacing: 0.3px;
   cursor: pointer;
-  transition: background-color 0.3s, margin 0.3s;
+  transition: background-color 0.3s, color 0.3s, margin 0.3s;
   margin: 0;
   border-radius: 8px;
   text-decoration: none;
@@ -1430,11 +1466,10 @@ canvas {
 }
 
 .sidebar-link.active {
-  background-color: rgba(0, 0, 0, 0.6);
+  background-color: rgba(42, 47, 59, 0.7);
 }
 
 .sidebar-link-label {
-  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1446,7 +1481,7 @@ canvas {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: rgba(220, 232, 255, 0.9);
+  color: inherit;
   flex: 0 0 18px;
   margin-right: 12px;
 }
@@ -1454,6 +1489,11 @@ canvas {
 .sidebar-link-icon svg {
   width: 18px;
   height: 18px;
+}
+
+.sidebar-link:hover .sidebar-link-icon,
+.sidebar-link.active .sidebar-link-icon {
+  color: inherit;
 }
 
 .sidebar-footer {

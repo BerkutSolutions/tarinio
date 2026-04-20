@@ -61,6 +61,15 @@ function formatPermissionLabel(ctx, permission) {
   );
 }
 
+function formatRoleLabel(ctx, role) {
+  const roleID = String(role?.id || "").trim();
+  return translateMaybe(
+    ctx,
+    `administration.roles.name.${roleID}`,
+    String(role?.name || roleID || "")
+  );
+}
+
 function renderPasswordToggleButton(ctx, targetID) {
   return `
     <button
@@ -201,15 +210,20 @@ function renderScriptCard(script, ctx, result) {
   `;
 }
 
-function renderRoleList(roleIDs) {
+function renderRoleList(roleIDs, roles, ctx) {
   const items = Array.isArray(roleIDs) ? roleIDs : [];
   if (!items.length) {
     return '<span class="waf-note">-</span>';
   }
-  return `<div class="administration-role-pill-list">${items.map((roleID) => `<span class="badge badge-neutral">${escapeHtml(roleID)}</span>`).join("")}</div>`;
+  const roleByID = new Map((Array.isArray(roles) ? roles : []).map((role) => [String(role?.id || ""), role]));
+  return `<div class="administration-role-pill-list">${items.map((roleID) => {
+    const normalizedID = String(roleID || "");
+    const role = roleByID.get(normalizedID) || { id: normalizedID, name: normalizedID };
+    return `<span class="badge badge-neutral">${escapeHtml(formatRoleLabel(ctx, role))}</span>`;
+  }).join("")}</div>`;
 }
 
-function renderUsersTable(users, ctx) {
+function renderUsersTable(users, roles, ctx) {
   const rows = Array.isArray(users) ? users : [];
   if (!rows.length) {
     return `<div class="waf-empty">${escapeHtml(ctx.t("administration.users.empty"))}</div>`;
@@ -234,7 +248,7 @@ function renderUsersTable(users, ctx) {
                 <strong>${escapeHtml(item.username || item.id || "-")}</strong>
               </td>
               <td>${escapeHtml(item.email || "-")}</td>
-              <td>${renderRoleList(item.role_ids)}</td>
+              <td>${renderRoleList(item.role_ids, roles, ctx)}</td>
               <td>${escapeHtml(item.is_active ? ctx.t("administration.users.status.active") : ctx.t("administration.users.status.disabled"))}</td>
               <td>${escapeHtml(formatDate(item.last_login_at || ""))}</td>
               <td>
@@ -343,7 +357,7 @@ function renderUserModal(item, mode, roles, ctx) {
                 ${(Array.isArray(roles) ? roles : []).map((role) => `
                   <label class="administration-role-option">
                     <input type="checkbox" name="role_ids" value="${escapeHtml(role.id)}"${roleIDs.has(role.id) ? " checked" : ""}${editable ? "" : " disabled"}>
-                    <span class="administration-role-option-title">${escapeHtml(role.name || role.id)}</span>
+                    <span class="administration-role-option-title">${escapeHtml(formatRoleLabel(ctx, role))}</span>
                   </label>
                 `).join("")}
               </div>
@@ -503,7 +517,7 @@ export async function renderAdministration(container, ctx) {
   };
 
   const renderUsers = () => {
-    usersStatus.innerHTML = renderUsersTable(state.users, ctx);
+    usersStatus.innerHTML = renderUsersTable(state.users, state.roles, ctx);
   };
 
   const renderRoles = () => {

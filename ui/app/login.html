@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -16,23 +16,7 @@
   </style>
   <script>
     (function () {
-      function toCode(input) {
-        var value = Number(input || 0);
-        if (value === 403 || value === 429) return value;
-        return 429;
-      }
-      function renderBlocked(opts) {
-        if (window.__wafBlockedRendered) return;
-        window.__wafBlockedRendered = true;
-        var code = toCode(opts && opts.code);
-        var title = code === 403 ? "403 Доступ ограничен" : "429 Слишком много запросов";
-        var text = code === 403
-          ? "Доступ временно ограничен защитой WAF/Anti-DDoS."
-          : "Сработала защита от флуда. Подождите, пока завершится окно блокировки.";
-        document.body.innerHTML = '<div class="waf-fallback-wrap"><article class="waf-fallback-card"><h1 class="waf-fallback-title">' + title + '</h1><p class="waf-fallback-sub">' + text + '</p><span class="waf-fallback-badge">Защита активна</span><p class="waf-fallback-hint">Обновляйте страницу позже. Пока блокировка активна, основной интерфейс скрыт.</p></article></div>';
-      }
-      window.__wafRenderBlocked = renderBlocked;
-      window.__wafMarkBoot = function () { window.__wafBootOk = true; };
+      var messages = {"en":{"title403":"403 Access Restricted","title429":"429 Too Many Requests","text403":"Access is temporarily limited by the WAF/Anti-DDoS protection policy.","text429":"Flood protection is active. Wait for the cooldown window to end and try again.","badge":"Protection active","hint":"Refresh the page later. While the block is active, the main interface stays hidden."},"ru":{"title403":"403 \u0414\u043e\u0441\u0442\u0443\u043f \u043e\u0433\u0440\u0430\u043d\u0438\u0447\u0435\u043d","title429":"429 \u0421\u043b\u0438\u0448\u043a\u043e\u043c \u043c\u043d\u043e\u0433\u043e \u0437\u0430\u043f\u0440\u043e\u0441\u043e\u0432","text403":"\u0414\u043e\u0441\u0442\u0443\u043f \u0432\u0440\u0435\u043c\u0435\u043d\u043d\u043e \u043e\u0433\u0440\u0430\u043d\u0438\u0447\u0435\u043d \u043f\u0440\u0430\u0432\u0438\u043b\u0430\u043c\u0438 \u0437\u0430\u0449\u0438\u0442\u044b WAF/Anti-DDoS.","text429":"\u0421\u0440\u0430\u0431\u043e\u0442\u0430\u043b\u0430 \u0437\u0430\u0449\u0438\u0442\u0430 \u043e\u0442 \u0444\u043b\u0443\u0434\u0430. \u041f\u043e\u0434\u043e\u0436\u0434\u0438\u0442\u0435, \u043f\u043e\u043a\u0430 \u0437\u0430\u0432\u0435\u0440\u0448\u0438\u0442\u0441\u044f \u043e\u043a\u043d\u043e \u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u043a\u0438, \u0438 \u043f\u043e\u0432\u0442\u043e\u0440\u0438\u0442\u0435 \u043f\u043e\u043f\u044b\u0442\u043a\u0443.","badge":"\u0417\u0430\u0449\u0438\u0442\u0430 \u0430\u043a\u0442\u0438\u0432\u043d\u0430","hint":"\u041e\u0431\u043d\u043e\u0432\u043b\u044f\u0439\u0442\u0435 \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0443 \u043f\u043e\u0437\u0436\u0435. \u041f\u043e\u043a\u0430 \u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u043a\u0430 \u0430\u043a\u0442\u0438\u0432\u043d\u0430, \u043e\u0441\u043d\u043e\u0432\u043d\u043e\u0439 \u0438\u043d\u0442\u0435\u0440\u0444\u0435\u0439\u0441 \u0441\u043a\u0440\u044b\u0442."},"de":{"title403":"403 Zugriff eingeschr\u00e4nkt","title429":"429 Zu viele Anfragen","text403":"Der Zugriff ist durch die WAF-/Anti-DDoS-Schutzrichtlinie vor\u00fcbergehend eingeschr\u00e4nkt.","text429":"Der Flutschutz ist aktiv. Warten Sie, bis das Sperrfenster endet, und versuchen Sie es erneut.","badge":"Schutz aktiv","hint":"Laden Sie die Seite sp\u00e4ter erneut. Solange die Sperre aktiv ist, bleibt die Hauptoberfl\u00e4che ausgeblendet."},"sr":{"title403":"403 \u041f\u0440\u0438\u0441\u0442\u0443\u043f \u0458\u0435 \u043e\u0433\u0440\u0430\u043d\u0438\u0447\u0435\u043d","title429":"429 \u041f\u0440\u0435\u0432\u0438\u0448\u0435 \u0437\u0430\u0445\u0442\u0435\u0432\u0430","text403":"\u041f\u0440\u0438\u0441\u0442\u0443\u043f \u0458\u0435 \u043f\u0440\u0438\u0432\u0440\u0435\u043c\u0435\u043d\u043e \u043e\u0433\u0440\u0430\u043d\u0438\u0447\u0435\u043d \u043f\u043e\u043b\u0438\u0442\u0438\u043a\u043e\u043c \u0437\u0430\u0448\u0442\u0438\u0442\u0435 WAF/Anti-DDoS.","text429":"\u0417\u0430\u0448\u0442\u0438\u0442\u0430 \u043e\u0434 \u0444\u043b\u0443\u0434\u0430 \u0458\u0435 \u0430\u043a\u0442\u0438\u0432\u043d\u0430. \u0421\u0430\u0447\u0435\u043a\u0430\u0458\u0442\u0435 \u0434\u0430 \u0441\u0435 \u043f\u0440\u043e\u0437\u043e\u0440 \u0431\u043b\u043e\u043a\u0430\u0434\u0435 \u0437\u0430\u0432\u0440\u0448\u0438 \u0438 \u043f\u043e\u043a\u0443\u0448\u0430\u0458\u0442\u0435 \u043f\u043e\u043d\u043e\u0432\u043e.","badge":"\u0417\u0430\u0448\u0442\u0438\u0442\u0430 \u0430\u043a\u0442\u0438\u0432\u043d\u0430","hint":"\u041e\u0441\u0432\u0435\u0436\u0438\u0442\u0435 \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0443 \u043a\u0430\u0441\u043d\u0438\u0458\u0435. \u0414\u043e\u043a \u0458\u0435 \u0431\u043b\u043e\u043a\u0430\u0434\u0430 \u0430\u043a\u0442\u0438\u0432\u043d\u0430, \u0433\u043b\u0430\u0432\u043d\u0438 \u0438\u043d\u0442\u0435\u0440\u0444\u0435\u0458\u0441 \u043e\u0441\u0442\u0430\u0458\u0435 \u0441\u0430\u043a\u0440\u0438\u0432\u0435\u043d."},"zh":{"title403":"403 \u8bbf\u95ee\u53d7\u9650","title429":"429 \u8bf7\u6c42\u8fc7\u591a","text403":"\u8bbf\u95ee\u5df2\u88ab WAF/Anti-DDoS \u4fdd\u62a4\u7b56\u7565\u4e34\u65f6\u9650\u5236\u3002","text429":"\u9632\u6d2a\u4fdd\u62a4\u5df2\u542f\u7528\u3002\u8bf7\u7b49\u5f85\u5c01\u9501\u7a97\u53e3\u7ed3\u675f\u540e\u518d\u8bd5\u3002","badge":"\u4fdd\u62a4\u5df2\u542f\u7528","hint":"\u8bf7\u7a0d\u540e\u5237\u65b0\u9875\u9762\u3002\u5c01\u9501\u751f\u6548\u671f\u95f4\uff0c\u4e3b\u754c\u9762\u5c06\u4fdd\u6301\u9690\u85cf\u3002"}}
       window.addEventListener("error", function (event) {
         var target = event && event.target;
         if (!target) return;
@@ -43,13 +27,6 @@
           renderBlocked({ code: 429 });
         }
       }, true);
-      fetch("/api/setup/status", { credentials: "include", cache: "no-store", headers: { Accept: "application/json" } })
-        .then(function (response) {
-          if (response.status === 403 || response.status === 429) {
-            renderBlocked({ code: response.status });
-          }
-        })
-        .catch(function () {});
     })();
   </script>
   <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon16.png">
@@ -76,6 +53,6 @@
       </form>
     </div>
   </div>
-  <script type="module" src="/static/js/login.js?v=20260418-v1-1-21-1" onload="window.__wafMarkBoot && window.__wafMarkBoot()" onerror="window.__wafRenderBlocked && window.__wafRenderBlocked({ code: 429 })"></script>
+  <script type="module" src="/static/js/login.js?v=20260419-v2-0-1" onload="window.__wafMarkBoot && window.__wafMarkBoot()" onerror="window.__wafRenderBlocked && window.__wafRenderBlocked({ code: 429 })"></script>
 </body>
 </html>
