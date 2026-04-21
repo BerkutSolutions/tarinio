@@ -24,6 +24,7 @@ type Config struct {
 	HTTPAddr         string
 	RuntimeRoot      string
 	RevisionStoreDir string
+	PostgresDSN      string
 	AuthIssuer       string
 	StartupSelfTest  bool
 	Security         SecurityConfig
@@ -34,6 +35,8 @@ type Config struct {
 	BootstrapAdmin   BootstrapAdminConfig
 	DevFastStart     DevFastStartConfig
 	Redis            redis.Config
+	HA               HAConfig
+	Metrics          MetricsConfig
 }
 
 type ACMEConfig struct {
@@ -76,11 +79,23 @@ type DevFastStartConfig struct {
 	MaxAttempts       int
 }
 
+type HAConfig struct {
+	Enabled                 bool
+	NodeID                  string
+	OperationLockTTLSeconds int
+	LeaderLockTTLSeconds    int
+}
+
+type MetricsConfig struct {
+	Token string
+}
+
 func LoadFromEnv() (Config, error) {
 	cfg := Config{
 		HTTPAddr:         defaultHTTPAddr,
 		RuntimeRoot:      defaultRuntimeRoot,
 		RevisionStoreDir: filepath.Join(defaultRuntimeRoot, defaultRevisionsDir),
+		PostgresDSN:      "",
 		AuthIssuer:       "WAF",
 		StartupSelfTest:  true,
 		Security: SecurityConfig{
@@ -119,6 +134,13 @@ func LoadFromEnv() (Config, error) {
 			MaxAttempts:       30,
 		},
 		Redis: redis.DefaultConfig(),
+		HA: HAConfig{
+			Enabled:                 false,
+			NodeID:                  hostnameOrDefault("waf-control-plane"),
+			OperationLockTTLSeconds: 120,
+			LeaderLockTTLSeconds:    30,
+		},
+		Metrics: MetricsConfig{},
 	}
 
 	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_HTTP_ADDR")); value != "" {
@@ -132,6 +154,9 @@ func LoadFromEnv() (Config, error) {
 	}
 	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_REVISION_STORE_DIR")); value != "" {
 		cfg.RevisionStoreDir = value
+	}
+	if value := strings.TrimSpace(os.Getenv("POSTGRES_DSN")); value != "" {
+		cfg.PostgresDSN = value
 	}
 	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_AUTH_ISSUER")); value != "" {
 		cfg.AuthIssuer = value
@@ -264,6 +289,29 @@ func LoadFromEnv() (Config, error) {
 		}
 		cfg.Redis.DialTimeout = time.Duration(seconds) * time.Second
 	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_HA_ENABLED")); value != "" {
+		cfg.HA.Enabled = !strings.EqualFold(value, "false") && value != "0"
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_HA_NODE_ID")); value != "" {
+		cfg.HA.NodeID = value
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_HA_OPERATION_LOCK_TTL_SECONDS")); value != "" {
+		seconds, err := strconv.Atoi(value)
+		if err != nil || seconds <= 0 {
+			return Config{}, fmt.Errorf("ha operation lock ttl must be a positive integer")
+		}
+		cfg.HA.OperationLockTTLSeconds = seconds
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_HA_LEADER_LOCK_TTL_SECONDS")); value != "" {
+		seconds, err := strconv.Atoi(value)
+		if err != nil || seconds <= 0 {
+			return Config{}, fmt.Errorf("ha leader lock ttl must be a positive integer")
+		}
+		cfg.HA.LeaderLockTTLSeconds = seconds
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_METRICS_TOKEN")); value != "" {
+		cfg.Metrics.Token = value
+	}
 
 	if err := validate(cfg); err != nil {
 		return Config{}, err
@@ -345,6 +393,17 @@ func validate(cfg Config) error {
 	if strings.TrimSpace(cfg.Redis.Addr) == "" {
 		return fmt.Errorf("redis addr is required")
 	}
+	if cfg.HA.Enabled {
+		if strings.TrimSpace(cfg.HA.NodeID) == "" {
+			return fmt.Errorf("ha node id is required when ha is enabled")
+		}
+		if cfg.HA.OperationLockTTLSeconds <= 0 {
+			return fmt.Errorf("ha operation lock ttl must be positive")
+		}
+		if cfg.HA.LeaderLockTTLSeconds <= 0 {
+			return fmt.Errorf("ha leader lock ttl must be positive")
+		}
+	}
 	return nil
 }
 
@@ -354,4 +413,12 @@ func splitHostPort(addr string) (string, string, error) {
 		return "", "", fmt.Errorf("expected host:port")
 	}
 	return addr[:index], addr[index+1:], nil
+}
+
+func hostnameOrDefault(fallback string) string {
+	hostname, err := os.Hostname()
+	if err != nil || strings.TrimSpace(hostname) == "" {
+		return fallback
+	}
+	return hostname
 }

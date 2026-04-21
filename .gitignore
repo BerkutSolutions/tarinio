@@ -12,6 +12,8 @@
 bin/
 dist/
 build/
+site/
+.docusaurus/
 coverage/
 *.coverprofile
 coverage.out
@@ -20,11 +22,13 @@ coverage.out
 
 # Caches
 .cache/
+.turbo/
 .gocache/
 .gomodcache/
 
 # Dependency folders
 node_modules/
+node_modules/.cache/
 
 # Python/tooling caches
 __pycache__/

@@ -23,6 +23,7 @@ import (
 	"waf/control-plane/internal/revisions"
 	"waf/control-plane/internal/revisionsnapshots"
 	"waf/control-plane/internal/sites"
+	"waf/control-plane/internal/telemetry"
 	"waf/control-plane/internal/tlsconfigs"
 	"waf/control-plane/internal/upstreams"
 	"waf/control-plane/internal/wafpolicies"
@@ -52,6 +53,7 @@ type ApplyService struct {
 	rollbackRunner pipeline.RollbackRunner
 	activationRoot string
 	audits         *AuditService
+	coord          DistributedCoordinator
 }
 
 func NewApplyService(runtimeRoot string, revisions revisionStoreForApply, snapshots revisionSnapshotReader, jobs JobStore, eventService *EventService, syntaxExecutor pipeline.CommandExecutor, reloadExecutor pipeline.CommandExecutor, healthChecker pipeline.HealthChecker, audits *AuditService) *ApplyService {
@@ -68,10 +70,35 @@ func NewApplyService(runtimeRoot string, revisions revisionStoreForApply, snapsh
 		rollbackRunner: pipeline.RollbackRunner{Activator: pipeline.AtomicActivator{Root: root}},
 		activationRoot: root,
 		audits:         audits,
+		coord:          NewNoopDistributedCoordinator(),
 	}
 }
 
 func (s *ApplyService) Apply(ctx context.Context, revisionID string) (job jobs.Job, err error) {
+	if s.coord == nil {
+		s.coord = NewNoopDistributedCoordinator()
+	}
+	err = s.coord.WithLock(ctx, "ha:revision:apply", s.coord.OperationTTL(), func(lockCtx context.Context) error {
+		job, err = s.applyUnlocked(lockCtx, revisionID)
+		return err
+	})
+	if err != nil {
+		telemetry.Default().RecordRevisionApply(s.coord.NodeID(), "failed")
+	} else {
+		telemetry.Default().RecordRevisionApply(s.coord.NodeID(), strings.ToLower(string(job.Status)))
+	}
+	return job, err
+}
+
+func (s *ApplyService) SetCoordinator(coord DistributedCoordinator) {
+	if coord == nil {
+		s.coord = NewNoopDistributedCoordinator()
+		return
+	}
+	s.coord = coord
+}
+
+func (s *ApplyService) applyUnlocked(ctx context.Context, revisionID string) (job jobs.Job, err error) {
 	defer func() {
 		details := map[string]any(nil)
 		if err != nil {

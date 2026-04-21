@@ -19,6 +19,8 @@
 bin/
 dist/
 build/
+site/
+.docusaurus/
 coverage/
 *.coverprofile
 coverage.out
@@ -30,9 +32,11 @@ stdout
 
 # Caches
 .cache/
+.turbo/
 .gocache/
 .gomodcache/
 node_modules/
+node_modules/.cache/
 __pycache__/
 .pytest_cache/
 .mypy_cache/

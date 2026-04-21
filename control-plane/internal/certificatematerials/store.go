@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"waf/control-plane/internal/storage"
 )
 
 const (
@@ -34,9 +36,11 @@ type state struct {
 // Store persists certificate material refs and stores files on disk.
 type Store struct {
 	root    string
-	path    string
+	state   *storage.JSONState
+	backend storage.Backend
 	files   string
 	refBase string
+	useDB   bool
 	mu      sync.Mutex
 }
 
@@ -49,9 +53,24 @@ func NewStore(root string) (*Store, error) {
 	}
 	return &Store{
 		root:    root,
-		path:    filepath.Join(root, "materials.json"),
+		state:   storage.NewFileJSONState(filepath.Join(root, "materials.json")),
+		backend: storage.NewFileBackend(),
 		files:   filepath.Join(root, "files"),
 		refBase: filepath.Base(root),
+	}, nil
+}
+
+func NewPostgresStore(root string, backend storage.Backend) (*Store, error) {
+	if strings.TrimSpace(root) == "" {
+		return nil, errors.New("certificate materials store root is required")
+	}
+	return &Store{
+		root:    root,
+		state:   storage.NewBackendJSONState(backend, "certificatematerials/materials.json", filepath.Join(root, "materials.json")),
+		backend: backend,
+		files:   filepath.Join(root, "files"),
+		refBase: "certificate-materials",
+		useDB:   true,
 	}, nil
 }
 
@@ -94,17 +113,13 @@ func (s *Store) Put(certificateID string, certificatePEM []byte, privateKeyPEM [
 		}
 	}
 
-	targetDir := filepath.Join(s.files, certificateID)
-	if err := os.RemoveAll(targetDir); err != nil {
+	if err := s.resetMaterialFiles(certificateID); err != nil {
 		return MaterialRecord{}, fmt.Errorf("reset certificate materials dir: %w", err)
 	}
-	if err := os.MkdirAll(targetDir, 0o755); err != nil {
-		return MaterialRecord{}, fmt.Errorf("create certificate materials dir: %w", err)
-	}
-	if err := writeFileAtomically(targetDir, certificateFileName, certificatePEM, 0o600); err != nil {
+	if err := s.writeMaterialBlob(certificateID, certificateFileName, certificatePEM, 0o600); err != nil {
 		return MaterialRecord{}, fmt.Errorf("write certificate file: %w", err)
 	}
-	if err := writeFileAtomically(targetDir, privateKeyFileName, privateKeyPEM, 0o600); err != nil {
+	if err := s.writeMaterialBlob(certificateID, privateKeyFileName, privateKeyPEM, 0o600); err != nil {
 		return MaterialRecord{}, fmt.Errorf("write private key file: %w", err)
 	}
 
@@ -170,11 +185,11 @@ func (s *Store) Read(certificateID string) (MaterialRecord, []byte, []byte, erro
 		if item.CertificateID != certificateID {
 			continue
 		}
-		certificatePEM, err := os.ReadFile(filepath.Join(s.files, certificateID, certificateFileName))
+		certificatePEM, err := s.readMaterialBlob(certificateID, certificateFileName)
 		if err != nil {
 			return MaterialRecord{}, nil, nil, fmt.Errorf("read certificate material file: %w", err)
 		}
-		privateKeyPEM, err := os.ReadFile(filepath.Join(s.files, certificateID, privateKeyFileName))
+		privateKeyPEM, err := s.readMaterialBlob(certificateID, privateKeyFileName)
 		if err != nil {
 			return MaterialRecord{}, nil, nil, fmt.Errorf("read private key material file: %w", err)
 		}
@@ -184,9 +199,9 @@ func (s *Store) Read(certificateID string) (MaterialRecord, []byte, []byte, erro
 }
 
 func (s *Store) loadLocked() (*state, error) {
-	content, err := os.ReadFile(s.path)
+	content, err := s.state.Load()
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
+		if errors.Is(err, storage.ErrNotFound) {
 			return &state{}, nil
 		}
 		return nil, fmt.Errorf("read certificate materials store: %w", err)
@@ -206,10 +221,50 @@ func (s *Store) saveLocked(current *state) error {
 		return fmt.Errorf("encode certificate materials store: %w", err)
 	}
 	content = append(content, '\n')
-	if err := os.WriteFile(s.path, content, 0o644); err != nil {
+	if err := s.state.Save(content); err != nil {
 		return fmt.Errorf("write certificate materials store: %w", err)
 	}
 	return nil
+}
+
+func (s *Store) resetMaterialFiles(certificateID string) error {
+	if s.useDB {
+		prefix := filepath.ToSlash(filepath.Join(s.refBase, "files", certificateID))
+		return s.backend.DeleteBlobsByPrefix(prefix)
+	}
+	targetDir := filepath.Join(s.files, certificateID)
+	if err := os.RemoveAll(targetDir); err != nil {
+		return err
+	}
+	return os.MkdirAll(targetDir, 0o755)
+}
+
+func (s *Store) writeMaterialBlob(certificateID, name string, content []byte, mode os.FileMode) error {
+	if s.useDB {
+		key := filepath.ToSlash(filepath.Join(s.refBase, "files", certificateID, name))
+		return s.backend.SaveBlob(key, content)
+	}
+	targetDir := filepath.Join(s.files, certificateID)
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
+		return err
+	}
+	return writeFileAtomically(targetDir, name, content, mode)
+}
+
+func (s *Store) readMaterialBlob(certificateID, name string) ([]byte, error) {
+	if s.useDB {
+		key := filepath.ToSlash(filepath.Join(s.refBase, "files", certificateID, name))
+		content, err := s.backend.LoadBlob(key)
+		if errors.Is(err, storage.ErrNotFound) {
+			legacyPath := filepath.Join(s.files, certificateID, name)
+			if migrateErr := storage.MigrateLegacyBlob(s.backend, key, legacyPath); migrateErr != nil {
+				return nil, migrateErr
+			}
+			return s.backend.LoadBlob(key)
+		}
+		return content, err
+	}
+	return os.ReadFile(filepath.Join(s.files, certificateID, name))
 }
 
 func normalizeID(value string) string {

@@ -1,6 +1,6 @@
-# TARINIO 2.0.1 Security
+# Security
 
-Wiki baseline: `2.0.1`
+This page belongs to the current documentation branch.
 
 This document defines the minimum production baseline and the main secure-operation practices for TARINIO.
 
@@ -15,7 +15,7 @@ This document defines the minimum production baseline and the main secure-operat
 
 ## Authentication And Access
 
-In version `2.0.1`, the platform supports:
+In version `2.0.2`, the platform supports:
 
 - session-based login;
 - `2FA` through TOTP;

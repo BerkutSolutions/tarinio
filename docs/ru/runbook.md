@@ -1,6 +1,6 @@
-# Runbook TARINIO 2.0.1
+# Runbook
 
-Wiki baseline: `2.0.1`
+Эта страница относится к текущей ветке документации.
 
 Этот runbook описывает ежедневные операторские действия, change flow, triage и rollback для TARINIO.
 

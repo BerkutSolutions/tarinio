@@ -13,6 +13,7 @@ BACKUP_DIR="${BACKUP_BASE_DIR}/${PROFILE}-${TIMESTAMP}"
 BACKUP_MAX_TOTAL_MB="${BACKUP_MAX_TOTAL_MB:-1024}"
 BACKUP_MAX_VOLUME_MB="${BACKUP_MAX_VOLUME_MB:-512}"
 BACKUP_HELPER_IMAGE="${BACKUP_HELPER_IMAGE:-busybox:1.36}"
+RUN_STRICT_POST_UPGRADE_VALIDATION="${RUN_STRICT_POST_UPGRADE_VALIDATION:-0}"
 FAILED=0
 
 if [ -t 1 ]; then
@@ -385,6 +386,13 @@ probe_container_http runtime "http://127.0.0.1:8081/healthz" 45
 step "Probing UI healthcheck page route"
 probe_host_http "http://127.0.0.1:8080/healthcheck"
 ok "post-upgrade health gate passed"
+
+if [ "$RUN_STRICT_POST_UPGRADE_VALIDATION" = "1" ] || [ "$RUN_STRICT_POST_UPGRADE_VALIDATION" = "true" ]; then
+  section "Strict Post-Upgrade Validation"
+  step "Running scripts/post-upgrade-smoke.sh"
+  PROFILE_DIR="$(pwd)" COMPOSE_CMD="$COMPOSE_CMD" run_logged sh "$INSTALL_DIR/scripts/post-upgrade-smoke.sh"
+  ok "strict post-upgrade validation passed"
+fi
 
 section "Done"
 echo "TARINIO is starting."

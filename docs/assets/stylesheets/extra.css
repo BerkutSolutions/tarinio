@@ -1,0 +1,36 @@
+:root {
+  --tarinio-surface: linear-gradient(135deg, #0f1720 0%, #183247 55%, #2d5c78 100%);
+  --tarinio-accent: #37c6d0;
+}
+
+.md-header,
+.md-tabs {
+  background: var(--tarinio-surface);
+}
+
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3 {
+  letter-spacing: -0.02em;
+}
+
+.md-typeset h1 {
+  font-weight: 700;
+}
+
+.md-typeset blockquote {
+  border-left: 0.2rem solid var(--tarinio-accent);
+}
+
+.md-typeset .admonition,
+.md-typeset details {
+  border-radius: 0.75rem;
+}
+
+.md-typeset code {
+  border-radius: 0.35rem;
+}
+
+.md-footer {
+  background: #101923;
+}

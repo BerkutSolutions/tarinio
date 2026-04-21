@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"waf/control-plane/internal/telemetry"
 )
 
 // HTTPReloadExecutor delegates runtime reload execution to the isolated runtime container.
@@ -28,12 +30,15 @@ func (e HTTPReloadExecutor) Run(name string, args []string, workdir string) erro
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
+		telemetry.Default().RecordRuntimeReload("runtime", "error")
 		return err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusNoContent {
+		telemetry.Default().RecordRuntimeReload("runtime", "failed")
 		return fmt.Errorf("runtime reload endpoint returned %d", resp.StatusCode)
 	}
+	telemetry.Default().RecordRuntimeReload("runtime", "succeeded")
 	return nil
 }

@@ -20,13 +20,19 @@ var autoApplyRegistry struct {
 	mu      sync.RWMutex
 	compile autoApplyCompileService
 	apply   autoApplyApplyService
+	coord   DistributedCoordinator
 }
 
-func ConfigureAutoApply(compile autoApplyCompileService, apply autoApplyApplyService) {
+func ConfigureAutoApply(compile autoApplyCompileService, apply autoApplyApplyService, coord DistributedCoordinator) {
 	autoApplyRegistry.mu.Lock()
 	defer autoApplyRegistry.mu.Unlock()
 	autoApplyRegistry.compile = compile
 	autoApplyRegistry.apply = apply
+	if coord == nil {
+		autoApplyRegistry.coord = NewNoopDistributedCoordinator()
+		return
+	}
+	autoApplyRegistry.coord = coord
 }
 
 func runAutoApply(ctx context.Context) error {
@@ -36,11 +42,30 @@ func runAutoApply(ctx context.Context) error {
 	autoApplyRegistry.mu.RLock()
 	compile := autoApplyRegistry.compile
 	apply := autoApplyRegistry.apply
+	coord := autoApplyRegistry.coord
 	autoApplyRegistry.mu.RUnlock()
 	if compile == nil || apply == nil {
 		return nil
 	}
+	if coord == nil {
+		coord = NewNoopDistributedCoordinator()
+	}
+	if !coord.Enabled() {
+		return runAutoApplyUnlocked(ctx, compile, apply)
+	}
+	acquired, err := coord.TryRunLeader(ctx, "ha:leader:auto-apply", coord.LeaderTTL(), func(lockCtx context.Context) error {
+		return runAutoApplyUnlocked(lockCtx, compile, apply)
+	})
+	if err != nil {
+		return err
+	}
+	if !acquired {
+		return nil
+	}
+	return nil
+}
 
+func runAutoApplyUnlocked(ctx context.Context, compile autoApplyCompileService, apply autoApplyApplyService) error {
 	compileResult, err := compile.Create(withAutoApplyDisabled(ctx))
 	if err != nil {
 		return fmt.Errorf("revision compile failed: %w", err)

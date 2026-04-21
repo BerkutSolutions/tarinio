@@ -47,7 +47,7 @@ services:
       WAF_DEFAULT_ANTIDDOS_MODEL_EMERGENCY_PER_IP_RPS: ${WAF_DEFAULT_ANTIDDOS_MODEL_EMERGENCY_PER_IP_RPS:-60}
       WAF_DEFAULT_ANTIDDOS_MODEL_WEIGHT_EMERGENCY_BOTNET: ${WAF_DEFAULT_ANTIDDOS_MODEL_WEIGHT_EMERGENCY_BOTNET:-6.0}
       WAF_DEFAULT_ANTIDDOS_MODEL_WEIGHT_EMERGENCY_SINGLE: ${WAF_DEFAULT_ANTIDDOS_MODEL_WEIGHT_EMERGENCY_SINGLE:-4.0}
-      POSTGRES_DSN: ${POSTGRES_DSN:-postgres://waf:waf@postgres:5432/waf?sslmode=disable}
+      POSTGRES_DSN: postgres://${POSTGRES_USER:-waf}:${POSTGRES_PASSWORD:-waf}@postgres:5432/${POSTGRES_DB:-waf}?sslmode=disable
     volumes:
       - waf-runtime-data:/var/lib/waf
       - waf-control-plane-data:/var/lib/waf/control-plane
@@ -120,13 +120,14 @@ services:
       - waf-net
 
   postgres:
-    image: postgres:15-alpine
+    image: postgres:15
     container_name: tarinio-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-waf}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-waf}
       POSTGRES_DB: ${POSTGRES_DB:-waf}
+      POSTGRES_INITDB_ARGS: ${POSTGRES_INITDB_ARGS:---auth-local=scram-sha-256 --auth-host=scram-sha-256 --locale=C.UTF-8}
     volumes:
       - waf-postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -215,20 +216,20 @@ services:
 
 networks:
   waf-net:
-    name: waf-net
+    name: ${WAF_STACK_NAME:-waf}-net
 
 volumes:
   waf-runtime-data:
-    name: waf-runtime-data
+    name: ${WAF_STACK_NAME:-waf}-runtime-data
   waf-control-plane-data:
-    name: waf-control-plane-data
+    name: ${WAF_STACK_NAME:-waf}-control-plane-data
   waf-certificates-data:
-    name: waf-certificates-data
+    name: ${WAF_STACK_NAME:-waf}-certificates-data
   waf-postgres-data:
-    name: waf-postgres-data
+    name: ${WAF_STACK_NAME:-waf}-postgres-data
   waf-nginx-logs:
-    name: waf-nginx-logs
+    name: ${WAF_STACK_NAME:-waf}-nginx-logs
   waf-l4-adaptive:
-    name: waf-l4-adaptive
+    name: ${WAF_STACK_NAME:-waf}-l4-adaptive
   waf-ddos-model-state:
-    name: waf-ddos-model-state
+    name: ${WAF_STACK_NAME:-waf}-ddos-model-state

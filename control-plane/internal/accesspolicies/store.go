@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"waf/control-plane/internal/storage"
 )
 
 // AccessPolicy is the minimal Stage 1 control-plane access policy entity.
@@ -31,8 +33,8 @@ type state struct {
 
 // Store persists access policies without runtime coupling.
 type Store struct {
-	path string
-	mu   sync.Mutex
+	state *storage.JSONState
+	mu    sync.Mutex
 }
 
 func NewStore(root string) (*Store, error) {
@@ -42,7 +44,16 @@ func NewStore(root string) (*Store, error) {
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		return nil, fmt.Errorf("create access policies store root: %w", err)
 	}
-	return &Store{path: filepath.Join(root, "access_policies.json")}, nil
+	return &Store{state: storage.NewFileJSONState(filepath.Join(root, "access_policies.json"))}, nil
+}
+
+func NewPostgresStore(root string, backend storage.Backend) (*Store, error) {
+	if strings.TrimSpace(root) == "" {
+		return nil, errors.New("access policies store root is required")
+	}
+	return &Store{
+		state: storage.NewBackendJSONState(backend, "accesspolicies/access_policies.json", filepath.Join(root, "access_policies.json")),
+	}, nil
 }
 
 func (s *Store) Create(item AccessPolicy) (AccessPolicy, error) {
@@ -150,9 +161,9 @@ func (s *Store) Delete(id string) error {
 }
 
 func (s *Store) loadLocked() (*state, error) {
-	content, err := os.ReadFile(s.path)
+	content, err := s.state.Load()
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
+		if errors.Is(err, storage.ErrNotFound) {
 			return &state{}, nil
 		}
 		return nil, fmt.Errorf("read access policies store: %w", err)
@@ -172,7 +183,7 @@ func (s *Store) saveLocked(current *state) error {
 		return fmt.Errorf("encode access policies store: %w", err)
 	}
 	content = append(content, '\n')
-	if err := os.WriteFile(s.path, content, 0o644); err != nil {
+	if err := s.state.Save(content); err != nil {
 		return fmt.Errorf("write access policies store: %w", err)
 	}
 	return nil

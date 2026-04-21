@@ -35,6 +35,9 @@ func main() {
 			}
 		}()
 	}
+	if application.Coordinator != nil && application.Coordinator.Enabled() {
+		fmt.Fprintf(os.Stdout, "control-plane ha enabled: node=%s\n", application.Coordinator.NodeID())
+	}
 
 	if err := application.HTTPServer.Start(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		fmt.Fprintf(os.Stderr, "control-plane server: %v\n", err)

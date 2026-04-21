@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"waf/control-plane/internal/appmeta"
+	"waf/control-plane/internal/storage"
 )
 
 type SettingsRuntimeHandler struct{}
@@ -43,6 +44,7 @@ type persistedRuntimeSettings struct {
 var runtimeSettingsState = struct {
 	mu                  sync.RWMutex
 	statePath           string
+	backend             storage.Backend
 	initialized         bool
 	updateChecksEnabled bool
 	lastCheckedAt       string
@@ -70,6 +72,10 @@ var runtimeRequestIndexes = &runtimeIndexFetcher{
 }
 
 func NewSettingsRuntimeHandler(settingsRoot string, runtimeHealthURL string) *SettingsRuntimeHandler {
+	return NewSettingsRuntimeHandlerWithBackend(settingsRoot, runtimeHealthURL, nil)
+}
+
+func NewSettingsRuntimeHandlerWithBackend(settingsRoot string, runtimeHealthURL string, backend storage.Backend) *SettingsRuntimeHandler {
 	runtimeSettingsState.mu.Lock()
 	defer runtimeSettingsState.mu.Unlock()
 
@@ -77,6 +83,22 @@ func NewSettingsRuntimeHandler(settingsRoot string, runtimeHealthURL string) *Se
 		root := strings.TrimSpace(settingsRoot)
 		if root != "" {
 			runtimeSettingsState.statePath = filepath.Join(root, "runtime_settings.json")
+		}
+	}
+	if !storage.IsNilBackend(backend) && strings.TrimSpace(runtimeSettingsState.statePath) != "" {
+		runtimeSettingsState.backend = backend
+		content, err := storage.NewBackendJSONState(backend, "settings/runtime_settings.json", runtimeSettingsState.statePath).Load()
+		if err == nil {
+			var stored persistedRuntimeSettings
+			if jsonErr := json.Unmarshal(content, &stored); jsonErr == nil {
+				runtimeSettingsState.updateChecksEnabled = stored.UpdateChecksEnabled
+				runtimeSettingsState.lastCheckedAt = stored.LastCheckedAt
+				runtimeSettingsState.latestVersion = stored.LatestVersion
+				runtimeSettingsState.releaseURL = stored.ReleaseURL
+				runtimeSettingsState.hasUpdate = stored.HasUpdate
+				runtimeSettingsState.storage = stored.Storage
+				runtimeSettingsState.initialized = true
+			}
 		}
 	}
 	if !runtimeSettingsState.initialized {
@@ -569,9 +591,20 @@ func loadPersistedRuntimeSettingsLocked() {
 	if path == "" {
 		return
 	}
-	content, err := os.ReadFile(path)
-	if err != nil {
-		return
+	var (
+		content []byte
+		err     error
+	)
+	if !storage.IsNilBackend(runtimeSettingsState.backend) {
+		content, err = storage.NewBackendJSONState(runtimeSettingsState.backend, "settings/runtime_settings.json", path).Load()
+		if err != nil {
+			return
+		}
+	} else {
+		content, err = os.ReadFile(path)
+		if err != nil {
+			return
+		}
 	}
 	var stored persistedRuntimeSettings
 	if err := json.Unmarshal(content, &stored); err != nil {
@@ -609,6 +642,10 @@ func savePersistedRuntimeSettingsLocked() {
 		return
 	}
 	content = append(content, '\n')
+	if !storage.IsNilBackend(runtimeSettingsState.backend) {
+		_ = storage.NewBackendJSONState(runtimeSettingsState.backend, "settings/runtime_settings.json", path).Save(content)
+		return
+	}
 	_ = os.WriteFile(path, content, 0o644)
 }
 

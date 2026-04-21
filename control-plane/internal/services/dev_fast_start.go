@@ -87,6 +87,7 @@ type DevFastStartBootstrapper struct {
 	easyStore    devFastStartEasySiteProfileStore
 	easyProfiles devFastStartEasySiteProfileService
 	ratePolicies devFastStartRateLimitPolicyStore
+	coord        DistributedCoordinator
 }
 
 func NewDevFastStartBootstrapper(
@@ -118,6 +119,7 @@ func NewDevFastStartBootstrapper(
 		easyStore:    easyStore,
 		easyProfiles: easyProfiles,
 		ratePolicies: ratePolicies,
+		coord:        NewNoopDistributedCoordinator(),
 	}
 }
 
@@ -125,7 +127,33 @@ func (b *DevFastStartBootstrapper) Run(ctx context.Context) error {
 	if b == nil || !b.cfg.Enabled {
 		return nil
 	}
+	if b.coord == nil {
+		b.coord = NewNoopDistributedCoordinator()
+	}
+	if !b.coord.Enabled() {
+		return b.runUnlocked(ctx)
+	}
+	running, err := b.coord.TryRunLeader(ctx, "ha:leader:dev-fast-start", b.coord.LeaderTTL(), func(lockCtx context.Context) error {
+		return b.runUnlocked(lockCtx)
+	})
+	if err != nil {
+		return err
+	}
+	if !running {
+		return nil
+	}
+	return nil
+}
 
+func (b *DevFastStartBootstrapper) SetCoordinator(coord DistributedCoordinator) {
+	if coord == nil {
+		b.coord = NewNoopDistributedCoordinator()
+		return
+	}
+	b.coord = coord
+}
+
+func (b *DevFastStartBootstrapper) runUnlocked(ctx context.Context) error {
 	changed, err := b.ensureManagementResources(ctx)
 	if err != nil {
 		return err

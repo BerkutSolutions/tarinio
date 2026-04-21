@@ -2,12 +2,15 @@ package antiddos
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"waf/control-plane/internal/storage"
 )
 
 type state struct {
@@ -15,8 +18,8 @@ type state struct {
 }
 
 type Store struct {
-	path string
-	mu   sync.Mutex
+	state *storage.JSONState
+	mu    sync.Mutex
 }
 
 func NewStore(root string) (*Store, error) {
@@ -26,7 +29,16 @@ func NewStore(root string) (*Store, error) {
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		return nil, fmt.Errorf("create anti-ddos store root: %w", err)
 	}
-	return &Store{path: filepath.Join(root, "anti_ddos_settings.json")}, nil
+	return &Store{state: storage.NewFileJSONState(filepath.Join(root, "anti_ddos_settings.json"))}, nil
+}
+
+func NewPostgresStore(root string, backend storage.Backend) (*Store, error) {
+	if strings.TrimSpace(root) == "" {
+		return nil, fmt.Errorf("anti-ddos store root is required")
+	}
+	return &Store{
+		state: storage.NewBackendJSONState(backend, "antiddos/anti_ddos_settings.json", filepath.Join(root, "anti_ddos_settings.json")),
+	}, nil
 }
 
 func (s *Store) Get() (Settings, error) {
@@ -71,9 +83,9 @@ func (s *Store) Upsert(item Settings) (Settings, error) {
 }
 
 func (s *Store) loadLocked() (*state, error) {
-	content, err := os.ReadFile(s.path)
+	content, err := s.state.Load()
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, storage.ErrNotFound) {
 			return &state{Settings: DefaultSettings()}, nil
 		}
 		return nil, fmt.Errorf("read anti-ddos store: %w", err)
@@ -92,7 +104,7 @@ func (s *Store) saveLocked(current *state) error {
 		return fmt.Errorf("encode anti-ddos store: %w", err)
 	}
 	content = append(content, '\n')
-	if err := os.WriteFile(s.path, content, 0o644); err != nil {
+	if err := s.state.Save(content); err != nil {
 		return fmt.Errorf("write anti-ddos store: %w", err)
 	}
 	return nil

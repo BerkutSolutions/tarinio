@@ -1,8 +1,8 @@
 # Documentation
 
-Version baseline: `2.0.1`
+Version baseline: `2.0.2`
 
-This directory is the release-synced documentation set for TARINIO `2.0.1`.
+This directory is the release-synced documentation set for TARINIO `2.0.2`.
 The Russian and English branches are intended to mirror the same product map and complement each other as one bilingual wiki: UI sections, workflows, API catalog, deployment, security, backups, upgrades, and operator runbooks.
 
 ## Main Entry Points
@@ -22,6 +22,7 @@ The Russian and English branches are intended to mirror the same product map and
 - API catalog: `docs/ru/api.md`
 - Security baseline: `docs/ru/security.md`
 - Deployment: `docs/ru/deploy.md`
+- HA / multi-node: `docs/ru/ha.md`
 - Runbook: `docs/ru/runbook.md`
 - Upgrade and rollback: `docs/ru/upgrade.md`
 - Backups and restore: `docs/ru/backups.md`
@@ -35,6 +36,7 @@ The Russian and English branches are intended to mirror the same product map and
 - API: `docs/eng/api.md`
 - Security: `docs/eng/security.md`
 - Deployment: `docs/eng/deploy.md`
+- HA / multi-node: `docs/eng/ha.md`
 - Runbook: `docs/eng/runbook.md`
 - Upgrade: `docs/eng/upgrade.md`
 - Backups: `docs/eng/backups.md`

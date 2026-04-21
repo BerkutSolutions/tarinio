@@ -16,6 +16,8 @@ import (
 	"sync"
 	"time"
 
+	"waf/control-plane/internal/storage"
+
 	"golang.org/x/crypto/argon2"
 )
 
@@ -58,8 +60,8 @@ type state struct {
 }
 
 type Store struct {
-	path string
-	mu   sync.Mutex
+	state *storage.JSONState
+	mu    sync.Mutex
 }
 
 func NewStore(root string, bootstrap BootstrapUser) (*Store, error) {
@@ -69,7 +71,20 @@ func NewStore(root string, bootstrap BootstrapUser) (*Store, error) {
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		return nil, fmt.Errorf("create users store root: %w", err)
 	}
-	store := &Store{path: filepath.Join(root, "users.json")}
+	store := &Store{state: storage.NewFileJSONState(filepath.Join(root, "users.json"))}
+	if err := store.seedBootstrap(bootstrap); err != nil {
+		return nil, err
+	}
+	return store, nil
+}
+
+func NewPostgresStore(root string, backend storage.Backend, bootstrap BootstrapUser) (*Store, error) {
+	if strings.TrimSpace(root) == "" {
+		return nil, errors.New("users store root is required")
+	}
+	store := &Store{
+		state: storage.NewBackendJSONState(backend, "users/users.json", filepath.Join(root, "users.json")),
+	}
 	if err := store.seedBootstrap(bootstrap); err != nil {
 		return nil, err
 	}
@@ -246,9 +261,9 @@ func (s *Store) seedBootstrap(bootstrap BootstrapUser) error {
 }
 
 func (s *Store) loadLocked() (*state, error) {
-	content, err := os.ReadFile(s.path)
+	content, err := s.state.Load()
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
+		if errors.Is(err, storage.ErrNotFound) {
 			return &state{}, nil
 		}
 		return nil, fmt.Errorf("read users store: %w", err)
@@ -267,7 +282,7 @@ func (s *Store) saveLocked(current *state) error {
 		return fmt.Errorf("encode users store: %w", err)
 	}
 	content = append(content, '\n')
-	if err := os.WriteFile(s.path, content, 0o600); err != nil {
+	if err := s.state.Save(content); err != nil {
 		return fmt.Errorf("write users store: %w", err)
 	}
 	return nil

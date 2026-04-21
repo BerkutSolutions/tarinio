@@ -1,6 +1,6 @@
-# Развёртывание TARINIO 2.0.1
+# Развёртывание
 
-Wiki baseline: `2.0.1`
+Эта страница относится к текущей ветке документации.
 
 Документ описывает практический deploy TARINIO для локальных, тестовых и production-сценариев.
 
@@ -88,7 +88,7 @@ docker compose -f deploy/compose/default/docker-compose.yml up -d --build
 
 - `/healthz` стабилен;
 - login и onboarding работают;
-- `GET /api/app/meta` возвращает `2.0.1`;
+- `GET /api/app/meta` возвращает `2.0.2`;
 - можно создать сайт и получить рабочую ревизию;
 - после apply runtime обслуживает ожидаемый хост;
 - события, запросы и аудит появляются в UI.

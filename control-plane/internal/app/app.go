@@ -1,10 +1,12 @@
 package app
 
 import (
+	"context"
 	"net"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"waf/control-plane/internal/accesspolicies"
 	"waf/control-plane/internal/antiddos"
@@ -16,6 +18,7 @@ import (
 	"waf/control-plane/internal/coordination/redis"
 	"waf/control-plane/internal/easysiteprofiles"
 	"waf/control-plane/internal/events"
+	"waf/control-plane/internal/handlers"
 	"waf/control-plane/internal/httpserver"
 	"waf/control-plane/internal/jobs"
 	"waf/control-plane/internal/passkeys"
@@ -26,6 +29,9 @@ import (
 	"waf/control-plane/internal/services"
 	"waf/control-plane/internal/sessions"
 	"waf/control-plane/internal/sites"
+	"waf/control-plane/internal/storage"
+	storemigrations "waf/control-plane/internal/store"
+	"waf/control-plane/internal/telemetry"
 	"waf/control-plane/internal/tlsconfigs"
 	"waf/control-plane/internal/upstreams"
 	"waf/control-plane/internal/users"
@@ -35,7 +41,9 @@ import (
 // App wires the minimal control-plane foundation without runtime coupling.
 type App struct {
 	Config                   config.Config
+	PostgresBackend          *storage.PostgresBackend
 	RedisBackend             *redis.Backend
+	Coordinator              services.DistributedCoordinator
 	RevisionStore            *revisions.Store
 	RevisionSnapshotStore    *revisionsnapshots.Store
 	SetupService             *services.SetupService
@@ -87,101 +95,259 @@ type App struct {
 }
 
 func New(cfg config.Config) (*App, error) {
+	handlers.SetSessionBootToken(cfg.Security.Pepper)
+	telemetry.Default().RecordBuild(cfg.HA.NodeID, cfg.HA.Enabled)
+
 	if err := appcompat.EnsureLegacyDataTransferred(cfg.RuntimeRoot, cfg.RevisionStoreDir); err != nil {
 		return nil, err
 	}
 
+	var postgresBackend *storage.PostgresBackend
+	if strings.TrimSpace(cfg.PostgresDSN) != "" {
+		backend, err := storage.NewPostgresBackend(cfg.PostgresDSN)
+		if err != nil {
+			return nil, err
+		}
+		if err := backend.Ping(); err != nil {
+			return nil, err
+		}
+		if err := storemigrations.RunMigrations(backend.DB()); err != nil {
+			return nil, err
+		}
+		if err := migrateLegacyStateToPostgres(backend, cfg.RevisionStoreDir); err != nil {
+			return nil, err
+		}
+		postgresBackend = backend
+	}
+
 	redisClient := redis.NewClient(cfg.Redis)
 	redisBackend := redis.NewBackend(redisClient)
+	coord := services.NewNoopDistributedCoordinator()
+	if cfg.HA.Enabled {
+		if err := redisClient.Ping(context.Background()); err != nil {
+			return nil, err
+		}
+		coord = services.NewRedisDistributedCoordinator(
+			redisBackend,
+			cfg.HA.NodeID,
+			time.Duration(cfg.HA.OperationLockTTLSeconds)*time.Second,
+			time.Duration(cfg.HA.LeaderLockTTLSeconds)*time.Second,
+		)
+	}
 
-	revisionStore, err := revisions.NewStore(filepath.Join(cfg.RevisionStoreDir, "revisions"))
-	if err != nil {
-		return nil, err
-	}
-	revisionSnapshotStore, err := revisionsnapshots.NewStore(filepath.Join(cfg.RevisionStoreDir, "revision-snapshots"))
-	if err != nil {
-		return nil, err
-	}
-	eventStore, err := events.NewStore(filepath.Join(cfg.RevisionStoreDir, "events"))
-	if err != nil {
-		return nil, err
-	}
-	auditStore, err := audits.NewStore(filepath.Join(cfg.RevisionStoreDir, "audits"))
-	if err != nil {
-		return nil, err
-	}
-	jobStore, err := jobs.NewStore(filepath.Join(cfg.RevisionStoreDir, "jobs"))
-	if err != nil {
-		return nil, err
-	}
-	roleStore, err := roles.NewStore(filepath.Join(cfg.RevisionStoreDir, "roles"))
-	if err != nil {
-		return nil, err
-	}
-	userStore, err := users.NewStore(filepath.Join(cfg.RevisionStoreDir, "users"), users.BootstrapUser{
+	revisionsRoot := filepath.Join(cfg.RevisionStoreDir, "revisions")
+	revisionSnapshotsRoot := filepath.Join(cfg.RevisionStoreDir, "revision-snapshots")
+	eventsRoot := filepath.Join(cfg.RevisionStoreDir, "events")
+	auditsRoot := filepath.Join(cfg.RevisionStoreDir, "audits")
+	jobsRoot := filepath.Join(cfg.RevisionStoreDir, "jobs")
+	rolesRoot := filepath.Join(cfg.RevisionStoreDir, "roles")
+	usersRoot := filepath.Join(cfg.RevisionStoreDir, "users")
+	sessionsRoot := filepath.Join(cfg.RevisionStoreDir, "sessions")
+	passkeysRoot := filepath.Join(cfg.RevisionStoreDir, "passkeys")
+	sitesRoot := filepath.Join(cfg.RevisionStoreDir, "sites")
+	upstreamsRoot := filepath.Join(cfg.RevisionStoreDir, "upstreams")
+	certificatesRoot := filepath.Join(cfg.RevisionStoreDir, "certificates")
+	certificateMaterialsRoot := filepath.Join(cfg.RevisionStoreDir, "certificate-materials")
+	tlsConfigsRoot := filepath.Join(cfg.RevisionStoreDir, "tlsconfigs")
+	wafPoliciesRoot := filepath.Join(cfg.RevisionStoreDir, "wafpolicies")
+	accessPoliciesRoot := filepath.Join(cfg.RevisionStoreDir, "accesspolicies")
+	rateLimitPoliciesRoot := filepath.Join(cfg.RevisionStoreDir, "ratelimitpolicies")
+	easySiteProfilesRoot := filepath.Join(cfg.RevisionStoreDir, "easysiteprofiles")
+	antiDDoSRoot := filepath.Join(cfg.RevisionStoreDir, "antiddos")
+
+	var (
+		err                      error
+		revisionStore            *revisions.Store
+		revisionSnapshotStore    *revisionsnapshots.Store
+		eventStore               *events.Store
+		auditStore               *audits.Store
+		jobStore                 *jobs.Store
+		roleStore                *roles.Store
+		userStore                *users.Store
+		sessionStore             *sessions.Store
+		passkeyStore             *passkeys.Store
+		siteStore                *sites.Store
+		upstreamStore            *upstreams.Store
+		certificateStore         *certificates.Store
+		certificateMaterialStore *certificatematerials.Store
+		tlsConfigStore           *tlsconfigs.Store
+		wafPolicyStore           *wafpolicies.Store
+		accessPolicyStore        *accesspolicies.Store
+		rateLimitPolicyStore     *ratelimitpolicies.Store
+		easySiteProfileStore     *easysiteprofiles.Store
+		antiDDoSStore            *antiddos.Store
+	)
+
+	bootstrapUser := users.BootstrapUser{
 		Enabled:  cfg.BootstrapAdmin.Enabled,
 		ID:       cfg.BootstrapAdmin.ID,
 		Username: cfg.BootstrapAdmin.Username,
 		Email:    cfg.BootstrapAdmin.Email,
 		Password: cfg.BootstrapAdmin.Password,
 		RoleIDs:  []string{"admin"},
-	})
-	if err != nil {
-		return nil, err
 	}
-	sessionStore, err := sessions.NewStore(filepath.Join(cfg.RevisionStoreDir, "sessions"))
-	if err != nil {
-		return nil, err
-	}
-	passkeyStore, err := passkeys.NewStore(filepath.Join(cfg.RevisionStoreDir, "passkeys"))
-	if err != nil {
-		return nil, err
-	}
-	siteStore, err := sites.NewStore(filepath.Join(cfg.RevisionStoreDir, "sites"))
-	if err != nil {
-		return nil, err
-	}
-	upstreamStore, err := upstreams.NewStore(filepath.Join(cfg.RevisionStoreDir, "upstreams"))
-	if err != nil {
-		return nil, err
-	}
-	certificateStore, err := certificates.NewStore(filepath.Join(cfg.RevisionStoreDir, "certificates"))
-	if err != nil {
-		return nil, err
-	}
-	certificateMaterialStore, err := certificatematerials.NewStore(filepath.Join(cfg.RevisionStoreDir, "certificate-materials"))
-	if err != nil {
-		return nil, err
-	}
-	tlsConfigStore, err := tlsconfigs.NewStore(filepath.Join(cfg.RevisionStoreDir, "tlsconfigs"))
-	if err != nil {
-		return nil, err
-	}
-	wafPolicyStore, err := wafpolicies.NewStore(filepath.Join(cfg.RevisionStoreDir, "wafpolicies"))
-	if err != nil {
-		return nil, err
-	}
-	accessPolicyStore, err := accesspolicies.NewStore(filepath.Join(cfg.RevisionStoreDir, "accesspolicies"))
-	if err != nil {
-		return nil, err
-	}
-	rateLimitPolicyStore, err := ratelimitpolicies.NewStore(filepath.Join(cfg.RevisionStoreDir, "ratelimitpolicies"))
-	if err != nil {
-		return nil, err
-	}
-	easySiteProfileStore, err := easysiteprofiles.NewStore(filepath.Join(cfg.RevisionStoreDir, "easysiteprofiles"))
-	if err != nil {
-		return nil, err
-	}
-	antiDDoSStore, err := antiddos.NewStore(filepath.Join(cfg.RevisionStoreDir, "antiddos"))
-	if err != nil {
-		return nil, err
+
+	if postgresBackend != nil {
+		revisionStore, err = revisions.NewPostgresStore(revisionsRoot, postgresBackend)
+		if err != nil {
+			return nil, err
+		}
+		revisionSnapshotStore, err = revisionsnapshots.NewPostgresStore(revisionSnapshotsRoot, postgresBackend)
+		if err != nil {
+			return nil, err
+		}
+		eventStore, err = events.NewPostgresStore(eventsRoot, postgresBackend)
+		if err != nil {
+			return nil, err
+		}
+		auditStore, err = audits.NewPostgresStore(auditsRoot, postgresBackend)
+		if err != nil {
+			return nil, err
+		}
+		jobStore, err = jobs.NewPostgresStore(jobsRoot, postgresBackend)
+		if err != nil {
+			return nil, err
+		}
+		roleStore, err = roles.NewPostgresStore(rolesRoot, postgresBackend)
+		if err != nil {
+			return nil, err
+		}
+		userStore, err = users.NewPostgresStore(usersRoot, postgresBackend, bootstrapUser)
+		if err != nil {
+			return nil, err
+		}
+		sessionStore, err = sessions.NewPostgresStore(sessionsRoot, postgresBackend)
+		if err != nil {
+			return nil, err
+		}
+		passkeyStore, err = passkeys.NewPostgresStore(passkeysRoot, postgresBackend)
+		if err != nil {
+			return nil, err
+		}
+		siteStore, err = sites.NewPostgresStore(sitesRoot, postgresBackend)
+		if err != nil {
+			return nil, err
+		}
+		upstreamStore, err = upstreams.NewPostgresStore(upstreamsRoot, postgresBackend)
+		if err != nil {
+			return nil, err
+		}
+		certificateStore, err = certificates.NewPostgresStore(certificatesRoot, postgresBackend)
+		if err != nil {
+			return nil, err
+		}
+		certificateMaterialStore, err = certificatematerials.NewPostgresStore(certificateMaterialsRoot, postgresBackend)
+		if err != nil {
+			return nil, err
+		}
+		tlsConfigStore, err = tlsconfigs.NewPostgresStore(tlsConfigsRoot, postgresBackend)
+		if err != nil {
+			return nil, err
+		}
+		wafPolicyStore, err = wafpolicies.NewPostgresStore(wafPoliciesRoot, postgresBackend)
+		if err != nil {
+			return nil, err
+		}
+		accessPolicyStore, err = accesspolicies.NewPostgresStore(accessPoliciesRoot, postgresBackend)
+		if err != nil {
+			return nil, err
+		}
+		rateLimitPolicyStore, err = ratelimitpolicies.NewPostgresStore(rateLimitPoliciesRoot, postgresBackend)
+		if err != nil {
+			return nil, err
+		}
+		easySiteProfileStore, err = easysiteprofiles.NewPostgresStore(easySiteProfilesRoot, postgresBackend)
+		if err != nil {
+			return nil, err
+		}
+		antiDDoSStore, err = antiddos.NewPostgresStore(antiDDoSRoot, postgresBackend)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		revisionStore, err = revisions.NewStore(revisionsRoot)
+		if err != nil {
+			return nil, err
+		}
+		revisionSnapshotStore, err = revisionsnapshots.NewStore(revisionSnapshotsRoot)
+		if err != nil {
+			return nil, err
+		}
+		eventStore, err = events.NewStore(eventsRoot)
+		if err != nil {
+			return nil, err
+		}
+		auditStore, err = audits.NewStore(auditsRoot)
+		if err != nil {
+			return nil, err
+		}
+		jobStore, err = jobs.NewStore(jobsRoot)
+		if err != nil {
+			return nil, err
+		}
+		roleStore, err = roles.NewStore(rolesRoot)
+		if err != nil {
+			return nil, err
+		}
+		userStore, err = users.NewStore(usersRoot, bootstrapUser)
+		if err != nil {
+			return nil, err
+		}
+		sessionStore, err = sessions.NewStore(sessionsRoot)
+		if err != nil {
+			return nil, err
+		}
+		passkeyStore, err = passkeys.NewStore(passkeysRoot)
+		if err != nil {
+			return nil, err
+		}
+		siteStore, err = sites.NewStore(sitesRoot)
+		if err != nil {
+			return nil, err
+		}
+		upstreamStore, err = upstreams.NewStore(upstreamsRoot)
+		if err != nil {
+			return nil, err
+		}
+		certificateStore, err = certificates.NewStore(certificatesRoot)
+		if err != nil {
+			return nil, err
+		}
+		certificateMaterialStore, err = certificatematerials.NewStore(certificateMaterialsRoot)
+		if err != nil {
+			return nil, err
+		}
+		tlsConfigStore, err = tlsconfigs.NewStore(tlsConfigsRoot)
+		if err != nil {
+			return nil, err
+		}
+		wafPolicyStore, err = wafpolicies.NewStore(wafPoliciesRoot)
+		if err != nil {
+			return nil, err
+		}
+		accessPolicyStore, err = accesspolicies.NewStore(accessPoliciesRoot)
+		if err != nil {
+			return nil, err
+		}
+		rateLimitPolicyStore, err = ratelimitpolicies.NewStore(rateLimitPoliciesRoot)
+		if err != nil {
+			return nil, err
+		}
+		easySiteProfileStore, err = easysiteprofiles.NewStore(easySiteProfilesRoot)
+		if err != nil {
+			return nil, err
+		}
+		antiDDoSStore, err = antiddos.NewStore(antiDDoSRoot)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	revisionService := services.NewRevisionService(revisionStore)
 	setupService := services.NewSetupService(userStore, siteStore, revisionStore)
 	auditService := services.NewAuditService(auditStore)
 	revisionCompileService := services.NewRevisionCompileService(revisionStore, revisionSnapshotStore, jobStore, siteStore, upstreamStore, certificateStore, tlsConfigStore, wafPolicyStore, accessPolicyStore, rateLimitPolicyStore, easySiteProfileStore, antiDDoSStore, certificateMaterialStore, auditService)
+	revisionCompileService.SetCoordinator(coord)
 	revisionCatalogService := services.NewRevisionCatalogService(revisionStore, revisionSnapshotStore, jobStore, eventStore, siteStore)
 	runtimeSecurityCollector := services.NewHTTPRuntimeSecurityEventCollector(cfg.RuntimeHealthURL, cfg.RuntimeAPIToken)
 	eventService := services.NewEventService(
@@ -221,10 +387,11 @@ func New(cfg config.Config) (*App, error) {
 	letsEncryptService := services.NewLetsEncryptService(letsEncryptClient, jobStore, certificateStore, certificateMaterialStore, auditService)
 	selfSignedCertificateService := services.NewLetsEncryptService(services.NewDevelopmentLetsEncryptClient(), jobStore, certificateStore, certificateMaterialStore, auditService)
 	tlsConfigService := services.NewTLSConfigService(tlsConfigStore, siteStore, certificateStore, auditService)
-	tlsAutoRenewService, err := services.NewTLSAutoRenewService(filepath.Join(cfg.RevisionStoreDir, "tls-auto-renew"), certificateStore, tlsConfigStore, letsEncryptService)
+	tlsAutoRenewService, err := services.NewTLSAutoRenewServiceWithBackend(filepath.Join(cfg.RevisionStoreDir, "tls-auto-renew"), postgresBackend, certificateStore, tlsConfigStore, letsEncryptService)
 	if err != nil {
 		return nil, err
 	}
+	tlsAutoRenewService.SetCoordinator(coord)
 	tlsAutoRenewService.Start()
 	wafPolicyService := services.NewWAFPolicyService(wafPolicyStore, siteStore, auditService)
 	accessPolicyService := services.NewAccessPolicyService(accessPolicyStore, siteStore, auditService)
@@ -240,9 +407,10 @@ func New(cfg config.Config) (*App, error) {
 		services.HTTPHealthChecker{URL: cfg.RuntimeHealthURL, Token: cfg.RuntimeAPIToken},
 		auditService,
 	)
+	applyService.SetCoordinator(coord)
 	easySiteProfileService := services.NewEasySiteProfileService(easySiteProfileStore, siteStore, wafPolicyStore, accessPolicyStore, rateLimitPolicyStore, revisionCompileService, applyService, auditService)
 	antiDDoSService := services.NewAntiDDoSService(antiDDoSStore, revisionCompileService, applyService, auditService)
-	services.ConfigureAutoApply(revisionCompileService, applyService)
+	services.ConfigureAutoApply(revisionCompileService, applyService, coord)
 	reportService := services.NewReportService(eventStore, jobStore, revisionStore)
 	runtimeRequestCollector := services.NewHTTPRuntimeRequestCollector(cfg.RuntimeHealthURL, cfg.RuntimeAPIToken)
 	runtimeReadyProbe := services.NewHTTPRuntimeReadyProbe(cfg.RuntimeHealthURL, cfg.RuntimeAPIToken)
@@ -250,7 +418,7 @@ func New(cfg config.Config) (*App, error) {
 	runtimeCRSService := services.NewRuntimeCRSService(services.RuntimeBaseURLFromHealthURL(cfg.RuntimeHealthURL), cfg.RuntimeAPIToken)
 	containerRuntimeService := services.NewContainerRuntimeService()
 	adminScriptService := services.NewAdminScriptService(cfg.RevisionStoreDir, detectScriptsRoot())
-	httpServer := httpserver.New(cfg.HTTPAddr, cfg.RuntimeRoot, cfg.RevisionStoreDir, cfg.RuntimeHealthURL, setupService, revisionService, authService, sessionStore, userStore, roleStore, siteService, manualBanService, upstreamService, certificateService, tlsConfigService, tlsAutoRenewService, certificateUploadService, certificateMaterialStore, letsEncryptService, selfSignedCertificateService, wafPolicyService, accessPolicyService, rateLimitPolicyService, easySiteProfileService, antiDDoSService, eventService, revisionCompileService, applyService, revisionCatalogService, auditService, reportService, dashboardService, containerRuntimeService, runtimeCRSService, runtimeRequestCollector, runtimeReadyProbe, runtimeSecurityCollector, runtimeRequestCollector, adminScriptService)
+	httpServer := httpserver.New(cfg.HTTPAddr, cfg.RuntimeRoot, cfg.RevisionStoreDir, cfg.RuntimeHealthURL, coord.Enabled(), coord.NodeID(), cfg.Metrics.Token, postgresBackend, setupService, revisionService, authService, sessionStore, userStore, roleStore, siteService, manualBanService, upstreamService, certificateService, tlsConfigService, tlsAutoRenewService, certificateUploadService, certificateMaterialStore, letsEncryptService, selfSignedCertificateService, wafPolicyService, accessPolicyService, rateLimitPolicyService, easySiteProfileService, antiDDoSService, eventService, revisionCompileService, applyService, revisionCatalogService, auditService, reportService, dashboardService, containerRuntimeService, runtimeCRSService, runtimeRequestCollector, runtimeReadyProbe, runtimeSecurityCollector, runtimeRequestCollector, adminScriptService)
 	var devFastStartBootstrapper *services.DevFastStartBootstrapper
 	if cfg.DevFastStart.Enabled {
 		devFastStartCertificateIssuer := letsEncryptService
@@ -272,11 +440,14 @@ func New(cfg config.Config) (*App, error) {
 			easySiteProfileService,
 			rateLimitPolicyStore,
 		)
+		devFastStartBootstrapper.SetCoordinator(coord)
 	}
 
 	return &App{
 		Config:                   cfg,
+		PostgresBackend:          postgresBackend,
 		RedisBackend:             redisBackend,
+		Coordinator:              coord,
 		RevisionStore:            revisionStore,
 		RevisionSnapshotStore:    revisionSnapshotStore,
 		SetupService:             setupService,

@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -21,6 +22,7 @@ const defaultHealthAddr = "127.0.0.1:8081"
 const runtimeAuthHeader = "X-WAF-Runtime-Token"
 
 var errActivePointerMissing = errors.New("active/current.json is required")
+var runtimeProm = newRuntimeMetrics()
 
 type activePointer struct {
 	RevisionID    string `json:"revision_id"`
@@ -43,6 +45,8 @@ func (s *runtimeStatus) setActiveBundle(pointer *activePointer, candidatePath st
 	s.bundleValidated = true
 	s.activeRevisionID = pointer.RevisionID
 	s.activeBundlePath = candidatePath
+	runtimeProm.setActiveRevision(pointer.RevisionID)
+	runtimeProm.setReady(true)
 }
 
 func (s *runtimeStatus) setBundleUnavailable() {
@@ -52,12 +56,15 @@ func (s *runtimeStatus) setBundleUnavailable() {
 	s.bundleValidated = false
 	s.activeRevisionID = ""
 	s.activeBundlePath = ""
+	runtimeProm.setActiveRevision("")
+	runtimeProm.setReady(false)
 }
 
 func (s *runtimeStatus) setNginxRunning(running bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.nginxRunning = running
+	runtimeProm.setReady(running && s.pointerLoaded && s.bundleValidated && s.activeRevisionID != "" && s.activeBundlePath != "")
 }
 
 func (s *runtimeStatus) live() bool {
@@ -95,13 +102,20 @@ func newRuntimeProcess(runtimeRoot, crsPath string, status *runtimeStatus, manag
 func (p *runtimeProcess) bootCurrent() error {
 	pointer, candidatePath, err := p.loadCurrentBundle()
 	if err != nil {
+		runtimeProm.recordBundleLoad("failed")
 		return err
 	}
 	if err := prepareRuntimeLayout(candidatePath, p.crsPath); err != nil {
+		runtimeProm.recordBundleLoad("failed")
 		return err
 	}
 	p.status.setActiveBundle(pointer, candidatePath)
-	return p.startOrReloadLocked()
+	if err := p.startOrReloadLocked(); err != nil {
+		runtimeProm.recordBundleLoad("failed")
+		return err
+	}
+	runtimeProm.recordBundleLoad("succeeded")
+	return nil
 }
 
 func (p *runtimeProcess) reloadCurrent() error {
@@ -110,13 +124,20 @@ func (p *runtimeProcess) reloadCurrent() error {
 
 	pointer, candidatePath, err := p.loadCurrentBundle()
 	if err != nil {
+		runtimeProm.recordReload("failed")
 		return err
 	}
 	if err := prepareRuntimeLayout(candidatePath, p.crsPath); err != nil {
+		runtimeProm.recordReload("failed")
 		return err
 	}
 	p.status.setActiveBundle(pointer, candidatePath)
-	return p.startOrReloadLocked()
+	if err := p.startOrReloadLocked(); err != nil {
+		runtimeProm.recordReload("failed")
+		return err
+	}
+	runtimeProm.recordReload("succeeded")
+	return nil
 }
 
 func (p *runtimeProcess) setCRSPath(path string) {
@@ -165,15 +186,7 @@ func (p *runtimeProcess) startOrReloadLocked() error {
 		go p.waitForExit(cmd)
 		return nil
 	}
-
-	reloadArgs := []string{"-p", "/etc/waf/nginx", "-c", "nginx.conf", "-s", "reload"}
-	if globalDirectiveReload := p.nginxGlobalDirective("/etc/waf/nginx/nginx.conf", false); strings.TrimSpace(globalDirectiveReload) != "" {
-		reloadArgs = append(reloadArgs, "-g", globalDirectiveReload)
-	}
-	reload := exec.Command("nginx", reloadArgs...)
-	reload.Stdout = os.Stdout
-	reload.Stderr = os.Stderr
-	return reload.Run()
+	return p.cmd.Process.Signal(syscall.SIGHUP)
 }
 
 func (p *runtimeProcess) nginxGlobalDirective(configPath string, daemonOff bool) string {
@@ -182,6 +195,9 @@ func (p *runtimeProcess) nginxGlobalDirective(configPath string, daemonOff bool)
 	configText := ""
 	if err == nil {
 		configText = string(content)
+	}
+	if !strings.Contains(configText, "pid ") {
+		directives = append(directives, "pid /etc/waf/nginx/nginx.pid;")
 	}
 	for _, modulePath := range p.modulePaths {
 		modulePath = strings.TrimSpace(modulePath)
@@ -223,6 +239,7 @@ func (s *runtimeStatus) handlers(process *runtimeProcess, securitySource *securi
 		}
 	}
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		runtimeProm.setLive(true)
 		if !s.live() {
 			http.Error(w, "not live", http.StatusServiceUnavailable)
 			return
@@ -232,12 +249,15 @@ func (s *runtimeStatus) handlers(process *runtimeProcess, securitySource *securi
 	})
 	mux.HandleFunc("/readyz", requireRuntimeAccess(func(w http.ResponseWriter, r *http.Request) {
 		if !s.ready() {
+			runtimeProm.setReady(false)
 			http.Error(w, "not ready", http.StatusServiceUnavailable)
 			return
 		}
+		runtimeProm.setReady(true)
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok\n"))
 	}))
+	mux.Handle("/metrics", runtimeProm)
 	mux.HandleFunc("/reload", requireRuntimeAccess(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -551,7 +571,7 @@ func startPeriodicL4GuardRefresh() {
 func startHealthServer(addr string, status *runtimeStatus, process *runtimeProcess, securitySource *securityEventSource, requestSource *requestStreamSource) error {
 	server := &http.Server{
 		Addr:    addr,
-		Handler: status.handlers(process, securitySource, requestSource),
+		Handler: runtimeProm.instrument(status.handlers(process, securitySource, requestSource)),
 	}
 	go func() {
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {

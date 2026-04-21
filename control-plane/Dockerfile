@@ -1,8 +1,9 @@
-FROM golang:1.24-bookworm AS builder
+FROM golang:1.25-bookworm AS builder
 
 WORKDIR /src
 COPY go.mod ./
 COPY go.sum ./
+COPY internal ./internal
 COPY compiler ./compiler
 COPY control-plane ./control-plane
 

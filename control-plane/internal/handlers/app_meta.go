@@ -7,10 +7,16 @@ import (
 	"waf/control-plane/internal/appmeta"
 )
 
-type AppMetaHandler struct{}
+type AppMetaHandler struct {
+	haEnabled bool
+	haNodeID  string
+}
 
-func NewAppMetaHandler() *AppMetaHandler {
-	return &AppMetaHandler{}
+func NewAppMetaHandler(haEnabled bool, haNodeID string) *AppMetaHandler {
+	return &AppMetaHandler{
+		haEnabled: haEnabled,
+		haNodeID:  strings.TrimSpace(haNodeID),
+	}
 }
 
 func (h *AppMetaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -27,5 +33,7 @@ func (h *AppMetaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		"product_name":    appmeta.ProductName,
 		"repository_url":  appmeta.RepositoryURL,
 		"github_releases": appmeta.GitHubAPIReleases,
+		"ha_enabled":      h.haEnabled,
+		"ha_node_id":      h.haNodeID,
 	})
 }

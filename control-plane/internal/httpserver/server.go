@@ -14,6 +14,8 @@ import (
 	"waf/control-plane/internal/roles"
 	"waf/control-plane/internal/services"
 	"waf/control-plane/internal/sessions"
+	"waf/control-plane/internal/storage"
+	"waf/control-plane/internal/telemetry"
 	"waf/control-plane/internal/users"
 )
 
@@ -26,6 +28,10 @@ func New(
 	runtimeRoot string,
 	revisionStoreDir string,
 	runtimeHealthURL string,
+	haEnabled bool,
+	haNodeID string,
+	metricsToken string,
+	stateBackend storage.Backend,
 	setupService interface {
 		Status() (services.SetupStatus, error)
 	},
@@ -75,13 +81,15 @@ func New(
 	adminScriptService *services.AdminScriptService,
 ) *Server {
 	mux := http.NewServeMux()
-	settingsRuntimeHandler := handlers.NewSettingsRuntimeHandler(filepath.Join(revisionStoreDir, "settings"), runtimeHealthURL)
+	metrics := telemetry.Default()
+	settingsRuntimeHandler := handlers.NewSettingsRuntimeHandlerWithBackend(filepath.Join(revisionStoreDir, "settings"), runtimeHealthURL, stateBackend)
 	administrationUsersHandler := handlers.NewAdministrationUsersHandlerWithSessions(userStore, roleStore, sessionStore)
 	administrationRolesHandler := handlers.NewAdministrationRolesHandler(roleStore, userStore)
 	zeroTrustHealthHandler := handlers.NewZeroTrustHealthHandler(userStore, roleStore)
 	mux.Handle("/healthz", handlers.NewHealthHandler(revisionService, revisionCatalogService, setupService, sessionStore, userStore, roleStore, revisionCompileService, runtimeReadyProbe, runtimeSecurityProbe, runtimeRequestProbe, runtimeCRSService))
+	mux.Handle("/metrics", metricsHandler(metrics.Registry(), metricsToken))
 	mux.Handle("/api/setup/status", handlers.NewSetupHandler(setupService))
-	mux.Handle("/api/app/meta", withAuth(authService, "", handlers.NewAppMetaHandler()))
+	mux.Handle("/api/app/meta", withAuth(authService, "", handlers.NewAppMetaHandler(haEnabled, haNodeID)))
 	mux.Handle("/api/app/ping", withAuth(authService, rbac.PermissionAuthSelf, handlers.NewAppPingHandler()))
 	mux.Handle("/api/app/compat", withAuth(authService, rbac.PermissionAuthSelf, handlers.NewAppCompatHandler(runtimeRoot, revisionStoreDir)))
 	mux.Handle("/api/app/compat/fix", withAuth(authService, rbac.PermissionAuthSelf, handlers.NewAppCompatHandler(runtimeRoot, revisionStoreDir)))
@@ -274,7 +282,7 @@ func New(
 	return &Server{
 		httpServer: &http.Server{
 			Addr:              addr,
-			Handler:           mux,
+			Handler:           metrics.InstrumentHTTP(mux, haNodeID),
 			ReadHeaderTimeout: 5 * time.Second,
 		},
 	}

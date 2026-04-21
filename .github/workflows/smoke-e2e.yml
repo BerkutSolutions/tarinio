@@ -11,12 +11,15 @@ jobs:
   login-healthcheck-dashboard:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+      WAF_STACK_NAME: gha-smoke-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
 
@@ -36,9 +39,26 @@ jobs:
           CONTROL_PLANE_ACME_USE_DEVELOPMENT_CLIENT=true
           EOF
 
+      - name: Cleanup previous stack state
+        shell: bash
+        run: docker compose -f deploy/compose/default/docker-compose.yml down -v --remove-orphans || true
+
       - name: Start stack
         shell: bash
         run: docker compose -f deploy/compose/default/docker-compose.yml up -d --build
+
+      - name: Wait for control-plane and ui
+        shell: bash
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8080/login >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "ui login endpoint did not become ready in time"
+          docker compose -f deploy/compose/default/docker-compose.yml ps
+          exit 1
 
       - name: Run e2e smoke login-healthcheck-dashboard
         shell: bash
@@ -51,9 +71,11 @@ jobs:
       - name: Dump compose logs on failure
         if: failure()
         shell: bash
-        run: docker compose -f deploy/compose/default/docker-compose.yml logs --no-color
+        run: |
+          docker compose -f deploy/compose/default/docker-compose.yml ps
+          docker compose -f deploy/compose/default/docker-compose.yml logs --no-color
 
       - name: Stop stack
         if: always()
         shell: bash
-        run: docker compose -f deploy/compose/default/docker-compose.yml down
+        run: docker compose -f deploy/compose/default/docker-compose.yml down -v --remove-orphans

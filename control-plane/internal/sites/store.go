@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"waf/control-plane/internal/storage"
 )
 
 // Site is the minimal Stage 1 control-plane site entity used by the first CRUD API.
@@ -27,8 +29,8 @@ type state struct {
 
 // Store persists sites as control-plane state without any runtime dependency.
 type Store struct {
-	path string
-	mu   sync.Mutex
+	state *storage.JSONState
+	mu    sync.Mutex
 }
 
 func NewStore(root string) (*Store, error) {
@@ -39,7 +41,16 @@ func NewStore(root string) (*Store, error) {
 		return nil, fmt.Errorf("create sites store root: %w", err)
 	}
 	return &Store{
-		path: filepath.Join(root, "sites.json"),
+		state: storage.NewFileJSONState(filepath.Join(root, "sites.json")),
+	}, nil
+}
+
+func NewPostgresStore(root string, backend storage.Backend) (*Store, error) {
+	if strings.TrimSpace(root) == "" {
+		return nil, errors.New("sites store root is required")
+	}
+	return &Store{
+		state: storage.NewBackendJSONState(backend, "sites/sites.json", filepath.Join(root, "sites.json")),
 	}, nil
 }
 
@@ -140,9 +151,9 @@ func (s *Store) Delete(id string) error {
 }
 
 func (s *Store) loadLocked() (*state, error) {
-	content, err := os.ReadFile(s.path)
+	content, err := s.state.Load()
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
+		if errors.Is(err, storage.ErrNotFound) {
 			return &state{}, nil
 		}
 		return nil, fmt.Errorf("read sites store: %w", err)
@@ -162,7 +173,7 @@ func (s *Store) saveLocked(current *state) error {
 		return fmt.Errorf("encode sites store: %w", err)
 	}
 	content = append(content, '\n')
-	if err := os.WriteFile(s.path, content, 0o644); err != nil {
+	if err := s.state.Save(content); err != nil {
 		return fmt.Errorf("write sites store: %w", err)
 	}
 	return nil

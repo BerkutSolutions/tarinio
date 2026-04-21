@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strings"
 	"sync"
+
+	"waf/control-plane/internal/storage"
 )
 
 type Status string
@@ -42,8 +44,8 @@ type state struct {
 // Store persists revision metadata and lifecycle state for the control plane.
 // It is not readable by runtime and contains no domain-model entities.
 type Store struct {
-	path string
-	mu   sync.Mutex
+	state *storage.JSONState
+	mu    sync.Mutex
 }
 
 func NewStore(root string) (*Store, error) {
@@ -54,7 +56,16 @@ func NewStore(root string) (*Store, error) {
 		return nil, fmt.Errorf("create store root: %w", err)
 	}
 	return &Store{
-		path: filepath.Join(root, "revisions.json"),
+		state: storage.NewFileJSONState(filepath.Join(root, "revisions.json")),
+	}, nil
+}
+
+func NewPostgresStore(root string, backend storage.Backend) (*Store, error) {
+	if strings.TrimSpace(root) == "" {
+		return nil, errors.New("store root is required")
+	}
+	return &Store{
+		state: storage.NewBackendJSONState(backend, "revisions/revisions.json", filepath.Join(root, "revisions.json")),
 	}, nil
 }
 
@@ -244,9 +255,9 @@ func (s *Store) Delete(revisionID string) error {
 }
 
 func (s *Store) loadLocked() (*state, error) {
-	content, err := os.ReadFile(s.path)
+	content, err := s.state.Load()
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
+		if errors.Is(err, storage.ErrNotFound) {
 			return &state{}, nil
 		}
 		return nil, fmt.Errorf("read store: %w", err)
@@ -266,7 +277,7 @@ func (s *Store) saveLocked(current *state) error {
 		return fmt.Errorf("encode store: %w", err)
 	}
 	content = append(content, '\n')
-	if err := os.WriteFile(s.path, content, 0o644); err != nil {
+	if err := s.state.Save(content); err != nil {
 		return fmt.Errorf("write store: %w", err)
 	}
 	return nil

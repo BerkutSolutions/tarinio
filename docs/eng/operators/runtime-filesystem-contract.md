@@ -1,6 +1,6 @@
 # Runtime Filesystem Contract
 
-Status: Stage 1 runtime contract for single-node deployment.
+Status: Stage 1 runtime contract for the shared runtime root used by single-node and HA control-plane deployments.
 
 ## Purpose
 
@@ -134,7 +134,7 @@ Runtime does not own:
 
 ## Final Rule
 
-For the single-node MVP:
+For the shared runtime-root contract used by both the single-node baseline and the HA control-plane topology:
 
 - `active/current.json` is authoritative;
 - `/etc/waf/current` is derived;

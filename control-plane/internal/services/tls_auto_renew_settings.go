@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"waf/control-plane/internal/storage"
 )
 
 type TLSAutoRenewSettings struct {
@@ -17,18 +19,27 @@ type TLSAutoRenewSettings struct {
 }
 
 type tlsAutoRenewSettingsStore struct {
-	path string
-	mu   sync.Mutex
+	state *storage.JSONState
+	mu    sync.Mutex
 }
 
 func newTLSAutoRenewSettingsStore(root string) (*tlsAutoRenewSettingsStore, error) {
+	return newTLSAutoRenewSettingsStoreWithBackend(root, nil)
+}
+
+func newTLSAutoRenewSettingsStoreWithBackend(root string, backend storage.Backend) (*tlsAutoRenewSettingsStore, error) {
 	if root == "" {
 		return nil, errors.New("tls auto-renew settings root is required")
 	}
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		return nil, fmt.Errorf("create tls auto-renew settings root: %w", err)
 	}
-	return &tlsAutoRenewSettingsStore{path: filepath.Join(root, "settings.json")}, nil
+	if !storage.IsNilBackend(backend) {
+		return &tlsAutoRenewSettingsStore{
+			state: storage.NewBackendJSONState(backend, "tls-auto-renew/settings.json", filepath.Join(root, "settings.json")),
+		}, nil
+	}
+	return &tlsAutoRenewSettingsStore{state: storage.NewFileJSONState(filepath.Join(root, "settings.json"))}, nil
 }
 
 func defaultTLSAutoRenewSettings() TLSAutoRenewSettings {
@@ -39,9 +50,9 @@ func (s *tlsAutoRenewSettingsStore) Get() (TLSAutoRenewSettings, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	payload, err := os.ReadFile(s.path)
+	payload, err := s.state.Load()
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
+		if errors.Is(err, storage.ErrNotFound) {
 			return defaultTLSAutoRenewSettings(), nil
 		}
 		return TLSAutoRenewSettings{}, fmt.Errorf("read tls auto-renew settings: %w", err)
@@ -70,7 +81,7 @@ func (s *tlsAutoRenewSettingsStore) Put(value TLSAutoRenewSettings) (TLSAutoRene
 		return TLSAutoRenewSettings{}, fmt.Errorf("encode tls auto-renew settings: %w", err)
 	}
 	body = append(body, '\n')
-	if err := os.WriteFile(s.path, body, 0o644); err != nil {
+	if err := s.state.Save(body); err != nil {
 		return TLSAutoRenewSettings{}, fmt.Errorf("write tls auto-renew settings: %w", err)
 	}
 	return value, nil

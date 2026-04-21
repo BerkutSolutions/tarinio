@@ -22,6 +22,22 @@ func (a *App) RunStartupSelfTest(ctx context.Context) error {
 	if !a.Config.StartupSelfTest {
 		return nil
 	}
+	if a.Coordinator != nil && a.Coordinator.Enabled() {
+		running, err := a.Coordinator.TryRunLeader(ctx, "ha:leader:startup-self-test", a.Coordinator.LeaderTTL(), func(lockCtx context.Context) error {
+			return a.runStartupSelfTestUnlocked(lockCtx)
+		})
+		if err != nil {
+			return err
+		}
+		if !running {
+			return nil
+		}
+		return nil
+	}
+	return a.runStartupSelfTestUnlocked(ctx)
+}
+
+func (a *App) runStartupSelfTestUnlocked(ctx context.Context) error {
 	if a.SiteService == nil ||
 		a.UpstreamService == nil ||
 		a.TLSConfigService == nil ||

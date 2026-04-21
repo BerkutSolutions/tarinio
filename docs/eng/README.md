@@ -1,8 +1,8 @@
-# TARINIO 2.0.1 Wiki
+# English Wiki
 
-Wiki baseline: `2.0.1`
+This page belongs to the current documentation branch.
 
-This is the main English index for TARINIO documentation. It is structured as an operator wiki for the real `2.0.1` product and is meant to complement the Russian branch, not lag behind it.
+This is the main English index for TARINIO documentation. It is structured as an operator wiki for the real `2.0.2` product and is meant to complement the Russian branch, not lag behind it.
 
 ## Start Here
 
@@ -18,15 +18,17 @@ This is the main English index for TARINIO documentation. It is structured as an
 3. API: `docs/eng/api.md`
 4. Security: `docs/eng/security.md`
 5. Deployment: `docs/eng/deploy.md`
-6. Runbook: `docs/eng/runbook.md`
-7. Upgrade and rollback: `docs/eng/upgrade.md`
-8. Backups and restore: `docs/eng/backups.md`
-9. CLI commands: `docs/CLI_COMMANDS.md`
+6. HA / multi-node: `docs/eng/ha.md`
+7. Runbook: `docs/eng/runbook.md`
+8. Upgrade and rollback: `docs/eng/upgrade.md`
+9. Backups and restore: `docs/eng/backups.md`
+10. CLI commands: `docs/CLI_COMMANDS.md`
 
 ## Operator Guides
 
 - Anti-DDoS runbook: `docs/eng/operators/anti-ddos-runbook.md`
 - Anti-DDoS model: `docs/eng/operators/anti-ddos-model.md`
+- HA architecture and operations: `docs/eng/ha.md`
 - Runtime L4 guard: `docs/eng/operators/runtime-l4-guard.md`
 - Runtime filesystem contract: `docs/eng/operators/runtime-filesystem-contract.md`
 - WAF tuning guide: `docs/eng/operators/waf-tuning-guide.md`
@@ -34,7 +36,7 @@ This is the main English index for TARINIO documentation. It is structured as an
 - OWASP CRS operations: `docs/eng/operators/owasp-crs.md`
 - Let's Encrypt DNS-01 operations: `docs/eng/operators/letsencrypt-dns.md`
 
-## What Matters In 2.0.1
+## What Matters In 2.0.2
 
 - Documentation is aligned with the application version from `control-plane/internal/appmeta/meta.go`.
 - The wiki covers the real UI sections: `Dashboard`, `Sites`, `Anti-DDoS`, `OWASP CRS`, `TLS`, `Requests`, `Revisions`, `Events`, `Bans`, `Administration`, `Activity`, `Settings`, and `Profile`.

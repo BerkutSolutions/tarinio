@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>TARINIO HA Lab Demo</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: "Segoe UI", sans-serif;
+      }
+      body {
+        margin: 0;
+        background: linear-gradient(135deg, #f4f7fb, #dfe9f3);
+        color: #10233c;
+      }
+      main {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 48px 24px 64px;
+      }
+      .card {
+        background: rgba(255, 255, 255, 0.88);
+        border: 1px solid rgba(16, 35, 60, 0.1);
+        border-radius: 24px;
+        padding: 24px;
+        box-shadow: 0 16px 50px rgba(16, 35, 60, 0.12);
+      }
+      h1 {
+        margin-top: 0;
+      }
+      ul {
+        line-height: 1.7;
+      }
+      code {
+        background: rgba(16, 35, 60, 0.08);
+        padding: 2px 6px;
+        border-radius: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="card">
+        <h1>TARINIO HA Lab Demo App</h1>
+        <p>This upstream is intentionally lightweight and exists only to validate WAF routing, rate limits, bad behavior controls, and HA failover.</p>
+        <ul>
+          <li><code>/</code> basic landing page</li>
+          <li><code>/limited.html</code> fixed page suitable for rate-limit tests</li>
+          <li><code>/headers</code> echo selected forwarded headers</li>
+          <li><code>/healthz</code> upstream health probe</li>
+        </ul>
+      </div>
+    </main>
+  </body>
+  </html>

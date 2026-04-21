@@ -16,6 +16,7 @@ import (
 	"waf/control-plane/internal/revisions"
 	"waf/control-plane/internal/revisionsnapshots"
 	"waf/control-plane/internal/sites"
+	"waf/control-plane/internal/telemetry"
 	"waf/control-plane/internal/tlsconfigs"
 	"waf/control-plane/internal/upstreams"
 	"waf/control-plane/internal/wafpolicies"
@@ -86,6 +87,7 @@ type RevisionCompileService struct {
 	antiDDoSSettings  AntiDDoSSettingsReader
 	materials         CertificateMaterialReader
 	audits            *AuditService
+	coord             DistributedCoordinator
 }
 
 type CertificateMaterialReader interface {
@@ -123,10 +125,35 @@ func NewRevisionCompileService(
 		antiDDoSSettings:  antiDDoSSettings,
 		materials:         materials,
 		audits:            audits,
+		coord:             NewNoopDistributedCoordinator(),
 	}
 }
 
 func (s *RevisionCompileService) Create(ctx context.Context) (result CompileRequestResult, err error) {
+	if s.coord == nil {
+		s.coord = NewNoopDistributedCoordinator()
+	}
+	err = s.coord.WithLock(ctx, "ha:revision:compile", s.coord.OperationTTL(), func(lockCtx context.Context) error {
+		result, err = s.createUnlocked(lockCtx)
+		return err
+	})
+	if err != nil {
+		telemetry.Default().RecordRevisionCompile(s.coord.NodeID(), "failed")
+	} else {
+		telemetry.Default().RecordRevisionCompile(s.coord.NodeID(), "succeeded")
+	}
+	return result, err
+}
+
+func (s *RevisionCompileService) SetCoordinator(coord DistributedCoordinator) {
+	if coord == nil {
+		s.coord = NewNoopDistributedCoordinator()
+		return
+	}
+	s.coord = coord
+}
+
+func (s *RevisionCompileService) createUnlocked(ctx context.Context) (result CompileRequestResult, err error) {
 	defer func() {
 		recordAudit(ctx, s.audits, audits.AuditEvent{
 			Action:            "revision.compile_request",

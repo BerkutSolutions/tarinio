@@ -9,6 +9,7 @@ import (
 
 	"waf/control-plane/internal/certificates"
 	"waf/control-plane/internal/jobs"
+	"waf/control-plane/internal/storage"
 	"waf/control-plane/internal/tlsconfigs"
 )
 
@@ -30,13 +31,18 @@ type TLSAutoRenewService struct {
 	tlsConfigs   tlsAutoRenewTLSConfigReader
 	renewer      tlsAutoRenewRenewer
 	interval     time.Duration
+	coord        DistributedCoordinator
 
 	attemptMu   sync.Mutex
 	lastAttempt map[string]time.Time
 }
 
 func NewTLSAutoRenewService(root string, certificates tlsAutoRenewCertificateReader, tlsConfigs tlsAutoRenewTLSConfigReader, renewer tlsAutoRenewRenewer) (*TLSAutoRenewService, error) {
-	store, err := newTLSAutoRenewSettingsStore(root)
+	return NewTLSAutoRenewServiceWithBackend(root, nil, certificates, tlsConfigs, renewer)
+}
+
+func NewTLSAutoRenewServiceWithBackend(root string, backend storage.Backend, certificates tlsAutoRenewCertificateReader, tlsConfigs tlsAutoRenewTLSConfigReader, renewer tlsAutoRenewRenewer) (*TLSAutoRenewService, error) {
+	store, err := newTLSAutoRenewSettingsStoreWithBackend(root, backend)
 	if err != nil {
 		return nil, err
 	}
@@ -46,6 +52,7 @@ func NewTLSAutoRenewService(root string, certificates tlsAutoRenewCertificateRea
 		tlsConfigs:   tlsConfigs,
 		renewer:      renewer,
 		interval:     6 * time.Hour,
+		coord:        NewNoopDistributedCoordinator(),
 		lastAttempt:  map[string]time.Time{},
 	}, nil
 }
@@ -78,7 +85,30 @@ func (s *TLSAutoRenewService) Start() {
 	}()
 }
 
+func (s *TLSAutoRenewService) SetCoordinator(coord DistributedCoordinator) {
+	if coord == nil {
+		s.coord = NewNoopDistributedCoordinator()
+		return
+	}
+	s.coord = coord
+}
+
 func (s *TLSAutoRenewService) runOnce() {
+	if s == nil || s.coord == nil {
+		s.runOnceUnlocked(context.Background())
+		return
+	}
+	if !s.coord.Enabled() {
+		s.runOnceUnlocked(context.Background())
+		return
+	}
+	_, _ = s.coord.TryRunLeader(context.Background(), "ha:leader:tls-auto-renew", s.coord.LeaderTTL(), func(ctx context.Context) error {
+		s.runOnceUnlocked(ctx)
+		return nil
+	})
+}
+
+func (s *TLSAutoRenewService) runOnceUnlocked(ctx context.Context) {
 	if s == nil || s.store == nil || s.certificates == nil || s.tlsConfigs == nil || s.renewer == nil {
 		return
 	}
@@ -128,7 +158,7 @@ func (s *TLSAutoRenewService) runOnce() {
 		if s.wasAttemptedRecently(id, now) {
 			continue
 		}
-		_, _ = s.renewer.Renew(context.Background(), id, nil)
+		_, _ = s.renewer.Renew(ctx, id, nil)
 		s.markAttempt(id, now)
 	}
 }

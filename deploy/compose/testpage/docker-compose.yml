@@ -17,7 +17,7 @@ services:
       WAF_RUNTIME_HEALTH_URL: http://runtime:8081/readyz
       WAF_RUNTIME_RELOAD_URL: http://runtime:8081/reload
       WAF_RUNTIME_API_TOKEN: ${WAF_RUNTIME_API_TOKEN:-default-runtime-shared-token}
-      POSTGRES_DSN: ${MGMT_POSTGRES_DSN:-postgres://waf:waf@postgres-mgmt:5432/waf?sslmode=disable}
+      POSTGRES_DSN: postgres://${MGMT_POSTGRES_USER:-waf}:${MGMT_POSTGRES_PASSWORD:-waf}@postgres-mgmt:5432/${MGMT_POSTGRES_DB:-waf}?sslmode=disable
       WAF_DEFAULT_LIMIT_REQ_RATE: ${MGMT_WAF_DEFAULT_LIMIT_REQ_RATE:-20r/s}
       WAF_DEFAULT_BAD_BEHAVIOR_BAN_TIME_SECONDS: ${MGMT_WAF_DEFAULT_BAD_BEHAVIOR_BAN_TIME_SECONDS:-10}
       CONTROL_PLANE_BOOTSTRAP_ADMIN_ENABLED: "true"
@@ -103,13 +103,14 @@ services:
       - waf-test-net
 
   postgres-mgmt:
-    image: postgres:15-alpine
+    image: postgres:15
     container_name: tarinio-test-postgres-mgmt
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${MGMT_POSTGRES_USER:-waf}
       POSTGRES_PASSWORD: ${MGMT_POSTGRES_PASSWORD:-waf}
       POSTGRES_DB: ${MGMT_POSTGRES_DB:-waf}
+      POSTGRES_INITDB_ARGS: ${MGMT_POSTGRES_INITDB_ARGS:---auth-local=scram-sha-256 --auth-host=scram-sha-256 --locale=C.UTF-8}
     volumes:
       - waf-test-mgmt-postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -152,7 +153,7 @@ services:
       WAF_RUNTIME_HEALTH_URL: http://runtime-test:8081/readyz
       WAF_RUNTIME_RELOAD_URL: http://runtime-test:8081/reload
       WAF_RUNTIME_API_TOKEN: ${WAF_RUNTIME_API_TOKEN:-default-runtime-shared-token}
-      POSTGRES_DSN: ${TEST_POSTGRES_DSN:-postgres://waf:waf@postgres-app:5432/waf?sslmode=disable}
+      POSTGRES_DSN: postgres://${TEST_POSTGRES_USER:-waf}:${TEST_POSTGRES_PASSWORD:-waf}@postgres-app:5432/${TEST_POSTGRES_DB:-waf}?sslmode=disable
       WAF_DEFAULT_LIMIT_REQ_RATE: ${TEST_WAF_DEFAULT_LIMIT_REQ_RATE:-5r/s}
       WAF_DEFAULT_BAD_BEHAVIOR_BAN_TIME_SECONDS: ${TEST_WAF_DEFAULT_BAD_BEHAVIOR_BAN_TIME_SECONDS:-10}
       CONTROL_PLANE_BOOTSTRAP_ADMIN_ENABLED: "true"
@@ -228,13 +229,14 @@ services:
       - waf-test-net
 
   postgres-app:
-    image: postgres:15-alpine
+    image: postgres:15
     container_name: tarinio-test-postgres-app
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${TEST_POSTGRES_USER:-waf}
       POSTGRES_PASSWORD: ${TEST_POSTGRES_PASSWORD:-waf}
       POSTGRES_DB: ${TEST_POSTGRES_DB:-waf}
+      POSTGRES_INITDB_ARGS: ${TEST_POSTGRES_INITDB_ARGS:---auth-local=scram-sha-256 --auth-host=scram-sha-256 --locale=C.UTF-8}
     volumes:
       - waf-test-app-postgres-data:/var/lib/postgresql/data
     healthcheck:

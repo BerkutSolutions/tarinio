@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"waf/control-plane/internal/storage"
 )
 
 type Status string
@@ -47,8 +49,8 @@ type state struct {
 }
 
 type Store struct {
-	path string
-	mu   sync.Mutex
+	state *storage.JSONState
+	mu    sync.Mutex
 }
 
 func NewStore(root string) (*Store, error) {
@@ -58,7 +60,16 @@ func NewStore(root string) (*Store, error) {
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		return nil, fmt.Errorf("create jobs store root: %w", err)
 	}
-	return &Store{path: filepath.Join(root, "jobs.json")}, nil
+	return &Store{state: storage.NewFileJSONState(filepath.Join(root, "jobs.json"))}, nil
+}
+
+func NewPostgresStore(root string, backend storage.Backend) (*Store, error) {
+	if strings.TrimSpace(root) == "" {
+		return nil, errors.New("jobs store root is required")
+	}
+	return &Store{
+		state: storage.NewBackendJSONState(backend, "jobs/jobs.json", filepath.Join(root, "jobs.json")),
+	}, nil
 }
 
 func (s *Store) Create(job Job) (Job, error) {
@@ -235,9 +246,9 @@ func (s *Store) update(jobID string, mutate func(*Job)) (Job, error) {
 }
 
 func (s *Store) loadLocked() (*state, error) {
-	content, err := os.ReadFile(s.path)
+	content, err := s.state.Load()
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
+		if errors.Is(err, storage.ErrNotFound) {
 			return &state{}, nil
 		}
 		return nil, fmt.Errorf("read jobs store: %w", err)
@@ -257,7 +268,7 @@ func (s *Store) saveLocked(current *state) error {
 		return fmt.Errorf("encode jobs store: %w", err)
 	}
 	content = append(content, '\n')
-	if err := os.WriteFile(s.path, content, 0o644); err != nil {
+	if err := s.state.Save(content); err != nil {
 		return fmt.Errorf("write jobs store: %w", err)
 	}
 	return nil

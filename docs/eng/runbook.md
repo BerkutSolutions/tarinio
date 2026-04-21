@@ -1,6 +1,6 @@
-# TARINIO 2.0.1 Runbook
+# Runbook
 
-Wiki baseline: `2.0.1`
+This page belongs to the current documentation branch.
 
 This runbook describes daily operator checks, standard change flow, triage, and rollback patterns for TARINIO.
 

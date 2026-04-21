@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"waf/control-plane/internal/storage"
 )
 
 // Limits is the minimal Stage 1 rate-limit declaration mapped later by the compiler.
@@ -34,8 +36,8 @@ type state struct {
 
 // Store persists rate-limit policies without runtime coupling.
 type Store struct {
-	path string
-	mu   sync.Mutex
+	state *storage.JSONState
+	mu    sync.Mutex
 }
 
 func NewStore(root string) (*Store, error) {
@@ -45,7 +47,16 @@ func NewStore(root string) (*Store, error) {
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		return nil, fmt.Errorf("create rate limit policies store root: %w", err)
 	}
-	return &Store{path: filepath.Join(root, "rate_limit_policies.json")}, nil
+	return &Store{state: storage.NewFileJSONState(filepath.Join(root, "rate_limit_policies.json"))}, nil
+}
+
+func NewPostgresStore(root string, backend storage.Backend) (*Store, error) {
+	if strings.TrimSpace(root) == "" {
+		return nil, errors.New("rate limit policies store root is required")
+	}
+	return &Store{
+		state: storage.NewBackendJSONState(backend, "ratelimitpolicies/rate_limit_policies.json", filepath.Join(root, "rate_limit_policies.json")),
+	}, nil
 }
 
 func (s *Store) Create(item RateLimitPolicy) (RateLimitPolicy, error) {
@@ -153,9 +164,9 @@ func (s *Store) Delete(id string) error {
 }
 
 func (s *Store) loadLocked() (*state, error) {
-	content, err := os.ReadFile(s.path)
+	content, err := s.state.Load()
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
+		if errors.Is(err, storage.ErrNotFound) {
 			return &state{}, nil
 		}
 		return nil, fmt.Errorf("read rate limit policies store: %w", err)
@@ -175,7 +186,7 @@ func (s *Store) saveLocked(current *state) error {
 		return fmt.Errorf("encode rate limit policies store: %w", err)
 	}
 	content = append(content, '\n')
-	if err := os.WriteFile(s.path, content, 0o644); err != nil {
+	if err := s.state.Save(content); err != nil {
 		return fmt.Errorf("write rate limit policies store: %w", err)
 	}
 	return nil

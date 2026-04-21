@@ -573,6 +573,16 @@ func SessionBootToken() string {
 	return sessionBootToken
 }
 
+func SetSessionBootToken(token string) {
+	trimmed := strings.TrimSpace(token)
+	if trimmed == "" {
+		return
+	}
+	sessionBootTokenMu.Lock()
+	defer sessionBootTokenMu.Unlock()
+	sessionBootToken = trimmed
+}
+
 func generateSessionBootToken() string {
 	buf := make([]byte, 32)
 	if _, err := rand.Read(buf); err != nil {

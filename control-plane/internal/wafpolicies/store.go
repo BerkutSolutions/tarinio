@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"waf/control-plane/internal/storage"
 )
 
 type Mode string
@@ -44,8 +46,8 @@ type state struct {
 
 // Store persists WAF policies without compiler or runtime coupling.
 type Store struct {
-	path string
-	mu   sync.Mutex
+	state *storage.JSONState
+	mu    sync.Mutex
 }
 
 func NewStore(root string) (*Store, error) {
@@ -55,7 +57,16 @@ func NewStore(root string) (*Store, error) {
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		return nil, fmt.Errorf("create waf policies store root: %w", err)
 	}
-	return &Store{path: filepath.Join(root, "waf_policies.json")}, nil
+	return &Store{state: storage.NewFileJSONState(filepath.Join(root, "waf_policies.json"))}, nil
+}
+
+func NewPostgresStore(root string, backend storage.Backend) (*Store, error) {
+	if strings.TrimSpace(root) == "" {
+		return nil, errors.New("waf policies store root is required")
+	}
+	return &Store{
+		state: storage.NewBackendJSONState(backend, "wafpolicies/waf_policies.json", filepath.Join(root, "waf_policies.json")),
+	}, nil
 }
 
 func (s *Store) Create(item WAFPolicy) (WAFPolicy, error) {
@@ -166,9 +177,9 @@ func (s *Store) Delete(id string) error {
 }
 
 func (s *Store) loadLocked() (*state, error) {
-	content, err := os.ReadFile(s.path)
+	content, err := s.state.Load()
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
+		if errors.Is(err, storage.ErrNotFound) {
 			return &state{}, nil
 		}
 		return nil, fmt.Errorf("read waf policies store: %w", err)
@@ -188,7 +199,7 @@ func (s *Store) saveLocked(current *state) error {
 		return fmt.Errorf("encode waf policies store: %w", err)
 	}
 	content = append(content, '\n')
-	if err := os.WriteFile(s.path, content, 0o644); err != nil {
+	if err := s.state.Save(content); err != nil {
 		return fmt.Errorf("write waf policies store: %w", err)
 	}
 	return nil

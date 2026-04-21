@@ -1,0 +1,76 @@
+:root {
+  --ifm-color-primary: #1f6f8b;
+  --ifm-color-primary-dark: #195b72;
+  --ifm-color-primary-darker: #154b5f;
+  --ifm-color-primary-darkest: #103946;
+  --ifm-color-primary-light: #2788aa;
+  --ifm-color-primary-lighter: #37a0c6;
+  --ifm-color-primary-lightest: #69bfdc;
+  --ifm-background-surface-color: #f6fbfd;
+  --ifm-code-font-size: 95%;
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #58c3d8;
+  --ifm-background-surface-color: #0f1c24;
+}
+
+.hero-page,
+.overview-page {
+  padding: 2rem 1rem 4rem;
+}
+
+.hero-panel {
+  max-width: 960px;
+  margin: 0 auto 2rem;
+  padding: 2.5rem;
+  border-radius: 1.5rem;
+  background: linear-gradient(135deg, #10202b 0%, #184258 55%, #2d7c97 100%);
+  color: #fff;
+  box-shadow: 0 24px 60px rgba(15, 38, 52, 0.24);
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  opacity: 0.78;
+  font-size: 0.85rem;
+}
+
+.hero-copy {
+  max-width: 760px;
+  font-size: 1.08rem;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 1.5rem;
+}
+
+.card-grid {
+  max-width: 1120px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.portal-card {
+  display: block;
+  padding: 1.25rem;
+  border-radius: 1rem;
+  text-decoration: none;
+  color: inherit;
+  background: var(--ifm-background-surface-color);
+  border: 1px solid rgba(31, 111, 139, 0.12);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+}
+
+.portal-card:hover {
+  transform: translateY(-2px);
+  text-decoration: none;
+  box-shadow: 0 16px 32px rgba(26, 83, 104, 0.12);
+  border-color: rgba(31, 111, 139, 0.25);
+}

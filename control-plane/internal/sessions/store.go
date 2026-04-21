@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"waf/control-plane/internal/storage"
 )
 
 type Session struct {
@@ -45,8 +47,8 @@ type state struct {
 }
 
 type Store struct {
-	path string
-	mu   sync.Mutex
+	state *storage.JSONState
+	mu    sync.Mutex
 }
 
 func NewStore(root string) (*Store, error) {
@@ -56,7 +58,16 @@ func NewStore(root string) (*Store, error) {
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		return nil, fmt.Errorf("create sessions store root: %w", err)
 	}
-	return &Store{path: filepath.Join(root, "sessions.json")}, nil
+	return &Store{state: storage.NewFileJSONState(filepath.Join(root, "sessions.json"))}, nil
+}
+
+func NewPostgresStore(root string, backend storage.Backend) (*Store, error) {
+	if strings.TrimSpace(root) == "" {
+		return nil, errors.New("sessions store root is required")
+	}
+	return &Store{
+		state: storage.NewBackendJSONState(backend, "sessions/sessions.json", filepath.Join(root, "sessions.json")),
+	}, nil
 }
 
 func (s *Store) CreateSession(userID string, username string, roleIDs []string, ttl time.Duration) (Session, error) {
@@ -331,9 +342,9 @@ func (s *Store) ConsumeTOTPSetupChallenge(id string) (TOTPSetupChallenge, bool, 
 }
 
 func (s *Store) loadLocked() (*state, error) {
-	content, err := os.ReadFile(s.path)
+	content, err := s.state.Load()
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
+		if errors.Is(err, storage.ErrNotFound) {
 			return &state{}, nil
 		}
 		return nil, fmt.Errorf("read sessions store: %w", err)
@@ -352,7 +363,7 @@ func (s *Store) saveLocked(current *state) error {
 		return fmt.Errorf("encode sessions store: %w", err)
 	}
 	content = append(content, '\n')
-	if err := os.WriteFile(s.path, content, 0o600); err != nil {
+	if err := s.state.Save(content); err != nil {
 		return fmt.Errorf("write sessions store: %w", err)
 	}
 	return nil

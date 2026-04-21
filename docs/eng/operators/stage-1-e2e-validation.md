@@ -56,4 +56,5 @@ Validation should be considered failed if:
 
 - `docs/eng/runbook.md`
 - `docs/eng/deploy.md`
+- `docs/eng/ha.md`
 - `docs/eng/ui.md`

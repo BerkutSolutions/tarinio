@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"waf/control-plane/internal/storage"
 )
 
 // TLSConfig binds a site to certificate metadata in control-plane state.
@@ -26,8 +28,8 @@ type state struct {
 
 // Store persists TLS configs keyed by site id without runtime coupling.
 type Store struct {
-	path string
-	mu   sync.Mutex
+	state *storage.JSONState
+	mu    sync.Mutex
 }
 
 func NewStore(root string) (*Store, error) {
@@ -37,7 +39,16 @@ func NewStore(root string) (*Store, error) {
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		return nil, fmt.Errorf("create tls configs store root: %w", err)
 	}
-	return &Store{path: filepath.Join(root, "tls_configs.json")}, nil
+	return &Store{state: storage.NewFileJSONState(filepath.Join(root, "tls_configs.json"))}, nil
+}
+
+func NewPostgresStore(root string, backend storage.Backend) (*Store, error) {
+	if strings.TrimSpace(root) == "" {
+		return nil, errors.New("tls configs store root is required")
+	}
+	return &Store{
+		state: storage.NewBackendJSONState(backend, "tlsconfigs/tls_configs.json", filepath.Join(root, "tls_configs.json")),
+	}, nil
 }
 
 func (s *Store) Create(item TLSConfig) (TLSConfig, error) {
@@ -137,9 +148,9 @@ func (s *Store) Delete(siteID string) error {
 }
 
 func (s *Store) loadLocked() (*state, error) {
-	content, err := os.ReadFile(s.path)
+	content, err := s.state.Load()
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
+		if errors.Is(err, storage.ErrNotFound) {
 			return &state{}, nil
 		}
 		return nil, fmt.Errorf("read tls configs store: %w", err)
@@ -159,7 +170,7 @@ func (s *Store) saveLocked(current *state) error {
 		return fmt.Errorf("encode tls configs store: %w", err)
 	}
 	content = append(content, '\n')
-	if err := os.WriteFile(s.path, content, 0o644); err != nil {
+	if err := s.state.Save(content); err != nil {
 		return fmt.Errorf("write tls configs store: %w", err)
 	}
 	return nil
