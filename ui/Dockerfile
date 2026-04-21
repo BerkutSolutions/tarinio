@@ -1,4 +1,4 @@
-FROM golang:1.24-alpine AS ui-tests
+FROM golang:1.25-alpine AS ui-tests
 
 WORKDIR /src
 
