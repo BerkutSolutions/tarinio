@@ -12,7 +12,7 @@ func TestRenderAccessRateLimitArtifacts_Deterministic(t *testing.T) {
 	}
 
 	accessPolicies := []AccessPolicyInput{
-		{ID: "access-b", SiteID: "site-b", DefaultAction: "allow", AllowCIDRs: []string{"10.0.0.0/8"}, DenyCIDRs: []string{"192.0.2.0/24"}},
+		{ID: "access-b", SiteID: "site-b", DefaultAction: "allow", AllowCIDRs: []string{"10.0.0.0/8"}, DenyCIDRs: []string{"192.0.3.0/24"}},
 		{ID: "access-a", SiteID: "site-a", DefaultAction: "deny", AllowCIDRs: []string{"203.0.113.0/24"}, TrustedProxyCIDRs: []string{"172.16.0.0/12", "172.16.0.0/12"}},
 	}
 

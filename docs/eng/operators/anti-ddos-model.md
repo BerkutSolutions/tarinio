@@ -27,7 +27,7 @@ Source of truth:
 
 The settings then follow this path:
 
-- operator changes settings;
+- operator changes settings in the control-plane;
 - compile creates a snapshot;
 - validate checks the bundle and runtime contract;
 - apply publishes the revision as active;

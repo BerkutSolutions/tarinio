@@ -4,7 +4,7 @@ This page belongs to the current documentation branch.
 
 ## Scope
 
-TARINIO `2.0.2` includes a production-oriented observability stack for HA deployments:
+TARINIO `2.0.3` includes a production-oriented observability stack for HA deployments:
 
 - Prometheus-compatible metrics from the control-plane;
 - Prometheus-compatible metrics from the runtime launcher;

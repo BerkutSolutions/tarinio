@@ -30,7 +30,7 @@ The support baseline assumes:
 
 ## Upgrade Safety Baseline
 
-TARINIO `2.0.2` expects upgrades to be safe because:
+TARINIO `2.0.3` expects upgrades to be safe because:
 
 - the AIO installer takes lightweight backups before upgrade;
 - PostgreSQL-backed state migrations are versioned;

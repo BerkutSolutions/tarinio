@@ -358,7 +358,7 @@
   "app.sites": "Dienste",
   "app.tls": "TLS / Zertifikate",
   "app.user.noRoles": "Keine Rollen",
-  "app.version": "v2.0.2",
+  "app.version": "v2.0.3",
   "auth.2fa.challengeMissing": "2FA challenge is missing. Bitte melden Sie sich erneut an.",
   "auth.2fa.code": "2FA code",
   "auth.2fa.codeRequired": "2FA code is required",

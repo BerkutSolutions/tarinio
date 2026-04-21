@@ -2,113 +2,104 @@
 
 Эта страница относится к текущей ветке документации.
 
-Этот документ описывает актуальный HTTP API control-plane по состоянию версии `2.0.2`. Каталог составлен по реально зарегистрированным маршрутам из `control-plane/internal/httpserver/server.go`.
+Документ описывает актуальный HTTP API control-plane для версии `2.0.3`. Каталог собран по реально зарегистрированным маршрутам из `control-plane/internal/httpserver/server.go`.
 
 ## Общие правила
 
-- Все прикладные ответы возвращаются в JSON, кроме download/export сценариев.
-- Основная аутентификация сессионная, через cookie.
-- Авторизация проверяется на сервере для каждого endpoint.
-- Права привязаны к permission-модели RBAC.
-- UI использует этот же API; если endpoint описан здесь, значит на него опирается интерфейс или системные процессы.
+- Основной формат ответов — JSON.
+- Исключение составляют сценарии загрузки и выгрузки файлов.
+- Основной способ аутентификации — сессионные cookie.
+- Проверка прав выполняется на сервере для каждого маршрута.
+- Интерфейс использует этот же API, поэтому перечисленные ниже маршруты соответствуют реальной работе продукта.
 
 ## Системные маршруты
 
 ### `GET /healthz`
 
-Системный health endpoint.
+Системная проверка состояния. Используется для контроля готовности control-plane и проверяет:
 
-Проверяет:
-
-- revision store;
-- revision catalog API;
-- компонентное состояние, которое нужно для запуска control-plane.
+- хранилище ревизий;
+- каталог ревизий;
+- ключевые внутренние компоненты, необходимые для старта.
 
 ### `GET /api/setup/status`
 
-Статус первичной инициализации.
+Статус первичной инициализации. Используется:
 
-Используется:
-
-- login;
-- onboarding;
-- guard-логикой перед входом в UI.
+- при входе;
+- в первичной настройке;
+- в логике предвходных проверок интерфейса.
 
 ### `GET /api/app/meta`
 
 Метаданные приложения:
 
 - версия;
-- product name;
-- repository URL;
-- данные по обновлениям, если включена проверка.
+- название продукта;
+- ссылка на репозиторий;
+- сведения о проверке обновлений;
+- признаки HA-режима и идентификатор текущего узла.
 
 ### `POST /api/app/ping`
 
-Фоновая проверка активной сессии из UI.
+Фоновая проверка активной пользовательской сессии.
 
 ### `GET /api/app/compat`
 
-Отчёт по совместимости модулей приложения и runtime.
+Отчёт о совместимости компонентов приложения и runtime.
 
 ### `POST /api/app/compat/fix`
 
-Попытка исправить найденную проблему совместимости.
+Попытка автоматически исправить обнаруженную проблему совместимости.
 
-## Runtime settings
+## Системные настройки runtime
 
 ### `GET /api/settings/runtime`
 
-Чтение runtime-настроек для вкладки `Settings -> General`.
+Чтение настроек runtime для раздела `Настройки -> Общие`.
 
-Используется для:
+Используется для отображения:
 
-- deployment mode;
-- update checks;
+- режима развёртывания;
+- состояния проверки обновлений;
 - метаданных текущей версии.
 
 ### `PUT /api/settings/runtime`
 
-Обновление runtime-настроек.
+Обновление настроек runtime. Через интерфейс изменяются:
 
-Через UI изменяются:
-
-- `update_checks_enabled`
-- сроки хранения `logs`, `activity`, `events`, `bans`
+- `update_checks_enabled`;
+- сроки хранения `logs`, `activity`, `events`, `bans`.
 
 ### `POST /api/settings/runtime/check-updates`
 
-Проверка обновлений.
-
-Поддерживает ручной и фоновый режим.
+Ручная или фоновая проверка доступности обновлений.
 
 ### `GET /api/settings/runtime/storage-indexes?storage_indexes_limit=N&storage_indexes_offset=N`
 
-Чтение индексов хранения для вкладки `Settings -> Storage`.
+Просмотр индексов хранения для раздела `Настройки -> Хранилище`.
 
 ### `DELETE /api/settings/runtime/storage-indexes?date=YYYY-MM-DD`
 
-Удаление индекса хранения за конкретную дату.
+Удаление индекса хранения за указанную дату.
 
 ## OWASP CRS
 
 ### `GET /api/owasp-crs/status`
 
-Статус установленного CRS-релиза.
+Статус установленного релиза CRS.
 
 ### `POST /api/owasp-crs/check-updates`
 
-Dry-run проверки доступности обновления CRS.
+Проверка доступности обновления без фактической установки.
 
 ### `POST /api/owasp-crs/update`
 
-Запуск обновления CRS.
+Запуск обновления CRS. Используется также для включения почасовой автоматической проверки обновлений.
 
-Используется также для включения hourly auto-update флага.
+## Аутентификация и учётная запись
 
-## Auth и учётная запись
-
-### Bootstrap и login
+### Первичный вход и сессия
 
 - `POST /api/auth/bootstrap`
 - `POST /api/auth/login`
@@ -116,7 +107,7 @@ Dry-run проверки доступности обновления CRS.
 - `POST /api/auth/logout`
 - `GET /api/auth/me`
 
-### 2FA
+### Второй фактор
 
 - `GET /api/auth/2fa/status`
 - `POST /api/auth/2fa/setup`
@@ -141,7 +132,7 @@ Dry-run проверки доступности обновления CRS.
 
 ## Конфигурационные ресурсы
 
-### Sites
+### Сайты
 
 - `GET /api/sites`
 - `POST /api/sites`
@@ -151,7 +142,7 @@ Dry-run проверки доступности обновления CRS.
 - `POST /api/sites/{id}/ban`
 - `POST /api/sites/{id}/unban`
 
-### Upstreams
+### Upstream-сервисы
 
 - `GET /api/upstreams`
 - `POST /api/upstreams`
@@ -159,7 +150,7 @@ Dry-run проверки доступности обновления CRS.
 - `PUT /api/upstreams/{id}`
 - `DELETE /api/upstreams/{id}`
 
-### Certificates
+### Сертификаты
 
 - `GET /api/certificates`
 - `POST /api/certificates`
@@ -167,7 +158,7 @@ Dry-run проверки доступности обновления CRS.
 - `PUT /api/certificates/{id}`
 - `DELETE /api/certificates/{id}`
 
-### TLS configs
+### TLS-конфигурации
 
 - `GET /api/tls-configs`
 - `POST /api/tls-configs`
@@ -175,12 +166,12 @@ Dry-run проверки доступности обновления CRS.
 - `PUT /api/tls-configs/{siteID}`
 - `DELETE /api/tls-configs/{siteID}`
 
-### TLS auto renew
+### Автопродление TLS
 
 - `GET /api/tls/auto-renew`
 - `PUT /api/tls/auto-renew`
 
-### Certificate material operations
+### Операции с сертификатными материалами
 
 - `POST /api/certificate-materials/upload`
 - `POST /api/certificate-materials/import-archive`
@@ -195,7 +186,7 @@ Dry-run проверки доступности обновления CRS.
 
 ## Политики
 
-### WAF policies
+### WAF-политики
 
 - `GET /api/waf-policies`
 - `POST /api/waf-policies`
@@ -203,7 +194,7 @@ Dry-run проверки доступности обновления CRS.
 - `PUT /api/waf-policies/{id}`
 - `DELETE /api/waf-policies/{id}`
 
-### Access policies
+### Политики доступа
 
 - `GET /api/access-policies`
 - `POST /api/access-policies`
@@ -213,7 +204,7 @@ Dry-run проверки доступности обновления CRS.
 - `PUT /api/access-policies/{id}`
 - `DELETE /api/access-policies/{id}`
 
-### Rate-limit policies
+### Политики ограничения скорости
 
 - `GET /api/rate-limit-policies`
 - `POST /api/rate-limit-policies`
@@ -221,7 +212,7 @@ Dry-run проверки доступности обновления CRS.
 - `PUT /api/rate-limit-policies/{id}`
 - `DELETE /api/rate-limit-policies/{id}`
 
-### Easy site profiles
+### Упрощённые профили сайтов
 
 - `GET /api/easy-site-profiles/{siteID}`
 - `PUT /api/easy-site-profiles/{siteID}`
@@ -234,9 +225,9 @@ Dry-run проверки доступности обновления CRS.
 - `POST /api/anti-ddos/settings`
 - `PUT /api/anti-ddos/settings`
 
-## Observability и отчёты
+## Наблюдаемость и отчёты
 
-### Requests и events
+### Запросы и события
 
 - `GET /api/events`
 - `GET /api/requests`
@@ -248,11 +239,11 @@ Dry-run проверки доступности обновления CRS.
 - `GET /api/dashboard/containers/logs`
 - `GET /api/dashboard/containers/issues`
 
-### Reports
+### Отчёты
 
 - `GET /api/reports/revisions`
 
-### Audit
+### Аудит
 
 - `GET /api/audit`
 
@@ -260,14 +251,12 @@ Dry-run проверки доступности обновления CRS.
 
 ### `GET /api/revisions`
 
-Новый агрегированный каталог ревизий в `2.0.2`.
-
-Используется разделом `Ревизии` и отдаёт:
+Агрегированный каталог ревизий, который используется разделом `Ревизии`. Маршрут возвращает:
 
 - список сервисов;
 - список ревизий;
-- summary-счётчики;
-- timeline статусов и событий применения.
+- сводные счётчики;
+- ленту статусов и событий применения.
 
 ### `POST /api/revisions/compile`
 
@@ -279,72 +268,43 @@ Dry-run проверки доступности обновления CRS.
 
 ### `DELETE /api/revisions/{revisionID}`
 
-Удаление неактивной ревизии.
-
-Удаляются связанные snapshot/job данные, но активная ревизия удалению не подлежит.
+Удаление неактивной ревизии. Связанные снимки и служебные данные удаляются вместе с ней, но активную ревизию удалить нельзя.
 
 ### `DELETE /api/revisions/statuses`
 
-Очистка status timeline ревизий.
-
-Важно:
-
-- очищает ленту статусов и счётчики;
-- не стирает у самих ревизий закреплённый факт последнего успешного или неуспешного применения.
+Очистка ленты статусов ревизий. При этом за самими ревизиями сохраняется информация о последнем успешном или неуспешном применении.
 
 ## Администрирование
 
-### `GET /api/administration/users`
+### Пользователи
 
-Список пользователей для административной таблицы.
+- `GET /api/administration/users`
+- `POST /api/administration/users`
+- `GET /api/administration/users/{id}`
+- `PUT /api/administration/users/{id}`
 
-### `POST /api/administration/users`
+### Роли
 
-Создание пользователя с явным набором ролей.
+- `GET /api/administration/roles`
+- `POST /api/administration/roles`
+- `GET /api/administration/roles/{id}`
+- `PUT /api/administration/roles/{id}`
 
-### `GET /api/administration/users/{id}`
+Маршрут `GET /api/administration/roles` также возвращает каталог известных прав для редактора ролей.
 
-Чтение одного пользователя для модального просмотра.
+### Проверка административной целостности
 
-### `PUT /api/administration/users/{id}`
+- `GET /api/administration/zero-trust/health`
 
-Обновление пользователя, включая статус, роли и необязательную смену пароля.
+Маршрут проверяет пользователей, роли, наличие обязательных ролей и полноту набора прав у встроенного `admin`.
 
-### `GET /api/administration/roles`
+### Административные сценарии
 
-Список ролей и каталог известных permission-ов для редактора ролей.
+- `GET /api/administration/scripts`
+- `POST /api/administration/scripts/{scriptID}/run`
+- `GET /api/administration/scripts/runs/{runID}/download`
 
-### `POST /api/administration/roles`
-
-Создание роли.
-
-### `GET /api/administration/roles/{id}`
-
-Чтение одной роли.
-
-### `PUT /api/administration/roles/{id}`
-
-Обновление роли. Встроенная роль `admin` нормализуется обратно в полный доступ.
-
-### `GET /api/administration/zero-trust/health`
-
-Zero-trust probe для users, roles, обязательных базовых ролей и полноты permission-набора у `admin`.
-
-### `GET /api/administration/scripts`
-
-Каталог административных сценариев.
-
-### `POST /api/administration/scripts/{scriptID}/run`
-
-Запуск сценария с входными параметрами.
-
-### `GET /api/administration/scripts/runs/{runID}/download`
-
-Скачивание архива результата выполнения.
-
-## Связь с UI
-
-Ниже указано, какие разделы UI опираются на какие группы API.
+## Связь разделов интерфейса с API
 
 - `Dashboard`: `dashboard/*`, `events`, `requests`
 - `Сайты`: `sites`, `upstreams`, `tls-configs`, `certificates`, `access-policies`, `easy-site-profiles`

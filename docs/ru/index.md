@@ -2,69 +2,67 @@
 
 Эта страница относится к текущей ветке документации.
 
-Это основной русскоязычный индекс документации TARINIO. Он собран как операторская wiki для реальной версии `2.0.2` и покрывает архитектуру, интерфейс, API, развёртывание, HA, эксплуатацию, безопасность, резервное копирование и обновления.
+Это основной русскоязычный раздел документации TARINIO. Он собран как практическая wiki для операторов, администраторов и команд внедрения и отражает фактическое состояние версии `2.0.3`.
 
 ## С чего начать
 
-- Общее описание продукта: `README.md`
-- Навигатор по документации: [Навигатор](navigator.md)
-- Полный обзор интерфейса: [Интерфейс](ui.md)
-- Архитектура и границы продукта: [Архитектура](architecture.md)
-- Каталог API: [API](api.md)
+- Общее описание продукта: [Навигатор](navigator.md)
+- Обзор разделов и маршрутов: [Навигатор](navigator.md)
+- Работа в интерфейсе: [Интерфейс](ui.md)
+- Устройство платформы: [Архитектура](architecture.md)
+- Каталог HTTP API: [API](api.md)
 
-## Базовые документы
+## Основные документы
 
 1. [Архитектура](architecture.md)
-2. [Интерфейс и сценарии работы](ui.md)
+2. [Интерфейс](ui.md)
 3. [API](api.md)
 4. [Безопасность](security.md)
 5. [Развёртывание](deploy.md)
-6. [HA / multi-node](ha.md)
-7. [Observability](observability.md)
-8. [Benchmarks](benchmarks.md)
-9. [Эксплуатация](runbook.md)
-10. [Troubleshooting](troubleshooting.md)
-11. [Обновление и откат](upgrade.md)
-12. [Резервные копии и восстановление](backups.md)
-13. [CLI-команды](cli-commands.md)
+6. [Высокая доступность](ha.md)
+7. [Наблюдаемость](observability.md)
+8. [Эксплуатация](runbook.md)
+9. [Обновление и откат](upgrade.md)
+10. [Резервное копирование и восстановление](backups.md)
+11. [CLI-команды](cli-commands.md)
 
-## Документы enterprise-уровня
+## Документы для эксплуатации
 
 - [Политика поддержки и жизненного цикла](support-lifecycle.md)
 - [Матрица совместимости](compatibility-matrix.md)
-- [Sizing Guide](sizing.md)
-- [Disaster Recovery Guide](disaster-recovery.md)
-- [Hardening Guide](hardening.md)
-- [Threat Model](threat-model.md)
+- [Подбор ресурсов](sizing.md)
+- [План аварийного восстановления](disaster-recovery.md)
+- [Укрепление безопасности](hardening.md)
+- [Модель угроз](threat-model.md)
 - [Референсные архитектуры](reference-architectures.md)
-- [Operations Cookbook](cookbook.md)
-- [Политика release notes](release-policy.md)
+- [Практические сценарии эксплуатации](cookbook.md)
+- [Политика выпуска релизов](release-policy.md)
 - [Известные ограничения](limitations.md)
-- [Compliance Mapping](compliance-mapping.md)
+- [Карта соответствия требованиям](compliance-mapping.md)
 
 ## Операторские руководства
 
-- [Anti-DDoS runbook](operators/anti-ddos-runbook.md)
-- [Anti-DDoS модель](operators/anti-ddos-model.md)
-- [Runtime L4 guard](operators/runtime-l4-guard.md)
+- [Руководство по Anti-DDoS](operators/anti-ddos-runbook.md)
+- [Модель Anti-DDoS](operators/anti-ddos-model.md)
+- [Защита на сетевом уровне](operators/runtime-l4-guard.md)
 - [Контракт файловой системы runtime](operators/runtime-filesystem-contract.md)
 - [Тюнинг WAF](operators/waf-tuning-guide.md)
-- [E2E-валидация Stage 1](operators/stage-1-e2e-validation.md)
+- [Проверка Stage 1 end-to-end](operators/stage-1-e2e-validation.md)
 - [OWASP CRS](operators/owasp-crs.md)
 - [Let's Encrypt DNS-01](operators/letsencrypt-dns.md)
 
-## Что важно в 2.0.2
+## Что важно в версии `2.0.3`
 
-- Документация синхронизирована с версией приложения из `control-plane/internal/appmeta/meta.go`.
-- В wiki отражён реальный UI с ключевыми разделами и эксплуатационными сценариями.
-- Отдельно задокументированы PostgreSQL-backed storage, HA / multi-node, observability и benchmark workflows.
-- Onboarding, login, `2FA`, passkeys и healthcheck описаны как реальные product flows.
+- Русская wiki синхронизирована с текущей версией продукта.
+- В документации отражён реальный интерфейс со всеми рабочими разделами.
+- Отдельно описаны ревизии, высокая доступность, наблюдаемость и эксплуатационные сценарии.
+- Первичная настройка, вход, `2FA`, passkeys и проверки состояния описаны как реальные пользовательские потоки, а не как абстрактные возможности.
 
-## Рекомендуемая последовательность чтения
+## Рекомендуемый порядок чтения
 
 ### Для первого знакомства
 
-1. `README.md`
+1. [Навигатор](navigator.md)
 2. [Архитектура](architecture.md)
 3. [Интерфейс](ui.md)
 
@@ -73,20 +71,20 @@
 1. [Развёртывание](deploy.md)
 2. [Безопасность](security.md)
 3. [Эксплуатация](runbook.md)
-4. [Резервные копии](backups.md)
+4. [Резервное копирование](backups.md)
 5. [Обновление](upgrade.md)
 
-### Для ежедневной эксплуатации
+### Для ежедневной работы
 
 1. [Интерфейс](ui.md)
 2. [Эксплуатация](runbook.md)
 3. [API](api.md)
-4. `operators/`
+4. Каталог `operators/`
 
-## Источник истины
+## Источник архитектурных решений
 
-Архитектурные решения Stage 0 остаются обязательной основой:
+Базовые архитектурные решения Stage 0 остаются обязательной основой проекта и хранятся в каталоге:
 
 - `docs/architecture/`
 
-Именно эти документы задают продуктовые границы, модель ревизий, компиляции и развёртывания.
+Эти документы задают продуктовые границы, модель ревизий, процесс компиляции и схему развёртывания.

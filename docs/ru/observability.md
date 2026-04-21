@@ -2,46 +2,62 @@
 
 Эта страница относится к текущей ветке документации.
 
-## Область
+В версии `2.0.3` TARINIO включает полноценный набор средств наблюдаемости для рабочих и высокодоступных развёртываний.
 
-В `2.0.2` TARINIO включает production-oriented observability stack для HA-развёртываний:
+## Что входит в контур наблюдаемости
 
-- Prometheus-compatible metrics от control-plane;
-- Prometheus-compatible metrics от runtime launcher;
-- PostgreSQL и Redis exporters в HA lab;
-- готовые Grafana dashboards для операторов;
-- strict post-upgrade smoke validation, который может проверять metrics availability.
+- совместимые с Prometheus метрики от control-plane;
+- совместимые с Prometheus метрики от runtime launcher;
+- экспортёры PostgreSQL и Redis в HA-лаборатории;
+- готовые панели Grafana для операторов;
+- проверки доступности метрик после обновления.
 
-## Metrics endpoints
+## Маршруты метрик
 
-Control-plane:
+### Control-plane
 
-- `/metrics`
-- защищён токеном `CONTROL_PLANE_METRICS_TOKEN`
-- токен можно передать через `X-TARINIO-Metrics-Token` или `?token=...`
+- маршрут: `/metrics`;
+- защита: токен `CONTROL_PLANE_METRICS_TOKEN`;
+- токен можно передать через заголовок `X-TARINIO-Metrics-Token` или параметр `?token=...`.
 
-Runtime:
+### Runtime
 
-- `/metrics`
-- защищён токеном `WAF_RUNTIME_METRICS_TOKEN`
-- токен можно передать через `X-TARINIO-Metrics-Token` или `?token=...`
+- маршрут: `/metrics`;
+- защита: токен `WAF_RUNTIME_METRICS_TOKEN`;
+- токен можно передать через заголовок `X-TARINIO-Metrics-Token` или параметр `?token=...`.
 
 ## Что измеряется
 
-Control-plane metrics включают:
+### Метрики control-plane
 
-- HTTP request totals по route, method, status и node;
-- latency histograms;
-- revision compile/apply outcomes;
-- HA lock acquisition и wait time;
-- leader-only task execution;
-- runtime reload outcomes;
-- build/version presence.
+- количество HTTP-запросов по маршрутам, методам, статусам и узлам;
+- гистограммы задержек;
+- результаты компиляции и применения ревизий;
+- время ожидания и захвата HA-блокировок;
+- выполнение задач, доступных только лидеру;
+- результаты перезагрузки runtime;
+- сведения о сборке и версии.
 
-Runtime metrics включают:
+### Метрики runtime
 
-- HTTP requests и latency для launcher API;
-- runtime reload totals;
-- bundle load totals;
-- liveness и readiness gauges;
-- active revision gauge.
+- количество HTTP-запросов и задержки в launcher API;
+- число перезагрузок runtime;
+- число загрузок конфигурационного пакета;
+- показатели liveness и readiness;
+- идентификатор активной ревизии.
+
+## Практическое применение
+
+Наблюдаемость в TARINIO помогает:
+
+- контролировать состояние платформы после изменений;
+- видеть деградацию ревизий и перезагрузок;
+- отслеживать поведение HA-кластера;
+- быстро проверять, что после обновления доступны ключевые метрики.
+
+## Когда смотреть метрики в первую очередь
+
+- после обновления;
+- после изменения политик и ревизий;
+- при подозрении на деградацию runtime;
+- при диагностике проблем в многонодовом режиме.

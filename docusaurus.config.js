@@ -86,8 +86,8 @@ const config = {
       items: [
         {to: '/', label: 'Главная', position: 'left'},
         {to: '/docs-overview', label: 'Навигатор', position: 'left'},
-        {to: '/ru/', label: 'Русская Wiki', position: 'left'},
-        {to: '/en/', label: 'English Wiki', position: 'left'},
+        {to: '/ru/', label: 'Русская wiki', position: 'left'},
+        {to: '/en/', label: 'English wiki', position: 'left'},
         {
           label: 'Язык',
           position: 'right',
@@ -97,10 +97,10 @@ const config = {
           ],
         },
         {
-          label: 'Версия 2.0.2',
+          label: 'Версия 2.0.3',
           position: 'right',
           items: [
-            {label: 'Текущий релиз 2.0.2', to: '/ru/release-policy/'},
+            {label: 'Текущий релиз 2.0.3', to: '/ru/release-policy/'},
             {label: 'CHANGELOG', href: 'https://github.com/BerkutSolutions/tarinio/blob/main/CHANGELOG.md'},
           ],
         },
@@ -118,8 +118,8 @@ const config = {
         {
           title: 'Документация',
           items: [
-            {label: 'Русская Wiki', to: '/ru/'},
-            {label: 'English Wiki', to: '/en/'},
+            {label: 'Русская wiki', to: '/ru/'},
+            {label: 'English wiki', to: '/en/'},
             {label: 'Навигатор', to: '/docs-overview'},
           ],
         },

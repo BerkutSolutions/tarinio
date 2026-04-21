@@ -8,8 +8,8 @@ export default function DocsOverviewPage() {
       <main className="overview-page">
         <h1>Навигатор документации</h1>
         <p>
-          Эта страница помогает быстро понять, куда идти дальше в TARINIO: на внедрение,
-          эксплуатацию, восстановление, hardening или проверку enterprise-сценариев.
+          Эта страница помогает быстро понять, куда идти дальше: на внедрение, эксплуатацию,
+          восстановление после сбоев, hardening или оценку enterprise-сценариев.
         </p>
 
         <div className="card-grid">
