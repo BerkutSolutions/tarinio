@@ -395,17 +395,17 @@ if [ "$RUN_STRICT_POST_UPGRADE_VALIDATION" = "1" ] || [ "$RUN_STRICT_POST_UPGRAD
 fi
 
 section "Done"
-echo "TARINIO is starting."
-echo "Installed version: $TARGET_VERSION"
-echo "Initial setup UI (temporary): http://<server-ip>:8080/login"
-echo "After onboarding: https://<your-domain>/login"
-echo "WAF HTTP:  http://<server-ip>/"
-echo "WAF HTTPS: https://<server-ip>/"
-echo "Installer log: $LOG_FILE"
-echo "Backup dir: $BACKUP_DIR"
-echo "Backup limits: per-volume=${BACKUP_MAX_VOLUME_MB}MB, total=${BACKUP_MAX_TOTAL_MB}MB"
-echo "Compatibility contract: $COMPAT_CONTRACT_VERSION"
-echo
-echo "Follow logs with:"
-echo "  cd $INSTALL_DIR/deploy/compose/$PROFILE"
-echo "  $COMPOSE_CMD -f docker-compose.yml logs -f"
+printf '%s\n' "TARINIO is starting."
+printf 'Installed version: %s\n' "$TARGET_VERSION"
+printf '%s\n' 'Initial setup UI (temporary): http://<server-ip>:8080/login'
+printf '%s\n' 'After onboarding: https://<your-domain>/login'
+printf '%s\n' 'WAF HTTP:  http://<server-ip>/'
+printf '%s\n' 'WAF HTTPS: https://<server-ip>/'
+printf 'Installer log: %s\n' "$LOG_FILE"
+printf 'Backup dir: %s\n' "$BACKUP_DIR"
+printf 'Backup limits: per-volume=%sMB, total=%sMB\n' "$BACKUP_MAX_VOLUME_MB" "$BACKUP_MAX_TOTAL_MB"
+printf 'Compatibility contract: %s\n' "$COMPAT_CONTRACT_VERSION"
+printf '\n'
+printf '%s\n' 'Follow logs with:'
+printf '  cd %s/deploy/compose/%s\n' "$INSTALL_DIR" "$PROFILE"
+printf '  %s -f docker-compose.yml logs -f\n' "$COMPOSE_CMD"
