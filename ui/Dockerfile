@@ -3,6 +3,8 @@ FROM golang:1.25-alpine AS ui-tests
 WORKDIR /src
 
 COPY go.mod go.sum ./
+COPY CHANGELOG.md README.md README.en.md ./
+COPY docs ./docs
 COPY ui/app ./ui/app
 COPY ui/tests ./ui/tests
 
