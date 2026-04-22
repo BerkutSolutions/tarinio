@@ -154,6 +154,8 @@ N_FILTER_STATUS="$(normalize_multi "$FILTER_STATUS")"
 IP_ERE="$(build_ere_pattern "$N_FILTER_IP")"
 SITE_ERE="$(build_ere_pattern "$N_FILTER_SITE")"
 URI_ERE="$(build_ere_pattern "$N_FILTER_URI")"
+UPSTREAM_EMPTY_ERE='\"upstream_addr\":\"\"|\"upstream_addr\":null|\"upstream_addr\":\"-\"'
+UPSTREAM_PRESENT_ERE='\"upstream_addr\":\"[^"]+\"'
 
 run_cli "app_meta.json" --json api GET /api/app/meta
 run_cli "sites.json" --json api GET /api/sites
@@ -290,6 +292,8 @@ fi
 if [[ -n "$SITE_ERE" ]]; then
   run_sh "runtime_access_site.log" "docker exec '$RUNTIME_CONTAINER' sh -lc \"grep -E '\\\"host\\\":\\\"($SITE_ERE)\\\"' /var/log/nginx/access.log | tail -n 8000\""
   run_sh "runtime_access_site_block_statuses.log" "docker exec '$RUNTIME_CONTAINER' sh -lc \"grep -E '\\\"host\\\":\\\"($SITE_ERE)\\\"' /var/log/nginx/access.log | grep -E '\\\"status\\\":(403|429|444|500|502|503|504)' | tail -n 4000\""
+  run_sh "runtime_access_site_status_200_no_upstream.log" "docker exec '$RUNTIME_CONTAINER' sh -lc \"grep -E '\\\"host\\\":\\\"($SITE_ERE)\\\"' /var/log/nginx/access.log | grep -E '\\\"status\\\":200' | grep -E '$UPSTREAM_EMPTY_ERE' | tail -n 4000\""
+  run_sh "runtime_access_site_status_200_with_upstream.log" "docker exec '$RUNTIME_CONTAINER' sh -lc \"grep -E '\\\"host\\\":\\\"($SITE_ERE)\\\"' /var/log/nginx/access.log | grep -E '\\\"status\\\":200' | grep -E '$UPSTREAM_PRESENT_ERE' | tail -n 4000\""
   run_sh "runtime_nginx_site_lookup.txt" "docker exec '$RUNTIME_CONTAINER' sh -lc \"grep -R --line-number -E 'server_name ($SITE_ERE)' /etc/waf/nginx 2>/dev/null\""
   run_sh "runtime_nginx_site_conf_focus.txt" "docker exec '$RUNTIME_CONTAINER' sh -lc \"nginx -T 2>/tmp/nginxT.txt; grep -nE '($SITE_ERE)|limit_req|waf_rate_limited|blacklist_uri|deny ' /tmp/nginxT.txt | tail -n 1200\""
 fi
@@ -297,6 +301,8 @@ fi
 if [[ -n "$URI_ERE" ]]; then
   run_sh "runtime_access_uri.log" "docker exec '$RUNTIME_CONTAINER' sh -lc \"grep -E '\\\"uri\\\":\\\"([^\\\"]*($URI_ERE)[^\\\"]*)\\\"' /var/log/nginx/access.log | tail -n 8000\""
   run_sh "runtime_access_uri_block_statuses.log" "docker exec '$RUNTIME_CONTAINER' sh -lc \"grep -E '\\\"uri\\\":\\\"([^\\\"]*($URI_ERE)[^\\\"]*)\\\"' /var/log/nginx/access.log | grep -E '\\\"status\\\":(403|429|444|500|502|503|504)' | tail -n 4000\""
+  run_sh "runtime_access_uri_status_200_no_upstream.log" "docker exec '$RUNTIME_CONTAINER' sh -lc \"grep -E '\\\"uri\\\":\\\"([^\\\"]*($URI_ERE)[^\\\"]*)\\\"' /var/log/nginx/access.log | grep -E '\\\"status\\\":200' | grep -E '$UPSTREAM_EMPTY_ERE' | tail -n 4000\""
+  run_sh "runtime_access_uri_status_200_with_upstream.log" "docker exec '$RUNTIME_CONTAINER' sh -lc \"grep -E '\\\"uri\\\":\\\"([^\\\"]*($URI_ERE)[^\\\"]*)\\\"' /var/log/nginx/access.log | grep -E '\\\"status\\\":200' | grep -E '$UPSTREAM_PRESENT_ERE' | tail -n 4000\""
 fi
 
 {
@@ -305,6 +311,9 @@ fi
   echo
   echo "## access recent matching common ingest endpoints"
   grep -nEi '\"uri\":\"/(api(/[0-9]+)?/(envelope|store|minidump)|api/2/envelope)\"' "$OUT/runtime_access_recent.log" || true
+  echo
+  echo "## common ingest endpoints: HTTP 200 without upstream"
+  grep -nEi '\"uri\":\"/(api(/[0-9]+)?/(envelope|store|minidump)|api/2/envelope)\"' "$OUT/runtime_access_recent.log" | grep -E '\"status\":200' | grep -E "$UPSTREAM_EMPTY_ERE" || true
 } >"$OUT/interesting_request_patterns.txt" 2>&1
 
 {
@@ -330,6 +339,15 @@ fi
   echo
   echo "## top hosts in recent access"
   grep -Eo '\"host\":\"[^\"]+\"' "$OUT/runtime_access_recent.log" | sort | uniq -c | sort -nr | head -n 30 || true
+  echo
+  echo "## HTTP 200 with upstream in recent access"
+  grep -E '\"status\":200' "$OUT/runtime_access_recent.log" | grep -E "$UPSTREAM_PRESENT_ERE" | wc -l | awk '{print "count="$1}'
+  echo
+  echo "## HTTP 200 without upstream in recent access"
+  grep -E '\"status\":200' "$OUT/runtime_access_recent.log" | grep -E "$UPSTREAM_EMPTY_ERE" | wc -l | awk '{print "count="$1}'
+  echo
+  echo "## sample HTTP 200 without upstream in recent access"
+  grep -E '\"status\":200' "$OUT/runtime_access_recent.log" | grep -E "$UPSTREAM_EMPTY_ERE" | tail -n 50 || true
 } >"$OUT/request_diagnostics_summary.txt" 2>&1
 
 {
@@ -342,6 +360,8 @@ fi
       echo "events_all.matches=$(grep -cF "$site" "$OUT/events_all.json" || true)"
       echo "sites.matches=$(grep -cF "$site" "$OUT/sites.json" || true)"
       echo "runtime_access.matches=$(grep -cE "\\\"host\\\":\\\"$site\\\"" "$OUT/runtime_access_site.log" 2>/dev/null || true)"
+      echo "runtime_access.status_200_with_upstream=$(grep -cE '\\\"status\\\":200' "$OUT/runtime_access_site_status_200_with_upstream.log" 2>/dev/null || true)"
+      echo "runtime_access.status_200_without_upstream=$(grep -cE '\\\"status\\\":200' "$OUT/runtime_access_site_status_200_no_upstream.log" 2>/dev/null || true)"
       echo "runtime_nginx_server_name.matches=$(grep -cF "$site" "$OUT/runtime_nginx_site_lookup.txt" || true)"
       echo "easy_profile_status=$(grep -Eo 'HTTP [0-9]+' "$OUT/easy_profile_${site//[^a-zA-Z0-9_.-]/_}.json" | tail -n1 || true)"
     done
