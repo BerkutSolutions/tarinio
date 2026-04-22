@@ -51,7 +51,7 @@ jobs:
         shell: bash
         run: |
           for i in $(seq 1 60); do
-            if curl -kfsS https://localhost/login >/dev/null 2>&1; then
+            if curl -kfsS --resolve localhost:443:127.0.0.1 https://localhost/login >/dev/null 2>&1; then
               exit 0
             fi
             sleep 2

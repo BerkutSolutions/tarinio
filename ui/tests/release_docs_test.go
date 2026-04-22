@@ -113,9 +113,18 @@ func TestReleaseDocsAndLockfileConsistency(t *testing.T) {
 func validateNpmLockfileInstall(t *testing.T, repoRoot string) {
 	t.Helper()
 
+	nodeCommand := "node"
 	npmCommand := "npm"
 	if runtime.GOOS == "windows" {
+		nodeCommand = "node.exe"
 		npmCommand = "npm.cmd"
+	}
+
+	lockfileCheck := exec.Command(nodeCommand, filepath.Join("scripts", "check-docs-lockfile.js"))
+	lockfileCheck.Dir = repoRoot
+	lockfileOutput, lockfileErr := lockfileCheck.CombinedOutput()
+	if lockfileErr != nil {
+		t.Fatalf("package-lock.json failed static lockfile validation: %v\n%s", lockfileErr, strings.TrimSpace(string(lockfileOutput)))
 	}
 
 	cmd := exec.Command(npmCommand, "ci", "--ignore-scripts", "--dry-run")

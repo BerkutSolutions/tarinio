@@ -2,10 +2,12 @@ package tests
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -38,9 +40,23 @@ func TestE2ESmoke_LoginHealthcheckDashboard(t *testing.T) {
 		Jar:     jar,
 	}
 	if strings.HasPrefix(strings.ToLower(baseURL), "https://") {
-		client.Transport = &http.Transport{
+		transport := &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
+		if baseParsed, parseErr := url.Parse(baseURL); parseErr == nil && strings.EqualFold(baseParsed.Hostname(), "localhost") {
+			dialer := &net.Dialer{Timeout: 15 * time.Second}
+			transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+				host, port, err := net.SplitHostPort(addr)
+				if err != nil {
+					return dialer.DialContext(ctx, network, addr)
+				}
+				if strings.EqualFold(host, "localhost") {
+					host = "127.0.0.1"
+				}
+				return dialer.DialContext(ctx, network, net.JoinHostPort(host, port))
+			}
+		}
+		client.Transport = transport
 	}
 
 	if err := waitForHTTP(client, baseURL+"/login", 90*time.Second); err != nil {
