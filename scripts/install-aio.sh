@@ -401,7 +401,7 @@ ok "post-upgrade health gate passed"
 if [ "$RUN_STRICT_POST_UPGRADE_VALIDATION" = "1" ] || [ "$RUN_STRICT_POST_UPGRADE_VALIDATION" = "true" ]; then
   section "Strict Post-Upgrade Validation"
   step "Running scripts/post-upgrade-smoke.sh"
-  PROFILE_DIR="$(pwd)" COMPOSE_CMD="$COMPOSE_CMD" run_logged sh "$INSTALL_DIR/scripts/post-upgrade-smoke.sh"
+  run_logged env "PROFILE_DIR=$(pwd)" "COMPOSE_CMD=$COMPOSE_CMD" sh "$INSTALL_DIR/scripts/post-upgrade-smoke.sh"
   ok "strict post-upgrade validation passed"
 fi
 
