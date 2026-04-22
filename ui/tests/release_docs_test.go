@@ -2,10 +2,11 @@ package tests
 
 import (
 	"encoding/json"
+	"os/exec"
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -54,30 +55,7 @@ func TestReleaseDocsAndLockfileConsistency(t *testing.T) {
 		t.Fatalf("package-lock.json root package version mismatch: got %q want %q", rootPkg.Version, appVersion)
 	}
 
-	var broken []string
-	for pkgPath, meta := range lock.Packages {
-		if !strings.HasPrefix(pkgPath, "node_modules/") {
-			continue
-		}
-		if meta.Version == "" || meta.Resolved == "" {
-			continue
-		}
-		if !strings.HasPrefix(meta.Resolved, "https://registry.npmjs.org/") {
-			continue
-		}
-
-		packageName := strings.TrimPrefix(pkgPath, "node_modules/")
-		leaf := packageName[strings.LastIndex(packageName, "/")+1:]
-		expectedSuffix := "/-/" + leaf + "-" + meta.Version + ".tgz"
-		if !strings.HasSuffix(meta.Resolved, expectedSuffix) {
-			broken = append(broken, pkgPath+": version="+meta.Version+", resolved="+meta.Resolved)
-		}
-	}
-
-	if len(broken) > 0 {
-		sort.Strings(broken)
-		t.Fatalf("package-lock.json contains corrupted npm tarball references: %v", sample(broken))
-	}
+	validateNpmLockfileInstall(t, repoRoot)
 
 	releaseScript := mustReadFile(t, filepath.Join(repoRoot, "scripts", "release.ps1"))
 	if !strings.Contains(releaseScript, "generate-release-artifacts.ps1") {
@@ -129,6 +107,22 @@ func TestReleaseDocsAndLockfileConsistency(t *testing.T) {
 		if strings.Contains(content, "2.0.5") {
 			t.Fatalf("i18n file still contains stale 2.0.5 version marker: %s", path)
 		}
+	}
+}
+
+func validateNpmLockfileInstall(t *testing.T, repoRoot string) {
+	t.Helper()
+
+	npmCommand := "npm"
+	if runtime.GOOS == "windows" {
+		npmCommand = "npm.cmd"
+	}
+
+	cmd := exec.Command(npmCommand, "ci", "--ignore-scripts", "--dry-run")
+	cmd.Dir = repoRoot
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("package-lock.json failed npm ci dry-run validation: %v\n%s", err, strings.TrimSpace(string(output)))
 	}
 }
 

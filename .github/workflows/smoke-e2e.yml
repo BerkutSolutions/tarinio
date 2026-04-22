@@ -51,7 +51,7 @@ jobs:
         shell: bash
         run: |
           for i in $(seq 1 60); do
-            if curl -fsS http://127.0.0.1:8080/login >/dev/null 2>&1; then
+            if curl -kfsS https://localhost/login >/dev/null 2>&1; then
               exit 0
             fi
             sleep 2
@@ -63,7 +63,7 @@ jobs:
       - name: Run e2e smoke login-healthcheck-dashboard
         shell: bash
         env:
-          WAF_E2E_BASE_URL: http://127.0.0.1:8080
+          WAF_E2E_BASE_URL: https://localhost
           WAF_E2E_USERNAME: admin
           WAF_E2E_PASSWORD: admin
         run: go test ./ui/tests -run TestE2ESmoke_LoginHealthcheckDashboard -count=1 -v

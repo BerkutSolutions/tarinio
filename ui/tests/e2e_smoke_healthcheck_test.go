@@ -2,6 +2,7 @@ package tests
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -35,6 +36,11 @@ func TestE2ESmoke_LoginHealthcheckDashboard(t *testing.T) {
 	client := &http.Client{
 		Timeout: 15 * time.Second,
 		Jar:     jar,
+	}
+	if strings.HasPrefix(strings.ToLower(baseURL), "https://") {
+		client.Transport = &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
 	}
 
 	if err := waitForHTTP(client, baseURL+"/login", 90*time.Second); err != nil {
