@@ -29,6 +29,10 @@ type User struct {
 	Department         string             `json:"department,omitempty"`
 	Position           string             `json:"position,omitempty"`
 	Language           string             `json:"language,omitempty"`
+	AuthSource         string             `json:"auth_source,omitempty"`
+	ExternalID         string             `json:"external_id,omitempty"`
+	ExternalGroups     []string           `json:"external_groups,omitempty"`
+	LastSyncedAt       string             `json:"last_synced_at,omitempty"`
 	PasswordHash       string             `json:"password_hash"`
 	IsActive           bool               `json:"is_active"`
 	RoleIDs            []string           `json:"role_ids"`
@@ -120,6 +124,41 @@ func (s *Store) FindByUsername(username string) (User, bool, error) {
 	username = normalizeUsername(username)
 	for _, item := range current.Users {
 		if item.Username == username {
+			return item, true, nil
+		}
+	}
+	return User{}, false, nil
+}
+
+func (s *Store) FindByEmail(email string) (User, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	current, err := s.loadLocked()
+	if err != nil {
+		return User{}, false, err
+	}
+	email = strings.ToLower(strings.TrimSpace(email))
+	for _, item := range current.Users {
+		if item.Email == email && email != "" {
+			return item, true, nil
+		}
+	}
+	return User{}, false, nil
+}
+
+func (s *Store) FindByExternalIdentity(authSource, externalID string) (User, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	current, err := s.loadLocked()
+	if err != nil {
+		return User{}, false, err
+	}
+	authSource = normalizeAuthSource(authSource)
+	externalID = strings.TrimSpace(externalID)
+	for _, item := range current.Users {
+		if item.AuthSource == authSource && item.ExternalID == externalID && authSource != "" && externalID != "" {
 			return item, true, nil
 		}
 	}
@@ -399,6 +438,10 @@ func normalizeUser(user User) User {
 	user.Department = strings.TrimSpace(user.Department)
 	user.Position = strings.TrimSpace(user.Position)
 	user.Language = normalizeUserLanguage(user.Language)
+	user.AuthSource = normalizeAuthSource(user.AuthSource)
+	user.ExternalID = strings.TrimSpace(user.ExternalID)
+	user.ExternalGroups = normalizeExternalGroups(user.ExternalGroups)
+	user.LastSyncedAt = strings.TrimSpace(user.LastSyncedAt)
 	user.RoleIDs = normalizeValues(user.RoleIDs)
 	user.TOTPSecret = strings.TrimSpace(user.TOTPSecret)
 	user.TOTPSecretEnc = strings.TrimSpace(user.TOTPSecretEnc)
@@ -434,6 +477,35 @@ func normalizeValues(items []string) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+func normalizeExternalGroups(items []string) []string {
+	out := make([]string, 0, len(items))
+	seen := map[string]struct{}{}
+	for _, item := range items {
+		value := strings.TrimSpace(item)
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func normalizeAuthSource(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", "local":
+		return strings.ToLower(strings.TrimSpace(value))
+	case "oidc", "scim":
+		return strings.ToLower(strings.TrimSpace(value))
+	default:
+		return ""
+	}
 }
 
 func sortUsers(items []User) {

@@ -88,6 +88,9 @@ type RevisionCompileService struct {
 	materials         CertificateMaterialReader
 	audits            *AuditService
 	coord             DistributedCoordinator
+	governance        interface {
+		PrepareCompiledRevision(ctx context.Context, revision revisions.Revision) (revisions.Revision, error)
+	}
 }
 
 type CertificateMaterialReader interface {
@@ -189,6 +192,12 @@ func (s *RevisionCompileService) createUnlocked(ctx context.Context) (result Com
 		Checksum:   checksum,
 		BundlePath: snapshotPath,
 		Status:     revisions.StatusPending,
+	}
+	if s.governance != nil {
+		revision, err = s.governance.PrepareCompiledRevision(ctx, revision)
+		if err != nil {
+			return CompileRequestResult{}, err
+		}
 	}
 	if err := s.revisions.SavePending(revision); err != nil {
 		return CompileRequestResult{}, err
@@ -293,4 +302,10 @@ func nextRevisionVersion(items []revisions.Revision) int {
 		}
 	}
 	return maxVersion + 1
+}
+
+func (s *RevisionCompileService) SetGovernance(governance interface {
+	PrepareCompiledRevision(ctx context.Context, revision revisions.Revision) (revisions.Revision, error)
+}) {
+	s.governance = governance
 }

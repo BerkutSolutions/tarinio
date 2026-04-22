@@ -300,6 +300,42 @@ func (s *requestClickHouseStore) deleteDay(day string) error {
 	return s.doQuery(cfg, fmt.Sprintf("ALTER TABLE %s.%s DELETE WHERE toDate(timestamp) = toDate('%s')", cfg.Database, cfg.Table, escapeSQLString(day)), nil)
 }
 
+func (s *requestClickHouseStore) exportDay(day string) ([]requestLogRecord, error) {
+	cfg, err := s.currentConfig()
+	if err != nil {
+		return nil, err
+	}
+	if !cfg.Enabled {
+		return nil, errClickHouseDisabled
+	}
+	if err := s.ensureSchema(cfg); err != nil {
+		return nil, err
+	}
+	query := strings.Builder{}
+	query.WriteString("SELECT event_hash, stream, ingested_at, timestamp, request_id, client_ip, country, method, uri, status, site, host, upstream_addr, referer, user_agent ")
+	query.WriteString(fmt.Sprintf("FROM %s.%s FINAL WHERE toDate(timestamp) = toDate('%s') ORDER BY timestamp ASC FORMAT JSONEachRow", cfg.Database, cfg.Table, escapeSQLString(day)))
+	resp, err := s.query(cfg, query.String())
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Close()
+	out := make([]requestLogRecord, 0, 256)
+	scanner := bufio.NewScanner(resp)
+	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		var record requestLogRecord
+		if err := json.Unmarshal([]byte(line), &record); err != nil {
+			continue
+		}
+		out = append(out, record)
+	}
+	return out, scanner.Err()
+}
+
 func (s *requestClickHouseStore) ensureSchema(cfg requestClickHouseConfig) error {
 	key := cfg.Endpoint + "|" + cfg.Database + "|" + cfg.Table + "|" + cfg.Username
 	s.mu.Lock()

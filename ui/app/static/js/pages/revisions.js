@@ -92,6 +92,9 @@ function revisionVisualStatus(item) {
   if (item?.is_active) {
     return "active";
   }
+  if (String(item?.approval_status || "").trim().toLowerCase() === "pending") {
+    return "pending";
+  }
   const lastApplyStatus = String(item?.last_apply_status || "").trim().toLowerCase();
   const status = String(item?.status || "").trim().toLowerCase();
   if (lastApplyStatus === "succeeded") {
@@ -378,7 +381,8 @@ export async function renderRevisions(container, ctx) {
             const sites = normalizeSites(item?.sites);
             const isActive = Boolean(item?.is_active);
             const isExpanded = isActive || state.expandedRevisionIDs.has(String(item?.id || ""));
-            const applyDisabled = state.pendingRevisionID === item.id || Boolean(item?.is_active);
+            const approvalPending = String(item?.approval_status || "").trim().toLowerCase() === "pending";
+            const applyDisabled = state.pendingRevisionID === item.id || Boolean(item?.is_active) || approvalPending;
             const deleteDisabled = state.pendingRevisionID === item.id || Boolean(item?.is_active);
             const visualStatus = revisionVisualStatus(item);
             return `
@@ -390,6 +394,7 @@ export async function renderRevisions(container, ctx) {
                   </div>
                   <div class="revisions-modal-badges">
                     ${statusBadge(visualStatus)}
+                    ${approvalPending ? `<button type="button" class="btn btn-sm" data-revision-approve="${escapeHtml(String(item?.id || ""))}">${escapeHtml(ctx.t("revisions.action.approve"))}</button>` : ""}
                     <button type="button" class="btn btn-sm" data-revision-apply="${escapeHtml(String(item?.id || ""))}" ${applyDisabled ? "disabled" : ""}>
                       ${escapeHtml(state.pendingRevisionID === item.id ? ctx.t("revisions.action.applying") : item?.is_active ? ctx.t("revisions.revision.applyBlocked") : ctx.t("revisions.action.apply"))}
                     </button>
@@ -422,6 +427,14 @@ export async function renderRevisions(container, ctx) {
                     <div class="revisions-modal-line">
                       <span>${escapeHtml(ctx.t("revisions.revision.checksum"))}</span>
                       <strong>${escapeHtml(String(item?.checksum || "-"))}</strong>
+                    </div>
+                    <div class="revisions-modal-line">
+                      <span>${escapeHtml(ctx.t("revisions.revision.approvals"))}</span>
+                      <strong>${escapeHtml(String(item?.approval_status || "-"))} (${escapeHtml(String((item?.approvals || []).length))}/${escapeHtml(String(item?.required_approvals || 0))})</strong>
+                    </div>
+                    <div class="revisions-modal-line">
+                      <span>${escapeHtml(ctx.t("revisions.revision.compiledBy"))}</span>
+                      <strong>${escapeHtml(String(item?.compiled_by_name || item?.compiled_by_user_id || "-"))}</strong>
                     </div>
                     ${item?.last_apply_at ? `
                       <div class="revisions-modal-line">
@@ -490,6 +503,17 @@ export async function renderRevisions(container, ctx) {
     } finally {
       state.pendingRevisionID = "";
       renderModal();
+    }
+  };
+
+  const runApprove = async (revisionID) => {
+    const comment = window.prompt(ctx.t("revisions.confirm.approve", { revisionId: revisionID })) || "";
+    try {
+      await ctx.api.post(`/api/revisions/${encodeURIComponent(revisionID)}/approve`, { comment });
+      ctx.notify(ctx.t("revisions.toast.approved", { revisionId: revisionID }), "success");
+      await loadCatalog();
+    } catch (error) {
+      ctx.notify(error?.message || ctx.t("revisions.error.approve"), "error");
     }
   };
 
@@ -574,6 +598,11 @@ export async function renderRevisions(container, ctx) {
     const applyButton = event.target.closest("[data-revision-apply]");
     if (applyButton) {
       await runApply(String(applyButton.getAttribute("data-revision-apply") || ""));
+      return;
+    }
+    const approveButton = event.target.closest("[data-revision-approve]");
+    if (approveButton) {
+      await runApprove(String(approveButton.getAttribute("data-revision-approve") || ""));
       return;
     }
     const deleteButton = event.target.closest("[data-revision-delete]");

@@ -39,11 +39,11 @@ type storageIndexItem struct {
 }
 
 type StorageRetention struct {
-	LogsDays     int `json:"logs_days"`
-	ActivityDays int `json:"activity_days"`
-	EventsDays   int `json:"events_days"`
-	BansDays     int `json:"bans_days"`
-	HotIndexDays int `json:"hot_index_days,omitempty"`
+	LogsDays      int `json:"logs_days"`
+	ActivityDays  int `json:"activity_days"`
+	EventsDays    int `json:"events_days"`
+	BansDays      int `json:"bans_days"`
+	HotIndexDays  int `json:"hot_index_days,omitempty"`
 	ColdIndexDays int `json:"cold_index_days,omitempty"`
 }
 
@@ -80,11 +80,11 @@ var runtimeSettingsState = struct {
 	releaseURL:          "",
 	hasUpdate:           false,
 	storage: StorageRetention{
-		LogsDays:     14,
-		ActivityDays: 30,
-		EventsDays:   30,
-		BansDays:     30,
-		HotIndexDays: loggingconfig.DefaultHotDays,
+		LogsDays:      14,
+		ActivityDays:  30,
+		EventsDays:    30,
+		BansDays:      30,
+		HotIndexDays:  loggingconfig.DefaultHotDays,
 		ColdIndexDays: loggingconfig.DefaultColdDays,
 	},
 	logging: loggingconfig.Normalize(loggingconfig.Settings{
@@ -93,7 +93,7 @@ var runtimeSettingsState = struct {
 			Backend: loggingconfig.BackendOpenSearch,
 		},
 		Cold: loggingconfig.ColdSettings{
-			Backend: loggingconfig.BackendClickHouse,
+			Backend: loggingconfig.BackendOpenSearch,
 		},
 		Retention: loggingconfig.RetentionSettings{
 			HotDays:  loggingconfig.DefaultHotDays,
@@ -127,9 +127,6 @@ var runtimeRequestIndexes = &runtimeIndexFetcher{
 func defaultLoggingSettingsFromEnv(current loggingconfig.Settings) loggingconfig.Settings {
 	current = loggingconfig.Normalize(current)
 	clickhouseEndpoint := strings.TrimRight(strings.TrimSpace(os.Getenv("CLICKHOUSE_ENDPOINT")), "/")
-	if clickhouseEndpoint == "" {
-		clickhouseEndpoint = "http://clickhouse:8123"
-	}
 	clickhouseUser := strings.TrimSpace(os.Getenv("CLICKHOUSE_USER"))
 	if clickhouseUser == "" {
 		clickhouseUser = "waf"
@@ -175,6 +172,9 @@ func defaultLoggingSettingsFromEnv(current loggingconfig.Settings) loggingconfig
 	if opensearchPassword != "" || opensearchAPIKey != "" || strings.TrimSpace(current.OpenSearch.PasswordEnc) != "" || strings.TrimSpace(current.OpenSearch.APIKeyEnc) != "" {
 		current.Backend = loggingconfig.BackendOpenSearch
 		current.Hot.Backend = loggingconfig.BackendOpenSearch
+		if current.Cold.Backend != loggingconfig.BackendClickHouse {
+			current.Cold.Backend = loggingconfig.BackendOpenSearch
+		}
 		current.OpenSearch.Endpoint = opensearchEndpoint
 		current.OpenSearch.Username = opensearchUsername
 		current.OpenSearch.IndexPrefix = opensearchIndexPrefix
@@ -211,11 +211,11 @@ func defaultLoggingSettingsFromEnv(current loggingconfig.Settings) loggingconfig
 		}
 	}
 	current.Routing.WriteRequestsToHot = current.Hot.Backend == loggingconfig.BackendOpenSearch
-	current.Routing.WriteRequestsToCold = false
+	current.Routing.WriteRequestsToCold = current.Cold.Backend == loggingconfig.BackendClickHouse || (current.Cold.Backend == loggingconfig.BackendOpenSearch && current.Hot.Backend != loggingconfig.BackendOpenSearch)
 	current.Routing.WriteEventsToHot = current.Hot.Backend == loggingconfig.BackendOpenSearch
-	current.Routing.WriteEventsToCold = false
+	current.Routing.WriteEventsToCold = current.Cold.Backend == loggingconfig.BackendClickHouse || (current.Cold.Backend == loggingconfig.BackendOpenSearch && current.Hot.Backend != loggingconfig.BackendOpenSearch)
 	current.Routing.WriteActivityToHot = current.Hot.Backend == loggingconfig.BackendOpenSearch
-	current.Routing.WriteActivityToCold = false
+	current.Routing.WriteActivityToCold = current.Cold.Backend == loggingconfig.BackendClickHouse || (current.Cold.Backend == loggingconfig.BackendOpenSearch && current.Hot.Backend != loggingconfig.BackendOpenSearch)
 	current.Routing.KeepLocalFallback = true
 	current.ClickHouse.Password = ""
 	current.OpenSearch.Password = ""
@@ -239,8 +239,13 @@ func reconcileLoggingSettingsFromEnv(current loggingconfig.Settings) loggingconf
 
 	if current.Cold.Backend == loggingconfig.BackendClickHouse && strings.TrimSpace(current.ClickHouse.PasswordEnc) == "" {
 		if clickhousePassword == "" {
-			current.Backend = loggingconfig.BackendFile
-			current.Cold.Backend = loggingconfig.BackendFile
+			if current.Hot.Backend == loggingconfig.BackendOpenSearch {
+				current.Backend = loggingconfig.BackendOpenSearch
+				current.Cold.Backend = loggingconfig.BackendOpenSearch
+			} else {
+				current.Backend = loggingconfig.BackendFile
+				current.Cold.Backend = loggingconfig.BackendFile
+			}
 		} else {
 			if encrypted, err := secretcrypto.Encrypt("waf:logging:clickhouse", clickhousePassword, strings.TrimSpace(runtimeSettingsState.pepper)); err == nil {
 				current.ClickHouse.PasswordEnc = encrypted
@@ -286,7 +291,7 @@ func reconcileLoggingSettingsFromEnv(current loggingconfig.Settings) loggingconf
 	}
 	if endpoint := strings.TrimRight(strings.TrimSpace(os.Getenv("OPENSEARCH_ENDPOINT")), "/"); endpoint != "" {
 		current.OpenSearch.Endpoint = endpoint
-	} else if current.Hot.Backend == loggingconfig.BackendOpenSearch && strings.TrimSpace(current.OpenSearch.Endpoint) == "" {
+	} else if (current.Hot.Backend == loggingconfig.BackendOpenSearch || current.Cold.Backend == loggingconfig.BackendOpenSearch) && strings.TrimSpace(current.OpenSearch.Endpoint) == "" {
 		current.OpenSearch.Endpoint = "http://opensearch:9200"
 	}
 	if username := strings.TrimSpace(os.Getenv("OPENSEARCH_USERNAME")); username != "" {
@@ -309,6 +314,8 @@ func reconcileLoggingSettingsFromEnv(current loggingconfig.Settings) loggingconf
 	current.Vault.TLSSkipVerify = current.Vault.TLSSkipVerify || parseEnvBool(os.Getenv("VAULT_TLS_SKIP_VERIFY"))
 	current.Routing.KeepLocalFallback = true
 	if current.Hot.Backend == loggingconfig.BackendOpenSearch {
+		current.Backend = loggingconfig.BackendOpenSearch
+	} else if current.Cold.Backend == loggingconfig.BackendOpenSearch {
 		current.Backend = loggingconfig.BackendOpenSearch
 	} else if current.Cold.Backend == loggingconfig.BackendClickHouse {
 		current.Backend = loggingconfig.BackendClickHouse
@@ -1425,8 +1432,8 @@ func parseLoggingSettings(raw map[string]any, current loggingconfig.Settings, pe
 	if incoming.Cold.Backend == loggingconfig.BackendClickHouse && strings.TrimSpace(incoming.ClickHouse.Endpoint) == "" {
 		return loggingconfig.Settings{}, fmt.Errorf("clickhouse endpoint is required when backend is clickhouse")
 	}
-	if incoming.Hot.Backend == loggingconfig.BackendOpenSearch && strings.TrimSpace(incoming.OpenSearch.Endpoint) == "" {
-		return loggingconfig.Settings{}, fmt.Errorf("opensearch endpoint is required when hot storage is opensearch")
+	if (incoming.Hot.Backend == loggingconfig.BackendOpenSearch || incoming.Cold.Backend == loggingconfig.BackendOpenSearch) && strings.TrimSpace(incoming.OpenSearch.Endpoint) == "" {
+		return loggingconfig.Settings{}, fmt.Errorf("opensearch endpoint is required when opensearch storage is enabled")
 	}
 	if incoming.SecretProvider == loggingconfig.SecretProviderVault && incoming.Vault.Enabled && strings.TrimSpace(incoming.Vault.Address) == "" {
 		return loggingconfig.Settings{}, fmt.Errorf("vault address is required when vault secret provider is enabled")

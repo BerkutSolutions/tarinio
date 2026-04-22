@@ -41,6 +41,7 @@ const (
 
 	PermissionRevisionsRead  Permission = "revisions.read"
 	PermissionRevisionsWrite Permission = "revisions.write"
+	PermissionRevisionsApprove Permission = "revisions.approve"
 
 	PermissionAdministrationRead       Permission = "administration.read"
 	PermissionAdministrationWrite      Permission = "administration.write"
@@ -94,6 +95,7 @@ func AllPermissions() []Permission {
 		PermissionBansRead,
 		PermissionRevisionsRead,
 		PermissionRevisionsWrite,
+		PermissionRevisionsApprove,
 		PermissionAdministrationRead,
 		PermissionAdministrationWrite,
 		PermissionAdministrationUsersRead,
@@ -141,6 +143,7 @@ func DefaultRoleDefinitions() []RoleDefinition {
 		PermissionEventsRead,
 		PermissionBansRead,
 		PermissionRevisionsRead,
+		PermissionRevisionsApprove,
 		PermissionActivityRead,
 	}
 	adminPermissions := append(append([]Permission(nil), commonSelf...), AllPermissions()...)
@@ -156,6 +159,7 @@ func DefaultRoleDefinitions() []RoleDefinition {
 		PermissionTLSWrite,
 		PermissionRevisionsRead,
 		PermissionRevisionsWrite,
+		PermissionRevisionsApprove,
 		PermissionActivityRead,
 		PermissionAdministrationRead,
 		PermissionAdministrationUsersRead,
@@ -177,6 +181,7 @@ func DefaultRoleDefinitions() []RoleDefinition {
 		PermissionEventsRead,
 		PermissionBansRead,
 		PermissionRevisionsRead,
+		PermissionRevisionsApprove,
 		PermissionActivityRead,
 	)
 	operatorPermissions := append(append([]Permission(nil), commonSelf...),

@@ -2,7 +2,7 @@
 
 This page belongs to the current documentation branch.
 
-This is the main English index for TARINIO documentation. It is structured as an operator wiki for the real `2.0.5` product and is meant to complement the Russian branch, not lag behind it.
+This is the main English index for TARINIO documentation. It is structured as an operator wiki for the real `2.0.6` product and is meant to complement the Russian branch, not lag behind it.
 
 ## Start Here
 
@@ -31,10 +31,14 @@ This is the main English index for TARINIO documentation. It is structured as an
 15. [Logging architecture](logging-architecture.md)
 16. [Secret management](secret-management.md)
 17. [Migration and compatibility](migration-compatibility.md)
+18. [Enterprise identity](enterprise-identity.md)
+19. [Evidence and releases](evidence-and-releases.md)
 
 ## Enterprise Trust Documents
 
 - [Support And Lifecycle Policy](support-lifecycle.md)
+- [Enterprise Identity](enterprise-identity.md)
+- [Evidence And Releases](evidence-and-releases.md)
 - [Compatibility Matrix](compatibility-matrix.md)
 - [Sizing Guide](sizing.md)
 - [Disaster Recovery Guide](disaster-recovery.md)
@@ -57,7 +61,7 @@ This is the main English index for TARINIO documentation. It is structured as an
 - [OWASP CRS operations](operators/owasp-crs.md)
 - [Let's Encrypt DNS-01 operations](operators/letsencrypt-dns.md)
 
-## What Matters In 2.0.5
+## What Matters In 2.0.6
 
 - Documentation is aligned with the application version from `control-plane/internal/appmeta/meta.go`.
 - The wiki covers the real UI sections: `Dashboard`, `Sites`, `Anti-DDoS`, `OWASP CRS`, `TLS`, `Requests`, `Revisions`, `Events`, `Bans`, `Administration`, `Activity`, `Settings`, and `Profile`.

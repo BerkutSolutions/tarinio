@@ -106,6 +106,7 @@ async function bootstrap() {
   }
 
   const passkeyBtn = document.getElementById("login-passkey-btn");
+  const oidcBtn = document.getElementById("login-oidc-btn");
   const usernameInput = document.getElementById("username");
 
   if (passkeyBtn) {
@@ -132,6 +133,23 @@ async function bootstrap() {
       } finally {
         passkeyBtn.disabled = false;
       }
+    });
+  }
+
+  if (oidcBtn) {
+    oidcBtn.hidden = true;
+    try {
+      const providers = await api.get("/api/auth/providers");
+      const oidc = providers?.oidc || {};
+      if (oidc.enabled) {
+        oidcBtn.hidden = false;
+        oidcBtn.textContent = oidc.display_name || t("login.oidc");
+      }
+    } catch {
+      oidcBtn.hidden = true;
+    }
+    oidcBtn.addEventListener("click", () => {
+      window.location.href = `/api/auth/oidc/start?next=${encodeURIComponent(currentNext())}`;
     });
   }
 

@@ -116,12 +116,21 @@ func TestReconcileLoggingSettingsFromEnvFallsBackToFileWithoutSecret(t *testing.
 	t.Setenv("CLICKHOUSE_USER", "")
 	t.Setenv("CLICKHOUSE_DB", "")
 	t.Setenv("CLICKHOUSE_ENDPOINT", "")
+	t.Setenv("OPENSEARCH_PASSWORD", "opensearch-secret")
+	t.Setenv("OPENSEARCH_ENDPOINT", "http://opensearch:9200")
 	runtimeSettingsState.pepper = "pepper-for-tests"
 
 	current := loggingconfig.Normalize(loggingconfig.Settings{
-		Backend: loggingconfig.BackendClickHouse,
+		Backend: loggingconfig.BackendOpenSearch,
+		Hot: loggingconfig.HotSettings{
+			Backend: loggingconfig.BackendOpenSearch,
+		},
 		Cold: loggingconfig.ColdSettings{
 			Backend: loggingconfig.BackendClickHouse,
+		},
+		OpenSearch: loggingconfig.OpenSearchSettings{
+			Endpoint: "http://opensearch:9200",
+			Username: "admin",
 		},
 		ClickHouse: loggingconfig.ClickHouseSettings{
 			Endpoint: "http://clickhouse:8123",
@@ -131,8 +140,11 @@ func TestReconcileLoggingSettingsFromEnvFallsBackToFileWithoutSecret(t *testing.
 		},
 	})
 	next := reconcileLoggingSettingsFromEnv(current)
-	if next.Backend != loggingconfig.BackendFile {
-		t.Fatalf("expected backend to fall back to file, got %q", next.Backend)
+	if next.Backend != loggingconfig.BackendOpenSearch {
+		t.Fatalf("expected backend to fall back to opensearch, got %q", next.Backend)
+	}
+	if next.Cold.Backend != loggingconfig.BackendOpenSearch {
+		t.Fatalf("expected cold backend to fall back to opensearch, got %q", next.Cold.Backend)
 	}
 }
 
@@ -309,5 +321,28 @@ func TestDefaultLoggingSettingsFromEnvReadsVaultTokenFile(t *testing.T) {
 	}
 	if decrypted != "vault-file-token" {
 		t.Fatalf("unexpected decrypted token: %q", decrypted)
+	}
+}
+
+func TestDefaultLoggingSettingsFromEnvUsesOpenSearchForHotAndColdByDefault(t *testing.T) {
+	t.Setenv("CLICKHOUSE_PASSWORD", "")
+	t.Setenv("CLICKHOUSE_ENDPOINT", "")
+	t.Setenv("OPENSEARCH_ENDPOINT", "http://opensearch:9200")
+	t.Setenv("OPENSEARCH_USERNAME", "admin")
+	t.Setenv("OPENSEARCH_PASSWORD", "opensearch-secret")
+	t.Setenv("VAULT_ENABLED", "true")
+	t.Setenv("VAULT_ADDR", "http://vault:8200")
+	t.Setenv("VAULT_TOKEN", "vault-token")
+	runtimeSettingsState.pepper = "pepper-for-tests"
+
+	next := defaultLoggingSettingsFromEnv(loggingconfig.Settings{})
+	if next.Hot.Backend != loggingconfig.BackendOpenSearch {
+		t.Fatalf("expected hot backend opensearch, got %q", next.Hot.Backend)
+	}
+	if next.Cold.Backend != loggingconfig.BackendOpenSearch {
+		t.Fatalf("expected cold backend opensearch, got %q", next.Cold.Backend)
+	}
+	if next.Routing.WriteRequestsToHot != true || next.Routing.WriteRequestsToCold != false {
+		t.Fatalf("expected single-write opensearch routing, got %+v", next.Routing)
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -275,6 +276,7 @@ func (s *requestOpenSearchStore) indexes(options requestQueryOptions, archiveRoo
 			"storage_type": "opensearch",
 		})
 	}
+	state, _ := loadRequestMigrationState(filepath.Join(archiveRoot, requestOpenSearchMigrationStateFile))
 	return map[string]any{
 		"items":             items,
 		"total":             len(items),
@@ -282,6 +284,7 @@ func (s *requestOpenSearchStore) indexes(options requestQueryOptions, archiveRoo
 		"offset":            options.Offset,
 		"archive_root":      archiveRoot,
 		"storage_type":      "opensearch",
+		"migration_state":   state,
 		"opensearch_target": fmt.Sprintf("%s/%s", cfg.Endpoint, cfg.RequestsIndex),
 	}, nil
 }
@@ -368,6 +371,34 @@ func (s *requestOpenSearchStore) exportDay(day string) ([]requestLogRecord, erro
 		out = append(out, hit.Source)
 	}
 	return out, nil
+}
+
+func (s *requestOpenSearchStore) containsDayRecords(day string, expected []requestLogRecord) error {
+	if s == nil || len(expected) == 0 {
+		return nil
+	}
+	records, err := s.exportDay(day)
+	if err != nil {
+		return err
+	}
+	seen := make(map[string]struct{}, len(records))
+	for _, record := range records {
+		hash := strings.TrimSpace(record.EventHash)
+		if hash == "" {
+			continue
+		}
+		seen[hash] = struct{}{}
+	}
+	for _, record := range expected {
+		hash := strings.TrimSpace(record.EventHash)
+		if hash == "" {
+			continue
+		}
+		if _, ok := seen[hash]; !ok {
+			return errors.New("opensearch migration validation failed: missing migrated records")
+		}
+	}
+	return nil
 }
 
 func (s *requestOpenSearchStore) deleteDay(day string) error {

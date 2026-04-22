@@ -274,7 +274,8 @@ export async function renderSettings(container, ctx) {
                     <label for="settings-logging-cold-backend">${escapeHtml(ctx.t("settings.logging.cold.backend"))}</label>
                     <select id="settings-logging-cold-backend">
                       <option value="file">${escapeHtml(ctx.t("settings.logging.backend.file"))}</option>
-                      <option value="clickhouse" selected>${escapeHtml(ctx.t("settings.logging.backend.clickhouse"))}</option>
+                      <option value="opensearch" selected>${escapeHtml(ctx.t("settings.logging.backend.opensearch"))}</option>
+                      <option value="clickhouse">${escapeHtml(ctx.t("settings.logging.backend.clickhouse"))}</option>
                     </select>
                   </div>
                   <div class="waf-field">
@@ -612,10 +613,16 @@ export async function renderSettings(container, ctx) {
         secretProvider,
       });
     }
-    if (hotBackend === "opensearch") {
+    if (hotBackend === "opensearch" && coldBackend === "opensearch") {
       return ctx.t("settings.logging.status.opensearch", {
         endpoint: String(logging?.opensearch?.endpoint || "-"),
-        retention: hotRetention,
+        retention: coldRetention,
+      });
+    }
+    if (hotBackend === "opensearch" || coldBackend === "opensearch") {
+      return ctx.t("settings.logging.status.opensearch", {
+        endpoint: String(logging?.opensearch?.endpoint || "-"),
+        retention: hotBackend === "opensearch" ? hotRetention : coldRetention,
       });
     }
     if (coldBackend === "clickhouse") {
@@ -630,12 +637,14 @@ export async function renderSettings(container, ctx) {
 
   const buildLoggingPayload = () => ({
     logging: {
-      backend: String(loggingHotBackend?.value || "opensearch") === "opensearch" ? "opensearch" : (String(loggingColdBackend?.value || "clickhouse") === "clickhouse" ? "clickhouse" : "file"),
+      backend: String(loggingHotBackend?.value || "opensearch") === "opensearch"
+        ? "opensearch"
+        : (String(loggingColdBackend?.value || "opensearch") === "clickhouse" ? "clickhouse" : (String(loggingColdBackend?.value || "opensearch") === "opensearch" ? "opensearch" : "file")),
       hot: {
         backend: String(loggingHotBackend?.value || "opensearch"),
       },
       cold: {
-        backend: String(loggingColdBackend?.value || "clickhouse"),
+        backend: String(loggingColdBackend?.value || "opensearch"),
       },
       retention: {
         hot_days: Number(storageHotIndexDays?.value || loggingHotRetention?.value || "30"),
@@ -723,7 +732,7 @@ export async function renderSettings(container, ctx) {
           loggingHotBackend.value = String(logging?.hot?.backend || "opensearch");
         }
         if (loggingColdBackend) {
-          loggingColdBackend.value = String(logging?.cold?.backend || "clickhouse");
+          loggingColdBackend.value = String(logging?.cold?.backend || "opensearch");
         }
         if (loggingHotRetention) {
           loggingHotRetention.value = String(Number(retention?.hot_days || 30));

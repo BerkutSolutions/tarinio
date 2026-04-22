@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"waf/control-plane/internal/jobs"
+	"waf/control-plane/internal/revisions"
 )
 
 type fakeRevisionApplyService struct{}
@@ -24,13 +25,19 @@ type fakeRevisionDeleteService struct {
 	deleted string
 }
 
+type fakeRevisionApproveService struct{}
+
+func (f *fakeRevisionApproveService) ApproveRevision(ctx context.Context, revisionID, comment string) (revisions.Revision, error) {
+	return revisions.Revision{ID: revisionID, ApprovalStatus: revisions.ApprovalApproved}, nil
+}
+
 func (f *fakeRevisionDeleteService) Delete(ctx context.Context, revisionID string) error {
 	f.deleted = revisionID
 	return nil
 }
 
 func TestRevisionApplyHandler_Apply(t *testing.T) {
-	handler := NewRevisionApplyHandler(&fakeRevisionApplyService{}, &fakeRevisionDeleteService{})
+	handler := NewRevisionApplyHandler(&fakeRevisionApplyService{}, &fakeRevisionDeleteService{}, &fakeRevisionApproveService{})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/revisions/rev-000001/apply", nil)
 	resp := httptest.NewRecorder()
@@ -42,7 +49,7 @@ func TestRevisionApplyHandler_Apply(t *testing.T) {
 
 func TestRevisionApplyHandler_Delete(t *testing.T) {
 	deleteService := &fakeRevisionDeleteService{}
-	handler := NewRevisionApplyHandler(&fakeRevisionApplyService{}, deleteService)
+	handler := NewRevisionApplyHandler(&fakeRevisionApplyService{}, deleteService, &fakeRevisionApproveService{})
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/revisions/rev-000001", nil)
 	resp := httptest.NewRecorder()

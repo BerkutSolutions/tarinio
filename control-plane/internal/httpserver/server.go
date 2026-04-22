@@ -39,6 +39,7 @@ func New(
 	},
 	revisionService *services.RevisionService,
 	authService *services.AuthService,
+	enterpriseService *services.EnterpriseService,
 	sessionStore *sessions.Store,
 	userStore *users.Store,
 	roleStore *roles.Store,
@@ -125,6 +126,9 @@ func New(
 	mux.Handle("/api/auth/login/2fa", handlers.NewAuthHandler(authService))
 	mux.Handle("/api/auth/passkeys/login/begin", handlers.NewAuthHandler(authService))
 	mux.Handle("/api/auth/passkeys/login/finish", handlers.NewAuthHandler(authService))
+	mux.Handle("/api/auth/providers", handlers.NewOIDCHandler(enterpriseService))
+	mux.Handle("/api/auth/oidc/start", handlers.NewOIDCHandler(enterpriseService))
+	mux.Handle("/api/auth/oidc/callback", handlers.NewOIDCHandler(enterpriseService))
 	mux.Handle("/api/auth/logout", withAuth(authService, "", handlers.NewAuthHandler(authService)))
 	mux.Handle("/api/auth/me", withAuth(authService, rbac.PermissionAuthSelf, handlers.NewAuthHandler(authService)))
 	mux.Handle("/api/auth/2fa/status", withAuth(authService, rbac.PermissionAuthSelf, handlers.NewAuthHandler(authService)))
@@ -283,8 +287,28 @@ func New(
 		http.MethodGet:  {rbac.PermissionAdministrationRead},
 		http.MethodPost: {rbac.PermissionAdministrationWrite},
 	}, handlers.NewAdministrationScriptsHandler(adminScriptService)))
+	mux.Handle("/api/administration/enterprise", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodGet: {rbac.PermissionAdministrationRead},
+		http.MethodPut: {rbac.PermissionAdministrationWrite},
+	}, handlers.NewEnterpriseHandler(enterpriseService)))
+	mux.Handle("/api/administration/enterprise/scim-tokens", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodPost: {rbac.PermissionAdministrationWrite},
+	}, handlers.NewEnterpriseHandler(enterpriseService)))
+	mux.Handle("/api/administration/enterprise/scim-tokens/", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodDelete: {rbac.PermissionAdministrationWrite},
+	}, handlers.NewEnterpriseHandler(enterpriseService)))
+	mux.Handle("/api/administration/support-bundle", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodGet: {rbac.PermissionAdministrationRead},
+	}, handlers.NewEnterpriseHandler(enterpriseService)))
 	mux.Handle("/api/revisions/compile", withAuth(authService, rbac.PermissionRevisionsWrite, handlers.NewRevisionCompileHandler(revisionCompileService)))
-	mux.Handle("/api/revisions/", withAuth(authService, rbac.PermissionRevisionsWrite, handlers.NewRevisionApplyHandler(applyService, revisionCatalogService)))
+	mux.Handle("/api/revisions/", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodDelete: {rbac.PermissionRevisionsWrite},
+		http.MethodPost:   {rbac.PermissionRevisionsWrite},
+	}, handlers.NewRevisionApplyHandler(applyService, revisionCatalogService, enterpriseService)))
+	mux.Handle("/scim/v2/ServiceProviderConfig", handlers.NewSCIMHandler(enterpriseService))
+	mux.Handle("/scim/v2/Users", handlers.NewSCIMHandler(enterpriseService))
+	mux.Handle("/scim/v2/Users/", handlers.NewSCIMHandler(enterpriseService))
+	mux.Handle("/scim/v2/Groups", handlers.NewSCIMHandler(enterpriseService))
 
 	return &Server{
 		httpServer: &http.Server{

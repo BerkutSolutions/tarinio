@@ -18,6 +18,9 @@ func TestLoadFromEnv_Defaults(t *testing.T) {
 	if cfg.HTTPAddr == "" || cfg.RuntimeRoot == "" || cfg.RevisionStoreDir == "" {
 		t.Fatal("expected defaults to be populated")
 	}
+	if cfg.Redis.Addr != "" {
+		t.Fatalf("expected redis to be optional by default, got %q", cfg.Redis.Addr)
+	}
 	if !cfg.StartupSelfTest {
 		t.Fatal("expected startup self-test to be enabled by default")
 	}
@@ -54,6 +57,15 @@ func TestLoadFromEnv_InvalidAddr(t *testing.T) {
 	_, err := LoadFromEnv()
 	if err == nil {
 		t.Fatal("expected invalid addr error")
+	}
+}
+
+func TestLoadFromEnv_RequiresRedisOnlyInHA(t *testing.T) {
+	t.Setenv("CONTROL_PLANE_HA_ENABLED", "true")
+	t.Setenv("CONTROL_PLANE_REDIS_ADDR", "")
+	_, err := LoadFromEnv()
+	if err == nil {
+		t.Fatal("expected redis validation error when HA is enabled")
 	}
 }
 

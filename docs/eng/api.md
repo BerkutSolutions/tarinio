@@ -2,7 +2,7 @@
 
 This page belongs to the current documentation branch.
 
-This document describes the current control-plane HTTP API for version `2.0.5`. The catalog is aligned with the routes registered in `control-plane/internal/httpserver/server.go`.
+This document describes the current control-plane HTTP API for version `2.0.6`. The catalog is aligned with the routes registered in `control-plane/internal/httpserver/server.go`.
 
 ## General Rules
 
@@ -113,6 +113,9 @@ Also accepts the hourly auto-update toggle path used by the UI.
 - `POST /api/auth/bootstrap`
 - `POST /api/auth/login`
 - `POST /api/auth/login/2fa`
+- `GET /api/auth/providers`
+- `GET /api/auth/oidc/start`
+- `GET /api/auth/oidc/callback`
 - `POST /api/auth/logout`
 - `GET /api/auth/me`
 
@@ -260,7 +263,7 @@ Also accepts the hourly auto-update toggle path used by the UI.
 
 ### `GET /api/revisions`
 
-The new aggregated revision catalog in `2.0.5`.
+The new aggregated revision catalog in `2.0.6`.
 
 It powers the `Revisions` UI and returns:
 
@@ -276,6 +279,10 @@ Compiles a new revision.
 ### `POST /api/revisions/{revisionID}/apply`
 
 Applies the selected revision.
+
+### `POST /api/revisions/{revisionID}/approve`
+
+Approves a revision that is blocked by the configured approval workflow.
 
 ### `DELETE /api/revisions/{revisionID}`
 
@@ -341,6 +348,25 @@ Runs a registered administrative script with input values.
 ### `GET /api/administration/scripts/runs/{runID}/download`
 
 Downloads the archived execution result.
+
+### Enterprise Administration
+
+- `GET /api/administration/enterprise`
+- `PUT /api/administration/enterprise`
+- `POST /api/administration/enterprise/scim-tokens`
+- `DELETE /api/administration/enterprise/scim-tokens/{id}`
+- `GET /api/administration/support-bundle`
+
+### SCIM
+
+- `GET /scim/v2/ServiceProviderConfig`
+- `GET /scim/v2/Users`
+- `POST /scim/v2/Users`
+- `GET /scim/v2/Users/{id}`
+- `PUT /scim/v2/Users/{id}`
+- `PATCH /scim/v2/Users/{id}`
+- `DELETE /scim/v2/Users/{id}`
+- `GET /scim/v2/Groups`
 
 ## API-To-UI Mapping
 

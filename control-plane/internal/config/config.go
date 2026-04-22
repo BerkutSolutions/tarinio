@@ -133,7 +133,10 @@ func LoadFromEnv() (Config, error) {
 			RetryDelaySeconds: 2,
 			MaxAttempts:       30,
 		},
-		Redis: redis.DefaultConfig(),
+		Redis: redis.Config{
+			DB:          redis.DefaultConfig().DB,
+			DialTimeout: redis.DefaultConfig().DialTimeout,
+		},
 		HA: HAConfig{
 			Enabled:                 false,
 			NodeID:                  hostnameOrDefault("waf-control-plane"),
@@ -390,10 +393,10 @@ func validate(cfg Config) error {
 			return fmt.Errorf("dev fast start upstream port must be between 1 and 65535")
 		}
 	}
-	if strings.TrimSpace(cfg.Redis.Addr) == "" {
-		return fmt.Errorf("redis addr is required")
-	}
 	if cfg.HA.Enabled {
+		if strings.TrimSpace(cfg.Redis.Addr) == "" {
+			return fmt.Errorf("redis addr is required when ha is enabled")
+		}
 		if strings.TrimSpace(cfg.HA.NodeID) == "" {
 			return fmt.Errorf("ha node id is required when ha is enabled")
 		}

@@ -152,6 +152,12 @@ is_placeholder_secret() {
 
 ensure_secure_env_defaults() {
   changed=0
+  needs_clickhouse=0
+  case "$PROFILE" in
+    enterprise|ha-lab)
+      needs_clickhouse=1
+      ;;
+  esac
 
   postgres_user="$(read_env_value POSTGRES_USER)"
   postgres_db="$(read_env_value POSTGRES_DB)"
@@ -177,7 +183,7 @@ ensure_secure_env_defaults() {
     changed=1
     ok "generated secure POSTGRES_PASSWORD"
   fi
-  if is_placeholder_secret "$clickhouse_password"; then
+  if [ "$needs_clickhouse" -eq 1 ] && is_placeholder_secret "$clickhouse_password"; then
     clickhouse_password="$(generate_secret 40)"
     write_env_value CLICKHOUSE_PASSWORD "$clickhouse_password"
     changed=1

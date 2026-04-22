@@ -170,11 +170,11 @@ func normalizeRoutingDefaults(input *Settings) {
 		!input.Routing.WriteActivityToHot && !input.Routing.WriteActivityToCold &&
 		!input.Routing.KeepLocalFallback {
 		input.Routing.WriteRequestsToHot = input.Hot.Backend == BackendOpenSearch
-		input.Routing.WriteRequestsToCold = input.Cold.Backend == BackendClickHouse
+		input.Routing.WriteRequestsToCold = input.Cold.Backend == BackendClickHouse || (input.Cold.Backend == BackendOpenSearch && input.Hot.Backend != BackendOpenSearch)
 		input.Routing.WriteEventsToHot = input.Hot.Backend == BackendOpenSearch
-		input.Routing.WriteEventsToCold = input.Cold.Backend == BackendClickHouse
+		input.Routing.WriteEventsToCold = input.Cold.Backend == BackendClickHouse || (input.Cold.Backend == BackendOpenSearch && input.Hot.Backend != BackendOpenSearch)
 		input.Routing.WriteActivityToHot = input.Hot.Backend == BackendOpenSearch
-		input.Routing.WriteActivityToCold = input.Cold.Backend == BackendClickHouse
+		input.Routing.WriteActivityToCold = input.Cold.Backend == BackendClickHouse || (input.Cold.Backend == BackendOpenSearch && input.Hot.Backend != BackendOpenSearch)
 		input.Routing.KeepLocalFallback = true
 	}
 }
@@ -209,6 +209,8 @@ func normalizeColdBackend(value string) string {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case BackendClickHouse:
 		return BackendClickHouse
+	case BackendOpenSearch:
+		return BackendOpenSearch
 	case BackendFile:
 		return BackendFile
 	default:
@@ -243,6 +245,8 @@ func legacyColdBackend(backend string) string {
 	switch backend {
 	case BackendClickHouse:
 		return BackendClickHouse
+	case BackendOpenSearch:
+		return BackendOpenSearch
 	default:
 		return BackendFile
 	}
@@ -294,13 +298,13 @@ func MaskSecrets(input Settings) Settings {
 	if strings.TrimSpace(out.OpenSearch.PasswordEnc) != "" {
 		out.OpenSearch.Password = MaskedSecretValue
 	}
-	if EnabledVault(out) && out.Hot.Backend == BackendOpenSearch {
+	if EnabledVault(out) && (out.Hot.Backend == BackendOpenSearch || out.Cold.Backend == BackendOpenSearch) {
 		out.OpenSearch.Password = MaskedSecretValue
 	}
 	if strings.TrimSpace(out.OpenSearch.APIKeyEnc) != "" {
 		out.OpenSearch.APIKey = MaskedSecretValue
 	}
-	if EnabledVault(out) && out.Hot.Backend == BackendOpenSearch {
+	if EnabledVault(out) && (out.Hot.Backend == BackendOpenSearch || out.Cold.Backend == BackendOpenSearch) {
 		out.OpenSearch.APIKey = MaskedSecretValue
 	}
 	if strings.TrimSpace(out.Vault.TokenEnc) != "" {
@@ -320,7 +324,7 @@ func EnabledClickHouse(input Settings) bool {
 
 func EnabledOpenSearch(input Settings) bool {
 	normalized := Normalize(input)
-	return normalized.Hot.Backend == BackendOpenSearch && normalized.OpenSearch.Endpoint != ""
+	return (normalized.Hot.Backend == BackendOpenSearch || normalized.Cold.Backend == BackendOpenSearch) && normalized.OpenSearch.Endpoint != ""
 }
 
 func EnabledVault(input Settings) bool {

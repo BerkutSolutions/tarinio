@@ -1,36 +1,65 @@
-## [2.0.5] - 22.04.2026
+## [2.0.6] - 22.04.2026
 
-### Архитектура логгирования
-- Добавлена двухуровневая модель хранения логов: `OpenSearch` используется как hot storage для поиска, расследований и alert-ready сценариев, а `ClickHouse` — как cold storage для долгосрочной аналитики, отчётов и antifraud/ML-пайплайнов.
-- Runtime теперь умеет безопасно работать с hot/cold-моделью без поломки старых standalone-установок: локальный файловый архив остаётся fallback-контуром, а исторические данные могут мигрировать из `OpenSearch` в `ClickHouse`.
-- По умолчанию основной backend логгирования переведён на `OpenSearch`, cold backend — на `ClickHouse`, а политика хранения жёстко ограничена: hot не больше `30` дней, cold не больше `730` дней.
+### Архитектура развёртывания
+- Профиль `deploy/compose/default` упрощён до standalone-контура без `Redis` и `ClickHouse`: по умолчанию используются `PostgreSQL`, `OpenSearch`, `Vault`, `runtime`, `ui` и `ddos-model`.
+- Для full / HA-сценариев добавлен отдельный профиль `deploy/compose/enterprise` с многонодовым control-plane, `Redis`, `Vault`, `OpenSearch` и `ClickHouse`.
+- Добавлен отдельный AIO-сценарий `scripts/install-aio-enterprise.sh` для полной enterprise-версии.
 
-### Requests, Events и Activity
-- Раздел `Requests` адаптирован под tier-aware хранение и теперь показывает, какие hot/cold backend’ы активны и какое окно хранения применяется.
-- Разделы `Events` и `Activity` приведены к той же модели отображения и получили привязку к активной архитектуре логгирования.
-- В настройках индексов добавлено переключение потоков `requests / events / activity`, а очистка индексов теперь поддерживается не только для запросов, но и для hot-индексов `OpenSearch` по событиям и активности.
-- Добавлены тесты, проверяющие миграцию старых request-данных из `OpenSearch` в `ClickHouse`, включая сценарий с историческими записями трёхмесячной давности.
+### Логгирование и хранение
+- Standalone-модель логгирования переведена на `OpenSearch` как backend по умолчанию для hot и cold хранения, если `ClickHouse` не подключён.
+- `ClickHouse` сохранён как отдельный cold analytics tier для enterprise-профиля и HA-сценариев.
+- Runtime и control-plane синхронизированы с OpenSearch-only режимом без деградации старой логики и без поломки fallback-контуров.
+- `Requests` переведён на backend-first модель: основным источником чтения стал API/runtime с `OpenSearch`, а локальный JSONL-архив больше не используется как пользовательский read-path через `ui/nginx`.
+- Локальный request archive сохранён как transient spool и recovery/fallback-слой, а не как основная база запросов для интерфейса.
 
-### Секреты и Vault
-- `HashiCorp Vault` вынесен в отдельный полноценный контур управления секретами логгирования и стал провайдером секретов по умолчанию для enterprise-режима.
-- Секреты `OpenSearch` и `ClickHouse` теперь могут храниться либо в локальном зашифрованном persisted state, либо в `Vault`, при этом API и UI больше не возвращают их в открытом виде.
-- Runtime умеет читать секреты backend’ов из `Vault` во время работы, а для этого контура добавлены отдельные тесты разрешения секретов.
-- Профиль `deploy/compose/default` теперь автоматически инициализирует, unseal-ит и подготавливает `Vault` для standalone-развёртывания, монтируя bootstrap token в `control-plane` и `runtime` через отдельный secret-volume.
+### Миграции и совместимость
+- Усилена миграция legacy request-данных: перед удалением старых записей теперь выполняется проверка, что данные реально появились в целевом хранилище.
+- Импорт старого локального request-архива теперь также валидируется до фиксации состояния миграции.
+- Standalone fallback с локальным файловым архивом продолжает работать даже при отключённом `ClickHouse`.
+- Добавлена verified-миграция legacy `*.jsonl` day-архивов в `OpenSearch` для безопасного обновления с `2.0.5`: сначала import, потом проверка по backend, потом очистка подтверждённого legacy-файла.
 
-### Интерфейс и настройки
-- Во вкладке `Настройки` переработана конфигурация логгирования: `Секреты и Vault` вынесены в отдельную вкладку `Секреты`.
-- Во вкладке `Хранение` добавлены отдельные поля для настройки hot/cold retention окон и лимитов индексов для `OpenSearch` и `ClickHouse`.
-- Убраны вводящие в заблуждение тексты про автоматическую ретенцию и локальный архив запросов, а UI синхронизирован с новой моделью hot/cold tiers.
-- Исправлены связанные UI-регрессии и контрактные проверки для новой структуры настроек.
-- Глобальный язык из раздела `Настройки` снова работает как общий default для всего приложения, а в `Профиле` добавлена персональная языковая настройка пользователя, которая хранится на сервере и не зависит от cookie/localStorage.
-- Внутренний management-трафик (`/api/*`, `/static/*`, `/login`, `/setup`, `/onboarding` на localhost/control-plane) исключён из request-архива, burst-аналитики и dashboard-виджетов, чтобы служебные запросы не раздували статистику и не создавали шум вроде `_global`.
+### Control-plane и координация
+- `Redis` больше не обязателен для standalone и используется только там, где действительно нужен для HA-координации, leader election и сериализации ревизий.
+- Конфигурация control-plane обновлена так, чтобы single-node установка не зависела от `Redis`, а HA по-прежнему требовал явный coordinator backend.
 
-### Развёртывание и совместимость
-- Профиль `deploy/compose/default` продолжает работать с новой архитектурой хранения и секретов, сохраняя обратную совместимость со старыми установками.
-- Если новые backend’ы или секретные интеграции ещё не настроены, система не переходит в нерабочее состояние и продолжает использовать безопасный fallback.
-- Обновлён `Сборщик событий WAF`: он собирает диагностику по `OpenSearch`, `ClickHouse`, `Vault`, runtime settings, индексам и сценариям `200 OK` без upstream.
+### Enterprise identity и доступ
+- Добавлен enterprise-контур идентификации с `OIDC`-входом через `/api/auth/providers`, `/api/auth/oidc/start` и `/api/auth/oidc/callback`.
+- Добавлен `SCIM 2.0` provisioning через `/scim/v2/*` с bearer-токенами, которые выпускаются и отзываются из раздела `Администрирование`.
+- Пользователи теперь хранят `auth_source`, `external_id`, `external_groups` и `last_synced_at`, что позволяет безопасно связывать локальные записи с внешними identity-источниками.
+- Реализован маппинг внешних групп в локальные роли через enterprise settings для сценариев `OIDC` и `SCIM`, включая LDAP/AD-backed группы, приходящие из внешнего identity provider.
+
+### Approval workflow и ревизии
+- Для ревизий добавлена approval policy с настраиваемым числом подтверждений, запретом self-approval и выделенными reviewer-ролями.
+- Ревизии могут переходить в `pending_approval`, а apply блокируется до достижения требуемого порога подтверждений.
+- В каталоге ревизий теперь видны compiled-by metadata, approval status, approvals, approved-at и подпись manifest-полей ревизии.
+- Добавлен маршрут `POST /api/revisions/{revisionID}/approve` и UI-действие подтверждения ревизии.
+
+### Аудит, доказательства и release artifacts
+- Audit log стал tamper-evident: каждое audit-событие теперь хранит `prev_hash` и `hash`, образуя проверяемую цепочку.
+- При compile ревизии подписываются её ключевые manifest-поля, а подпись и key ID сохраняются в metadata ревизии.
+- Добавлен signed support bundle через `/api/administration/support-bundle`: архив содержит `manifest.json`, `signature.json`, публичный ключ, audits, events, jobs и revisions.
+- Manifest support bundle теперь включает `sha256` файлов, summary по audit chain и количество подписанных ревизий.
+- Добавлена генерация release artifacts в `build/release/<version>/`: `release-manifest.json`, `signature.json`, `checksums.txt`, `sbom.cdx.json`, `provenance.json` и `release-public-key.pem`.
+- `scripts/release.ps1` теперь обязательно генерирует signed release artifacts до публикации.
+
+### Интерфейс и API
+- В экране входа добавлена кнопка enterprise SSO, которая автоматически появляется при включённом `OIDC`.
+- В разделе `Администрирование` появился отдельный enterprise-блок для `OIDC`, `SCIM`, approval policy и signed support bundle.
+- Раздел `Ревизии` теперь показывает статус согласования, автора compile, количество approvals и даёт approve без ручной работы вне интерфейса.
+- API-документация дополнена enterprise-маршрутами, approval flow и SCIM surface.
+- UI-запросы на `/api/requests` переведены на JSON API-ответ и больше не зависят от прямого чтения локального request archive через reverse proxy.
+
+### Healthcheck и эксплуатация
+- Классификация container log issues обновлена так, чтобы healthcheck не поднимал ложные предупреждения по штатным startup-сообщениям `OpenSearch`, `JDK` и single-node plugin noise.
+- Убраны ложные `error`-срабатывания на строках `JVM arguments`, `ErrorFile` и `ShowCodeDetailsInExceptionMessages` в логах `OpenSearch`.
+- Для `ui` отключено временное файловое буферизование ответа на маршруте fallback `/api/requests`, чтобы `nginx` не создавал `proxy_temp` warning при чтении крупных архивных ответов.
+- Маршрут `/api/requests` в `ui/nginx` упрощён до прямого API-proxy без попытки отдавать legacy-файл как первичный источник данных.
+- Профиль `deploy/compose/default` повторно проверен через `docker compose up -d --build`: `control-plane`, `runtime`, `ui`, `postgres`, `opensearch`, `vault` и `ddos-model` поднимаются в статусе `healthy`.
 
 ### Документация и качество
-- Существенно расширены документы по архитектуре логгирования и управлению секретами, чтобы они были полезны не только как overview, но и как операторские инструкции.
-- Версия продукта, интерфейса, документации и release metadata синхронизирована на `2.0.5`.
+- Добавлены полноценные документы по enterprise identity и evidence/release model в обеих ветках документации.
+- Документация обновлена так, чтобы прямо отражать реальное поведение `OIDC`, `SCIM`, approval workflow, audit chain, support bundle и release artifacts.
+- В release/docs consistency test добавлены проверки на наличие enterprise-документов и на обязательную генерацию release artifacts в `scripts/release.ps1`.
+- Добавлены регрессионные тесты на фильтрацию benign container log issues для `OpenSearch` и на сохранение детекта реальных ошибок.
 - Полный прогон `go test ./...` проходит успешно.
+- `npm run docs:build` проходит успешно.

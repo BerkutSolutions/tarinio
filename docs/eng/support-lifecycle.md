@@ -30,7 +30,7 @@ The support baseline assumes:
 
 ## Upgrade Safety Baseline
 
-TARINIO `2.0.5` expects upgrades to be safe because:
+TARINIO `2.0.6` expects upgrades to be safe because:
 
 - the AIO installer takes lightweight backups before upgrade;
 - PostgreSQL-backed state migrations are versioned;
@@ -62,4 +62,18 @@ For enterprise-style usage:
 - promote through lab -> preprod -> prod;
 - keep the HA lab as a rehearsal environment;
 - treat upgrade validation as mandatory change control;
-- archive release notes and benchmark results with each promotion.
+- archive release notes and benchmark results with each promotion;
+- archive `release-manifest.json`, `signature.json`, `sbom.cdx.json`, and `provenance.json` with each promoted build.
+
+## Release Evidence In 2.0.6
+
+The release workflow now generates signed release artifacts in `build/release/<version>/`.
+
+These artifacts are meant to travel with the promoted release:
+
+- `release-manifest.json`
+- `signature.json`
+- `checksums.txt`
+- `sbom.cdx.json`
+- `provenance.json`
+- `release-public-key.pem`

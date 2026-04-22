@@ -11,7 +11,6 @@ services:
       CONTROL_PLANE_HTTP_ADDR: 0.0.0.0:8080
       WAF_RUNTIME_ROOT: /var/lib/waf
       CONTROL_PLANE_SECURITY_PEPPER: ${CONTROL_PLANE_SECURITY_PEPPER:-waf-dev-pepper-change-me}
-      CONTROL_PLANE_REDIS_ADDR: redis:6379
       WAF_RUNTIME_HEALTH_URL: http://runtime:8081/readyz
       WAF_RUNTIME_RELOAD_URL: http://runtime:8081/reload
       WAF_RUNTIME_API_TOKEN: ${WAF_RUNTIME_API_TOKEN:-default-runtime-shared-token}
@@ -68,8 +67,6 @@ services:
     expose:
       - "8080"
     depends_on:
-      redis:
-        condition: service_healthy
       postgres:
         condition: service_healthy
       opensearch:
@@ -137,18 +134,6 @@ services:
     networks:
       - waf-net
 
-  redis:
-    image: redis:7-alpine
-    container_name: tarinio-redis
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - waf-net
-
   postgres:
     image: postgres:15
     container_name: tarinio-postgres
@@ -165,24 +150,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - waf-net
-
-  clickhouse:
-    image: clickhouse/clickhouse-server:24.8
-    container_name: tarinio-clickhouse
-    restart: unless-stopped
-    environment:
-      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-waf_logs}
-      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-waf}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-change-me-clickhouse-password}
-    volumes:
-      - waf-clickhouse-data:/var/lib/clickhouse
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8123/ping | grep -q Ok"]
-      interval: 15s
-      timeout: 5s
-      retries: 10
     networks:
       - waf-net
 
@@ -330,8 +297,6 @@ volumes:
     name: ${WAF_STACK_NAME:-waf}-nginx-logs
   waf-request-archive-data:
     name: ${WAF_STACK_NAME:-waf}-request-archive-data
-  waf-clickhouse-data:
-    name: ${WAF_STACK_NAME:-waf}-clickhouse-data
   waf-opensearch-data:
     name: ${WAF_STACK_NAME:-waf}-opensearch-data
   waf-vault-data:

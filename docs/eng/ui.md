@@ -2,7 +2,7 @@
 
 This page belongs to the current documentation branch.
 
-This document describes the real TARINIO administrative interface for version `2.0.5`: login, onboarding, healthcheck, the sidebar sections, and the practical workflows behind each screen.
+This document describes the real TARINIO administrative interface for version `2.0.6`: login, onboarding, healthcheck, the sidebar sections, and the practical workflows behind each screen.
 
 ## Interface Map
 
@@ -39,6 +39,7 @@ The login screen supports:
 
 - username and password login;
 - passkey login;
+- enterprise `OIDC` login when enabled;
 - automatic redirect to `2FA` when the account requires a second factor;
 - redirect to onboarding when the system is not bootstrapped yet.
 
@@ -345,7 +346,7 @@ Typical use cases:
 
 ## Revisions
 
-This is the core change-management screen in `2.0.5`.
+This is the core change-management screen in `2.0.6`.
 
 It includes:
 
@@ -409,6 +410,7 @@ It includes:
 - explicit edit actions for accounts and roles;
 - creation of new users and roles in-place from the same screen;
 - a role editor with grouped permission selection;
+- an `Enterprise` panel for `OIDC`, `SCIM`, approval policy, and support evidence;
 - the existing catalog of administrative scripts and downloadable run archives.
 
 Operational rules:
@@ -416,6 +418,7 @@ Operational rules:
 - the built-in `admin` account always keeps full access;
 - base role templates now include `auditor`, `manager`, and `soc`;
 - access to UI sections is enforced by server-side zero-trust permissions, not only by frontend visibility.
+- enterprise group mappings are configured from the same screen and apply to external identities coming from `OIDC` and `SCIM`.
 
 ## Activity
 
@@ -523,3 +526,4 @@ Across the application, TARINIO uses:
 3. Use `Requests` for request-level detail.
 4. Use `Bans` for block decisions and manual intervention.
 5. Use `Activity` to understand whether the incident overlaps with a recent administrative change.
+6. Export a signed support bundle from `Administration -> Enterprise` when evidence needs to leave the system.

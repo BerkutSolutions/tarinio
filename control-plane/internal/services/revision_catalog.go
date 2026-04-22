@@ -75,22 +75,30 @@ type RevisionCatalogSite struct {
 }
 
 type RevisionCatalogItem struct {
-	ID               string                `json:"id"`
-	Version          int                   `json:"version"`
-	CreatedAt        string                `json:"created_at"`
-	Status           string                `json:"status"`
-	Checksum         string                `json:"checksum"`
-	IsActive         bool                  `json:"is_active"`
-	Sites            []RevisionCatalogSite `json:"sites"`
-	SiteCount        int                   `json:"site_count"`
-	LastApplyJobID   string                `json:"last_apply_job_id,omitempty"`
-	LastApplyStatus  string                `json:"last_apply_status,omitempty"`
-	LastApplyResult  string                `json:"last_apply_result,omitempty"`
-	LastApplyAt      string                `json:"last_apply_at,omitempty"`
-	LastEventType    string                `json:"last_event_type,omitempty"`
-	LastEventTime    string                `json:"last_event_time,omitempty"`
-	LastEventSummary string                `json:"last_event_summary,omitempty"`
-	SnapshotError    string                `json:"snapshot_error,omitempty"`
+	ID                string                     `json:"id"`
+	Version           int                        `json:"version"`
+	CreatedAt         string                     `json:"created_at"`
+	Status            string                     `json:"status"`
+	Checksum          string                     `json:"checksum"`
+	IsActive          bool                       `json:"is_active"`
+	CompiledByUserID  string                     `json:"compiled_by_user_id,omitempty"`
+	CompiledByName    string                     `json:"compiled_by_name,omitempty"`
+	ApprovalStatus    string                     `json:"approval_status,omitempty"`
+	RequiredApprovals int                        `json:"required_approvals,omitempty"`
+	Approvals         []revisions.ApprovalRecord `json:"approvals,omitempty"`
+	ApprovedAt        string                     `json:"approved_at,omitempty"`
+	Signature         string                     `json:"signature,omitempty"`
+	SignatureKeyID    string                     `json:"signature_key_id,omitempty"`
+	Sites             []RevisionCatalogSite      `json:"sites"`
+	SiteCount         int                        `json:"site_count"`
+	LastApplyJobID    string                     `json:"last_apply_job_id,omitempty"`
+	LastApplyStatus   string                     `json:"last_apply_status,omitempty"`
+	LastApplyResult   string                     `json:"last_apply_result,omitempty"`
+	LastApplyAt       string                     `json:"last_apply_at,omitempty"`
+	LastEventType     string                     `json:"last_event_type,omitempty"`
+	LastEventTime     string                     `json:"last_event_time,omitempty"`
+	LastEventSummary  string                     `json:"last_event_summary,omitempty"`
+	SnapshotError     string                     `json:"snapshot_error,omitempty"`
 }
 
 type RevisionTimelineEntry struct {
@@ -250,12 +258,20 @@ func (s *RevisionCatalogService) List(_ context.Context) (RevisionCatalogRespons
 			summary.FailedRevisions++
 		}
 		card := RevisionCatalogItem{
-			ID:        revision.ID,
-			Version:   revision.Version,
-			CreatedAt: revision.CreatedAt,
-			Status:    string(derivedStatus),
-			Checksum:  revision.Checksum,
-			IsActive:  activeExists && activeRevision.ID == revision.ID,
+			ID:                revision.ID,
+			Version:           revision.Version,
+			CreatedAt:         revision.CreatedAt,
+			Status:            string(derivedStatus),
+			Checksum:          revision.Checksum,
+			IsActive:          activeExists && activeRevision.ID == revision.ID,
+			CompiledByUserID:  revision.CompiledByUserID,
+			CompiledByName:    revision.CompiledByName,
+			ApprovalStatus:    string(revision.ApprovalStatus),
+			RequiredApprovals: revision.RequiredApprovals,
+			Approvals:         append([]revisions.ApprovalRecord(nil), revision.Approvals...),
+			ApprovedAt:        revision.ApprovedAt,
+			Signature:         revision.Signature,
+			SignatureKeyID:    revision.SignatureKeyID,
 		}
 		snapshot, loadErr := s.snapshots.Load(revision.BundlePath)
 		if loadErr != nil {
@@ -434,6 +450,9 @@ func deriveRevisionStatus(revision revisions.Revision, hasLastApplyJob bool, las
 	}
 	if revision.Status == revisions.StatusFailed {
 		return revisions.StatusFailed
+	}
+	if revision.ApprovalStatus == revisions.ApprovalPending {
+		return revisions.StatusPendingApproval
 	}
 	if hasLastApplyJob {
 		switch lastApplyJob.Status {

@@ -1,0 +1,556 @@
+services:
+  api-lb:
+    image: nginx:1.27-alpine
+    container_name: tarinio-ha-api-lb
+    restart: unless-stopped
+    depends_on:
+      control-plane-a:
+        condition: service_healthy
+      control-plane-b:
+        condition: service_healthy
+    volumes:
+      - ./api-lb/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      waf-ha-net:
+        aliases:
+          - control-plane
+    mem_limit: 128m
+    cpus: 0.25
+
+  control-plane-a:
+    build:
+      context: ../../..
+      dockerfile: control-plane/Dockerfile
+    container_name: tarinio-ha-control-plane-a
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      CONTROL_PLANE_HTTP_ADDR: 0.0.0.0:8080
+      CONTROL_PLANE_HA_ENABLED: ${CONTROL_PLANE_HA_ENABLED:-true}
+      CONTROL_PLANE_HA_NODE_ID: control-plane-a
+      CONTROL_PLANE_HA_OPERATION_LOCK_TTL_SECONDS: ${CONTROL_PLANE_HA_OPERATION_LOCK_TTL_SECONDS:-180}
+      CONTROL_PLANE_HA_LEADER_LOCK_TTL_SECONDS: ${CONTROL_PLANE_HA_LEADER_LOCK_TTL_SECONDS:-45}
+      WAF_RUNTIME_ROOT: /var/lib/waf
+      CONTROL_PLANE_REDIS_ADDR: redis:6379
+      CONTROL_PLANE_SECURITY_PEPPER: ${CONTROL_PLANE_SECURITY_PEPPER:-waf-dev-pepper-change-me}
+      CONTROL_PLANE_METRICS_TOKEN: ${CONTROL_PLANE_METRICS_TOKEN:-ha-lab-metrics}
+      WAF_RUNTIME_HEALTH_URL: http://runtime:8081/readyz
+      WAF_RUNTIME_RELOAD_URL: http://runtime:8081/reload
+      WAF_RUNTIME_API_TOKEN: ${WAF_RUNTIME_API_TOKEN:-ha-lab-runtime-shared-token}
+      POSTGRES_DSN: postgres://${POSTGRES_USER:-waf}:${POSTGRES_PASSWORD:-waf}@postgres:5432/${POSTGRES_DB:-waf}?sslmode=disable
+      CLICKHOUSE_ENDPOINT: ${CLICKHOUSE_ENDPOINT:-http://clickhouse:8123}
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-waf_logs}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-waf}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-change-me-clickhouse-password}
+      OPENSEARCH_ENDPOINT: ${OPENSEARCH_ENDPOINT:-http://opensearch:9200}
+      OPENSEARCH_USERNAME: ${OPENSEARCH_USERNAME:-admin}
+      OPENSEARCH_PASSWORD: ${OPENSEARCH_PASSWORD:-change-me-opensearch-password}
+      OPENSEARCH_INDEX_PREFIX: ${OPENSEARCH_INDEX_PREFIX:-waf-hot}
+      VAULT_ENABLED: ${VAULT_ENABLED:-true}
+      VAULT_ADDR: ${VAULT_ADDR:-http://vault:8200}
+      VAULT_MOUNT: ${VAULT_MOUNT:-secret}
+      VAULT_PATH_PREFIX: ${VAULT_PATH_PREFIX:-tarinio}
+      VAULT_TOKEN: ${VAULT_TOKEN:-}
+      VAULT_TOKEN_FILE: /var/run/waf-secrets/root-token
+    volumes:
+      - waf-ha-runtime-data:/var/lib/waf
+      - waf-ha-control-plane-data:/var/lib/waf/control-plane
+      - waf-ha-certificates-data:/var/lib/waf/control-plane/certificate-materials
+      - waf-ha-vault-bootstrap-data:/var/run/waf-secrets:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    expose:
+      - "8080"
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - waf-ha-net
+    mem_limit: 1024m
+    cpus: 1.0
+
+  control-plane-b:
+    build:
+      context: ../../..
+      dockerfile: control-plane/Dockerfile
+    container_name: tarinio-ha-control-plane-b
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      CONTROL_PLANE_HTTP_ADDR: 0.0.0.0:8080
+      CONTROL_PLANE_HA_ENABLED: ${CONTROL_PLANE_HA_ENABLED:-true}
+      CONTROL_PLANE_HA_NODE_ID: control-plane-b
+      CONTROL_PLANE_HA_OPERATION_LOCK_TTL_SECONDS: ${CONTROL_PLANE_HA_OPERATION_LOCK_TTL_SECONDS:-180}
+      CONTROL_PLANE_HA_LEADER_LOCK_TTL_SECONDS: ${CONTROL_PLANE_HA_LEADER_LOCK_TTL_SECONDS:-45}
+      WAF_RUNTIME_ROOT: /var/lib/waf
+      CONTROL_PLANE_REDIS_ADDR: redis:6379
+      CONTROL_PLANE_SECURITY_PEPPER: ${CONTROL_PLANE_SECURITY_PEPPER:-waf-dev-pepper-change-me}
+      CONTROL_PLANE_METRICS_TOKEN: ${CONTROL_PLANE_METRICS_TOKEN:-ha-lab-metrics}
+      WAF_RUNTIME_HEALTH_URL: http://runtime:8081/readyz
+      WAF_RUNTIME_RELOAD_URL: http://runtime:8081/reload
+      WAF_RUNTIME_API_TOKEN: ${WAF_RUNTIME_API_TOKEN:-ha-lab-runtime-shared-token}
+      POSTGRES_DSN: postgres://${POSTGRES_USER:-waf}:${POSTGRES_PASSWORD:-waf}@postgres:5432/${POSTGRES_DB:-waf}?sslmode=disable
+      CLICKHOUSE_ENDPOINT: ${CLICKHOUSE_ENDPOINT:-http://clickhouse:8123}
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-waf_logs}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-waf}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-change-me-clickhouse-password}
+      OPENSEARCH_ENDPOINT: ${OPENSEARCH_ENDPOINT:-http://opensearch:9200}
+      OPENSEARCH_USERNAME: ${OPENSEARCH_USERNAME:-admin}
+      OPENSEARCH_PASSWORD: ${OPENSEARCH_PASSWORD:-change-me-opensearch-password}
+      OPENSEARCH_INDEX_PREFIX: ${OPENSEARCH_INDEX_PREFIX:-waf-hot}
+      VAULT_ENABLED: ${VAULT_ENABLED:-true}
+      VAULT_ADDR: ${VAULT_ADDR:-http://vault:8200}
+      VAULT_MOUNT: ${VAULT_MOUNT:-secret}
+      VAULT_PATH_PREFIX: ${VAULT_PATH_PREFIX:-tarinio}
+      VAULT_TOKEN: ${VAULT_TOKEN:-}
+      VAULT_TOKEN_FILE: /var/run/waf-secrets/root-token
+    volumes:
+      - waf-ha-runtime-data:/var/lib/waf
+      - waf-ha-control-plane-data:/var/lib/waf/control-plane
+      - waf-ha-certificates-data:/var/lib/waf/control-plane/certificate-materials
+      - waf-ha-vault-bootstrap-data:/var/run/waf-secrets:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    expose:
+      - "8080"
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - waf-ha-net
+    mem_limit: 1024m
+    cpus: 1.0
+
+  runtime:
+    build:
+      context: ../../..
+      dockerfile: runtime/image/Dockerfile
+    container_name: tarinio-ha-runtime
+    restart: unless-stopped
+    depends_on:
+      ui:
+        condition: service_started
+    environment:
+      WAF_RUNTIME_ROOT: /var/lib/waf
+      WAF_REQUEST_ARCHIVE_ROOT: /var/lib/waf-request-archive
+      WAF_RUNTIME_HEALTH_ADDR: 0.0.0.0:8081
+      WAF_RUNTIME_API_TOKEN: ${WAF_RUNTIME_API_TOKEN:-ha-lab-runtime-shared-token}
+      WAF_RUNTIME_METRICS_TOKEN: ${WAF_RUNTIME_METRICS_TOKEN:-ha-lab-runtime-metrics}
+      CONTROL_PLANE_SECURITY_PEPPER: ${CONTROL_PLANE_SECURITY_PEPPER:-waf-dev-pepper-change-me}
+      CLICKHOUSE_ENDPOINT: ${CLICKHOUSE_ENDPOINT:-http://clickhouse:8123}
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-waf_logs}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-waf}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-change-me-clickhouse-password}
+      OPENSEARCH_ENDPOINT: ${OPENSEARCH_ENDPOINT:-http://opensearch:9200}
+      OPENSEARCH_USERNAME: ${OPENSEARCH_USERNAME:-admin}
+      OPENSEARCH_PASSWORD: ${OPENSEARCH_PASSWORD:-change-me-opensearch-password}
+      OPENSEARCH_INDEX_PREFIX: ${OPENSEARCH_INDEX_PREFIX:-waf-hot}
+      VAULT_ENABLED: ${VAULT_ENABLED:-true}
+      VAULT_ADDR: ${VAULT_ADDR:-http://vault:8200}
+      VAULT_MOUNT: ${VAULT_MOUNT:-secret}
+      VAULT_PATH_PREFIX: ${VAULT_PATH_PREFIX:-tarinio}
+      VAULT_TOKEN: ${VAULT_TOKEN:-}
+      VAULT_TOKEN_FILE: /var/run/waf-secrets/root-token
+      WAF_L4_GUARD_ADAPTIVE_PATH: /etc/waf/l4guard-adaptive/adaptive.json
+      WAF_L4_GUARD_REAPPLY_INTERVAL_SECONDS: ${WAF_L4_GUARD_REAPPLY_INTERVAL_SECONDS:-5}
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - waf-ha-runtime-data:/var/lib/waf:ro
+      - waf-ha-request-archive-data:/var/lib/waf-request-archive
+      - waf-ha-control-plane-data:/var/lib/waf/control-plane:ro
+      - waf-ha-nginx-logs:/var/log/nginx
+      - waf-ha-l4-adaptive:/etc/waf/l4guard-adaptive:ro
+      - waf-ha-vault-bootstrap-data:/var/run/waf-secrets:ro
+    ports:
+      - "${HA_WAF_HTTP_PORT:-18085}:80"
+      - "${HA_WAF_HTTPS_PORT:-18443}:443"
+    expose:
+      - "80"
+      - "8081"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8081/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - waf-ha-net
+    mem_limit: 1536m
+    cpus: 2.0
+
+  redis:
+    image: redis:7-alpine
+    container_name: tarinio-ha-redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - waf-ha-net
+    mem_limit: 256m
+    cpus: 0.5
+
+  postgres:
+    image: postgres:15
+    container_name: tarinio-ha-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-waf}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-waf}
+      POSTGRES_DB: ${POSTGRES_DB:-waf}
+      POSTGRES_INITDB_ARGS: ${POSTGRES_INITDB_ARGS:---auth-local=scram-sha-256 --auth-host=scram-sha-256 --locale=C.UTF-8}
+    volumes:
+      - waf-ha-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-waf} -d ${POSTGRES_DB:-waf}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - waf-ha-net
+    mem_limit: 1024m
+    cpus: 1.0
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    container_name: tarinio-ha-clickhouse
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-waf_logs}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-waf}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-change-me-clickhouse-password}
+    volumes:
+      - waf-ha-clickhouse-data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8123/ping | grep -q Ok"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    networks:
+      - waf-ha-net
+    mem_limit: 768m
+    cpus: 1.0
+
+  opensearch:
+    image: opensearchproject/opensearch:2.18.0
+    container_name: tarinio-ha-opensearch
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+      DISABLE_SECURITY_PLUGIN: "true"
+      OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
+    volumes:
+      - waf-ha-opensearch-data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "bash -lc 'exec 3<>/dev/tcp/127.0.0.1/9200'"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+    networks:
+      - waf-ha-net
+    mem_limit: 1024m
+    cpus: 1.0
+
+  vault:
+    image: hashicorp/vault:1.18
+    container_name: tarinio-ha-vault
+    restart: unless-stopped
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_LOCAL_CONFIG: |
+        ui = true
+        disable_mlock = true
+        storage "file" {
+          path = "/vault/file"
+        }
+        listener "tcp" {
+          address = "0.0.0.0:8200"
+          tls_disable = 1
+        }
+        api_addr = "http://vault:8200"
+      VAULT_BOOTSTRAP_DIR: /vault/bootstrap
+      VAULT_LOCAL_ADDR: http://127.0.0.1:8200
+      VAULT_MOUNT: ${VAULT_MOUNT:-secret}
+    entrypoint: ["/bin/sh", "/usr/local/bin/tarinio-vault-entrypoint"]
+    volumes:
+      - waf-ha-vault-data:/vault/file
+      - waf-ha-vault-bootstrap-data:/vault/bootstrap
+      - ./vault/entrypoint.sh:/usr/local/bin/tarinio-vault-entrypoint:ro
+    healthcheck:
+      test: ["CMD-SHELL", "vault status -address=http://127.0.0.1:8200 >/dev/null 2>&1; code=$$?; [ \"$$code\" = \"0\" ]"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+    networks:
+      - waf-ha-net
+    mem_limit: 512m
+    cpus: 0.5
+
+  ui:
+    build:
+      context: ../../..
+      dockerfile: ui/Dockerfile
+    container_name: tarinio-ha-ui
+    restart: unless-stopped
+    depends_on:
+      api-lb:
+        condition: service_healthy
+    ports:
+      - "${HA_UI_PORT:-18080}:80"
+    expose:
+      - "80"
+    healthcheck:
+      test: ["CMD-SHELL", "/bin/busybox wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - waf-ha-net
+    mem_limit: 256m
+    cpus: 0.5
+
+  ddos-model:
+    build:
+      context: ../../..
+      dockerfile: deploy/compose/default/ddos-model/Dockerfile
+    container_name: tarinio-ha-ddos-model
+    restart: unless-stopped
+    environment:
+      MODEL_LOG_PATH: /logs/access.log
+      MODEL_STATE_PATH: /state/model-state.json
+      MODEL_OUTPUT_PATH: /out/adaptive.json
+      MODEL_RUNTIME_ROOT: /var/lib/waf
+      MODEL_POLL_INTERVAL_SECONDS: ${DDOS_MODEL_POLL_INTERVAL_SECONDS:-2}
+      MODEL_DECAY_LAMBDA: ${DDOS_MODEL_DECAY_LAMBDA:-0.08}
+      MODEL_THROTTLE_THRESHOLD: ${DDOS_MODEL_THROTTLE_THRESHOLD:-2.5}
+      MODEL_DROP_THRESHOLD: ${DDOS_MODEL_DROP_THRESHOLD:-6.0}
+      MODEL_HOLD_SECONDS: ${DDOS_MODEL_HOLD_SECONDS:-60}
+      MODEL_THROTTLE_RATE_PER_SECOND: ${DDOS_MODEL_THROTTLE_RATE_PER_SECOND:-3}
+      MODEL_THROTTLE_BURST: ${DDOS_MODEL_THROTTLE_BURST:-6}
+      MODEL_THROTTLE_TARGET: ${DDOS_MODEL_THROTTLE_TARGET:-REJECT}
+      MODEL_WEIGHT_429: ${DDOS_MODEL_WEIGHT_429:-1.0}
+      MODEL_WEIGHT_403: ${DDOS_MODEL_WEIGHT_403:-1.8}
+      MODEL_WEIGHT_444: ${DDOS_MODEL_WEIGHT_444:-2.2}
+      MODEL_EMERGENCY_RPS: ${DDOS_MODEL_EMERGENCY_RPS:-180}
+      MODEL_EMERGENCY_UNIQUE_IPS: ${DDOS_MODEL_EMERGENCY_UNIQUE_IPS:-40}
+      MODEL_EMERGENCY_PER_IP_RPS: ${DDOS_MODEL_EMERGENCY_PER_IP_RPS:-60}
+      MODEL_WEIGHT_EMERGENCY_BOTNET: ${DDOS_MODEL_WEIGHT_EMERGENCY_BOTNET:-6.0}
+      MODEL_WEIGHT_EMERGENCY_SINGLE: ${DDOS_MODEL_WEIGHT_EMERGENCY_SINGLE:-4.0}
+    depends_on:
+      runtime:
+        condition: service_started
+    volumes:
+      - waf-ha-nginx-logs:/logs:ro
+      - waf-ha-runtime-data:/var/lib/waf:ro
+      - waf-ha-ddos-model-state:/state
+      - waf-ha-l4-adaptive:/out
+    healthcheck:
+      test: ["CMD-SHELL", "test -s /out/adaptive.json || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+    networks:
+      - waf-ha-net
+    mem_limit: 512m
+    cpus: 0.75
+
+  demo-app:
+    build:
+      context: ../../..
+      dockerfile: deploy/compose/enterprise/demo-app/Dockerfile
+    container_name: tarinio-ha-demo-app
+    restart: unless-stopped
+    expose:
+      - "80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - waf-ha-net
+    mem_limit: 128m
+    cpus: 0.25
+
+  toolbox:
+    build:
+      context: ../../..
+      dockerfile: deploy/compose/enterprise/toolbox/Dockerfile
+    container_name: tarinio-ha-toolbox
+    profiles:
+      - tools
+    environment:
+      BASE_URL: http://api-lb:8080
+      CONTROL_PLANE_BOOTSTRAP_ADMIN_USERNAME: ${CONTROL_PLANE_BOOTSTRAP_ADMIN_USERNAME:-admin}
+      CONTROL_PLANE_BOOTSTRAP_ADMIN_PASSWORD: ${CONTROL_PLANE_BOOTSTRAP_ADMIN_PASSWORD:-admin}
+    depends_on:
+      api-lb:
+        condition: service_healthy
+      runtime:
+        condition: service_healthy
+    networks:
+      - waf-ha-net
+    mem_limit: 256m
+    cpus: 0.5
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: tarinio-ha-prometheus
+    profiles:
+      - observability
+    restart: unless-stopped
+    depends_on:
+      control-plane-a:
+        condition: service_healthy
+      control-plane-b:
+        condition: service_healthy
+      runtime:
+        condition: service_healthy
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - waf-ha-prometheus-data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+    ports:
+      - "${HA_PROMETHEUS_PORT:-19090}:9090"
+    networks:
+      - waf-ha-net
+    mem_limit: 512m
+    cpus: 0.5
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: tarinio-ha-grafana
+    profiles:
+      - observability
+    restart: unless-stopped
+    depends_on:
+      prometheus:
+        condition: service_started
+    environment:
+      GF_SECURITY_ADMIN_USER: ${HA_GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${HA_GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - waf-ha-grafana-data:/var/lib/grafana
+    ports:
+      - "${HA_GRAFANA_PORT:-13000}:3000"
+    networks:
+      - waf-ha-net
+    mem_limit: 384m
+    cpus: 0.5
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.16.0
+    container_name: tarinio-ha-postgres-exporter
+    profiles:
+      - observability
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATA_SOURCE_NAME: postgresql://${POSTGRES_USER:-waf}:${POSTGRES_PASSWORD:-waf}@postgres:5432/${POSTGRES_DB:-waf}?sslmode=disable
+    expose:
+      - "9187"
+    networks:
+      - waf-ha-net
+    mem_limit: 128m
+    cpus: 0.25
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.62.0
+    container_name: tarinio-ha-redis-exporter
+    profiles:
+      - observability
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    command:
+      - --redis.addr=redis://redis:6379
+    expose:
+      - "9121"
+    networks:
+      - waf-ha-net
+    mem_limit: 96m
+    cpus: 0.25
+
+networks:
+  waf-ha-net:
+    name: waf-ha-net
+    ipam:
+      config:
+        - subnet: 172.31.0.0/24
+
+volumes:
+  waf-ha-runtime-data:
+    name: waf-ha-runtime-data
+  waf-ha-control-plane-data:
+    name: waf-ha-control-plane-data
+  waf-ha-certificates-data:
+    name: waf-ha-certificates-data
+  waf-ha-postgres-data:
+    name: waf-ha-postgres-data
+  waf-ha-nginx-logs:
+    name: waf-ha-nginx-logs
+  waf-ha-request-archive-data:
+    name: waf-ha-request-archive-data
+  waf-ha-l4-adaptive:
+    name: waf-ha-l4-adaptive
+  waf-ha-ddos-model-state:
+    name: waf-ha-ddos-model-state
+  waf-ha-clickhouse-data:
+    name: waf-ha-clickhouse-data
+  waf-ha-opensearch-data:
+    name: waf-ha-opensearch-data
+  waf-ha-vault-data:
+    name: waf-ha-vault-data
+  waf-ha-vault-bootstrap-data:
+    name: waf-ha-vault-bootstrap-data
+  waf-ha-prometheus-data:
+    name: waf-ha-prometheus-data
+  waf-ha-grafana-data:
+    name: waf-ha-grafana-data

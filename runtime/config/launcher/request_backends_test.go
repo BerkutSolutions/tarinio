@@ -156,9 +156,9 @@ func TestRequestBackendsResolveSecretsFromVault(t *testing.T) {
 		t.Fatalf("encrypt vault token: %v", err)
 	}
 	writeRuntimeSettingsFixture(t, settingsPath, pepper, loggingconfig.Settings{
-		Backend: loggingconfig.BackendOpenSearch,
-		Hot: loggingconfig.HotSettings{Backend: loggingconfig.BackendOpenSearch},
-		Cold: loggingconfig.ColdSettings{Backend: loggingconfig.BackendClickHouse},
+		Backend:        loggingconfig.BackendOpenSearch,
+		Hot:            loggingconfig.HotSettings{Backend: loggingconfig.BackendOpenSearch},
+		Cold:           loggingconfig.ColdSettings{Backend: loggingconfig.BackendClickHouse},
 		SecretProvider: loggingconfig.SecretProviderVault,
 		Vault: loggingconfig.VaultSettings{
 			Enabled:    true,
@@ -196,6 +196,203 @@ func TestRequestBackendsResolveSecretsFromVault(t *testing.T) {
 	}
 	if opensearchCfg.Password != "os-secret" || opensearchCfg.APIKey != "os-api" {
 		t.Fatalf("unexpected opensearch secrets from vault: password=%q api=%q", opensearchCfg.Password, opensearchCfg.APIKey)
+	}
+}
+
+func TestRequestStreamDefaultsToSingleOpenSearchWriteWhenColdMatchesHot(t *testing.T) {
+	root := t.TempDir()
+	settingsPath := filepath.Join(root, "runtime_settings.json")
+	writeRuntimeSettingsFixture(t, settingsPath, "", loggingconfig.Settings{
+		Backend: loggingconfig.BackendOpenSearch,
+		Hot: loggingconfig.HotSettings{
+			Backend: loggingconfig.BackendOpenSearch,
+		},
+		Cold: loggingconfig.ColdSettings{
+			Backend: loggingconfig.BackendOpenSearch,
+		},
+		Retention: loggingconfig.RetentionSettings{
+			HotDays:  loggingconfig.DefaultHotDays,
+			ColdDays: loggingconfig.DefaultColdDays,
+		},
+		OpenSearch: loggingconfig.OpenSearchSettings{
+			Endpoint:      "http://opensearch:9200",
+			RequestsIndex: "waf-requests",
+		},
+	})
+
+	source := newRequestStreamSource(
+		filepath.Join(root, "missing-access.log"),
+		100,
+		filepath.Join(root, "archive"),
+		loggingconfig.DefaultHotDays,
+		withRequestOpenSearch(settingsPath, ""),
+	)
+
+	settings := source.loadLoggingSettingsLocked()
+	if !settings.Routing.WriteRequestsToHot {
+		t.Fatal("expected hot writes to stay enabled for opensearch")
+	}
+	if settings.Routing.WriteRequestsToCold {
+		t.Fatal("expected cold writes to stay disabled when opensearch is both hot and cold backend")
+	}
+}
+
+func TestRequestStreamMigratesLegacyArchiveToOpenSearchAndRemovesOldFile(t *testing.T) {
+	pepper := "pepper-for-tests"
+	oldDay := time.Now().UTC().AddDate(0, 0, -2).Format("2006-01-02")
+	oldStamp := oldDay + "T11:12:13Z"
+
+	opensearch := newFakeOpenSearch(nil)
+	opensearchServer := httptest.NewServer(opensearch)
+	defer opensearchServer.Close()
+
+	root := t.TempDir()
+	archiveRoot := filepath.Join(root, "archive")
+	if err := os.MkdirAll(archiveRoot, 0o755); err != nil {
+		t.Fatalf("mkdir archive: %v", err)
+	}
+	legacyRow, err := json.Marshal(requestRecordToMap(requestLogRecord{
+		EventHash:    requestRecordHash(requestLogRecord{Stream: "runtime", Timestamp: oldStamp, RequestID: "req-legacy", ClientIP: "203.0.113.10", Method: "GET", URI: "/legacy", Status: 200, Site: "legacy", Host: "legacy.example.com"}),
+		Stream:       "runtime",
+		IngestedAt:   oldStamp,
+		Timestamp:    oldStamp,
+		RequestID:    "req-legacy",
+		ClientIP:     "203.0.113.10",
+		Method:       "GET",
+		URI:          "/legacy",
+		Status:       200,
+		Site:         "legacy",
+		Host:         "legacy.example.com",
+		UpstreamAddr: "10.0.0.1:80",
+	}))
+	if err != nil {
+		t.Fatalf("marshal legacy row: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(archiveRoot, oldDay+".jsonl"), append(legacyRow, '\n'), 0o644); err != nil {
+		t.Fatalf("write legacy archive: %v", err)
+	}
+
+	settingsPath := filepath.Join(root, "runtime_settings.json")
+	writeRuntimeSettingsFixture(t, settingsPath, pepper, loggingconfig.Settings{
+		Backend: loggingconfig.BackendOpenSearch,
+		Hot:     loggingconfig.HotSettings{Backend: loggingconfig.BackendOpenSearch},
+		Cold:    loggingconfig.ColdSettings{Backend: loggingconfig.BackendOpenSearch},
+		Retention: loggingconfig.RetentionSettings{
+			HotDays:  loggingconfig.DefaultHotDays,
+			ColdDays: loggingconfig.DefaultColdDays,
+		},
+		Routing: loggingconfig.RoutingSettings{
+			WriteRequestsToHot: true,
+			KeepLocalFallback:  true,
+		},
+		OpenSearch: loggingconfig.OpenSearchSettings{
+			Endpoint:      opensearchServer.URL,
+			RequestsIndex: "waf-requests",
+		},
+	})
+
+	source := newRequestStreamSource(
+		filepath.Join(root, "missing-access.log"),
+		100,
+		archiveRoot,
+		loggingconfig.DefaultHotDays,
+		withRequestOpenSearch(settingsPath, pepper),
+	)
+
+	if err := source.probe(url.Values{}); err != nil {
+		t.Fatalf("probe failed: %v", err)
+	}
+	if got := opensearch.recordCount(); got != 1 {
+		t.Fatalf("expected migrated row in opensearch, got %d", got)
+	}
+	if _, err := os.Stat(filepath.Join(archiveRoot, oldDay+".jsonl")); !os.IsNotExist(err) {
+		t.Fatalf("expected legacy archive file to be removed after verified migration, stat err=%v", err)
+	}
+	state, err := loadRequestMigrationState(filepath.Join(archiveRoot, requestOpenSearchMigrationStateFile))
+	if err != nil {
+		t.Fatalf("load opensearch migration state: %v", err)
+	}
+	if _, ok := state.ImportedDays[oldDay]; !ok {
+		t.Fatalf("expected imported day %s in migration state", oldDay)
+	}
+}
+
+func TestRequestStreamKeepsLegacyArchiveWhenOpenSearchValidationFails(t *testing.T) {
+	pepper := "pepper-for-tests"
+	oldDay := time.Now().UTC().AddDate(0, 0, -2).Format("2006-01-02")
+	oldStamp := oldDay + "T11:12:13Z"
+
+	opensearch := newFakeOpenSearchWithoutPersist(nil)
+	opensearchServer := httptest.NewServer(opensearch)
+	defer opensearchServer.Close()
+
+	root := t.TempDir()
+	archiveRoot := filepath.Join(root, "archive")
+	if err := os.MkdirAll(archiveRoot, 0o755); err != nil {
+		t.Fatalf("mkdir archive: %v", err)
+	}
+	record := requestLogRecord{
+		Stream:       "runtime",
+		IngestedAt:   oldStamp,
+		Timestamp:    oldStamp,
+		RequestID:    "req-legacy",
+		ClientIP:     "203.0.113.10",
+		Method:       "GET",
+		URI:          "/legacy",
+		Status:       200,
+		Site:         "legacy",
+		Host:         "legacy.example.com",
+		UpstreamAddr: "10.0.0.1:80",
+	}
+	record.EventHash = requestRecordHash(record)
+	legacyRow, err := json.Marshal(requestRecordToMap(record))
+	if err != nil {
+		t.Fatalf("marshal legacy row: %v", err)
+	}
+	legacyPath := filepath.Join(archiveRoot, oldDay+".jsonl")
+	if err := os.WriteFile(legacyPath, append(legacyRow, '\n'), 0o644); err != nil {
+		t.Fatalf("write legacy archive: %v", err)
+	}
+
+	settingsPath := filepath.Join(root, "runtime_settings.json")
+	writeRuntimeSettingsFixture(t, settingsPath, pepper, loggingconfig.Settings{
+		Backend: loggingconfig.BackendOpenSearch,
+		Hot:     loggingconfig.HotSettings{Backend: loggingconfig.BackendOpenSearch},
+		Cold:    loggingconfig.ColdSettings{Backend: loggingconfig.BackendOpenSearch},
+		Retention: loggingconfig.RetentionSettings{
+			HotDays:  loggingconfig.DefaultHotDays,
+			ColdDays: loggingconfig.DefaultColdDays,
+		},
+		Routing: loggingconfig.RoutingSettings{
+			WriteRequestsToHot: true,
+			KeepLocalFallback:  true,
+		},
+		OpenSearch: loggingconfig.OpenSearchSettings{
+			Endpoint:      opensearchServer.URL,
+			RequestsIndex: "waf-requests",
+		},
+	})
+
+	source := newRequestStreamSource(
+		filepath.Join(root, "missing-access.log"),
+		100,
+		archiveRoot,
+		loggingconfig.DefaultHotDays,
+		withRequestOpenSearch(settingsPath, pepper),
+	)
+
+	if err := source.probe(url.Values{}); err == nil {
+		t.Fatal("expected probe to fail when opensearch migration validation fails")
+	}
+	if _, err := os.Stat(legacyPath); err != nil {
+		t.Fatalf("expected legacy archive to remain after failed validation, stat err=%v", err)
+	}
+	state, err := loadRequestMigrationState(filepath.Join(archiveRoot, requestOpenSearchMigrationStateFile))
+	if err != nil {
+		t.Fatalf("load opensearch migration state: %v", err)
+	}
+	if _, ok := state.ImportedDays[oldDay]; ok {
+		t.Fatalf("did not expect imported day %s to be marked complete after failed validation", oldDay)
 	}
 }
 
@@ -355,10 +552,15 @@ func (f *fakeClickHouse) recordsJSON(query string) []string {
 type fakeOpenSearch struct {
 	mu      sync.Mutex
 	records []requestLogRecord
+	dropBulk bool
 }
 
 func newFakeOpenSearch(records []requestLogRecord) *fakeOpenSearch {
 	return &fakeOpenSearch{records: append([]requestLogRecord{}, records...)}
+}
+
+func newFakeOpenSearchWithoutPersist(records []requestLogRecord) *fakeOpenSearch {
+	return &fakeOpenSearch{records: append([]requestLogRecord{}, records...), dropBulk: true}
 }
 
 func (f *fakeOpenSearch) recordCount() int {
@@ -388,6 +590,10 @@ func (f *fakeOpenSearch) handleBulk(w http.ResponseWriter, r *http.Request) {
 	lines := make([]string, 0)
 	for scanner.Scan() {
 		lines = append(lines, scanner.Text())
+	}
+	if f.dropBulk {
+		_, _ = w.Write([]byte(`{"errors":false}`))
+		return
 	}
 	for i := 1; i < len(lines); i += 2 {
 		var record requestLogRecord

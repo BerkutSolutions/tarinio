@@ -372,8 +372,11 @@ function ensureIPDetail(map, ip) {
   return map.get(key);
 }
 
-function parseRequestsJSONL(text) {
-  const raw = String(text || "").trim();
+function normalizeRequestRowsPayload(payload) {
+  if (Array.isArray(payload)) {
+    return payload.filter((row) => row && typeof row === "object");
+  }
+  const raw = String(payload || "").trim();
   if (!raw) {
     return [];
   }
@@ -397,7 +400,7 @@ function parseRequestsJSONL(text) {
         rows.push(parsed);
       }
     } catch (_error) {
-      rows.push({ stream: "archive", ingested_at: "", raw: line, entry: {} });
+      return [];
     }
   }
   return rows;
@@ -408,12 +411,17 @@ async function fetchRequestsRows() {
     const response = await fetch("/api/requests", {
       method: "GET",
       credentials: "include",
-      headers: { Accept: "text/plain" }
+      headers: { Accept: "application/json" }
     });
     if (!response.ok) {
       return [];
     }
-    return parseRequestsJSONL(await response.text());
+    const text = await response.text();
+    try {
+      return normalizeRequestRowsPayload(JSON.parse(text));
+    } catch (_error) {
+      return normalizeRequestRowsPayload(text);
+    }
   } catch (_error) {
     return [];
   }

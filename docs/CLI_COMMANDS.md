@@ -171,7 +171,7 @@ Useful checks:
 
 ```powershell
 cd deploy/compose/testpage
-docker compose logs -f control-plane runtime control-plane-test runtime-test request-archive
+docker compose logs -f control-plane runtime control-plane-test runtime-test ui
 docker compose ps
 ```
 
@@ -184,17 +184,13 @@ docker compose exec ddos-model-mgmt sh -lc "cat /out/adaptive.json"
 docker compose exec ddos-model-app sh -lc "cat /out/adaptive.json"
 ```
 
-Request archive checks:
+Request API and backend checks:
 
 ```powershell
 cd deploy/compose/testpage
-docker compose exec request-archive sh -lc "tail -n 40 /archive/requests.jsonl"
+docker compose logs --since=10m runtime
+docker compose exec control-plane wget -qO- http://127.0.0.1:8080/api/requests
 ```
-
-Request archive env limits:
-- `REQUEST_ARCHIVE_MAX_FILE_SIZE_MB` (default `256`)
-- `REQUEST_ARCHIVE_MAX_FILES` (default `7`)
-- `REQUEST_ARCHIVE_RETENTION_DAYS` (default `2`)
 
 Adaptive model env limits/tuning:
 - `WAF_L4_GUARD_REAPPLY_INTERVAL_SECONDS` (default `5`)
@@ -219,9 +215,6 @@ Example:
 
 ```powershell
 cd deploy/compose/testpage
-$env:REQUEST_ARCHIVE_MAX_FILE_SIZE_MB="64"
-$env:REQUEST_ARCHIVE_MAX_FILES="10"
-$env:REQUEST_ARCHIVE_RETENTION_DAYS="7"
 docker compose up -d --build
 ```
 

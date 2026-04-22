@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -17,6 +18,7 @@ import (
 	"waf/control-plane/internal/config"
 	"waf/control-plane/internal/coordination/redis"
 	"waf/control-plane/internal/easysiteprofiles"
+	"waf/control-plane/internal/enterprise"
 	"waf/control-plane/internal/events"
 	"waf/control-plane/internal/handlers"
 	"waf/control-plane/internal/httpserver"
@@ -56,6 +58,8 @@ type App struct {
 	AdminScriptService       *services.AdminScriptService
 	AuditStore               *audits.Store
 	AuditService             *services.AuditService
+	EnterpriseStore          *enterprise.Store
+	EnterpriseService        *services.EnterpriseService
 	ReportService            *services.ReportService
 	DashboardService         *services.DashboardService
 	ContainerRuntimeService  *services.ContainerRuntimeService
@@ -120,19 +124,24 @@ func New(cfg config.Config) (*App, error) {
 		postgresBackend = backend
 	}
 
-	redisClient := redis.NewClient(cfg.Redis)
-	redisBackend := redis.NewBackend(redisClient)
+	var redisBackend *redis.Backend
 	coord := services.NewNoopDistributedCoordinator()
-	if cfg.HA.Enabled {
-		if err := redisClient.Ping(context.Background()); err != nil {
-			return nil, err
+	if strings.TrimSpace(cfg.Redis.Addr) != "" {
+		redisClient := redis.NewClient(cfg.Redis)
+		redisBackend = redis.NewBackend(redisClient)
+		if cfg.HA.Enabled {
+			if err := redisClient.Ping(context.Background()); err != nil {
+				return nil, err
+			}
+			coord = services.NewRedisDistributedCoordinator(
+				redisBackend,
+				cfg.HA.NodeID,
+				time.Duration(cfg.HA.OperationLockTTLSeconds)*time.Second,
+				time.Duration(cfg.HA.LeaderLockTTLSeconds)*time.Second,
+			)
 		}
-		coord = services.NewRedisDistributedCoordinator(
-			redisBackend,
-			cfg.HA.NodeID,
-			time.Duration(cfg.HA.OperationLockTTLSeconds)*time.Second,
-			time.Duration(cfg.HA.LeaderLockTTLSeconds)*time.Second,
-		)
+	} else if cfg.HA.Enabled {
+		return nil, fmt.Errorf("redis addr is required when ha is enabled")
 	}
 
 	revisionsRoot := filepath.Join(cfg.RevisionStoreDir, "revisions")
@@ -154,6 +163,7 @@ func New(cfg config.Config) (*App, error) {
 	rateLimitPoliciesRoot := filepath.Join(cfg.RevisionStoreDir, "ratelimitpolicies")
 	easySiteProfilesRoot := filepath.Join(cfg.RevisionStoreDir, "easysiteprofiles")
 	antiDDoSRoot := filepath.Join(cfg.RevisionStoreDir, "antiddos")
+	enterpriseRoot := filepath.Join(cfg.RevisionStoreDir, "enterprise")
 
 	var (
 		err                      error
@@ -176,6 +186,7 @@ func New(cfg config.Config) (*App, error) {
 		rateLimitPolicyStore     *ratelimitpolicies.Store
 		easySiteProfileStore     *easysiteprofiles.Store
 		antiDDoSStore            *antiddos.Store
+		enterpriseStore          *enterprise.Store
 	)
 
 	bootstrapUser := users.BootstrapUser{
@@ -264,6 +275,10 @@ func New(cfg config.Config) (*App, error) {
 		if err != nil {
 			return nil, err
 		}
+		enterpriseStore, err = enterprise.NewPostgresStore(enterpriseRoot, postgresBackend)
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		revisionStore, err = revisions.NewStore(revisionsRoot)
 		if err != nil {
@@ -341,6 +356,10 @@ func New(cfg config.Config) (*App, error) {
 		if err != nil {
 			return nil, err
 		}
+		enterpriseStore, err = enterprise.NewStore(enterpriseRoot)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	revisionService := services.NewRevisionService(revisionStore)
@@ -355,6 +374,7 @@ func New(cfg config.Config) (*App, error) {
 		services.WithRuntimeSecurityCollector(runtimeSecurityCollector),
 	)
 	jobService := services.NewJobService(jobStore)
+	enterpriseService := services.NewEnterpriseService(enterpriseStore, userStore, roleStore, sessionStore, revisionStore, auditStore, eventStore, jobStore, auditService)
 	authService := services.NewAuthService(userStore, roleStore, sessionStore, passkeyStore, cfg.AuthIssuer, services.AuthSecurityConfig{
 		Pepper: cfg.Security.Pepper,
 		WebAuthn: services.WebAuthnConfig{
@@ -364,6 +384,7 @@ func New(cfg config.Config) (*App, error) {
 			Origins: append([]string(nil), cfg.Security.WebAuthn.Origins...),
 		},
 	}, auditService)
+	revisionCompileService.SetGovernance(enterpriseService)
 	siteService := services.NewSiteService(siteStore, auditService)
 	manualBanService := services.NewManualBanService(accessPolicyStore, siteStore, auditService)
 	upstreamService := services.NewUpstreamService(upstreamStore, siteStore, auditService)
@@ -408,6 +429,7 @@ func New(cfg config.Config) (*App, error) {
 		auditService,
 	)
 	applyService.SetCoordinator(coord)
+	applyService.SetGovernance(enterpriseService)
 	easySiteProfileService := services.NewEasySiteProfileService(easySiteProfileStore, siteStore, wafPolicyStore, accessPolicyStore, rateLimitPolicyStore, revisionCompileService, applyService, auditService)
 	antiDDoSService := services.NewAntiDDoSService(antiDDoSStore, revisionCompileService, applyService, auditService)
 	services.ConfigureAutoApply(revisionCompileService, applyService, coord)
@@ -418,7 +440,7 @@ func New(cfg config.Config) (*App, error) {
 	runtimeCRSService := services.NewRuntimeCRSService(services.RuntimeBaseURLFromHealthURL(cfg.RuntimeHealthURL), cfg.RuntimeAPIToken)
 	containerRuntimeService := services.NewContainerRuntimeService()
 	adminScriptService := services.NewAdminScriptService(cfg.RevisionStoreDir, detectScriptsRoot())
-	httpServer := httpserver.New(cfg.HTTPAddr, cfg.RuntimeRoot, cfg.RevisionStoreDir, cfg.RuntimeHealthURL, coord.Enabled(), coord.NodeID(), cfg.Metrics.Token, postgresBackend, setupService, revisionService, authService, sessionStore, userStore, roleStore, siteService, manualBanService, upstreamService, certificateService, tlsConfigService, tlsAutoRenewService, certificateUploadService, certificateMaterialStore, letsEncryptService, selfSignedCertificateService, wafPolicyService, accessPolicyService, rateLimitPolicyService, easySiteProfileService, antiDDoSService, eventService, revisionCompileService, applyService, revisionCatalogService, auditService, reportService, dashboardService, containerRuntimeService, runtimeCRSService, runtimeRequestCollector, runtimeReadyProbe, runtimeSecurityCollector, runtimeRequestCollector, adminScriptService)
+	httpServer := httpserver.New(cfg.HTTPAddr, cfg.RuntimeRoot, cfg.RevisionStoreDir, cfg.RuntimeHealthURL, coord.Enabled(), coord.NodeID(), cfg.Metrics.Token, postgresBackend, setupService, revisionService, authService, enterpriseService, sessionStore, userStore, roleStore, siteService, manualBanService, upstreamService, certificateService, tlsConfigService, tlsAutoRenewService, certificateUploadService, certificateMaterialStore, letsEncryptService, selfSignedCertificateService, wafPolicyService, accessPolicyService, rateLimitPolicyService, easySiteProfileService, antiDDoSService, eventService, revisionCompileService, applyService, revisionCatalogService, auditService, reportService, dashboardService, containerRuntimeService, runtimeCRSService, runtimeRequestCollector, runtimeReadyProbe, runtimeSecurityCollector, runtimeRequestCollector, adminScriptService)
 	var devFastStartBootstrapper *services.DevFastStartBootstrapper
 	if cfg.DevFastStart.Enabled {
 		devFastStartCertificateIssuer := letsEncryptService
@@ -460,6 +482,8 @@ func New(cfg config.Config) (*App, error) {
 		AdminScriptService:       adminScriptService,
 		AuditStore:               auditStore,
 		AuditService:             auditService,
+		EnterpriseStore:          enterpriseStore,
+		EnterpriseService:        enterpriseService,
 		ReportService:            reportService,
 		DashboardService:         dashboardService,
 		ContainerRuntimeService:  containerRuntimeService,

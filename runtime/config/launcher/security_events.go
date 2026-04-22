@@ -73,6 +73,10 @@ type requestStreamSource struct {
 	clickhouse          *requestClickHouseStore
 }
 
+const requestOpenSearchMigrationStateFile = ".opensearch-migration-state.json"
+const requestClickHouseMigrationStateFile = ".clickhouse-migration-state.json"
+const requestHotToColdMigrationStateFile = ".hot-to-cold-migration-state.json"
+
 const requestIngestBatchLines = 4000
 
 type requestStreamOption func(*requestStreamSource)
@@ -208,7 +212,13 @@ func (s *requestStreamSource) probe(query url.Values) error {
 	if err := s.ensureArchiveRootLocked(); err != nil {
 		return err
 	}
-	return s.ingestLatestLocked(options.RetentionDays)
+	if err := s.ingestLatestLocked(options.RetentionDays); err != nil {
+		return err
+	}
+	if strings.TrimSpace(s.lastIngestError) != "" {
+		return errors.New(strings.TrimSpace(s.lastIngestError))
+	}
+	return nil
 }
 
 func (s *requestStreamSource) startBackgroundIngest(interval time.Duration) {
@@ -238,6 +248,16 @@ func (s *requestStreamSource) ingestLatestLocked(retentionDays int) error {
 	file, err := os.Open(s.path)
 	if err != nil {
 		if os.IsNotExist(err) {
+			if s.clickhouse != nil {
+				if importErr := s.importArchiveDaysToClickHouseLocked(); importErr != nil {
+					s.lastIngestError = importErr.Error()
+				}
+			}
+			if s.opensearch != nil {
+				if importErr := s.importArchiveDaysToOpenSearchLocked(); importErr != nil {
+					s.lastIngestError = importErr.Error()
+				}
+			}
 			if migrateErr := s.migrateHotToColdLocked(retentionDays); migrateErr != nil {
 				s.lastIngestError = migrateErr.Error()
 			}
@@ -324,14 +344,15 @@ func (s *requestStreamSource) ingestLatestLocked(retentionDays int) error {
 		_ = handle.Close()
 	}
 	settings := s.loadLoggingSettingsLocked()
-	if s.opensearch != nil && len(records) > 0 && settings.Routing.WriteRequestsToHot {
+	writeToOpenSearch := s.opensearch != nil && len(records) > 0 && ((settings.Routing.WriteRequestsToHot && settings.Hot.Backend == loggingconfig.BackendOpenSearch) || (settings.Routing.WriteRequestsToCold && settings.Cold.Backend == loggingconfig.BackendOpenSearch))
+	if writeToOpenSearch {
 		if err := s.opensearch.insert(records); err != nil {
 			s.lastIngestError = err.Error()
 		} else {
 			s.lastIngestError = ""
 		}
 	}
-	if s.clickhouse != nil && len(records) > 0 && settings.Routing.WriteRequestsToCold {
+	if s.clickhouse != nil && len(records) > 0 && settings.Routing.WriteRequestsToCold && settings.Cold.Backend == loggingconfig.BackendClickHouse {
 		if err := s.clickhouse.insert(records); err != nil {
 			s.lastIngestError = err.Error()
 		} else {
@@ -340,6 +361,11 @@ func (s *requestStreamSource) ingestLatestLocked(retentionDays int) error {
 	}
 	if s.clickhouse != nil {
 		if err := s.importArchiveDaysToClickHouseLocked(); err != nil {
+			s.lastIngestError = err.Error()
+		}
+	}
+	if s.opensearch != nil {
+		if err := s.importArchiveDaysToOpenSearchLocked(); err != nil {
 			s.lastIngestError = err.Error()
 		}
 	}
@@ -355,7 +381,7 @@ func (s *requestStreamSource) loadLoggingSettingsLocked() loggingconfig.Settings
 		return loggingconfig.Normalize(loggingconfig.Settings{
 			Backend: loggingconfig.BackendOpenSearch,
 			Hot:     loggingconfig.HotSettings{Backend: loggingconfig.BackendOpenSearch},
-			Cold:    loggingconfig.ColdSettings{Backend: loggingconfig.BackendClickHouse},
+			Cold:    loggingconfig.ColdSettings{Backend: loggingconfig.BackendOpenSearch},
 			Retention: loggingconfig.RetentionSettings{
 				HotDays:  loggingconfig.DefaultHotDays,
 				ColdDays: loggingconfig.DefaultColdDays,
@@ -371,7 +397,7 @@ func (s *requestStreamSource) loadLoggingSettingsLocked() loggingconfig.Settings
 		return loggingconfig.Normalize(loggingconfig.Settings{
 			Backend: loggingconfig.BackendOpenSearch,
 			Hot:     loggingconfig.HotSettings{Backend: loggingconfig.BackendOpenSearch},
-			Cold:    loggingconfig.ColdSettings{Backend: loggingconfig.BackendClickHouse},
+			Cold:    loggingconfig.ColdSettings{Backend: loggingconfig.BackendOpenSearch},
 			Retention: loggingconfig.RetentionSettings{
 				HotDays:  loggingconfig.DefaultHotDays,
 				ColdDays: loggingconfig.DefaultColdDays,
@@ -389,7 +415,7 @@ func (s *requestStreamSource) loadLoggingSettingsLocked() loggingconfig.Settings
 		return loggingconfig.Normalize(loggingconfig.Settings{
 			Backend: loggingconfig.BackendOpenSearch,
 			Hot:     loggingconfig.HotSettings{Backend: loggingconfig.BackendOpenSearch},
-			Cold:    loggingconfig.ColdSettings{Backend: loggingconfig.BackendClickHouse},
+			Cold:    loggingconfig.ColdSettings{Backend: loggingconfig.BackendOpenSearch},
 			Retention: loggingconfig.RetentionSettings{
 				HotDays:  loggingconfig.DefaultHotDays,
 				ColdDays: loggingconfig.DefaultColdDays,
@@ -684,11 +710,9 @@ func (s *requestStreamSource) deleteIndex(query url.Values) error {
 	if _, err := time.Parse("2006-01-02", day); err != nil {
 		return errors.New("date must be in YYYY-MM-DD format")
 	}
-	if s.clickhouse != nil {
-		if s.opensearch != nil {
-			if err := s.opensearch.deleteDay(day); err != nil {
-				s.lastIngestError = err.Error()
-			}
+	if s.opensearch != nil {
+		if err := s.opensearch.deleteDay(day); err != nil {
+			s.lastIngestError = err.Error()
 		}
 	}
 	if s.clickhouse != nil {
@@ -700,13 +724,85 @@ func (s *requestStreamSource) deleteIndex(query url.Values) error {
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	statePath := filepath.Join(s.archiveRoot, ".clickhouse-migration-state.json")
-	state, err := loadRequestMigrationState(statePath)
-	if err == nil {
+	for _, name := range []string{
+		requestOpenSearchMigrationStateFile,
+		requestClickHouseMigrationStateFile,
+		requestHotToColdMigrationStateFile,
+	} {
+		statePath := filepath.Join(s.archiveRoot, name)
+		state, err := loadRequestMigrationState(statePath)
+		if err != nil {
+			continue
+		}
 		delete(state.ImportedDays, day)
 		_ = saveRequestMigrationState(statePath, state)
 	}
 	return nil
+}
+
+func (s *requestStreamSource) importArchiveDaysToOpenSearchLocked() error {
+	if s.opensearch == nil {
+		return nil
+	}
+	cfg, err := s.opensearch.currentConfig()
+	if err != nil {
+		return err
+	}
+	if !cfg.Enabled {
+		return nil
+	}
+	statePath := filepath.Join(s.archiveRoot, requestOpenSearchMigrationStateFile)
+	state, err := loadRequestMigrationState(statePath)
+	if err != nil {
+		return err
+	}
+	days, err := s.listArchiveDaysLocked("")
+	if err != nil {
+		return err
+	}
+	today := time.Now().UTC().Format("2006-01-02")
+	for _, day := range days {
+		if day >= today {
+			continue
+		}
+		if _, ok := state.ImportedDays[day]; ok {
+			continue
+		}
+		content, err := os.ReadFile(filepath.Join(s.archiveRoot, day+".jsonl"))
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return err
+		}
+		lines := strings.Split(string(content), "\n")
+		records := make([]requestLogRecord, 0, len(lines))
+		for _, line := range lines {
+			record, ok := loadRequestLogRecordFromArchiveLine(line)
+			if !ok {
+				continue
+			}
+			records = append(records, record)
+		}
+		if len(records) == 0 {
+			if err := os.Remove(filepath.Join(s.archiveRoot, day+".jsonl")); err != nil && !os.IsNotExist(err) {
+				return err
+			}
+			state.ImportedDays[day] = time.Now().UTC().Format(time.RFC3339)
+			continue
+		}
+		if err := s.opensearch.insert(records); err != nil {
+			return err
+		}
+		if err := s.opensearch.containsDayRecords(day, records); err != nil {
+			return err
+		}
+		if err := os.Remove(filepath.Join(s.archiveRoot, day+".jsonl")); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+		state.ImportedDays[day] = time.Now().UTC().Format(time.RFC3339)
+	}
+	return saveRequestMigrationState(statePath, state)
 }
 
 func (s *requestStreamSource) importArchiveDaysToClickHouseLocked() error {
@@ -717,7 +813,7 @@ func (s *requestStreamSource) importArchiveDaysToClickHouseLocked() error {
 	if err != nil || !cfg.Enabled || !cfg.MigrationEnabled {
 		return err
 	}
-	statePath := filepath.Join(s.archiveRoot, ".clickhouse-migration-state.json")
+	statePath := filepath.Join(s.archiveRoot, requestClickHouseMigrationStateFile)
 	state, err := loadRequestMigrationState(statePath)
 	if err != nil {
 		return err
@@ -753,6 +849,9 @@ func (s *requestStreamSource) importArchiveDaysToClickHouseLocked() error {
 		if err := s.clickhouse.insert(records); err != nil {
 			return err
 		}
+		if err := s.validateClickHouseDayContainsRecords(day, records); err != nil {
+			return err
+		}
 		state.ImportedDays[day] = time.Now().UTC().Format(time.RFC3339)
 	}
 	return saveRequestMigrationState(statePath, state)
@@ -772,7 +871,7 @@ func (s *requestStreamSource) migrateHotToColdLocked(retentionDays int) error {
 	if retentionDays <= 0 {
 		retentionDays = loggingconfig.DefaultHotDays
 	}
-	statePath := filepath.Join(s.archiveRoot, ".hot-to-cold-migration-state.json")
+	statePath := filepath.Join(s.archiveRoot, requestHotToColdMigrationStateFile)
 	state, err := loadRequestMigrationState(statePath)
 	if err != nil {
 		return err
@@ -801,6 +900,9 @@ func (s *requestStreamSource) migrateHotToColdLocked(retentionDays int) error {
 			if err := s.clickhouse.insert(records); err != nil {
 				return err
 			}
+			if err := s.validateClickHouseDayContainsRecords(day, records); err != nil {
+				return err
+			}
 		}
 		if err := s.opensearch.deleteDay(day); err != nil {
 			return err
@@ -808,6 +910,33 @@ func (s *requestStreamSource) migrateHotToColdLocked(retentionDays int) error {
 		state.ImportedDays[day] = time.Now().UTC().Format(time.RFC3339)
 	}
 	return saveRequestMigrationState(statePath, state)
+}
+
+func (s *requestStreamSource) validateClickHouseDayContainsRecords(day string, expected []requestLogRecord) error {
+	if s == nil || s.clickhouse == nil || len(expected) == 0 {
+		return nil
+	}
+	records, err := s.clickhouse.exportDay(day)
+	if err != nil {
+		return err
+	}
+	seen := make(map[string]struct{}, len(records))
+	for _, record := range records {
+		if strings.TrimSpace(record.EventHash) == "" {
+			continue
+		}
+		seen[strings.TrimSpace(record.EventHash)] = struct{}{}
+	}
+	for _, record := range expected {
+		hash := strings.TrimSpace(record.EventHash)
+		if hash == "" {
+			continue
+		}
+		if _, ok := seen[hash]; !ok {
+			return errors.New("clickhouse migration validation failed: missing migrated records")
+		}
+	}
+	return nil
 }
 
 func (s *requestStreamSource) indexesFromBackendsLocked(options requestQueryOptions) (map[string]any, bool) {
@@ -871,6 +1000,7 @@ func (s *requestStreamSource) indexesFromBackendsLocked(options requestQueryOpti
 		"offset":       options.Offset,
 		"archive_root": s.archiveRoot,
 		"storage_type": "tiered",
+		"last_ingest_error": s.lastIngestError,
 	}, true
 }
 

@@ -1,6 +1,8 @@
 package audits
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -35,6 +37,8 @@ type AuditEvent struct {
 	OccurredAt        string         `json:"occurred_at"`
 	Summary           string         `json:"summary"`
 	Details           map[string]any `json:"details_json,omitempty"`
+	PrevHash          string         `json:"prev_hash,omitempty"`
+	Hash              string         `json:"hash,omitempty"`
 }
 
 type Query struct {
@@ -56,6 +60,14 @@ type ListResult struct {
 	Total  int          `json:"total"`
 	Limit  int          `json:"limit"`
 	Offset int          `json:"offset"`
+}
+
+type ChainSummary struct {
+	EventCount int    `json:"event_count"`
+	HeadHash   string `json:"head_hash,omitempty"`
+	TailHash   string `json:"tail_hash,omitempty"`
+	Valid      bool   `json:"valid"`
+	Error      string `json:"error,omitempty"`
 }
 
 type state struct {
@@ -98,6 +110,14 @@ func (s *Store) Append(event AuditEvent) error {
 	if err != nil {
 		return err
 	}
+	if len(current.Events) > 0 {
+		event.PrevHash = strings.TrimSpace(current.Events[0].Hash)
+	}
+	hash, err := ComputeEventHash(event)
+	if err != nil {
+		return err
+	}
+	event.Hash = hash
 	current.Events = append(current.Events, event)
 	sortEvents(current.Events)
 	return s.saveLocked(current)
@@ -207,6 +227,8 @@ func normalizeEvent(event AuditEvent) AuditEvent {
 	event.RelatedRevisionID = strings.TrimSpace(event.RelatedRevisionID)
 	event.RelatedJobID = strings.TrimSpace(event.RelatedJobID)
 	event.Summary = strings.TrimSpace(event.Summary)
+	event.PrevHash = strings.TrimSpace(event.PrevHash)
+	event.Hash = strings.TrimSpace(event.Hash)
 	return event
 }
 
@@ -255,4 +277,79 @@ func parseTime(value string) (time.Time, error) {
 		return time.Time{}, nil
 	}
 	return time.Parse(time.RFC3339Nano, value)
+}
+
+func ComputeEventHash(event AuditEvent) (string, error) {
+	payload := struct {
+		ID                string         `json:"id"`
+		ActorUserID       string         `json:"actor_user_id,omitempty"`
+		ActorIP           string         `json:"actor_ip,omitempty"`
+		Action            string         `json:"action"`
+		ResourceType      string         `json:"resource_type"`
+		ResourceID        string         `json:"resource_id"`
+		SiteID            string         `json:"site_id,omitempty"`
+		RelatedRevisionID string         `json:"related_revision_id,omitempty"`
+		RelatedJobID      string         `json:"related_job_id,omitempty"`
+		Status            Status         `json:"status"`
+		OccurredAt        string         `json:"occurred_at"`
+		Summary           string         `json:"summary"`
+		Details           map[string]any `json:"details_json,omitempty"`
+		PrevHash          string         `json:"prev_hash,omitempty"`
+	}{
+		ID:                event.ID,
+		ActorUserID:       event.ActorUserID,
+		ActorIP:           event.ActorIP,
+		Action:            event.Action,
+		ResourceType:      event.ResourceType,
+		ResourceID:        event.ResourceID,
+		SiteID:            event.SiteID,
+		RelatedRevisionID: event.RelatedRevisionID,
+		RelatedJobID:      event.RelatedJobID,
+		Status:            event.Status,
+		OccurredAt:        event.OccurredAt,
+		Summary:           event.Summary,
+		Details:           event.Details,
+		PrevHash:          event.PrevHash,
+	}
+	content, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("encode audit hash payload: %w", err)
+	}
+	sum := sha256.Sum256(content)
+	return hex.EncodeToString(sum[:]), nil
+}
+
+func SummarizeChain(items []AuditEvent) ChainSummary {
+	summary := ChainSummary{
+		EventCount: len(items),
+		Valid:      true,
+	}
+	if len(items) == 0 {
+		return summary
+	}
+	summary.HeadHash = strings.TrimSpace(items[0].Hash)
+	summary.TailHash = strings.TrimSpace(items[len(items)-1].Hash)
+	for i, item := range items {
+		expectedHash, err := ComputeEventHash(item)
+		if err != nil {
+			summary.Valid = false
+			summary.Error = err.Error()
+			return summary
+		}
+		if expectedHash != strings.TrimSpace(item.Hash) {
+			summary.Valid = false
+			summary.Error = fmt.Sprintf("hash mismatch at audit event %s", item.ID)
+			return summary
+		}
+		if i+1 >= len(items) {
+			continue
+		}
+		nextHash := strings.TrimSpace(items[i+1].Hash)
+		if strings.TrimSpace(item.PrevHash) != nextHash {
+			summary.Valid = false
+			summary.Error = fmt.Sprintf("chain mismatch between audit events %s and %s", item.ID, items[i+1].ID)
+			return summary
+		}
+	}
+	return summary
 }

@@ -16,24 +16,48 @@ import (
 type Status string
 
 const (
-	StatusPending  Status = "pending"
-	StatusInactive Status = "inactive"
-	StatusActive   Status = "active"
-	StatusFailed   Status = "failed"
+	StatusPending         Status = "pending"
+	StatusPendingApproval Status = "pending_approval"
+	StatusInactive        Status = "inactive"
+	StatusActive          Status = "active"
+	StatusFailed          Status = "failed"
 )
+
+type ApprovalStatus string
+
+const (
+	ApprovalNotRequired ApprovalStatus = "not_required"
+	ApprovalPending     ApprovalStatus = "pending"
+	ApprovalApproved    ApprovalStatus = "approved"
+)
+
+type ApprovalRecord struct {
+	UserID     string `json:"user_id"`
+	Username   string `json:"username,omitempty"`
+	Comment    string `json:"comment,omitempty"`
+	ApprovedAt string `json:"approved_at"`
+}
 
 // Revision stores the minimal control-plane metadata for one compiled bundle.
 type Revision struct {
-	ID              string `json:"id"`
-	Version         int    `json:"version"`
-	CreatedAt       string `json:"created_at"`
-	Checksum        string `json:"checksum"`
-	BundlePath      string `json:"bundle_path"`
-	Status          Status `json:"status"`
-	LastApplyJobID  string `json:"last_apply_job_id,omitempty"`
-	LastApplyStatus string `json:"last_apply_status,omitempty"`
-	LastApplyResult string `json:"last_apply_result,omitempty"`
-	LastApplyAt     string `json:"last_apply_at,omitempty"`
+	ID                string           `json:"id"`
+	Version           int              `json:"version"`
+	CreatedAt         string           `json:"created_at"`
+	Checksum          string           `json:"checksum"`
+	BundlePath        string           `json:"bundle_path"`
+	Status            Status           `json:"status"`
+	CompiledByUserID  string           `json:"compiled_by_user_id,omitempty"`
+	CompiledByName    string           `json:"compiled_by_name,omitempty"`
+	ApprovalStatus    ApprovalStatus   `json:"approval_status,omitempty"`
+	RequiredApprovals int              `json:"required_approvals,omitempty"`
+	Approvals         []ApprovalRecord `json:"approvals,omitempty"`
+	ApprovedAt        string           `json:"approved_at,omitempty"`
+	Signature         string           `json:"signature,omitempty"`
+	SignatureKeyID    string           `json:"signature_key_id,omitempty"`
+	LastApplyJobID    string           `json:"last_apply_job_id,omitempty"`
+	LastApplyStatus   string           `json:"last_apply_status,omitempty"`
+	LastApplyResult   string           `json:"last_apply_result,omitempty"`
+	LastApplyAt       string           `json:"last_apply_at,omitempty"`
 }
 
 type state struct {
@@ -73,10 +97,15 @@ func (s *Store) SavePending(revision Revision) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if revision.Status == "" {
+		revision.Status = StatusPending
+	}
+	if revision.ApprovalStatus == "" {
+		revision.ApprovalStatus = ApprovalNotRequired
+	}
 	if err := validateRevision(revision); err != nil {
 		return err
 	}
-	revision.Status = StatusPending
 
 	current, err := s.loadLocked()
 	if err != nil {
@@ -135,6 +164,64 @@ func (s *Store) MarkFailed(revisionID string) error {
 	if current.CurrentActiveRevisionID == revisionID {
 		current.CurrentActiveRevisionID = ""
 	}
+	sortRevisions(current.Revisions)
+	return s.saveLocked(current)
+}
+
+func (s *Store) Approve(revisionID string, approval ApprovalRecord, requiredApprovals int) (Revision, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	current, err := s.loadLocked()
+	if err != nil {
+		return Revision{}, err
+	}
+	index := indexByID(current.Revisions, revisionID)
+	if index == -1 {
+		return Revision{}, fmt.Errorf("revision %s not found", revisionID)
+	}
+	item := current.Revisions[index]
+	for _, existing := range item.Approvals {
+		if existing.UserID == strings.TrimSpace(approval.UserID) {
+			return Revision{}, fmt.Errorf("revision %s already approved by %s", revisionID, approval.UserID)
+		}
+	}
+	item.Approvals = append(item.Approvals, normalizeApproval(approval))
+	item.RequiredApprovals = requiredApprovals
+	if requiredApprovals <= 0 || len(item.Approvals) >= requiredApprovals {
+		item.ApprovalStatus = ApprovalApproved
+		item.ApprovedAt = approval.ApprovedAt
+		if item.Status == StatusPendingApproval {
+			item.Status = StatusPending
+		}
+	} else {
+		item.ApprovalStatus = ApprovalPending
+		item.Status = StatusPendingApproval
+	}
+	current.Revisions[index] = item
+	sortRevisions(current.Revisions)
+	if err := s.saveLocked(current); err != nil {
+		return Revision{}, err
+	}
+	return item, nil
+}
+
+func (s *Store) UpdateRevision(revision Revision) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	current, err := s.loadLocked()
+	if err != nil {
+		return err
+	}
+	index := indexByID(current.Revisions, revision.ID)
+	if index == -1 {
+		return fmt.Errorf("revision %s not found", revision.ID)
+	}
+	if err := validateRevision(revision); err != nil {
+		return err
+	}
+	current.Revisions[index] = revision
 	sortRevisions(current.Revisions)
 	return s.saveLocked(current)
 }
@@ -299,6 +386,9 @@ func validateRevision(revision Revision) error {
 	if strings.TrimSpace(revision.BundlePath) == "" {
 		return errors.New("revision bundle path is required")
 	}
+	if revision.Status == "" {
+		return errors.New("revision status is required")
+	}
 	return nil
 }
 
@@ -318,4 +408,12 @@ func indexByID(revisions []Revision, revisionID string) int {
 		}
 	}
 	return -1
+}
+
+func normalizeApproval(item ApprovalRecord) ApprovalRecord {
+	item.UserID = strings.TrimSpace(item.UserID)
+	item.Username = strings.TrimSpace(item.Username)
+	item.Comment = strings.TrimSpace(item.Comment)
+	item.ApprovedAt = strings.TrimSpace(item.ApprovedAt)
+	return item
 }

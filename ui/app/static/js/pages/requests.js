@@ -26,8 +26,11 @@ function buildPageButtons(totalPages, currentPage, dataAttr) {
   return pages.join("");
 }
 
-function parseRequestsJSONL(text) {
-  const raw = String(text || "").trim();
+function normalizeRequestRowsPayload(payload) {
+  if (Array.isArray(payload)) {
+    return payload.filter((row) => row && typeof row === "object");
+  }
+  const raw = String(payload || "").trim();
   if (!raw) {
     return [];
   }
@@ -51,7 +54,7 @@ function parseRequestsJSONL(text) {
         rows.push(parsed);
       }
     } catch (_error) {
-      rows.push({ stream: "archive", ingested_at: "", raw: line, entry: {} });
+      return [];
     }
   }
   return rows;
@@ -601,7 +604,7 @@ export async function renderRequests(container, ctx) {
         fetch(`/api/requests?${params.toString()}`, {
           method: "GET",
           credentials: "include",
-          headers: { Accept: "text/plain" },
+          headers: { Accept: "application/json" },
           signal
         }),
         ctx.api.get("/api/sites", { signal }).catch(() => []),
@@ -619,7 +622,13 @@ export async function renderRequests(container, ctx) {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
-      const text = await response.text();
+      const responseText = await response.text();
+      let payload = [];
+      try {
+        payload = JSON.parse(responseText);
+      } catch (_error) {
+        payload = normalizeRequestRowsPayload(responseText);
+      }
       if (!isActive()) {
         return;
       }
@@ -631,7 +640,7 @@ export async function renderRequests(container, ctx) {
           siteHostMap.set(id, host);
         }
       }
-      state.rows = parseRequestsJSONL(text).map((row) => {
+      state.rows = normalizeRequestRowsPayload(payload).map((row) => {
         const entry = row?.entry && typeof row.entry === "object" ? row.entry : {};
         const serviceDisplay = resolveServiceDisplay(entry.site, siteHostMap);
         const timestampDate = parseTimestamp(entry.timestamp || row?.ingested_at);

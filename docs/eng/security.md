@@ -15,12 +15,19 @@ This document defines the minimum production baseline and the main secure-operat
 
 ## Authentication And Access
 
-In version `2.0.5`, the platform supports:
+In version `2.0.6`, the platform supports:
 
 - session-based login;
+- enterprise login through `OIDC`;
+- `SCIM` provisioning with external group mappings;
 - `2FA` through TOTP;
 - passkeys for login and as a second factor;
 - server-side permission checks on every endpoint.
+
+Important boundary:
+
+- directory-backed `LDAP/AD` group mapping is supported when groups are projected into `OIDC` or `SCIM`;
+- standalone direct `LDAP` password login is not part of `2.0.6`.
 
 Recommendations:
 
@@ -69,6 +76,11 @@ Use the following for investigation:
 - `Requests` for request-level detail;
 - `Revisions` to correlate incidents with rollout history.
 
+For evidence-grade export:
+
+- use the signed support bundle from `Administration -> Enterprise`;
+- archive the generated release manifest, signature, `SBOM`, and provenance for promoted builds.
+
 ## Backup And Restore As A Security Capability
 
 Secure operation also requires:
@@ -84,3 +96,5 @@ Secure operation also requires:
 - `docs/eng/runbook.md`
 - `docs/eng/upgrade.md`
 - `docs/eng/ui.md`
+- `docs/eng/enterprise-identity.md`
+- `docs/eng/evidence-and-releases.md`

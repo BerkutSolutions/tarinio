@@ -2,10 +2,12 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strings"
 
 	"waf/control-plane/internal/jobs"
+	"waf/control-plane/internal/revisions"
 )
 
 type revisionApplyService interface {
@@ -16,13 +18,18 @@ type revisionDeleteService interface {
 	Delete(ctx context.Context, revisionID string) error
 }
 
-type RevisionApplyHandler struct {
-	apply  revisionApplyService
-	delete revisionDeleteService
+type revisionApproveService interface {
+	ApproveRevision(ctx context.Context, revisionID, comment string) (revisions.Revision, error)
 }
 
-func NewRevisionApplyHandler(apply revisionApplyService, deleteService revisionDeleteService) *RevisionApplyHandler {
-	return &RevisionApplyHandler{apply: apply, delete: deleteService}
+type RevisionApplyHandler struct {
+	apply   revisionApplyService
+	delete  revisionDeleteService
+	approve revisionApproveService
+}
+
+func NewRevisionApplyHandler(apply revisionApplyService, deleteService revisionDeleteService, approve revisionApproveService) *RevisionApplyHandler {
+	return &RevisionApplyHandler{apply: apply, delete: deleteService, approve: approve}
 }
 
 func (h *RevisionApplyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -49,6 +56,36 @@ func (h *RevisionApplyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 			return
 		}
 		writeJSON(w, http.StatusCreated, job)
+		return
+	}
+	if r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/approve") {
+		revisionID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/api/revisions/"), "/approve")
+		revisionID = strings.TrimSuffix(revisionID, "/")
+		if strings.TrimSpace(revisionID) == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "revision id is required"})
+			return
+		}
+		if h.approve == nil {
+			writeJSON(w, http.StatusNotImplemented, map[string]any{"error": "revision approve is unavailable"})
+			return
+		}
+		var payload struct {
+			Comment string `json:"comment"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&payload)
+		result, err := h.approve.ApproveRevision(withActorIP(r), revisionID, payload.Comment)
+		if err != nil {
+			status := http.StatusBadRequest
+			if strings.Contains(err.Error(), "not found") {
+				status = http.StatusNotFound
+			}
+			if strings.Contains(strings.ToLower(err.Error()), "not allowed") || strings.Contains(strings.ToLower(err.Error()), "disabled") {
+				status = http.StatusForbidden
+			}
+			writeJSON(w, status, map[string]any{"error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"revision": result, "approved": true})
 		return
 	}
 	if r.Method == http.MethodDelete {

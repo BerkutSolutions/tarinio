@@ -54,6 +54,9 @@ type ApplyService struct {
 	activationRoot string
 	audits         *AuditService
 	coord          DistributedCoordinator
+	governance     interface {
+		EnsureRevisionCanApply(revision revisions.Revision) error
+	}
 }
 
 func NewApplyService(runtimeRoot string, revisions revisionStoreForApply, snapshots revisionSnapshotReader, jobs JobStore, eventService *EventService, syntaxExecutor pipeline.CommandExecutor, reloadExecutor pipeline.CommandExecutor, healthChecker pipeline.HealthChecker, audits *AuditService) *ApplyService {
@@ -98,6 +101,12 @@ func (s *ApplyService) SetCoordinator(coord DistributedCoordinator) {
 	s.coord = coord
 }
 
+func (s *ApplyService) SetGovernance(governance interface {
+	EnsureRevisionCanApply(revision revisions.Revision) error
+}) {
+	s.governance = governance
+}
+
 func (s *ApplyService) applyUnlocked(ctx context.Context, revisionID string) (job jobs.Job, err error) {
 	defer func() {
 		details := map[string]any(nil)
@@ -126,6 +135,11 @@ func (s *ApplyService) applyUnlocked(ctx context.Context, revisionID string) (jo
 	}
 	if !ok {
 		return jobs.Job{}, fmt.Errorf("revision %s not found", revisionID)
+	}
+	if s.governance != nil {
+		if err := s.governance.EnsureRevisionCanApply(revision); err != nil {
+			return jobs.Job{}, err
+		}
 	}
 
 	job, err = s.jobs.Create(jobs.Job{

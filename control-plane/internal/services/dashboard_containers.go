@@ -568,6 +568,8 @@ var leadingRFC3339LogPattern = regexp.MustCompile(`^\[[0-9]{4}-[0-9]{2}-[0-9]{2}
 var leadingNginxTimePattern = regexp.MustCompile(`^[0-9]{4}/[0-9]{2}/[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\s+`)
 var inlineRFC3339Pattern = regexp.MustCompile(`[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.+\-Z]+`)
 var inlineNginxTimePattern = regexp.MustCompile(`[0-9]{4}/[0-9]{2}/[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}`)
+var containerWarningPattern = regexp.MustCompile(`(?i)(?:\[\s*warn(?:ing)?\s*\]|(?:^|[^a-z])warn(?:ing)?:)`)
+var containerErrorPattern = regexp.MustCompile(`(?i)(?:\[\s*error\s*\]|(?:^|[^a-z])(?:failed|fatal|panic):|context deadline exceeded|timeout exceeded|timed out|connection refused|no such file or directory|segmentation fault|(?:^|[^a-z])traceback(?:[^a-z]|$)|(?:^|[^a-z])[a-z0-9_.]*exception(?::|[^a-z]|$)|open\(\)\s)`)
 
 func parseSizeToBytes(value string) uint64 {
 	match := sizePattern.FindStringSubmatch(strings.TrimSpace(value))
@@ -665,6 +667,25 @@ func classifyContainerLogIssue(message string) (string, bool) {
 	lower := strings.ToLower(trimmed)
 	benignPatterns := []string{
 		"warning: no config file specified, using the default config. in order to specify a config file use redis-server /path/to/redis.conf",
+		"warning: a restricted method in java.lang.foreign.linker has been called",
+		"warning: java.lang.foreign.linker::downcallhandle has been called by the unnamed module",
+		"warning: use --enable-native-access=all-unnamed to avoid a warning for this module",
+		"warning: a terminally deprecated method in java.lang.system has been called",
+		"warning: system::setsecuritymanager has been called by org.opensearch.bootstrap.opensearch",
+		"warning: system::setsecuritymanager has been called by org.opensearch.bootstrap.security",
+		"warning: system::setsecuritymanager will be removed in a future release",
+		"warning: please consider reporting this to the maintainers of org.opensearch.bootstrap.opensearch",
+		"warning: please consider reporting this to the maintainers of org.opensearch.bootstrap.security",
+		"warning: compat locale provider will be removed in a future release",
+		"warning: using incubator modules: jdk.incubator.vector",
+		"jvm arguments [",
+		"falling back to single shard assignment since batch mode disable or multiple custom allocators set",
+		"message: index [.opensearch-observability/",
+		"config override setting update called with empty string. ignoring.",
+		"gateway.auto_import_dangling_indices is disabled, dangling indices will not be automatically detected or imported and must be managed manually",
+		"master key is a required config for using create and update datasource apis.",
+		"opensearch security plugin installed but disabled. this can expose your configuration",
+		"failed to initialize logtype config index and builtin log types",
 	}
 	for _, pattern := range benignPatterns {
 		if strings.Contains(lower, pattern) {
@@ -674,28 +695,11 @@ func classifyContainerLogIssue(message string) (string, bool) {
 	if strings.Contains(lower, "[notice]") {
 		return "", false
 	}
-	if strings.Contains(lower, "[warn]") || strings.Contains(lower, " warning:") || strings.HasPrefix(lower, "warn:") {
+	if containerWarningPattern.MatchString(trimmed) {
 		return "warning", true
 	}
-	errorTokens := []string{
-		"[error]",
-		" failed:",
-		" fatal:",
-		" panic:",
-		"context deadline exceeded",
-		"timeout exceeded",
-		"timed out",
-		"connection refused",
-		"no such file or directory",
-		"segmentation fault",
-		"traceback",
-		"exception",
-		"open() ",
-	}
-	for _, token := range errorTokens {
-		if strings.Contains(lower, token) {
-			return "error", true
-		}
+	if containerErrorPattern.MatchString(trimmed) {
+		return "error", true
 	}
 	return "", false
 }
