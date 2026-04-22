@@ -219,15 +219,26 @@ probe_container_http() {
 
 probe_host_http() {
   url="$1"
-  if command -v curl >/dev/null 2>&1; then
-    run_logged curl -fsS -I "$url"
-    return
-  fi
-  if command -v wget >/dev/null 2>&1; then
-    run_logged wget -qO- "$url"
-    return
-  fi
-  fail "curl/wget is required for host probe: $url"
+  attempts="${2:-30}"
+  i=1
+  while [ "$i" -le "$attempts" ]; do
+    if command -v curl >/dev/null 2>&1; then
+      if run_logged curl -fsS -I "$url"; then
+        ok "host responded: $url"
+        return 0
+      fi
+    elif command -v wget >/dev/null 2>&1; then
+      if run_logged wget --server-response --spider "$url"; then
+        ok "host responded: $url"
+        return 0
+      fi
+    else
+      fail "curl/wget is required for host probe: $url"
+    fi
+    sleep 2
+    i=$((i + 1))
+  done
+  fail "host probe failed for $url after ${attempts} attempts"
 }
 
 extract_version() {
@@ -383,8 +394,8 @@ step "Probing control-plane health endpoint"
 probe_container_http control-plane "http://127.0.0.1:8080/healthz" 45
 step "Probing runtime health endpoint"
 probe_container_http runtime "http://127.0.0.1:8081/healthz" 45
-step "Probing UI healthcheck page route"
-probe_host_http "http://127.0.0.1:8080/healthcheck"
+step "Probing public runtime gateway route"
+probe_host_http "http://127.0.0.1/" 45
 ok "post-upgrade health gate passed"
 
 if [ "$RUN_STRICT_POST_UPGRADE_VALIDATION" = "1" ] || [ "$RUN_STRICT_POST_UPGRADE_VALIDATION" = "true" ]; then
@@ -397,8 +408,8 @@ fi
 section "Done"
 printf '%s\n' "TARINIO is starting."
 printf 'Installed version: %s\n' "$TARGET_VERSION"
-printf '%s\n' 'Initial setup UI (temporary): http://<server-ip>:8080/login'
-printf '%s\n' 'After onboarding: https://<your-domain>/login'
+printf '%s\n' 'Initial setup: http://<server-ip>/'
+printf '%s\n' 'After successful onboarding: https://<your-domain>/login'
 printf '%s\n' 'WAF HTTP:  http://<server-ip>/'
 printf '%s\n' 'WAF HTTPS: https://<server-ip>/'
 printf 'Installer log: %s\n' "$LOG_FILE"

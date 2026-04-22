@@ -5,7 +5,8 @@ COMPOSE_CMD="${COMPOSE_CMD:-docker compose}"
 PROFILE_DIR="${PROFILE_DIR:-$(pwd)}"
 CONTROL_PLANE_SERVICE="${CONTROL_PLANE_SERVICE:-control-plane}"
 RUNTIME_SERVICE="${RUNTIME_SERVICE:-runtime}"
-HOST_BASE_URL="${HOST_BASE_URL:-http://127.0.0.1:8080}"
+HOST_BASE_URL="${HOST_BASE_URL:-http://127.0.0.1}"
+HOST_PROBE_PATH="${HOST_PROBE_PATH:-/}"
 RUNTIME_API_TOKEN="${WAF_RUNTIME_API_TOKEN:-}"
 CONTROL_PLANE_METRICS_TOKEN="${CONTROL_PLANE_METRICS_TOKEN:-}"
 RUNTIME_METRICS_TOKEN="${WAF_RUNTIME_METRICS_TOKEN:-}"
@@ -40,8 +41,8 @@ if [ -n "$RUNTIME_API_TOKEN" ]; then
   probe_exec "$RUNTIME_SERVICE" "wget -qO- --header='X-WAF-Runtime-Token: $RUNTIME_API_TOKEN' http://127.0.0.1:8081/readyz >/dev/null"
 fi
 
-echo "Strict post-upgrade smoke: host healthcheck"
-probe_host "$HOST_BASE_URL/healthcheck"
+echo "Strict post-upgrade smoke: host gateway"
+probe_host "${HOST_BASE_URL}${HOST_PROBE_PATH}"
 
 if [ -n "$CONTROL_PLANE_METRICS_TOKEN" ]; then
   echo "Strict post-upgrade smoke: control-plane metrics"
