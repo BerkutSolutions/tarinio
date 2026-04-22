@@ -22,6 +22,20 @@ func TestE2ESmoke_LoginHealthcheckDashboard(t *testing.T) {
 	if baseURL == "" {
 		t.Skip("WAF_E2E_BASE_URL is not set; skipping e2e smoke test")
 	}
+	requestBaseURL := baseURL
+	requestHostOverride := ""
+	originalBaseParsed, err := url.Parse(baseURL)
+	if err != nil {
+		t.Fatalf("parse base url: %v", err)
+	}
+	requestBaseParsed := originalBaseParsed
+	if strings.EqualFold(originalBaseParsed.Hostname(), "localhost") {
+		requestHostOverride = originalBaseParsed.Hostname()
+		requestBaseParsed = &url.URL{}
+		*requestBaseParsed = *originalBaseParsed
+		requestBaseParsed.Host = net.JoinHostPort("127.0.0.1", effectivePort(originalBaseParsed))
+		requestBaseURL = strings.TrimRight(requestBaseParsed.String(), "/")
+	}
 	username := strings.TrimSpace(os.Getenv("WAF_E2E_USERNAME"))
 	if username == "" {
 		username = "admin"
@@ -39,7 +53,7 @@ func TestE2ESmoke_LoginHealthcheckDashboard(t *testing.T) {
 		Timeout: 15 * time.Second,
 		Jar:     jar,
 	}
-	if strings.HasPrefix(strings.ToLower(baseURL), "https://") {
+	if strings.HasPrefix(strings.ToLower(requestBaseURL), "https://") {
 		transport := &http.Transport{
 			Proxy:                 nil,
 			ForceAttemptHTTP2:     false,
@@ -64,7 +78,7 @@ func TestE2ESmoke_LoginHealthcheckDashboard(t *testing.T) {
 		client.Transport = transport
 	}
 
-	if err := waitForHTTP(client, baseURL+"/login", "", 90*time.Second); err != nil {
+	if err := waitForHTTP(client, requestBaseURL+"/login", requestHostOverride, 90*time.Second); err != nil {
 		t.Fatalf("ui is not ready: %v", err)
 	}
 
@@ -72,7 +86,7 @@ func TestE2ESmoke_LoginHealthcheckDashboard(t *testing.T) {
 		"username": username,
 		"password": password,
 	}
-	loginResp := postJSON(t, client, baseURL+"/api/auth/login", "", loginPayload)
+	loginResp := postJSON(t, client, requestBaseURL+"/api/auth/login", requestHostOverride, loginPayload)
 	if loginResp.StatusCode != http.StatusOK {
 		t.Fatalf("login failed: status=%d body=%s", loginResp.StatusCode, mustReadBody(t, loginResp.Body))
 	}
@@ -84,11 +98,13 @@ func TestE2ESmoke_LoginHealthcheckDashboard(t *testing.T) {
 		t.Fatalf("smoke flow requires direct login without 2fa; got requires_2fa=true")
 	}
 
-	baseParsed, err := url.Parse(baseURL)
-	if err != nil {
-		t.Fatalf("parse base url: %v", err)
+	if requestHostOverride != "" {
+		jar.SetCookies(requestBaseParsed, loginResp.Cookies())
 	}
-	cookies := jar.Cookies(baseParsed)
+	cookies := jar.Cookies(originalBaseParsed)
+	if len(cookies) == 0 {
+		cookies = jar.Cookies(requestBaseParsed)
+	}
 	hasSession := false
 	for _, c := range cookies {
 		if strings.TrimSpace(c.Name) == "waf_session" && strings.TrimSpace(c.Value) != "" {
@@ -100,7 +116,7 @@ func TestE2ESmoke_LoginHealthcheckDashboard(t *testing.T) {
 		t.Fatalf("expected waf_session cookie after login")
 	}
 
-	healthcheckPage := getWithAuth(t, client, baseURL+"/healthcheck", "")
+	healthcheckPage := getWithAuth(t, client, requestBaseURL+"/healthcheck", requestHostOverride)
 	if healthcheckPage.StatusCode != http.StatusOK {
 		t.Fatalf("healthcheck page failed: status=%d", healthcheckPage.StatusCode)
 	}
@@ -109,7 +125,7 @@ func TestE2ESmoke_LoginHealthcheckDashboard(t *testing.T) {
 		t.Fatalf("healthcheck page contract mismatch: missing current page markers")
 	}
 
-	compatResp := getWithAuth(t, client, baseURL+"/api/app/compat", "")
+	compatResp := getWithAuth(t, client, requestBaseURL+"/api/app/compat", requestHostOverride)
 	if compatResp.StatusCode != http.StatusOK {
 		t.Fatalf("compat api failed: status=%d body=%s", compatResp.StatusCode, mustReadBody(t, compatResp.Body))
 	}
@@ -127,7 +143,7 @@ func TestE2ESmoke_LoginHealthcheckDashboard(t *testing.T) {
 		t.Fatalf("compat api returned empty module_id")
 	}
 
-	fixResp := postJSON(t, client, baseURL+"/api/app/compat/fix", "", map[string]any{"module_id": firstModuleID})
+	fixResp := postJSON(t, client, requestBaseURL+"/api/app/compat/fix", requestHostOverride, map[string]any{"module_id": firstModuleID})
 	if fixResp.StatusCode != http.StatusOK {
 		t.Fatalf("compat fix failed: status=%d body=%s", fixResp.StatusCode, mustReadBody(t, fixResp.Body))
 	}
@@ -139,7 +155,7 @@ func TestE2ESmoke_LoginHealthcheckDashboard(t *testing.T) {
 		t.Fatalf("compat fix response expected ok=true, got: %#v", fixData)
 	}
 
-	dashboardPage := getWithAuth(t, client, baseURL+"/dashboard", "")
+	dashboardPage := getWithAuth(t, client, requestBaseURL+"/dashboard", requestHostOverride)
 	if dashboardPage.StatusCode != http.StatusOK {
 		t.Fatalf("dashboard page failed: status=%d body=%s", dashboardPage.StatusCode, mustReadBody(t, dashboardPage.Body))
 	}
@@ -148,7 +164,7 @@ func TestE2ESmoke_LoginHealthcheckDashboard(t *testing.T) {
 		t.Fatalf("dashboard page contract mismatch: missing content area marker")
 	}
 
-	dashboardStatsResp := getWithAuth(t, client, baseURL+"/api/dashboard/stats", "")
+	dashboardStatsResp := getWithAuth(t, client, requestBaseURL+"/api/dashboard/stats", requestHostOverride)
 	if dashboardStatsResp.StatusCode != http.StatusOK {
 		t.Fatalf("dashboard stats failed: status=%d body=%s", dashboardStatsResp.StatusCode, mustReadBody(t, dashboardStatsResp.Body))
 	}
@@ -229,6 +245,16 @@ func getWithAuth(t *testing.T, client *http.Client, endpoint string, hostOverrid
 		t.Fatalf("request failed %s: %v", endpoint, err)
 	}
 	return resp
+}
+
+func effectivePort(u *url.URL) string {
+	if port := strings.TrimSpace(u.Port()); port != "" {
+		return port
+	}
+	if strings.EqualFold(u.Scheme, "https") {
+		return "443"
+	}
+	return "80"
 }
 
 func mustReadBody(t *testing.T, body io.ReadCloser) string {
