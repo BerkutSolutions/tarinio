@@ -10,6 +10,7 @@ services:
     environment:
       CONTROL_PLANE_HTTP_ADDR: 0.0.0.0:8080
       WAF_RUNTIME_ROOT: /var/lib/waf
+      CONTROL_PLANE_SECURITY_PEPPER: ${CONTROL_PLANE_SECURITY_PEPPER:-waf-dev-pepper-change-me}
       CONTROL_PLANE_REDIS_ADDR: redis:6379
       WAF_RUNTIME_HEALTH_URL: http://runtime:8081/readyz
       WAF_RUNTIME_RELOAD_URL: http://runtime:8081/reload
@@ -48,10 +49,21 @@ services:
       WAF_DEFAULT_ANTIDDOS_MODEL_WEIGHT_EMERGENCY_BOTNET: ${WAF_DEFAULT_ANTIDDOS_MODEL_WEIGHT_EMERGENCY_BOTNET:-6.0}
       WAF_DEFAULT_ANTIDDOS_MODEL_WEIGHT_EMERGENCY_SINGLE: ${WAF_DEFAULT_ANTIDDOS_MODEL_WEIGHT_EMERGENCY_SINGLE:-4.0}
       POSTGRES_DSN: postgres://${POSTGRES_USER:-waf}:${POSTGRES_PASSWORD:-waf}@postgres:5432/${POSTGRES_DB:-waf}?sslmode=disable
+      OPENSEARCH_ENDPOINT: ${OPENSEARCH_ENDPOINT:-http://opensearch:9200}
+      OPENSEARCH_USERNAME: ${OPENSEARCH_USERNAME:-admin}
+      OPENSEARCH_PASSWORD: ${OPENSEARCH_PASSWORD:-change-me-opensearch-password}
+      OPENSEARCH_INDEX_PREFIX: ${OPENSEARCH_INDEX_PREFIX:-waf-hot}
+      VAULT_ENABLED: ${VAULT_ENABLED:-true}
+      VAULT_ADDR: ${VAULT_ADDR:-http://vault:8200}
+      VAULT_MOUNT: ${VAULT_MOUNT:-secret}
+      VAULT_PATH_PREFIX: ${VAULT_PATH_PREFIX:-tarinio}
+      VAULT_TOKEN: ${VAULT_TOKEN:-}
+      VAULT_TOKEN_FILE: /var/run/waf-secrets/root-token
     volumes:
       - waf-runtime-data:/var/lib/waf
       - waf-control-plane-data:/var/lib/waf/control-plane
       - waf-certificates-data:/var/lib/waf/control-plane/certificate-materials
+      - waf-vault-bootstrap-data:/var/run/waf-secrets:ro
       - /var/run/docker.sock:/var/run/docker.sock
     expose:
       - "8080"
@@ -59,6 +71,10 @@ services:
       redis:
         condition: service_healthy
       postgres:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+      vault:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
@@ -79,8 +95,20 @@ services:
         condition: service_started
     environment:
       WAF_RUNTIME_ROOT: /var/lib/waf
+      WAF_REQUEST_ARCHIVE_ROOT: /var/lib/waf-request-archive
       WAF_RUNTIME_HEALTH_ADDR: 0.0.0.0:8081
       WAF_RUNTIME_API_TOKEN: ${WAF_RUNTIME_API_TOKEN:-default-runtime-shared-token}
+      CONTROL_PLANE_SECURITY_PEPPER: ${CONTROL_PLANE_SECURITY_PEPPER:-waf-dev-pepper-change-me}
+      OPENSEARCH_ENDPOINT: ${OPENSEARCH_ENDPOINT:-http://opensearch:9200}
+      OPENSEARCH_USERNAME: ${OPENSEARCH_USERNAME:-admin}
+      OPENSEARCH_PASSWORD: ${OPENSEARCH_PASSWORD:-change-me-opensearch-password}
+      OPENSEARCH_INDEX_PREFIX: ${OPENSEARCH_INDEX_PREFIX:-waf-hot}
+      VAULT_ENABLED: ${VAULT_ENABLED:-true}
+      VAULT_ADDR: ${VAULT_ADDR:-http://vault:8200}
+      VAULT_MOUNT: ${VAULT_MOUNT:-secret}
+      VAULT_PATH_PREFIX: ${VAULT_PATH_PREFIX:-tarinio}
+      VAULT_TOKEN: ${VAULT_TOKEN:-}
+      VAULT_TOKEN_FILE: /var/run/waf-secrets/root-token
       # L4 thresholds are sourced from runtime bundle (/etc/waf/l4guard/config.json),
       # compiled from control-plane anti-DDoS settings.
       WAF_L4_GUARD_ADAPTIVE_PATH: /etc/waf/l4guard-adaptive/adaptive.json
@@ -90,9 +118,11 @@ services:
       - NET_RAW
     volumes:
       - waf-runtime-data:/var/lib/waf:ro
+      - waf-request-archive-data:/var/lib/waf-request-archive
       - waf-control-plane-data:/var/lib/waf/control-plane:ro
       - waf-nginx-logs:/var/log/nginx
       - waf-l4-adaptive:/etc/waf/l4guard-adaptive:ro
+      - waf-vault-bootstrap-data:/var/run/waf-secrets:ro
     ports:
       - "80:80"
       - "443:443"
@@ -135,6 +165,77 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - waf-net
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    container_name: tarinio-clickhouse
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-waf_logs}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-waf}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-change-me-clickhouse-password}
+    volumes:
+      - waf-clickhouse-data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8123/ping | grep -q Ok"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    networks:
+      - waf-net
+
+  opensearch:
+    image: opensearchproject/opensearch:2.18.0
+    container_name: tarinio-opensearch
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+      DISABLE_SECURITY_PLUGIN: "true"
+      OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
+    volumes:
+      - waf-opensearch-data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "bash -lc 'exec 3<>/dev/tcp/127.0.0.1/9200'"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+    networks:
+      - waf-net
+
+  vault:
+    image: hashicorp/vault:1.18
+    container_name: tarinio-vault
+    restart: unless-stopped
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_LOCAL_CONFIG: |
+        ui = true
+        disable_mlock = true
+        storage "file" {
+          path = "/vault/file"
+        }
+        listener "tcp" {
+          address = "0.0.0.0:8200"
+          tls_disable = 1
+        }
+        api_addr = "http://vault:8200"
+      VAULT_BOOTSTRAP_DIR: /vault/bootstrap
+      VAULT_LOCAL_ADDR: http://127.0.0.1:8200
+      VAULT_MOUNT: ${VAULT_MOUNT:-secret}
+    entrypoint: ["/bin/sh", "/usr/local/bin/tarinio-vault-entrypoint"]
+    volumes:
+      - waf-vault-data:/vault/file
+      - waf-vault-bootstrap-data:/vault/bootstrap
+      - ./vault/entrypoint.sh:/usr/local/bin/tarinio-vault-entrypoint:ro
+    healthcheck:
+      test: ["CMD-SHELL", "vault status -address=http://127.0.0.1:8200 >/dev/null 2>&1; code=$$?; [ \"$$code\" = \"0\" ]"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
     networks:
       - waf-net
 
@@ -227,6 +328,16 @@ volumes:
     name: ${WAF_STACK_NAME:-waf}-postgres-data
   waf-nginx-logs:
     name: ${WAF_STACK_NAME:-waf}-nginx-logs
+  waf-request-archive-data:
+    name: ${WAF_STACK_NAME:-waf}-request-archive-data
+  waf-clickhouse-data:
+    name: ${WAF_STACK_NAME:-waf}-clickhouse-data
+  waf-opensearch-data:
+    name: ${WAF_STACK_NAME:-waf}-opensearch-data
+  waf-vault-data:
+    name: ${WAF_STACK_NAME:-waf}-vault-data
+  waf-vault-bootstrap-data:
+    name: ${WAF_STACK_NAME:-waf}-vault-bootstrap-data
   waf-l4-adaptive:
     name: ${WAF_STACK_NAME:-waf}-l4-adaptive
   waf-ddos-model-state:

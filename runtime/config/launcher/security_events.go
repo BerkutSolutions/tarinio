@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"waf/internal/loggingconfig"
 )
 
 var accessLogPattern = regexp.MustCompile(`^(\S+) \S+ \S+ \[([^\]]+)\] "([A-Z]+) ([^"]*?) HTTP/[^"]*" (\d{3}) (\S+) "([^"]*)" "([^"]*)" "([^"]*)"$`)
@@ -66,23 +68,48 @@ type requestStreamSource struct {
 	defaultRetention    int
 	lastIngestError     string
 	lastProcessedOffset int64
+	settingsPath        string
+	opensearch          *requestOpenSearchStore
+	clickhouse          *requestClickHouseStore
 }
 
 const requestIngestBatchLines = 4000
 
-func newRequestStreamSource(path string, maxItems int, archiveRoot string, defaultRetention int) *requestStreamSource {
+type requestStreamOption func(*requestStreamSource)
+
+func withRequestClickHouse(settingsPath string, pepper string) requestStreamOption {
+	return func(source *requestStreamSource) {
+		source.settingsPath = strings.TrimSpace(settingsPath)
+		source.clickhouse = newRequestClickHouseStore(settingsPath, pepper)
+	}
+}
+
+func withRequestOpenSearch(settingsPath string, pepper string) requestStreamOption {
+	return func(source *requestStreamSource) {
+		source.settingsPath = strings.TrimSpace(settingsPath)
+		source.opensearch = newRequestOpenSearchStore(settingsPath, pepper)
+	}
+}
+
+func newRequestStreamSource(path string, maxItems int, archiveRoot string, defaultRetention int, options ...requestStreamOption) *requestStreamSource {
 	if maxItems <= 0 {
 		maxItems = 500
 	}
 	if defaultRetention <= 0 {
 		defaultRetention = 30
 	}
-	return &requestStreamSource{
+	source := &requestStreamSource{
 		path:             path,
 		maxItems:         maxItems,
 		archiveRoot:      archiveRoot,
 		defaultRetention: defaultRetention,
 	}
+	for _, option := range options {
+		if option != nil {
+			option(source)
+		}
+	}
+	return source
 }
 
 type requestQueryOptions struct {
@@ -166,6 +193,10 @@ func (s *requestStreamSource) latest(query url.Values) ([]map[string]any, error)
 	if options.Probe {
 		return []map[string]any{}, nil
 	}
+	items, handled, err := s.latestFromBackendsLocked(options)
+	if handled {
+		return items, err
+	}
 	return s.loadArchiveRowsLocked(options)
 }
 
@@ -207,6 +238,9 @@ func (s *requestStreamSource) ingestLatestLocked(retentionDays int) error {
 	file, err := os.Open(s.path)
 	if err != nil {
 		if os.IsNotExist(err) {
+			if migrateErr := s.migrateHotToColdLocked(retentionDays); migrateErr != nil {
+				s.lastIngestError = migrateErr.Error()
+			}
 			s.pruneArchiveLocked(retentionDays)
 			return nil
 		}
@@ -227,6 +261,7 @@ func (s *requestStreamSource) ingestLatestLocked(retentionDays int) error {
 
 	reader := bufio.NewReaderSize(file, 64*1024)
 	rowsByDay := map[string][][]byte{}
+	records := make([]requestLogRecord, 0, requestIngestBatchLines)
 	nextOffset := s.lastProcessedOffset
 	processed := 0
 	for processed < requestIngestBatchLines {
@@ -256,28 +291,19 @@ func (s *requestStreamSource) ingestLatestLocked(retentionDays int) error {
 			}
 			continue
 		}
-		row := map[string]any{
-			"stream":      "runtime",
-			"ingested_at": item.when.UTC().Format(time.RFC3339Nano),
-			"entry": map[string]any{
-				"timestamp":     item.when.UTC().Format(time.RFC3339Nano),
-				"request_id":    item.requestID,
-				"client_ip":     item.ip,
-				"country":       item.country,
-				"method":        item.method,
-				"uri":           item.path,
-				"status":        item.status,
-				"site":          item.siteID,
-				"host":          item.host,
-				"upstream_addr": item.upstreamAddr,
-				"referer":       item.referer,
-				"user_agent":    item.userAgent,
-			},
+		if shouldSkipInternalManagementRequest(item) {
+			if errors.Is(readErr, io.EOF) {
+				break
+			}
+			continue
 		}
+		record := newRequestLogRecord(item)
+		row := requestRecordToMap(record)
 		content, marshalErr := json.Marshal(row)
 		if marshalErr != nil {
 			continue
 		}
+		records = append(records, record)
 		day := item.when.UTC().Format("2006-01-02")
 		rowsByDay[day] = append(rowsByDay[day], append(content, '\n'))
 		if errors.Is(readErr, io.EOF) {
@@ -297,8 +323,129 @@ func (s *requestStreamSource) ingestLatestLocked(retentionDays int) error {
 		}
 		_ = handle.Close()
 	}
+	settings := s.loadLoggingSettingsLocked()
+	if s.opensearch != nil && len(records) > 0 && settings.Routing.WriteRequestsToHot {
+		if err := s.opensearch.insert(records); err != nil {
+			s.lastIngestError = err.Error()
+		} else {
+			s.lastIngestError = ""
+		}
+	}
+	if s.clickhouse != nil && len(records) > 0 && settings.Routing.WriteRequestsToCold {
+		if err := s.clickhouse.insert(records); err != nil {
+			s.lastIngestError = err.Error()
+		} else {
+			s.lastIngestError = ""
+		}
+	}
+	if s.clickhouse != nil {
+		if err := s.importArchiveDaysToClickHouseLocked(); err != nil {
+			s.lastIngestError = err.Error()
+		}
+	}
+	if err := s.migrateHotToColdLocked(retentionDays); err != nil {
+		s.lastIngestError = err.Error()
+	}
 	s.pruneArchiveLocked(retentionDays)
 	return nil
+}
+
+func (s *requestStreamSource) loadLoggingSettingsLocked() loggingconfig.Settings {
+	if strings.TrimSpace(s.settingsPath) == "" {
+		return loggingconfig.Normalize(loggingconfig.Settings{
+			Backend: loggingconfig.BackendOpenSearch,
+			Hot:     loggingconfig.HotSettings{Backend: loggingconfig.BackendOpenSearch},
+			Cold:    loggingconfig.ColdSettings{Backend: loggingconfig.BackendClickHouse},
+			Retention: loggingconfig.RetentionSettings{
+				HotDays:  loggingconfig.DefaultHotDays,
+				ColdDays: loggingconfig.DefaultColdDays,
+			},
+			Routing: loggingconfig.RoutingSettings{
+				WriteRequestsToHot: true,
+				KeepLocalFallback:  true,
+			},
+		})
+	}
+	content, err := os.ReadFile(s.settingsPath)
+	if err != nil {
+		return loggingconfig.Normalize(loggingconfig.Settings{
+			Backend: loggingconfig.BackendOpenSearch,
+			Hot:     loggingconfig.HotSettings{Backend: loggingconfig.BackendOpenSearch},
+			Cold:    loggingconfig.ColdSettings{Backend: loggingconfig.BackendClickHouse},
+			Retention: loggingconfig.RetentionSettings{
+				HotDays:  loggingconfig.DefaultHotDays,
+				ColdDays: loggingconfig.DefaultColdDays,
+			},
+			Routing: loggingconfig.RoutingSettings{
+				WriteRequestsToHot: true,
+				KeepLocalFallback:  true,
+			},
+		})
+	}
+	var payload struct {
+		Logging loggingconfig.Settings `json:"logging"`
+	}
+	if err := json.Unmarshal(content, &payload); err != nil {
+		return loggingconfig.Normalize(loggingconfig.Settings{
+			Backend: loggingconfig.BackendOpenSearch,
+			Hot:     loggingconfig.HotSettings{Backend: loggingconfig.BackendOpenSearch},
+			Cold:    loggingconfig.ColdSettings{Backend: loggingconfig.BackendClickHouse},
+			Retention: loggingconfig.RetentionSettings{
+				HotDays:  loggingconfig.DefaultHotDays,
+				ColdDays: loggingconfig.DefaultColdDays,
+			},
+			Routing: loggingconfig.RoutingSettings{
+				WriteRequestsToHot: true,
+				KeepLocalFallback:  true,
+			},
+		})
+	}
+	return loggingconfig.Normalize(payload.Logging)
+}
+
+func (s *requestStreamSource) latestFromBackendsLocked(options requestQueryOptions) ([]map[string]any, bool, error) {
+	combined := make([]map[string]any, 0)
+	seen := map[string]struct{}{}
+	hadBackend := false
+
+	if s.opensearch != nil {
+		items, err := s.opensearch.latest(options)
+		if err == nil {
+			hadBackend = true
+			appendRequestRowsDedup(&combined, seen, items)
+		} else if !errors.Is(err, errOpenSearchDisabled) {
+			s.lastIngestError = err.Error()
+		}
+	}
+	if s.clickhouse != nil {
+		items, err := s.clickhouse.latest(options)
+		if err == nil {
+			hadBackend = true
+			appendRequestRowsDedup(&combined, seen, items)
+		} else if !errors.Is(err, errClickHouseDisabled) {
+			s.lastIngestError = err.Error()
+		}
+	}
+	if !hadBackend {
+		return nil, false, nil
+	}
+	sort.Slice(combined, func(i, j int) bool {
+		left := requestRowTimestamp(combined[i])
+		right := requestRowTimestamp(combined[j])
+		return left.After(right)
+	})
+	if options.Offset > 0 || (options.Limit > 0 && len(combined) > options.Limit) {
+		start := maxInt(options.Offset, 0)
+		if start > len(combined) {
+			start = len(combined)
+		}
+		end := len(combined)
+		if options.Limit > 0 && start+options.Limit < end {
+			end = start + options.Limit
+		}
+		combined = combined[start:end]
+	}
+	return combined, true, nil
 }
 
 func (s *requestStreamSource) ensureArchiveRootLocked() error {
@@ -468,6 +615,11 @@ func (s *requestStreamSource) indexes(query url.Values) (map[string]any, error) 
 		limit = 50
 	}
 
+	options := requestQueryOptions{Limit: limit, Offset: offset, RetentionDays: s.defaultRetention}
+	if payload, ok := s.indexesFromBackendsLocked(options); ok {
+		payload["last_ingest_error"] = s.lastIngestError
+		return payload, nil
+	}
 	days, err := s.listArchiveDaysLocked("")
 	if err != nil {
 		return nil, err
@@ -532,17 +684,274 @@ func (s *requestStreamSource) deleteIndex(query url.Values) error {
 	if _, err := time.Parse("2006-01-02", day); err != nil {
 		return errors.New("date must be in YYYY-MM-DD format")
 	}
+	if s.clickhouse != nil {
+		if s.opensearch != nil {
+			if err := s.opensearch.deleteDay(day); err != nil {
+				s.lastIngestError = err.Error()
+			}
+		}
+	}
+	if s.clickhouse != nil {
+		if err := s.clickhouse.deleteDay(day); err != nil {
+			s.lastIngestError = err.Error()
+		}
+	}
 	path := filepath.Join(s.archiveRoot, day+".jsonl")
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		return err
 	}
+	statePath := filepath.Join(s.archiveRoot, ".clickhouse-migration-state.json")
+	state, err := loadRequestMigrationState(statePath)
+	if err == nil {
+		delete(state.ImportedDays, day)
+		_ = saveRequestMigrationState(statePath, state)
+	}
 	return nil
+}
+
+func (s *requestStreamSource) importArchiveDaysToClickHouseLocked() error {
+	if s.clickhouse == nil {
+		return nil
+	}
+	cfg, err := s.clickhouse.currentConfig()
+	if err != nil || !cfg.Enabled || !cfg.MigrationEnabled {
+		return err
+	}
+	statePath := filepath.Join(s.archiveRoot, ".clickhouse-migration-state.json")
+	state, err := loadRequestMigrationState(statePath)
+	if err != nil {
+		return err
+	}
+	days, err := s.listArchiveDaysLocked("")
+	if err != nil {
+		return err
+	}
+	for _, day := range days {
+		if _, ok := state.ImportedDays[day]; ok {
+			continue
+		}
+		content, err := os.ReadFile(filepath.Join(s.archiveRoot, day+".jsonl"))
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return err
+		}
+		lines := strings.Split(string(content), "\n")
+		records := make([]requestLogRecord, 0, len(lines))
+		for _, line := range lines {
+			record, ok := loadRequestLogRecordFromArchiveLine(line)
+			if !ok {
+				continue
+			}
+			records = append(records, record)
+		}
+		if len(records) == 0 {
+			state.ImportedDays[day] = time.Now().UTC().Format(time.RFC3339)
+			continue
+		}
+		if err := s.clickhouse.insert(records); err != nil {
+			return err
+		}
+		state.ImportedDays[day] = time.Now().UTC().Format(time.RFC3339)
+	}
+	return saveRequestMigrationState(statePath, state)
+}
+
+func (s *requestStreamSource) migrateHotToColdLocked(retentionDays int) error {
+	if s.opensearch == nil || s.clickhouse == nil {
+		return nil
+	}
+	settings := s.loadLoggingSettingsLocked()
+	if settings.Cold.Backend != loggingconfig.BackendClickHouse || settings.Hot.Backend != loggingconfig.BackendOpenSearch {
+		return nil
+	}
+	if retentionDays <= 0 {
+		retentionDays = settings.Retention.HotDays
+	}
+	if retentionDays <= 0 {
+		retentionDays = loggingconfig.DefaultHotDays
+	}
+	statePath := filepath.Join(s.archiveRoot, ".hot-to-cold-migration-state.json")
+	state, err := loadRequestMigrationState(statePath)
+	if err != nil {
+		return err
+	}
+	days, err := s.opensearch.days()
+	if err != nil {
+		if errors.Is(err, errOpenSearchDisabled) {
+			return nil
+		}
+		return err
+	}
+	cutoff := time.Now().UTC().AddDate(0, 0, -retentionDays)
+	for _, day := range days {
+		if _, ok := state.ImportedDays[day]; ok {
+			continue
+		}
+		parsedDay, err := time.Parse("2006-01-02", day)
+		if err != nil || !parsedDay.Before(cutoff) {
+			continue
+		}
+		records, err := s.opensearch.exportDay(day)
+		if err != nil {
+			return err
+		}
+		if len(records) > 0 {
+			if err := s.clickhouse.insert(records); err != nil {
+				return err
+			}
+		}
+		if err := s.opensearch.deleteDay(day); err != nil {
+			return err
+		}
+		state.ImportedDays[day] = time.Now().UTC().Format(time.RFC3339)
+	}
+	return saveRequestMigrationState(statePath, state)
+}
+
+func (s *requestStreamSource) indexesFromBackendsLocked(options requestQueryOptions) (map[string]any, bool) {
+	mergedItems := make([]map[string]any, 0)
+	hadBackend := false
+	seen := map[string]struct{}{}
+	total := 0
+
+	if s.opensearch != nil {
+		payload, err := s.opensearch.indexes(requestQueryOptions{Limit: 500, Offset: 0}, s.archiveRoot)
+		if err == nil {
+			hadBackend = true
+			total += parseMapInt(payload, "total")
+			for _, item := range parseIndexItems(payload) {
+				key := indexItemKey(item)
+				if _, ok := seen[key]; ok {
+					continue
+				}
+				seen[key] = struct{}{}
+				mergedItems = append(mergedItems, item)
+			}
+		} else if !errors.Is(err, errOpenSearchDisabled) {
+			s.lastIngestError = err.Error()
+		}
+	}
+	if s.clickhouse != nil {
+		payload, err := s.clickhouse.indexes(requestQueryOptions{Limit: 500, Offset: 0}, s.archiveRoot)
+		if err == nil {
+			hadBackend = true
+			total += parseMapInt(payload, "total")
+			for _, item := range parseIndexItems(payload) {
+				key := indexItemKey(item)
+				if _, ok := seen[key]; ok {
+					continue
+				}
+				seen[key] = struct{}{}
+				mergedItems = append(mergedItems, item)
+			}
+		} else if !errors.Is(err, errClickHouseDisabled) {
+			s.lastIngestError = err.Error()
+		}
+	}
+	if !hadBackend {
+		return nil, false
+	}
+	sort.Slice(mergedItems, func(i, j int) bool {
+		return strings.TrimSpace(asString(mergedItems[i]["date"])) > strings.TrimSpace(asString(mergedItems[j]["date"]))
+	})
+	start := maxInt(options.Offset, 0)
+	if start > len(mergedItems) {
+		start = len(mergedItems)
+	}
+	end := len(mergedItems)
+	if options.Limit > 0 && start+options.Limit < end {
+		end = start + options.Limit
+	}
+	return map[string]any{
+		"items":        mergedItems[start:end],
+		"total":        len(mergedItems),
+		"limit":        options.Limit,
+		"offset":       options.Offset,
+		"archive_root": s.archiveRoot,
+		"storage_type": "tiered",
+	}, true
 }
 
 func reverseRequestRows(items []map[string]any) {
 	for left, right := 0, len(items)-1; left < right; left, right = left+1, right-1 {
 		items[left], items[right] = items[right], items[left]
 	}
+}
+
+func appendRequestRowsDedup(target *[]map[string]any, seen map[string]struct{}, items []map[string]any) {
+	for _, item := range items {
+		key := requestRowKey(item)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		*target = append(*target, item)
+	}
+}
+
+func requestRowKey(item map[string]any) string {
+	entry, _ := item["entry"].(map[string]any)
+	return strings.Join([]string{
+		strings.TrimSpace(asString(item["stream"])),
+		strings.TrimSpace(asString(item["ingested_at"])),
+		strings.TrimSpace(asString(entry["timestamp"])),
+		strings.TrimSpace(asString(entry["request_id"])),
+		strings.TrimSpace(asString(entry["client_ip"])),
+		strings.TrimSpace(asString(entry["uri"])),
+		strconv.Itoa(parseIntValue(entry["status"])),
+	}, "|")
+}
+
+func requestRowTimestamp(item map[string]any) time.Time {
+	entry, _ := item["entry"].(map[string]any)
+	for _, raw := range []string{
+		strings.TrimSpace(asString(entry["timestamp"])),
+		strings.TrimSpace(asString(item["ingested_at"])),
+	} {
+		if raw == "" {
+			continue
+		}
+		if parsed, err := time.Parse(time.RFC3339Nano, raw); err == nil {
+			return parsed.UTC()
+		}
+		if parsed, err := time.Parse(time.RFC3339, raw); err == nil {
+			return parsed.UTC()
+		}
+	}
+	return time.Time{}
+}
+
+func parseIndexItems(payload map[string]any) []map[string]any {
+	raw, _ := payload["items"].([]map[string]any)
+	if raw != nil {
+		return raw
+	}
+	itemsRaw, _ := payload["items"].([]any)
+	out := make([]map[string]any, 0, len(itemsRaw))
+	for _, item := range itemsRaw {
+		typed, _ := item.(map[string]any)
+		if typed != nil {
+			out = append(out, typed)
+		}
+	}
+	return out
+}
+
+func parseMapInt(payload map[string]any, key string) int {
+	if payload == nil {
+		return 0
+	}
+	return parseIntValue(payload[key])
+}
+
+func indexItemKey(item map[string]any) string {
+	return strings.Join([]string{
+		strings.TrimSpace(asString(item["date"])),
+		strings.TrimSpace(asString(item["storage_type"])),
+		strings.TrimSpace(asString(item["file_name"])),
+	}, "|")
 }
 
 func asString(value any) string {
@@ -854,7 +1263,7 @@ func burstScopeKey(item parsedAccess) string {
 	if host := strings.ToLower(strings.TrimSpace(item.host)); host != "" {
 		return host
 	}
-	return "_global"
+	return "unknown"
 }
 
 func normalizeBurstPath(path string) string {
@@ -870,6 +1279,9 @@ func normalizeBurstPath(path string) string {
 }
 
 func shouldTrackRequestBurst(item parsedAccess) bool {
+	if shouldSkipInternalManagementRequest(item) {
+		return false
+	}
 	if shouldSkipInternalSite(item.siteID) {
 		return false
 	}
@@ -880,6 +1292,47 @@ func shouldTrackRequestBurst(item parsedAccess) bool {
 		return false
 	}
 	return !shouldIgnoreBurstPath(item.path)
+}
+
+func shouldSkipInternalManagementRequest(item parsedAccess) bool {
+	if shouldSkipInternalSite(item.siteID) {
+		return true
+	}
+	path := normalizeBurstPath(item.path)
+	if path == "" || !isInternalManagementPath(path) {
+		return false
+	}
+	host := strings.ToLower(strings.TrimSpace(item.host))
+	return host == "" || isInternalManagementHost(host) || sanitizeSiteID(item.siteID) == ""
+}
+
+func isInternalManagementHost(host string) bool {
+	switch strings.TrimSpace(strings.ToLower(host)) {
+	case "localhost", "127.0.0.1", "::1", "control-plane", "ui":
+		return true
+	default:
+		return false
+	}
+}
+
+func isInternalManagementPath(path string) bool {
+	switch {
+	case strings.HasPrefix(path, "/api/"),
+		strings.HasPrefix(path, "/static/"),
+		strings.HasPrefix(path, "/dashboard"),
+		strings.HasPrefix(path, "/healthz"),
+		strings.HasPrefix(path, "/readyz"),
+		strings.HasPrefix(path, "/login"),
+		strings.HasPrefix(path, "/logout"),
+		strings.HasPrefix(path, "/setup"),
+		strings.HasPrefix(path, "/onboarding"),
+		strings.HasPrefix(path, "/favicon"),
+		strings.HasPrefix(path, "/manifest"),
+		strings.HasPrefix(path, "/site.webmanifest"):
+		return true
+	default:
+		return false
+	}
 }
 
 func shouldIgnoreBurstPath(path string) bool {

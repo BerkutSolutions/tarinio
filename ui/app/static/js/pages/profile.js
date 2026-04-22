@@ -1,3 +1,4 @@
+import { applyTranslations, availableLanguages } from "../i18n.js";
 import { availableTimeZones, formatDateTimeInZone, loadPreferences, savePreferences } from "../preferences.js";
 import { escapeHtml } from "../ui.js";
 
@@ -42,6 +43,13 @@ function webAuthnSupported() {
 function formatDateTime(value, prefs) {
   if (!value) return "-";
   return formatDateTimeInZone(value, prefs.timeZone || "Europe/Moscow");
+}
+
+function renderLanguageOptions(selected) {
+  const current = String(selected || "").trim().toLowerCase();
+  return availableLanguages()
+    .map((item) => `<option value="${escapeHtml(item.id)}"${item.id === current ? " selected" : ""}>${escapeHtml(item.label)}</option>`)
+    .join("");
 }
 
 async function refresh2FA(ctx) {
@@ -200,12 +208,21 @@ export async function renderProfile(container, ctx) {
         <div class="waf-card-head">
           <div>
             <h3>${escapeHtml(ctx.t("settings.general"))}</h3>
-            <div class="muted">${escapeHtml(ctx.t("profile.preferences.saved"))}</div>
+            <div class="muted">${escapeHtml(ctx.t("profile.preferences.subtitle"))}</div>
           </div>
         </div>
         <div class="waf-card-body waf-stack">
           <form id="settings-form" class="waf-form">
             <div class="waf-grid two">
+              <div class="waf-list-item">
+                <div class="waf-list-head">
+                  <div class="waf-list-title">${escapeHtml(ctx.t("profile.preferences.language"))}</div>
+                </div>
+                <div class="waf-field">
+                  <label for="settings-language">${escapeHtml(ctx.t("profile.preferences.language"))}</label>
+                  <select id="settings-language" class="select"></select>
+                </div>
+              </div>
               <div class="waf-list-item">
                 <div class="waf-list-head">
                   <div class="waf-list-title">${escapeHtml(ctx.t("settings.timezone.label"))}</div>
@@ -371,17 +388,38 @@ export async function renderProfile(container, ctx) {
   setText("password-last-changed", me?.password_changed_at ? `${ctx.t("accounts.passwordLastChanged")}: ${formatDateTime(me.password_changed_at, prefs)}` : "");
 
   const tz = container.querySelector("#settings-timezone");
+  const language = container.querySelector("#settings-language");
   const autoLogout = container.querySelector("#settings-auto-logout");
   autoLogout.checked = !!prefs.autoLogout;
   tz.innerHTML = availableTimeZones().map((zone) => `<option value="${escapeHtml(zone)}">${escapeHtml(zone)}</option>`).join("");
   tz.value = prefs.timeZone || "Europe/Moscow";
+  if (language) {
+    language.innerHTML = renderLanguageOptions(me?.language || ctx.getLanguage?.() || "en");
+  }
 
   container.querySelector("#settings-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const next = savePreferences({
+    const nextLanguage = String(language?.value || "").trim().toLowerCase();
+    let updatedUser = me;
+    try {
+      updatedUser = await ctx.api.put("/api/auth/me", {
+        language: nextLanguage,
+      });
+      if (typeof ctx.setCurrentUser === "function") {
+        ctx.setCurrentUser(updatedUser);
+      }
+      if (typeof ctx.setLanguage === "function") {
+        await ctx.setLanguage(String(updatedUser?.language || nextLanguage || "en"));
+      }
+    } catch (err) {
+      showAlert(alertEl, err?.message || ctx.t("common.error"));
+      return;
+    }
+    savePreferences({
       timeZone: tz.value || "Europe/Moscow",
       autoLogout: !!autoLogout.checked,
     });
+    me = updatedUser;
     showAlert(alertEl, ctx.t("settings.saved"), true);
     ctx.notify(ctx.t("settings.saved"));
   });

@@ -109,6 +109,7 @@ export async function renderRequests(container, ctx) {
     selectedDate: todayDateKeyLocal(),
     selectedDateTime: "",
     storageLogsDays: 14,
+    loggingSummary: null,
     serviceOptions: [],
     methodOptions: [],
     statusOptions: []
@@ -319,6 +320,11 @@ export async function renderRequests(container, ctx) {
           <div>
             <h3>${escapeHtml(ctx.t("app.requests"))}</h3>
             <div class="muted">${escapeHtml(ctx.t("requests.subtitle"))}</div>
+            <div class="waf-note">${escapeHtml(ctx.t("requests.storageTier", {
+              hot: String(state.loggingSummary?.hot_backend || "file"),
+              cold: String(state.loggingSummary?.cold_backend || "file"),
+              retention: String(state.storageLogsDays || 14),
+            }))}</div>
           </div>
           <button class="btn ghost btn-sm" id="requests-refresh" type="button">${escapeHtml(ctx.t("common.refresh"))}</button>
         </div>
@@ -586,6 +592,7 @@ export async function renderRequests(container, ctx) {
       if (Number.isFinite(logsDays) && logsDays > 0) {
         state.storageLogsDays = logsDays;
       }
+      state.loggingSummary = runtimeSettings?.logging_summary || null;
       const params = new URLSearchParams();
       params.set("limit", String(state.fetchLimit));
       params.set("day", state.selectedDate || todayDateKeyLocal());

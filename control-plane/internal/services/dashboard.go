@@ -264,7 +264,8 @@ func summarizeRequests(items []map[string]any, cutoff, now time.Time) (int, []Da
 		}
 		uri := strings.TrimSpace(asString(entry["uri"]))
 		siteID := strings.TrimSpace(asString(entry["site"]))
-		if shouldSkipInternalRequest(uri, siteID) {
+		host := strings.TrimSpace(asString(entry["host"]))
+		if shouldSkipInternalRequest(uri, siteID, host) {
 			continue
 		}
 		when := parseAnyTime(entry["timestamp"])
@@ -310,7 +311,12 @@ func summarizeAttackEvents(items []events.Event, cutoff, now time.Time) (int, in
 		if when.IsZero() || when.Before(cutoff) {
 			continue
 		}
-		if shouldSkipInternalRequest("", item.SiteID) {
+		host := strings.TrimSpace(asString(item.Details["host"]))
+		path := strings.TrimSpace(asString(item.Details["path"]))
+		if path == "" {
+			path = strings.TrimSpace(asString(item.Details["uri"]))
+		}
+		if shouldSkipInternalRequest(path, item.SiteID, host) {
 			continue
 		}
 		// Not every security event should be counted as an "attack" in the dashboard.
@@ -383,7 +389,8 @@ func summarizeRequestAttacks(items []map[string]any, cutoff time.Time) requestAt
 		}
 		uri := strings.TrimSpace(asString(entry["uri"]))
 		siteID := strings.TrimSpace(asString(entry["site"]))
-		if shouldSkipInternalRequest(uri, siteID) {
+		host := strings.TrimSpace(asString(entry["host"]))
+		if shouldSkipInternalRequest(uri, siteID, host) {
 			continue
 		}
 		statusCode := parseAnyInt(entry["status"])
@@ -435,7 +442,7 @@ func buildHourlySeries(values map[time.Time]int, now time.Time) []DashboardTimeC
 	return out
 }
 
-func shouldSkipInternalRequest(uri string, siteID string) bool {
+func shouldSkipInternalRequest(uri string, siteID string, host string) bool {
 	path := strings.ToLower(strings.TrimSpace(uri))
 	site := strings.ToLower(strings.TrimSpace(siteID))
 	site = strings.ReplaceAll(site, "_", "-")
@@ -445,11 +452,26 @@ func shouldSkipInternalRequest(uri string, siteID string) bool {
 	if path == "" {
 		return false
 	}
-	return strings.HasPrefix(path, "/api/dashboard") ||
+	if !isInternalManagementPath(path) {
+		return false
+	}
+	host = strings.ToLower(strings.TrimSpace(host))
+	return host == "" || host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "control-plane" || host == "ui" || site == ""
+}
+
+func isInternalManagementPath(path string) bool {
+	return strings.HasPrefix(path, "/api/") ||
+		strings.HasPrefix(path, "/static/") ||
 		strings.HasPrefix(path, "/dashboard") ||
 		strings.HasPrefix(path, "/healthz") ||
 		strings.HasPrefix(path, "/readyz") ||
-		strings.HasPrefix(path, "/login")
+		strings.HasPrefix(path, "/login") ||
+		strings.HasPrefix(path, "/logout") ||
+		strings.HasPrefix(path, "/setup") ||
+		strings.HasPrefix(path, "/onboarding") ||
+		strings.HasPrefix(path, "/favicon") ||
+		strings.HasPrefix(path, "/manifest") ||
+		strings.HasPrefix(path, "/site.webmanifest")
 }
 
 func mergeSeriesMax(primary []DashboardTimeCount, secondary []DashboardTimeCount) []DashboardTimeCount {

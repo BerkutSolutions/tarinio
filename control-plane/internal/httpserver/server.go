@@ -4,7 +4,9 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"waf/control-plane/internal/certificatematerials"
@@ -82,7 +84,12 @@ func New(
 ) *Server {
 	mux := http.NewServeMux()
 	metrics := telemetry.Default()
-	settingsRuntimeHandler := handlers.NewSettingsRuntimeHandlerWithBackend(filepath.Join(revisionStoreDir, "settings"), runtimeHealthURL, stateBackend)
+	settingsRuntimeHandler := handlers.NewSettingsRuntimeHandlerWithBackend(
+		filepath.Join(revisionStoreDir, "settings"),
+		runtimeHealthURL,
+		stateBackend,
+		strings.TrimSpace(os.Getenv("CONTROL_PLANE_SECURITY_PEPPER")),
+	)
 	administrationUsersHandler := handlers.NewAdministrationUsersHandlerWithSessions(userStore, roleStore, sessionStore)
 	administrationRolesHandler := handlers.NewAdministrationRolesHandler(roleStore, userStore)
 	zeroTrustHealthHandler := handlers.NewZeroTrustHealthHandler(userStore, roleStore)

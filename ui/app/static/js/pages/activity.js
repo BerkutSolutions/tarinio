@@ -103,12 +103,25 @@ function applyPreset(container, preset) {
 }
 
 export async function renderActivity(container, ctx) {
+  let runtimeSettings = null;
+  try {
+    runtimeSettings = await ctx.api.get("/api/settings/runtime");
+  } catch {
+    runtimeSettings = null;
+  }
+  const loggingSummary = runtimeSettings?.logging_summary || {};
+  const activityRetention = Number(runtimeSettings?.storage?.activity_days || 30);
   container.innerHTML = `
     <section class="waf-card no-page-card-head">
       <div class="waf-card-head">
         <div>
           <h3>${escapeHtml(ctx.t("activity.title"))}</h3>
           <div class="muted">${escapeHtml(ctx.t("activity.subtitle"))}</div>
+          <div class="waf-note">${escapeHtml(ctx.t("activity.storageTier", {
+            hot: String(loggingSummary?.hot_backend || "file"),
+            cold: String(loggingSummary?.cold_backend || "file"),
+            retention: String(activityRetention),
+          }))}</div>
         </div>
       </div>
       <div class="waf-card-body waf-stack">

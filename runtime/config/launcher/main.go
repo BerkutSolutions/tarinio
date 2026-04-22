@@ -565,8 +565,16 @@ func run() error {
 	requestSource := newRequestStreamSource(
 		"/var/log/nginx/access.log",
 		50000,
-		filepath.Join(runtimeRoot, "requests-archive"),
+		requestArchiveRoot(runtimeRoot),
 		30,
+		withRequestOpenSearch(
+			filepath.Join(runtimeRoot, "control-plane", "settings", "runtime_settings.json"),
+			strings.TrimSpace(os.Getenv("CONTROL_PLANE_SECURITY_PEPPER")),
+		),
+		withRequestClickHouse(
+			filepath.Join(runtimeRoot, "control-plane", "settings", "runtime_settings.json"),
+			strings.TrimSpace(os.Getenv("CONTROL_PLANE_SECURITY_PEPPER")),
+		),
 	)
 	requestSource.startBackgroundIngest(3 * time.Second)
 	if err := startHealthServer(healthAddr, status, process, securitySource, requestSource); err != nil {
@@ -584,6 +592,13 @@ func run() error {
 	}
 
 	return <-process.exitCh
+}
+
+func requestArchiveRoot(runtimeRoot string) string {
+	if configured := strings.TrimSpace(os.Getenv("WAF_REQUEST_ARCHIVE_ROOT")); configured != "" {
+		return configured
+	}
+	return filepath.Join(runtimeRoot, "requests-archive")
 }
 
 func startPeriodicCRSUpdate(manager *crsManager, process *runtimeProcess) {

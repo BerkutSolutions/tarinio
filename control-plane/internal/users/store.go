@@ -28,6 +28,7 @@ type User struct {
 	FullName           string             `json:"full_name,omitempty"`
 	Department         string             `json:"department,omitempty"`
 	Position           string             `json:"position,omitempty"`
+	Language           string             `json:"language,omitempty"`
 	PasswordHash       string             `json:"password_hash"`
 	IsActive           bool               `json:"is_active"`
 	RoleIDs            []string           `json:"role_ids"`
@@ -397,6 +398,7 @@ func normalizeUser(user User) User {
 	user.FullName = strings.TrimSpace(user.FullName)
 	user.Department = strings.TrimSpace(user.Department)
 	user.Position = strings.TrimSpace(user.Position)
+	user.Language = normalizeUserLanguage(user.Language)
 	user.RoleIDs = normalizeValues(user.RoleIDs)
 	user.TOTPSecret = strings.TrimSpace(user.TOTPSecret)
 	user.TOTPSecretEnc = strings.TrimSpace(user.TOTPSecretEnc)
@@ -436,4 +438,15 @@ func normalizeValues(items []string) []string {
 
 func sortUsers(items []User) {
 	sort.Slice(items, func(i, j int) bool { return items[i].ID < items[j].ID })
+}
+
+func normalizeUserLanguage(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "":
+		return ""
+	case "ru", "en", "de", "sr", "zh":
+		return strings.ToLower(strings.TrimSpace(value))
+	default:
+		return ""
+	}
 }

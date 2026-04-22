@@ -40,6 +40,7 @@ type authService interface {
 	FinishPasskeyRegister(ctx context.Context, sessionID, challengeID, name string, credentialJSON json.RawMessage, req *http.Request) (services.PasskeyItem, error)
 	RenamePasskey(sessionID, id, name string) (services.PasskeyItem, error)
 	DeletePasskey(sessionID, id string) error
+	UpdatePreferences(ctx context.Context, sessionID string, input services.AuthUserPreferences) (services.AuthUser, error)
 }
 
 type AuthHandler struct {
@@ -93,6 +94,10 @@ type passkeyRenameRequest struct {
 	Name string `json:"name"`
 }
 
+type updateMeRequest struct {
+	Language string `json:"language"`
+}
+
 func NewAuthHandler(auth authService) *AuthHandler {
 	return &AuthHandler{auth: auth}
 }
@@ -117,6 +122,8 @@ func (h *AuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.logout(w, r)
 	case r.URL.Path == "/api/auth/me" && r.Method == http.MethodGet:
 		h.me(w, r)
+	case r.URL.Path == "/api/auth/me" && r.Method == http.MethodPut:
+		h.updateMe(w, r)
 	case r.URL.Path == "/api/auth/2fa/status" && r.Method == http.MethodGet:
 		h.twoFAStatus(w, r)
 	case r.URL.Path == "/api/auth/2fa/setup" && r.Method == http.MethodPost:
@@ -268,6 +275,29 @@ func (h *AuthHandler) me(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		clearSessionCookie(w)
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": err.Error()})
+		return
+	}
+	SetSessionCookieForRequest(w, r, sessionID)
+	writeJSON(w, http.StatusOK, user)
+}
+
+func (h *AuthHandler) updateMe(w http.ResponseWriter, r *http.Request) {
+	sessionID, ok := readSessionID(r)
+	if !ok {
+		clearSessionCookie(w)
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "session required"})
+		return
+	}
+	var req updateMeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
+		return
+	}
+	user, err := h.auth.UpdatePreferences(withActorIP(r), sessionID, services.AuthUserPreferences{
+		Language: req.Language,
+	})
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 		return
 	}
 	SetSessionCookieForRequest(w, r, sessionID)

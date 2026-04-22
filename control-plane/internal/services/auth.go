@@ -33,10 +33,15 @@ type AuthUser struct {
 	FullName               string   `json:"full_name,omitempty"`
 	Department             string   `json:"department,omitempty"`
 	Position               string   `json:"position,omitempty"`
+	Language               string   `json:"language,omitempty"`
 	RoleIDs                []string `json:"role_ids"`
 	Permissions            []string `json:"permissions"`
 	TOTPEnabled            bool     `json:"totp_enabled"`
 	RecoveryCodesRemaining int      `json:"recovery_codes_remaining"`
+}
+
+type AuthUserPreferences struct {
+	Language string `json:"language,omitempty"`
 }
 
 type SessionResult struct {
@@ -922,6 +927,38 @@ func (s *AuthService) Me(sessionID string) (AuthUser, error) {
 	return s.userByID(session.UserID)
 }
 
+func (s *AuthService) UpdatePreferences(ctx context.Context, sessionID string, input AuthUserPreferences) (result AuthUser, err error) {
+	session, err := s.Authenticate(sessionID)
+	if err != nil {
+		return AuthUser{}, err
+	}
+	defer func() {
+		recordAudit(ctx, s.audits, audits.AuditEvent{
+			ActorUserID:  session.UserID,
+			Action:       "auth.preferences_update",
+			ResourceType: "user",
+			ResourceID:   session.UserID,
+			Status:       auditStatus(err),
+			Summary:      "update personal preferences",
+			Details: map[string]any{
+				"language": normalizeUserLanguage(input.Language),
+			},
+		})
+	}()
+	user, ok, err := s.users.Get(session.UserID)
+	if err != nil {
+		return AuthUser{}, err
+	}
+	if !ok {
+		return AuthUser{}, errors.New("user not found")
+	}
+	user.Language = normalizeUserLanguage(input.Language)
+	if _, err := s.users.Update(user); err != nil {
+		return AuthUser{}, err
+	}
+	return s.userByID(user.ID)
+}
+
 func (s *AuthService) SetupTOTP(ctx context.Context, sessionID string) (result TOTPSetupResult, err error) {
 	session, err := s.Authenticate(sessionID)
 	if err != nil {
@@ -1115,6 +1152,7 @@ func (s *AuthService) userByID(userID string) (AuthUser, error) {
 		FullName:               user.FullName,
 		Department:             user.Department,
 		Position:               user.Position,
+		Language:               normalizeUserLanguage(user.Language),
 		RoleIDs:                append([]string(nil), user.RoleIDs...),
 		Permissions:            s.policy.Permissions(user.RoleIDs),
 		TOTPEnabled:            user.TOTPEnabled,
@@ -1184,6 +1222,17 @@ func countUnusedRecoveryCodes(user users.User) int {
 		}
 	}
 	return count
+}
+
+func normalizeUserLanguage(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "":
+		return ""
+	case "ru", "en", "de", "sr", "zh":
+		return strings.ToLower(strings.TrimSpace(value))
+	default:
+		return ""
+	}
 }
 
 func deriveRPID(req *http.Request) string {

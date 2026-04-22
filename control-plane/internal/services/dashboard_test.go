@@ -194,3 +194,62 @@ func TestDashboardService_FallsBackToBlockedRequestsForAttackWidgets(t *testing.
 		t.Fatalf("expected attacked URLs to be populated from blocked requests")
 	}
 }
+
+func TestDashboardService_SkipsInternalManagementTraffic(t *testing.T) {
+	now := time.Now().UTC()
+	service := NewDashboardService(
+		&fakeDashboardEventReader{
+			items: []events.Event{
+				{
+					ID:         "evt-ui",
+					Type:       events.TypeSecurityWAF,
+					SiteID:     "",
+					OccurredAt: now.Format(time.RFC3339),
+					Details: map[string]any{
+						"path":   "/api/events",
+						"host":   "localhost",
+						"status": 403,
+					},
+				},
+			},
+		},
+		&fakeDashboardRequestCollector{
+			items: []map[string]any{
+				{
+					"ingested_at": now.Format(time.RFC3339),
+					"entry": map[string]any{
+						"timestamp": now.Format(time.RFC3339),
+						"site":      "",
+						"host":      "localhost",
+						"uri":       "/api/requests",
+						"status":    200,
+						"client_ip": "127.0.0.1",
+					},
+				},
+				{
+					"ingested_at": now.Format(time.RFC3339),
+					"entry": map[string]any{
+						"timestamp": now.Format(time.RFC3339),
+						"site":      "site-a",
+						"host":      "shop.example.com",
+						"uri":       "/checkout",
+						"status":    200,
+						"client_ip": "203.0.113.10",
+					},
+				},
+			},
+		},
+		&fakeDashboardRuntimeProbe{},
+	)
+
+	stats, err := service.Stats()
+	if err != nil {
+		t.Fatalf("stats failed: %v", err)
+	}
+	if stats.RequestsDay != 1 {
+		t.Fatalf("expected internal requests to be skipped, got %d", stats.RequestsDay)
+	}
+	if stats.AttacksDay != 0 {
+		t.Fatalf("expected internal security events to be skipped, got %d", stats.AttacksDay)
+	}
+}

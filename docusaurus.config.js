@@ -97,10 +97,10 @@ const config = {
           ],
         },
         {
-          label: 'Версия 2.0.4',
+          label: 'Версия 2.0.5',
           position: 'right',
           items: [
-            {label: 'Текущий релиз 2.0.4', to: '/ru/release-policy/'},
+            {label: 'Текущий релиз 2.0.5', to: '/ru/release-policy/'},
             {label: 'CHANGELOG', href: 'https://github.com/BerkutSolutions/tarinio/blob/main/CHANGELOG.md'},
           ],
         },

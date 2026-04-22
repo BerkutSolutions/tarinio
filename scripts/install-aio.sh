@@ -95,6 +95,121 @@ run_logged() {
   "$@" >>"$LOG_FILE" 2>&1
 }
 
+generate_secret() {
+  length="${1:-48}"
+  if command -v openssl >/dev/null 2>&1; then
+    bytes=$((length + 8))
+    openssl rand -base64 "$bytes" 2>/dev/null | tr -dc 'A-Za-z0-9' | head -c "$length"
+    return 0
+  fi
+  if [ -r /dev/urandom ]; then
+    tr -dc 'A-Za-z0-9' </dev/urandom | head -c "$length"
+    return 0
+  fi
+  date +%s | sha256sum | awk '{print $1}' | head -c "$length"
+}
+
+read_env_value() {
+  key="$1"
+  if [ ! -f .env ]; then
+    return 0
+  fi
+  awk -F= -v key="$key" '$1 == key { value=$0; sub("^[^=]*=", "", value); print value }' .env | tail -n 1
+}
+
+write_env_value() {
+  key="$1"
+  value="$2"
+  tmp_file=".env.tmp.$$"
+  awk -F= -v key="$key" -v value="$value" '
+    BEGIN { written = 0 }
+    $1 == key {
+      print key "=" value
+      written = 1
+      next
+    }
+    { print }
+    END {
+      if (!written) {
+        print key "=" value
+      }
+    }
+  ' .env >"$tmp_file"
+  mv "$tmp_file" .env
+}
+
+is_placeholder_secret() {
+  value="$(printf "%s" "$1" | tr -d '\r')"
+  case "$value" in
+    ""|change-me*|default|changeme|please-change*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+ensure_secure_env_defaults() {
+  changed=0
+
+  postgres_user="$(read_env_value POSTGRES_USER)"
+  postgres_db="$(read_env_value POSTGRES_DB)"
+  postgres_password="$(read_env_value POSTGRES_PASSWORD)"
+  clickhouse_password="$(read_env_value CLICKHOUSE_PASSWORD)"
+  opensearch_password="$(read_env_value OPENSEARCH_PASSWORD)"
+  security_pepper="$(read_env_value CONTROL_PLANE_SECURITY_PEPPER)"
+  postgres_dsn="$(read_env_value POSTGRES_DSN)"
+
+  if [ -z "$postgres_user" ]; then
+    postgres_user="waf"
+    write_env_value POSTGRES_USER "$postgres_user"
+    changed=1
+  fi
+  if [ -z "$postgres_db" ]; then
+    postgres_db="waf"
+    write_env_value POSTGRES_DB "$postgres_db"
+    changed=1
+  fi
+  if is_placeholder_secret "$postgres_password"; then
+    postgres_password="$(generate_secret 40)"
+    write_env_value POSTGRES_PASSWORD "$postgres_password"
+    changed=1
+    ok "generated secure POSTGRES_PASSWORD"
+  fi
+  if is_placeholder_secret "$clickhouse_password"; then
+    clickhouse_password="$(generate_secret 40)"
+    write_env_value CLICKHOUSE_PASSWORD "$clickhouse_password"
+    changed=1
+    ok "generated secure CLICKHOUSE_PASSWORD"
+  fi
+  if is_placeholder_secret "$opensearch_password"; then
+    opensearch_password="$(generate_secret 40)"
+    write_env_value OPENSEARCH_PASSWORD "$opensearch_password"
+    changed=1
+    ok "generated secure OPENSEARCH_PASSWORD"
+  fi
+  if is_placeholder_secret "$security_pepper"; then
+    security_pepper="$(generate_secret 64)"
+    write_env_value CONTROL_PLANE_SECURITY_PEPPER "$security_pepper"
+    changed=1
+    ok "generated secure CONTROL_PLANE_SECURITY_PEPPER"
+  fi
+
+  target_postgres_dsn="postgres://${postgres_user}:${postgres_password}@postgres:5432/${postgres_db}?sslmode=disable"
+  if [ -z "$postgres_dsn" ] || printf "%s" "$postgres_dsn" | grep -q "change-me"; then
+    write_env_value POSTGRES_DSN "$target_postgres_dsn"
+    changed=1
+    ok "normalized POSTGRES_DSN for current credentials"
+  fi
+
+  if [ "$changed" -eq 1 ]; then
+    ok ".env security defaults normalized"
+  else
+    ok ".env security defaults already set"
+  fi
+}
+
 safe_snapshot() {
   mkdir -p "$BACKUP_DIR"
   if [ -f "$INSTALL_DIR/deploy/compose/$PROFILE/.env" ]; then
@@ -120,7 +235,7 @@ compose_capture() {
 should_backup_volume() {
   name="$1"
   case "$name" in
-    *runtime-data*|*control-plane-data*|*certificates-data*|*postgres-data*|*ddos-model-state*|*request-archive-data*|*l4-adaptive*)
+    *runtime-data*|*control-plane-data*|*certificates-data*|*postgres-data*|*clickhouse-data*|*opensearch-data*|*vault-data*|*vault-bootstrap-data*|*ddos-model-state*|*request-archive-data*|*l4-adaptive*)
       return 0
       ;;
     *)
@@ -354,6 +469,8 @@ if [ ! -f .env ]; then
 else
   ok ".env already exists"
 fi
+step "Normalizing runtime secrets and secure defaults"
+ensure_secure_env_defaults
 
 section "Build And Start"
 EXISTING_CONTAINERS="$($COMPOSE_CMD -f docker-compose.yml ps -aq 2>/dev/null || true)"

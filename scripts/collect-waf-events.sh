@@ -21,6 +21,9 @@ set -u
 DEPLOY_DIR="${DEPLOY_DIR:-/opt/tarinio/deploy/compose/default}"
 RUNTIME_CONTAINER="${RUNTIME_CONTAINER:-tarinio-runtime}"
 CONTROL_PLANE_CONTAINER="${CONTROL_PLANE_CONTAINER:-tarinio-control-plane}"
+CLICKHOUSE_CONTAINER="${CLICKHOUSE_CONTAINER:-tarinio-clickhouse}"
+OPENSEARCH_CONTAINER="${OPENSEARCH_CONTAINER:-tarinio-opensearch}"
+VAULT_CONTAINER="${VAULT_CONTAINER:-tarinio-vault}"
 WAF_CLI_BIN="${WAF_CLI_BIN:-waf-cli}"
 SINCE="${SINCE:-24h}"
 NON_INTERACTIVE="${NON_INTERACTIVE:-0}"
@@ -155,7 +158,7 @@ IP_ERE="$(build_ere_pattern "$N_FILTER_IP")"
 SITE_ERE="$(build_ere_pattern "$N_FILTER_SITE")"
 URI_ERE="$(build_ere_pattern "$N_FILTER_URI")"
 UPSTREAM_EMPTY_ERE='\"upstream_addr\":\"\"|\"upstream_addr\":null|\"upstream_addr\":\"-\"'
-UPSTREAM_PRESENT_ERE='\"upstream_addr\":\"[^"]+\"'
+UPSTREAM_PRESENT_ERE='\"upstream_addr\":\"[^\\\"]+\"'
 
 run_cli "app_meta.json" --json api GET /api/app/meta
 run_cli "sites.json" --json api GET /api/sites
@@ -167,7 +170,17 @@ run_cli "audit_ban_actions.txt" audit --action accesspolicy.ban --limit 200
 run_cli "audit_unban_actions.txt" audit --action accesspolicy.unban --limit 200
 run "runtime_logs_since.log" docker logs --since="$SINCE" "$RUNTIME_CONTAINER"
 run "control_plane_logs_since.log" docker logs --since="$SINCE" "$CONTROL_PLANE_CONTAINER"
+run "clickhouse_logs_since.log" docker logs --since="$SINCE" "$CLICKHOUSE_CONTAINER"
+run "opensearch_logs_since.log" docker logs --since="$SINCE" "$OPENSEARCH_CONTAINER"
+run "vault_logs_since.log" docker logs --since="$SINCE" "$VAULT_CONTAINER"
 run_sh "runtime_access_recent.log" "docker exec '$RUNTIME_CONTAINER' sh -lc \"tail -n 12000 /var/log/nginx/access.log\""
+run_cli "runtime_settings.json" --json api GET /api/settings/runtime
+run_sh "runtime_request_indexes.json" "docker exec '$RUNTIME_CONTAINER' sh -lc \"wget --header='X-WAF-Runtime-Token: ${WAF_RUNTIME_API_TOKEN:-default-runtime-shared-token}' -qO- 'http://127.0.0.1:8081/requests/indexes?limit=20&offset=0'\""
+run_sh "clickhouse_ping.txt" "docker exec '$CLICKHOUSE_CONTAINER' sh -lc \"wget -qO- http://127.0.0.1:8123/ping\""
+run_sh "clickhouse_request_log_count.txt" "docker exec '$CLICKHOUSE_CONTAINER' sh -lc \"clickhouse-client --user \\\"\\${CLICKHOUSE_USER:-default}\\\" --password \\\"\\${CLICKHOUSE_PASSWORD:-}\\\" --query \\\"SELECT count() FROM waf_logs.request_logs\\\" 2>/dev/null || true\""
+run_sh "opensearch_health.txt" "docker exec '$OPENSEARCH_CONTAINER' bash -lc \"exec 3<>/dev/tcp/127.0.0.1/9200; printf 'GET /_cluster/health HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n' >&3; cat <&3\""
+run_sh "opensearch_requests_count.txt" "docker exec '$OPENSEARCH_CONTAINER' bash -lc \"exec 3<>/dev/tcp/127.0.0.1/9200; printf 'GET /waf-requests/_count HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n' >&3; cat <&3\""
+run_sh "vault_health.txt" "docker exec '$VAULT_CONTAINER' sh -lc \"vault status -format=json -address=http://127.0.0.1:8200 2>/dev/null || true\""
 
 if [[ -n "$N_FILTER_SITE" ]]; then
   for site in $N_FILTER_SITE; do

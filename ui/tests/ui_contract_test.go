@@ -94,6 +94,16 @@ func TestUIContract_OnboardingAndSidebarMarkers(t *testing.T) {
 			},
 		},
 		{
+			file: filepath.Join("..", "app", "static", "js", "pages", "settings.js"),
+			markers: []string{
+				`data-settings-panel="secrets"`,
+				`data-storage-index-stream="events"`,
+				`data-storage-index-stream="activity"`,
+				`settings-storage-hot-index-days`,
+				`settings-storage-cold-index-days`,
+			},
+		},
+		{
 			file: filepath.Join("..", "app", "static", "js", "app.js"),
 			markers: []string{
 				`id: "requests"`,

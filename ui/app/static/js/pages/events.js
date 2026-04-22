@@ -85,12 +85,25 @@ function buildPageButtons(totalPages, currentPage, dataAttr) {
 }
 
 export async function renderEvents(container, ctx) {
+  let runtimeSettings = null;
+  try {
+    runtimeSettings = await ctx.api.get("/api/settings/runtime");
+  } catch {
+    runtimeSettings = null;
+  }
+  const loggingSummary = runtimeSettings?.logging_summary || {};
+  const eventsRetention = Number(runtimeSettings?.storage?.events_days || 30);
   container.innerHTML = `
     <section class="waf-card no-page-card-head">
       <div class="waf-card-head">
         <div>
           <h3>${escapeHtml(ctx.t("app.events"))}</h3>
           <div class="muted">${escapeHtml(ctx.t("events.subtitle"))}</div>
+          <div class="waf-note">${escapeHtml(ctx.t("events.storageTier", {
+            hot: String(loggingSummary?.hot_backend || "file"),
+            cold: String(loggingSummary?.cold_backend || "file"),
+            retention: String(eventsRetention),
+          }))}</div>
         </div>
       </div>
       <div class="waf-card-body waf-stack">

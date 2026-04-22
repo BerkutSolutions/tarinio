@@ -57,6 +57,9 @@ func (f *fakeAuthService) Logout(ctx context.Context, sessionID string) error { 
 func (f *fakeAuthService) Me(sessionID string) (services.AuthUser, error) {
 	return services.AuthUser{ID: "admin", Username: "admin", TOTPEnabled: true}, nil
 }
+func (f *fakeAuthService) UpdatePreferences(ctx context.Context, sessionID string, input services.AuthUserPreferences) (services.AuthUser, error) {
+	return services.AuthUser{ID: "admin", Username: "admin", Language: input.Language}, nil
+}
 func (f *fakeAuthService) SetupTOTP(ctx context.Context, sessionID string) (services.TOTPSetupResult, error) {
 	return services.TOTPSetupResult{ChallengeID: "challenge-1", Secret: "SECRET"}, nil
 }
@@ -129,5 +132,25 @@ func TestSetSessionCookieForRequest_UsesForwardedProto(t *testing.T) {
 	}
 	if !foundSecure {
 		t.Fatal("expected secure session cookie when X-Forwarded-Proto=https")
+	}
+}
+
+func TestAuthHandler_UpdateMePreferences(t *testing.T) {
+	handler := NewAuthHandler(&fakeAuthService{})
+
+	req := httptest.NewRequest(http.MethodPut, "/api/auth/me", bytes.NewBufferString(`{"language":"ru"}`))
+	req.AddCookie(&http.Cookie{Name: SessionCookieName, Value: "session-1"})
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	var payload services.AuthUser
+	if err := json.Unmarshal(resp.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if payload.Language != "ru" {
+		t.Fatalf("expected language ru, got %q", payload.Language)
 	}
 }

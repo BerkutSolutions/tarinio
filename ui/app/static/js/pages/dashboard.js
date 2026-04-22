@@ -207,7 +207,27 @@ function shouldSkipInternalSite(siteID) {
   return site === "control-plane-access" || site === "control-plane" || site === "ui";
 }
 
-function shouldSkipInternalRequest(uri, siteID) {
+function isInternalManagementHost(host) {
+  const value = String(host || "").trim().toLowerCase();
+  return !value || value === "localhost" || value === "127.0.0.1" || value === "::1" || value === "control-plane" || value === "ui";
+}
+
+function isInternalManagementPath(path) {
+  return path.startsWith("/api/") ||
+    path.startsWith("/static/") ||
+    path.startsWith("/dashboard") ||
+    path.startsWith("/healthz") ||
+    path.startsWith("/readyz") ||
+    path.startsWith("/login") ||
+    path.startsWith("/logout") ||
+    path.startsWith("/setup") ||
+    path.startsWith("/onboarding") ||
+    path.startsWith("/favicon") ||
+    path.startsWith("/manifest") ||
+    path.startsWith("/site.webmanifest");
+}
+
+function shouldSkipInternalRequest(uri, siteID, host = "") {
   if (shouldSkipInternalSite(siteID)) {
     return true;
   }
@@ -215,11 +235,10 @@ function shouldSkipInternalRequest(uri, siteID) {
   if (!path) {
     return false;
   }
-  return path.startsWith("/api/dashboard") ||
-    path.startsWith("/dashboard") ||
-    path.startsWith("/healthz") ||
-    path.startsWith("/readyz") ||
-    path.startsWith("/login");
+  if (!isInternalManagementPath(path)) {
+    return false;
+  }
+  return isInternalManagementHost(host) || !String(siteID || "").trim();
 }
 
 function resolveSiteLabel(siteID, host) {
@@ -542,7 +561,7 @@ function buildDetailModel(stats, requestRows, eventRows) {
     }
     const site = resolveSiteLabel(entry.site, entry.host);
     const uri = String(entry.uri || "-").trim() || "-";
-    if (shouldSkipInternalRequest(uri, site)) {
+    if (shouldSkipInternalRequest(uri, entry.site, entry.host)) {
       return;
     }
     const method = String(entry.method || "-").trim() || "-";

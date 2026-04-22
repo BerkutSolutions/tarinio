@@ -144,6 +144,11 @@ function renderRBAC(user) {
   badge.textContent = "";
 }
 
+function preferredLanguageForUser(user) {
+  const language = String(user?.language || "").trim().toLowerCase();
+  return language || "";
+}
+
 function currentPermissionSet() {
   return new Set(Array.isArray(currentUser?.permissions) ? currentUser.permissions.map((item) => String(item || "").trim()) : []);
 }
@@ -247,6 +252,11 @@ async function renderPage() {
       setLanguage,
       getLanguage,
       currentUser,
+      setCurrentUser(nextUser) {
+        if (nextUser && typeof nextUser === "object") {
+          currentUser = nextUser;
+        }
+      },
       signal,
       isActive,
     });
@@ -483,7 +493,7 @@ async function loadMeta() {
   try {
     const meta = await api.get("/api/app/meta");
     const sharedLanguage = String(meta?.ui_language || "").trim().toLowerCase();
-    if (sharedLanguage && sharedLanguage !== getLanguage()) {
+    if (!preferredLanguageForUser(currentUser) && sharedLanguage && sharedLanguage !== getLanguage()) {
       await setLanguage(sharedLanguage);
     }
     if (meta?.app_version) {
@@ -491,7 +501,7 @@ async function loadMeta() {
     }
     renderUpdateBadge(meta);
   } catch {
-    setVersion("v2.0.4");
+    setVersion("v2.0.5");
     renderUpdateBadge(null);
   }
 }
@@ -522,7 +532,7 @@ function startSessionPing() {
 
 async function bootstrap() {
   await applyTranslations(getLanguage());
-  setVersion("v2.0.4");
+  setVersion("v2.0.5");
 
   const access = await checkEntryAccess("app");
   if (!access.allowed) {
@@ -532,6 +542,9 @@ async function bootstrap() {
   currentUser = access.user || (await loadUser());
   if (!currentUser) {
     return;
+  }
+  if (preferredLanguageForUser(currentUser) && preferredLanguageForUser(currentUser) !== getLanguage()) {
+    await setLanguage(preferredLanguageForUser(currentUser));
   }
 
   renderRBAC(currentUser);
@@ -556,5 +569,4 @@ async function bootstrap() {
 }
 
 bootstrap();
-
 

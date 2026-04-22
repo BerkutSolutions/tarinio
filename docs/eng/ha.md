@@ -4,7 +4,7 @@ This page belongs to the current documentation branch.
 
 ## Scope
 
-TARINIO `2.0.4` now supports a practical multi-node control-plane topology on one Docker host:
+TARINIO `2.0.5` now supports a practical multi-node control-plane topology on one Docker host:
 
 - shared PostgreSQL state;
 - shared Redis coordination;
@@ -16,7 +16,7 @@ This closes the earlier gap where the product was documented as PostgreSQL-backe
 
 ## What Is HA Today
 
-The supported HA shape in `2.0.4` is:
+The supported HA shape in `2.0.5` is:
 
 ```text
 ui -> api-lb -> control-plane-a / control-plane-b

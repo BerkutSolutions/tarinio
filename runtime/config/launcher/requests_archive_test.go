@@ -127,3 +127,61 @@ func TestRequestArchiveDeleteIndex(t *testing.T) {
 		t.Fatalf("expected index file to be removed, got err=%v", err)
 	}
 }
+
+func TestRequestArchiveFallsBackWhenClickHouseConfigIsMissing(t *testing.T) {
+	root := t.TempDir()
+	logPath := filepath.Join(root, "access.log")
+	archiveRoot := filepath.Join(root, "requests-archive")
+	settingsPath := filepath.Join(root, "runtime_settings.json")
+	source := newRequestStreamSource(
+		logPath,
+		100,
+		archiveRoot,
+		30,
+		withRequestClickHouse(settingsPath, "pepper-for-tests"),
+	)
+
+	line := `{"timestamp":"2026-04-22T11:09:00Z","request_id":"req-1","client_ip":"1.1.1.1","method":"GET","uri":"/requests","status":200,"site":"localhost","host":"localhost","upstream_addr":"172.18.0.6:80"}`
+	if err := os.WriteFile(logPath, []byte(line+"\n"), 0o644); err != nil {
+		t.Fatalf("write log fixture: %v", err)
+	}
+
+	items, err := source.latest(url.Values{})
+	if err != nil {
+		t.Fatalf("latest failed: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected archive fallback to return one row, got %d", len(items))
+	}
+	entry, _ := items[0]["entry"].(map[string]any)
+	if got := asString(entry["request_id"]); got != "req-1" {
+		t.Fatalf("unexpected request id: %s", got)
+	}
+}
+
+func TestRequestArchiveSkipsInternalManagementTraffic(t *testing.T) {
+	root := t.TempDir()
+	logPath := filepath.Join(root, "access.log")
+	archiveRoot := filepath.Join(root, "requests-archive")
+	source := newRequestStreamSource(logPath, 100, archiveRoot, 30)
+
+	lines := []string{
+		`{"timestamp":"2026-04-22T11:09:00Z","request_id":"req-ui","client_ip":"127.0.0.1","method":"GET","uri":"/api/requests","status":200,"site":"","host":"localhost"}`,
+		`{"timestamp":"2026-04-22T11:10:00Z","request_id":"req-real","client_ip":"1.1.1.1","method":"GET","uri":"/checkout","status":200,"site":"site-a","host":"shop.example.com","upstream_addr":"172.18.0.7:80"}`,
+	}
+	if err := os.WriteFile(logPath, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
+		t.Fatalf("write log fixture: %v", err)
+	}
+
+	items, err := source.latest(url.Values{})
+	if err != nil {
+		t.Fatalf("latest failed: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected one retained row, got %d", len(items))
+	}
+	entry, _ := items[0]["entry"].(map[string]any)
+	if got := asString(entry["request_id"]); got != "req-real" {
+		t.Fatalf("unexpected request id: %s", got)
+	}
+}
