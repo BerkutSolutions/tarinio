@@ -26,8 +26,8 @@ jobs:
       - name: Prepare compose env
         shell: bash
         run: |
-          cp deploy/compose/default/.env.example deploy/compose/default/.env
-          cat >> deploy/compose/default/.env <<'EOF'
+          cp deploy/compose/auto-start/.env.example deploy/compose/auto-start/.env
+          cat >> deploy/compose/auto-start/.env <<'EOF'
           POSTGRES_PASSWORD=waf
           POSTGRES_DSN=postgres://waf:waf@postgres:5432/waf?sslmode=disable
           CONTROL_PLANE_BOOTSTRAP_ADMIN_ENABLED=true
@@ -37,21 +37,27 @@ jobs:
           CONTROL_PLANE_BOOTSTRAP_ADMIN_PASSWORD=admin
           CONTROL_PLANE_ACME_ENABLED=false
           CONTROL_PLANE_ACME_USE_DEVELOPMENT_CLIENT=true
+          CONTROL_PLANE_DEV_FAST_START_ENABLED=true
+          CONTROL_PLANE_DEV_FAST_START_HOST=localhost
+          CONTROL_PLANE_DEV_FAST_START_CERTIFICATE_ID=control-plane-localhost-tls
+          CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID=control-plane-access
+          CONTROL_PLANE_DEV_FAST_START_UPSTREAM_HOST=ui
+          CONTROL_PLANE_DEV_FAST_START_UPSTREAM_PORT=80
           EOF
 
       - name: Cleanup previous stack state
         shell: bash
-        run: docker compose -f deploy/compose/default/docker-compose.yml down -v --remove-orphans || true
+        run: docker compose -f deploy/compose/auto-start/docker-compose.yml down -v --remove-orphans || true
 
       - name: Start stack
         shell: bash
-        run: docker compose -f deploy/compose/default/docker-compose.yml up -d --build
+        run: docker compose -f deploy/compose/auto-start/docker-compose.yml up -d --build
 
       - name: Wait for control-plane and ui
         shell: bash
         run: |
           for i in $(seq 1 60); do
-            if curl -fsS http://127.0.0.1/login >/dev/null 2>&1; then
+            if curl -kfsS --resolve localhost:443:127.0.0.1 https://localhost/login >/dev/null 2>&1; then
               exit 0
             fi
             sleep 2
@@ -59,7 +65,7 @@ jobs:
           echo "ui login endpoint did not become ready in time"
           curl -I http://127.0.0.1/login || true
           curl -kI --resolve localhost:443:127.0.0.1 https://localhost/login || true
-          docker compose -f deploy/compose/default/docker-compose.yml ps
+          docker compose -f deploy/compose/auto-start/docker-compose.yml ps
           exit 1
 
       - name: Run e2e smoke login-healthcheck-dashboard
@@ -74,10 +80,10 @@ jobs:
         if: failure()
         shell: bash
         run: |
-          docker compose -f deploy/compose/default/docker-compose.yml ps
-          docker compose -f deploy/compose/default/docker-compose.yml logs --no-color
+          docker compose -f deploy/compose/auto-start/docker-compose.yml ps
+          docker compose -f deploy/compose/auto-start/docker-compose.yml logs --no-color
 
       - name: Stop stack
         if: always()
         shell: bash
-        run: docker compose -f deploy/compose/default/docker-compose.yml down -v --remove-orphans
+        run: docker compose -f deploy/compose/auto-start/docker-compose.yml down -v --remove-orphans
