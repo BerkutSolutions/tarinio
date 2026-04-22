@@ -15,7 +15,7 @@ This document defines the minimum production baseline and the main secure-operat
 
 ## Authentication And Access
 
-In version `2.0.3`, the platform supports:
+In version `2.0.4`, the platform supports:
 
 - session-based login;
 - `2FA` through TOTP;

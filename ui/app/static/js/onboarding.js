@@ -31,6 +31,11 @@ const state = {
 };
 
 const onboardingDraftStorageKey = "waf_onboarding_draft";
+const onboardingNoAutoApplyOptions = {
+  headers: {
+    "X-WAF-Auto-Apply-Disabled": "1"
+  }
+};
 const stepRouteMap = {
   1: "/onboarding/user-creation",
   2: "/onboarding/site-tls",
@@ -160,7 +165,7 @@ function buildUpstreamHostURL(upstream) {
 
 async function ensureFirstInitEasyProfileTemplate(site, upstream, tlsMode, acmeAccountEmail = "") {
   const endpoint = `/api/easy-site-profiles/${encodeURIComponent(site.id)}`;
-  const current = await api.get(endpoint);
+  const current = await api.get(endpoint, onboardingNoAutoApplyOptions);
   const selectedTLSMode = String(tlsMode || "letsencrypt").toLowerCase();
   const isSelfSigned = selectedTLSMode === "self-signed";
   const selectedCA = selectedTLSMode === "zerossl" ? "zerossl" : "letsencrypt";
@@ -183,7 +188,22 @@ async function ensureFirstInitEasyProfileTemplate(site, upstream, tlsMode, acmeA
         : "/"
     }
   };
-  return api.put(endpoint, next);
+  return api.put(endpoint, next, onboardingNoAutoApplyOptions);
+}
+
+async function compileAndApplyRevision() {
+  setLoading(document.getElementById("onboarding-feedback"), t("onboarding.apply.loading"));
+  const compileResponse = await api.post("/api/revisions/compile", {}, onboardingNoAutoApplyOptions);
+  const revisionID = String(compileResponse?.revision?.id || "").trim();
+  if (!revisionID) {
+    throw new Error(t("onboarding.error.apply"));
+  }
+  setLoading(document.getElementById("onboarding-feedback"), t("onboarding.apply.loading"));
+  await api.post(`/api/revisions/${encodeURIComponent(revisionID)}/apply`, {});
+  state.setup = await loadSetupStatus();
+  if (!state.setup?.has_active_revision) {
+    throw new Error(t("onboarding.error.apply"));
+  }
 }
 
 function currentTLSMode() {
@@ -520,7 +540,7 @@ async function ensureSiteAndTLS() {
 
   if (!sites.some((item) => item.id === site.id)) {
     try {
-      await api.post("/api/sites", site);
+      await api.post("/api/sites", site, onboardingNoAutoApplyOptions);
     } catch (error) {
       if (!isDefaultUpstreamRequiredError(error)) {
         throw error;
@@ -534,13 +554,13 @@ async function ensureSiteAndTLS() {
   }
   if (!upstreams.some((item) => item.id === upstream.id)) {
     try {
-      await api.post("/api/upstreams", upstream);
+      await api.post("/api/upstreams", upstream, onboardingNoAutoApplyOptions);
     } catch (error) {
       const conflict = error?.status === 409 || String(error?.message || "").toLowerCase().includes("already exists");
       if (!conflict) {
         throw error;
       }
-      await api.put(`/api/upstreams/${encodeURIComponent(upstream.id)}`, upstream);
+      await api.put(`/api/upstreams/${encodeURIComponent(upstream.id)}`, upstream, onboardingNoAutoApplyOptions);
     }
   }
   if (tlsMode === "self-signed") {
@@ -548,7 +568,7 @@ async function ensureSiteAndTLS() {
       certificate_id: certificateID,
       common_name: site.primary_host,
       san_list: []
-    });
+    }, onboardingNoAutoApplyOptions);
   } else {
     await api.post("/api/certificates/acme/issue", {
       certificate_id: certificateID,
@@ -563,7 +583,7 @@ async function ensureSiteAndTLS() {
       dns_propagation_seconds: challengeType === "dns-01" ? dnsPropagationSeconds : 0,
       zerossl_eab_kid: tlsMode === "zerossl" ? zeroSSLEABKID : "",
       zerossl_eab_hmac_key: tlsMode === "zerossl" ? zeroSSLEABHMAC : ""
-    });
+    }, onboardingNoAutoApplyOptions);
   }
 
   if (!tlsConfigs.some((item) => item.site_id === site.id)) {
@@ -572,13 +592,13 @@ async function ensureSiteAndTLS() {
       certificate_id: certificateID
     };
     try {
-      await api.post("/api/tls-configs", tlsPayload);
+      await api.post("/api/tls-configs", tlsPayload, onboardingNoAutoApplyOptions);
     } catch (error) {
       const conflict = error?.status === 409 || String(error?.message || "").toLowerCase().includes("already exists");
       if (!conflict) {
         throw error;
       }
-      await api.put(`/api/tls-configs/${encodeURIComponent(site.id)}`, tlsPayload);
+      await api.put(`/api/tls-configs/${encodeURIComponent(site.id)}`, tlsPayload, onboardingNoAutoApplyOptions);
     }
   }
   await ensureFirstInitEasyProfileTemplate(site, upstream, tlsMode, acmeEmail);
@@ -632,6 +652,7 @@ async function runApply() {
     }
 
     await ensureSiteAndTLS();
+    await compileAndApplyRevision();
     renderSummary();
 
     notify(t("toast.initialSetupCompleted"));

@@ -34,6 +34,7 @@ type StorageRetention struct {
 
 type persistedRuntimeSettings struct {
 	UpdateChecksEnabled bool             `json:"update_checks_enabled"`
+	Language            string           `json:"language,omitempty"`
 	LastCheckedAt       string           `json:"last_checked_at,omitempty"`
 	LatestVersion       string           `json:"latest_version,omitempty"`
 	ReleaseURL          string           `json:"release_url,omitempty"`
@@ -47,6 +48,7 @@ var runtimeSettingsState = struct {
 	backend             storage.Backend
 	initialized         bool
 	updateChecksEnabled bool
+	language            string
 	lastCheckedAt       string
 	latestVersion       string
 	releaseURL          string
@@ -54,6 +56,7 @@ var runtimeSettingsState = struct {
 	storage             StorageRetention
 }{
 	updateChecksEnabled: true,
+	language:            "en",
 	lastCheckedAt:       "",
 	latestVersion:       appmeta.AppVersion,
 	releaseURL:          "",
@@ -117,6 +120,12 @@ func CurrentStorageRetention() StorageRetention {
 	return runtimeSettingsState.storage
 }
 
+func CurrentRuntimeLanguage() string {
+	runtimeSettingsState.mu.RLock()
+	defer runtimeSettingsState.mu.RUnlock()
+	return normalizeRuntimeLanguage(runtimeSettingsState.language)
+}
+
 func (h *SettingsRuntimeHandler) responsePayload() map[string]any {
 	runtimeSettingsState.mu.RLock()
 	defer runtimeSettingsState.mu.RUnlock()
@@ -128,6 +137,7 @@ func responsePayloadLocked(indexes map[string]any) map[string]any {
 		"deployment_mode":       "standalone",
 		"app_version":           appmeta.AppVersion,
 		"update_checks_enabled": runtimeSettingsState.updateChecksEnabled,
+		"language":              normalizeRuntimeLanguage(runtimeSettingsState.language),
 		"storage":               runtimeSettingsState.storage,
 		"update": map[string]any{
 			"has_update":     runtimeSettingsState.hasUpdate,
@@ -274,6 +284,7 @@ func responsePayloadWithoutIndexesLocked() map[string]any {
 		"deployment_mode":       "standalone",
 		"app_version":           appmeta.AppVersion,
 		"update_checks_enabled": runtimeSettingsState.updateChecksEnabled,
+		"language":              normalizeRuntimeLanguage(runtimeSettingsState.language),
 		"storage":               runtimeSettingsState.storage,
 		"update": map[string]any{
 			"has_update":     runtimeSettingsState.hasUpdate,
@@ -453,6 +464,16 @@ func (h *SettingsRuntimeHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 			runtimeSettingsState.updateChecksEnabled = flag
 			updated = true
 		}
+		if raw, exists := body["language"]; exists {
+			value, typeOK := raw.(string)
+			if !typeOK {
+				runtimeSettingsState.mu.Unlock()
+				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "language must be string"})
+				return
+			}
+			runtimeSettingsState.language = normalizeRuntimeLanguage(value)
+			updated = true
+		}
 		if raw, exists := body["storage"]; exists {
 			typed, typeOK := raw.(map[string]any)
 			if !typeOK {
@@ -611,6 +632,7 @@ func loadPersistedRuntimeSettingsLocked() {
 		return
 	}
 	runtimeSettingsState.updateChecksEnabled = stored.UpdateChecksEnabled
+	runtimeSettingsState.language = normalizeRuntimeLanguage(stored.Language)
 	runtimeSettingsState.lastCheckedAt = strings.TrimSpace(stored.LastCheckedAt)
 	runtimeSettingsState.latestVersion = strings.TrimSpace(stored.LatestVersion)
 	runtimeSettingsState.releaseURL = strings.TrimSpace(stored.ReleaseURL)
@@ -631,6 +653,7 @@ func savePersistedRuntimeSettingsLocked() {
 	}
 	payload := persistedRuntimeSettings{
 		UpdateChecksEnabled: runtimeSettingsState.updateChecksEnabled,
+		Language:            normalizeRuntimeLanguage(runtimeSettingsState.language),
 		LastCheckedAt:       runtimeSettingsState.lastCheckedAt,
 		LatestVersion:       runtimeSettingsState.latestVersion,
 		ReleaseURL:          runtimeSettingsState.releaseURL,
@@ -647,6 +670,15 @@ func savePersistedRuntimeSettingsLocked() {
 		return
 	}
 	_ = os.WriteFile(path, content, 0o644)
+}
+
+func normalizeRuntimeLanguage(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "ru", "de", "sr", "zh":
+		return strings.ToLower(strings.TrimSpace(value))
+	default:
+		return "en"
+	}
 }
 
 func readJSONBody(w http.ResponseWriter, r *http.Request) (map[string]any, bool) {

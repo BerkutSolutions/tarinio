@@ -20,6 +20,7 @@ import (
 const defaultRuntimeRoot = "/var/lib/waf"
 const defaultHealthAddr = "127.0.0.1:8081"
 const runtimeAuthHeader = "X-WAF-Runtime-Token"
+const bootstrapUIUpstream = "http://ui:80"
 
 var errActivePointerMissing = errors.New("active/current.json is required")
 var runtimeProm = newRuntimeMetrics()
@@ -118,6 +119,13 @@ func (p *runtimeProcess) bootCurrent() error {
 	return nil
 }
 
+func (p *runtimeProcess) bootBootstrapUI() error {
+	if err := writeBootstrapNginxConfig("/etc/waf/nginx", bootstrapUIUpstream); err != nil {
+		return err
+	}
+	return p.startOrReloadLocked()
+}
+
 func (p *runtimeProcess) reloadCurrent() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -187,6 +195,58 @@ func (p *runtimeProcess) startOrReloadLocked() error {
 		return nil
 	}
 	return p.cmd.Process.Signal(syscall.SIGHUP)
+}
+
+func writeBootstrapNginxConfig(rootDir, uiUpstream string) error {
+	rootDir = strings.TrimSpace(rootDir)
+	if rootDir == "" {
+		return errors.New("bootstrap nginx root is required")
+	}
+	uiUpstream = strings.TrimSpace(uiUpstream)
+	if uiUpstream == "" {
+		return errors.New("bootstrap ui upstream is required")
+	}
+	confDir := filepath.Join(rootDir, "conf.d")
+	if err := os.MkdirAll(confDir, 0o755); err != nil {
+		return err
+	}
+	nginxConf := `worker_processes auto;
+events {
+    worker_connections 1024;
+}
+http {
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
+    sendfile      on;
+    access_log    /var/log/nginx/access.log;
+    error_log     /var/log/nginx/error.log;
+    include /etc/waf/nginx/conf.d/*.conf;
+}
+`
+	bootstrapConf := fmt.Sprintf(`server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+    absolute_redirect off;
+    resolver 127.0.0.11 ipv6=off valid=30s;
+
+    location / {
+        proxy_pass %s;
+        proxy_http_version 1.1;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+`, uiUpstream)
+	if err := os.WriteFile(filepath.Join(rootDir, "nginx.conf"), []byte(nginxConf), 0o644); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(confDir, "bootstrap.conf"), []byte(bootstrapConf), 0o644); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (p *runtimeProcess) nginxGlobalDirective(configPath string, daemonOff bool) string {
@@ -514,8 +574,13 @@ func run() error {
 	}
 	startPeriodicL4GuardRefresh()
 	startPeriodicCRSUpdate(manager, process)
-	if err := process.bootCurrent(); err != nil && !errors.Is(err, errActivePointerMissing) {
-		return err
+	if err := process.bootCurrent(); err != nil {
+		if !errors.Is(err, errActivePointerMissing) {
+			return err
+		}
+		if fallbackErr := process.bootBootstrapUI(); fallbackErr != nil {
+			return fallbackErr
+		}
 	}
 
 	return <-process.exitCh

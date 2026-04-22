@@ -134,3 +134,63 @@ func TestDashboardService_RuntimeProbeFailureMarksRuntimeDown(t *testing.T) {
 		t.Fatalf("expected runtime service to be down, got %#v", stats.Services)
 	}
 }
+
+func TestDashboardService_FallsBackToBlockedRequestsForAttackWidgets(t *testing.T) {
+	now := time.Now().UTC()
+	service := NewDashboardService(
+		&fakeDashboardEventReader{},
+		&fakeDashboardRequestCollector{
+			items: []map[string]any{
+				{
+					"ingested_at": now.Format(time.RFC3339),
+					"entry": map[string]any{
+						"timestamp": now.Format(time.RFC3339),
+						"site":      "site-b",
+						"uri":       "/signin",
+						"status":    403,
+						"client_ip": "198.51.100.7",
+						"country":   "DE",
+						"method":    "POST",
+					},
+				},
+				{
+					"ingested_at": now.Add(-time.Minute).Format(time.RFC3339),
+					"entry": map[string]any{
+						"timestamp": now.Add(-time.Minute).Format(time.RFC3339),
+						"site":      "site-b",
+						"uri":       "/checkout",
+						"status":    429,
+						"client_ip": "198.51.100.8",
+						"country":   "FR",
+						"method":    "GET",
+					},
+				},
+			},
+		},
+		&fakeDashboardRuntimeProbe{},
+	)
+
+	stats, err := service.Stats()
+	if err != nil {
+		t.Fatalf("stats failed: %v", err)
+	}
+
+	if stats.AttacksDay != 2 {
+		t.Fatalf("expected blocked requests fallback to expose 2 attacks, got %d", stats.AttacksDay)
+	}
+	if stats.BlockedAttacksDay != 2 {
+		t.Fatalf("expected blocked requests fallback to expose 2 blocked attacks, got %d", stats.BlockedAttacksDay)
+	}
+	if stats.UniqueAttackerIPsDay != 2 {
+		t.Fatalf("expected 2 unique attacker IPs from requests fallback, got %d", stats.UniqueAttackerIPsDay)
+	}
+	if len(stats.TopAttackerIPs) == 0 || stats.TopAttackerIPs[0].Key != "198.51.100.7" {
+		t.Fatalf("expected top attacker IPs to be populated from blocked requests, got %#v", stats.TopAttackerIPs)
+	}
+	if len(stats.TopAttackerCountries) == 0 {
+		t.Fatalf("expected top attacker countries to be populated from blocked requests")
+	}
+	if len(stats.MostAttackedURLs) == 0 {
+		t.Fatalf("expected attacked URLs to be populated from blocked requests")
+	}
+}

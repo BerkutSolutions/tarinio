@@ -1,7 +1,11 @@
 package telemetry
 
 import (
+	"encoding/json"
+	"log"
+	"net"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -75,6 +79,7 @@ func (m *Metrics) InstrumentHTTP(next http.Handler, nodeID string) http.Handler 
 		next.ServeHTTP(recorder, r)
 		route := normalizeRoute(r.URL.Path)
 		statusCode := recorder.statusCode
+		duration := time.Since(start)
 		m.httpRequests.Inc(map[string]string{
 			"node":   nodeID,
 			"method": strings.ToUpper(strings.TrimSpace(r.Method)),
@@ -85,7 +90,8 @@ func (m *Metrics) InstrumentHTTP(next http.Handler, nodeID string) http.Handler 
 			"node":   nodeID,
 			"method": strings.ToUpper(strings.TrimSpace(r.Method)),
 			"route":  route,
-		}, time.Since(start).Seconds())
+		}, duration.Seconds())
+		logHTTPRequest(nodeID, r, route, statusCode, recorder.bytesWritten, duration)
 	})
 }
 
@@ -128,12 +134,133 @@ func (m *Metrics) RecordRuntimeReload(nodeID, status string) {
 
 type statusRecorder struct {
 	http.ResponseWriter
-	statusCode int
+	statusCode   int
+	bytesWritten int
 }
 
 func (s *statusRecorder) WriteHeader(statusCode int) {
 	s.statusCode = statusCode
 	s.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (s *statusRecorder) Write(p []byte) (int, error) {
+	if s.statusCode == 0 {
+		s.statusCode = http.StatusOK
+	}
+	n, err := s.ResponseWriter.Write(p)
+	s.bytesWritten += n
+	return n, err
+}
+
+type httpRequestLogEntry struct {
+	Timestamp     string   `json:"timestamp"`
+	Component     string   `json:"component"`
+	Node          string   `json:"node"`
+	Method        string   `json:"method"`
+	Route         string   `json:"route"`
+	Path          string   `json:"path"`
+	Host          string   `json:"host,omitempty"`
+	Status        int      `json:"status"`
+	DurationMS    int64    `json:"duration_ms"`
+	ResponseBytes int      `json:"response_bytes"`
+	RemoteIP      string   `json:"remote_ip,omitempty"`
+	ForwardedFor  string   `json:"forwarded_for,omitempty"`
+	QueryKeys     []string `json:"query_keys,omitempty"`
+	RequestID     string   `json:"request_id,omitempty"`
+	Referer       string   `json:"referer,omitempty"`
+	UserAgent     string   `json:"user_agent,omitempty"`
+	ContentLength int64    `json:"content_length,omitempty"`
+}
+
+func logHTTPRequest(nodeID string, r *http.Request, route string, statusCode int, responseBytes int, duration time.Duration) {
+	if r == nil || !shouldLogHTTPRequest(r.URL.Path) {
+		return
+	}
+	entry := httpRequestLogEntry{
+		Timestamp:     time.Now().UTC().Format(time.RFC3339Nano),
+		Component:     "control-plane.http",
+		Node:          normalizeNode(nodeID),
+		Method:        strings.ToUpper(strings.TrimSpace(r.Method)),
+		Route:         route,
+		Path:          strings.TrimSpace(r.URL.Path),
+		Host:          strings.TrimSpace(r.Host),
+		Status:        statusCode,
+		DurationMS:    duration.Milliseconds(),
+		ResponseBytes: responseBytes,
+		RemoteIP:      requestRemoteIP(r),
+		ForwardedFor:  truncateLogValue(r.Header.Get("X-Forwarded-For"), 256),
+		QueryKeys:     requestQueryKeys(r),
+		RequestID:     truncateLogValue(firstHeader(r, "X-Request-ID", "X-Correlation-ID"), 128),
+		Referer:       truncateLogValue(r.Header.Get("Referer"), 256),
+		UserAgent:     truncateLogValue(r.UserAgent(), 256),
+	}
+	if r.ContentLength > 0 {
+		entry.ContentLength = r.ContentLength
+	}
+	raw, err := json.Marshal(entry)
+	if err != nil {
+		log.Printf("[warn] telemetry request log marshal failed: %v", err)
+		return
+	}
+	log.Printf("%s", raw)
+}
+
+func shouldLogHTTPRequest(path string) bool {
+	switch strings.TrimSpace(path) {
+	case "", "/healthz", "/metrics":
+		return false
+	default:
+		return true
+	}
+}
+
+func requestRemoteIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr))
+	if err == nil {
+		return host
+	}
+	return strings.TrimSpace(r.RemoteAddr)
+}
+
+func requestQueryKeys(r *http.Request) []string {
+	if r == nil || r.URL == nil {
+		return nil
+	}
+	values := r.URL.Query()
+	if len(values) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		trimmed := strings.TrimSpace(key)
+		if trimmed == "" {
+			continue
+		}
+		keys = append(keys, trimmed)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func firstHeader(r *http.Request, names ...string) string {
+	for _, name := range names {
+		value := strings.TrimSpace(r.Header.Get(name))
+		if value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func truncateLogValue(value string, limit int) string {
+	value = strings.TrimSpace(value)
+	if value == "" || limit <= 0 {
+		return value
+	}
+	if len(value) <= limit {
+		return value
+	}
+	return value[:limit]
 }
 
 func normalizeNode(nodeID string) string {
@@ -199,6 +326,12 @@ func normalizeRoute(path string) string {
 	}
 	if strings.HasPrefix(path, "/api/certificate-materials/export/") {
 		return "/api/certificate-materials/export/:id"
+	}
+	if strings.HasPrefix(path, "/api/administration/scripts/runs/") {
+		return "/api/administration/scripts/runs/:id/download"
+	}
+	if strings.HasPrefix(path, "/api/administration/scripts/") && strings.HasSuffix(path, "/run") {
+		return "/api/administration/scripts/:id/run"
 	}
 	return path
 }

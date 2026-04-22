@@ -527,6 +527,12 @@ function buildDetailModel(stats, requestRows, eventRows) {
   const attacksByCountry = new Map();
   const errorsByCodeAndSite = new Map();
   const ipDetails = new Map();
+  const fallbackAttacksBySite = new Map();
+  const fallbackBlockedBySite = new Map();
+  const fallbackAttacksByURL = new Map();
+  const fallbackAttacksByCountry = new Map();
+  const fallbackIPDetails = new Map();
+  let eventAttackCount = 0;
 
   (Array.isArray(requestRows) ? requestRows : []).forEach((row) => {
     const entry = row?.entry && typeof row.entry === "object" ? row.entry : {};
@@ -572,6 +578,24 @@ function buildDetailModel(stats, requestRows, eventRows) {
         }
       }
     }
+
+    if (status === 403 || status === 429 || status === 444) {
+      addToMap(fallbackAttacksBySite, site, 1);
+      addToMap(fallbackBlockedBySite, site, 1);
+      addToMap(fallbackAttacksByURL, uri, 1);
+      addToMap(fallbackAttacksByCountry, requestCountry, 1);
+      if (ip) {
+        const fallbackDetail = ensureIPDetail(fallbackIPDetails, ip);
+        if (fallbackDetail) {
+          fallbackDetail.attacks += 1;
+          fallbackDetail.blocked += 1;
+          addToMap(fallbackDetail.pages, uri, 1);
+          addToMap(fallbackDetail.methods, method, 1);
+          addToMap(fallbackDetail.sites, site, 1);
+          addToMap(fallbackDetail.countryCounts, requestCountry, 1);
+        }
+      }
+    }
   });
 
   (Array.isArray(eventRows) ? eventRows : []).forEach((item) => {
@@ -591,6 +615,7 @@ function buildDetailModel(stats, requestRows, eventRows) {
     if (typeof rawBlocked === "boolean" && !rawBlocked) {
       return;
     }
+    eventAttackCount += 1;
 
     const ip = String(details.client_ip || details.ip || "").trim();
     const path = String(details.path || details.uri || "-").trim() || "-";
@@ -620,6 +645,25 @@ function buildDetailModel(stats, requestRows, eventRows) {
       }
     }
   });
+
+  if (eventAttackCount === 0) {
+    fallbackAttacksBySite.forEach((count, key) => addToMap(attacksBySite, key, count));
+    fallbackBlockedBySite.forEach((count, key) => addToMap(blockedBySite, key, count));
+    fallbackAttacksByURL.forEach((count, key) => addToMap(attacksByURL, key, count));
+    fallbackAttacksByCountry.forEach((count, key) => addToMap(attacksByCountry, key, count));
+    fallbackIPDetails.forEach((fallbackDetail, ip) => {
+      const detail = ensureIPDetail(ipDetails, ip);
+      if (!detail) {
+        return;
+      }
+      detail.attacks += fallbackDetail.attacks;
+      detail.blocked += fallbackDetail.blocked;
+      fallbackDetail.pages.forEach((count, key) => addToMap(detail.pages, key, count));
+      fallbackDetail.methods.forEach((count, key) => addToMap(detail.methods, key, count));
+      fallbackDetail.sites.forEach((count, key) => addToMap(detail.sites, key, count));
+      fallbackDetail.countryCounts.forEach((count, key) => addToMap(detail.countryCounts, key, count));
+    });
+  }
 
   const errorsByCode = [];
   const errorsByCodeSites = new Map();
@@ -1002,7 +1046,7 @@ function mergeWidgetData(stats, detailModel, containersOverview, ctx) {
       renderLabel: (item) => renderCountryBadge(item?.countryCode || item?.key),
       rowAttrs: (item) => `data-widget-action="country-detail" data-country-code="${escapeHtml(normalizeCountryCode(item?.countryCode || item?.key))}"`
     }),
-    "top-urls": renderTopList(stats?.most_attacked_urls || [], ctx.t("dashboard.empty.topURLs"), {
+    "top-urls": renderTopList((Array.isArray(stats?.most_attacked_urls) && stats.most_attacked_urls.length ? stats.most_attacked_urls : (detailModel?.attacksByURL || [])), ctx.t("dashboard.empty.topURLs"), {
       containerAction: "top-urls",
       rowAttrs: (item) => {
         const url = String(item?.key || "").trim();
@@ -1356,53 +1400,31 @@ function buildWidgetDetail(action, payload, stats, detailModel, containersOvervi
         { labelKey: "dashboard.detail.memoryFreeBytes", value: formatBytes(system.memory_free_bytes || 0) },
         { labelKey: "dashboard.detail.memoryTotalBytes", value: formatBytes(system.memory_total_bytes || 0) }
       ];
-    const loadSections = [];
-    const requestsBySite = detailModel?.requestsBySite || [];
-    const requestsByURL = detailModel?.requestsByURL || [];
-    const requestsByIP = detailModel?.requestsByIP || [];
-    const attacksBySite = detailModel?.attacksBySite || [];
-
-    if (requestsBySite.length) {
-      loadSections.push(renderDetailSection(
-        ctx.t("dashboard.detail.loadBySites"),
-        renderDetailTable(requestsBySite, ctx, ctx.t("dashboard.detail.site"), ctx.t("dashboard.detail.requests"))
-      ));
-    }
-    if (requestsByURL.length) {
-      loadSections.push(renderDetailSection(
-        ctx.t("dashboard.detail.loadByPages"),
-        renderDetailTable(requestsByURL, ctx, ctx.t("dashboard.detail.page"), ctx.t("dashboard.detail.requests"))
-      ));
-    }
-    if (requestsByIP.length) {
-      loadSections.push(renderDetailSection(
-        ctx.t("dashboard.detail.loadByIPs"),
-        renderDetailTable(requestsByIP, ctx, ctx.t("dashboard.detail.ip"), ctx.t("dashboard.detail.requests"), {
-          labelFormatter: (item) => {
-            const ip = String(item?.key || "-");
-            const countryCode = detailModel?.ipCountryByIP?.get?.(ip) || "UNK";
-            return `${escapeHtml(ip)} ${renderCountryBadge(countryCode)}`;
-          },
-          rowAttrs: (item) => {
-            const ip = String(item?.key || "").trim();
-            return ip ? `data-widget-action="ip-detail" data-ip="${escapeHtml(ip)}"` : "";
-          }
-        })
-      ));
-    }
-    if (attacksBySite.length) {
-      loadSections.push(renderDetailSection(
-        ctx.t("dashboard.detail.loadByAttackSites"),
-        renderDetailTable(attacksBySite, ctx, ctx.t("dashboard.detail.site"), ctx.t("dashboard.detail.attacks"))
-      ));
-    }
+    const topCPUProcesses = Array.isArray(system?.top_cpu_processes) ? system.top_cpu_processes : [];
+    const topMemoryProcesses = Array.isArray(system?.top_memory_processes) ? system.top_memory_processes : [];
+    const processRows = (action === "cpu" ? topCPUProcesses : topMemoryProcesses).map((item) => ({
+      ...item,
+      key: item?.name || item?.command || `pid-${item?.pid || 0}`
+    }));
+    const processSectionTitle = action === "cpu" ? "dashboard.detail.processesByCPU" : "dashboard.detail.processesByMemory";
+    const countTitle = action === "cpu" ? "dashboard.detail.cpuPercent" : "dashboard.detail.memoryUsedBytes";
     return {
       title: ctx.t(action === "cpu" ? "dashboard.widget.cpu" : "dashboard.widget.memory"),
       subtitle: ctx.t("dashboard.detail.loadSubtitle"),
       body: renderSummaryMetrics(metrics, ctx) +
-      (loadSections.length
-        ? loadSections.join("")
-        : `<div class="waf-empty">${escapeHtml(ctx.t("dashboard.detail.loadSourcesEmpty"))}</div>`)
+      renderDetailSection(
+        ctx.t(processSectionTitle),
+        renderDetailTable(processRows, ctx, ctx.t("dashboard.detail.process"), ctx.t(countTitle), {
+          labelFormatter: (item) => `
+            <div><strong>${escapeHtml(String(item?.name || item?.command || "-"))}</strong></div>
+            <div class="muted">PID ${escapeHtml(String(item?.pid || 0))} | ${escapeHtml(ctx.t("dashboard.detail.threads"))}: ${escapeHtml(formatNumber(item?.threads || 0))} | ${escapeHtml(ctx.t("dashboard.detail.state"))}: ${escapeHtml(String(item?.state || "-"))}</div>
+            <div class="muted">${escapeHtml(String(item?.command || item?.name || "-"))}</div>
+          `,
+          countFormatter: (item) => action === "cpu"
+            ? escapeHtml(formatPercent(item?.cpu_percent || 0))
+            : `${escapeHtml(formatBytes(item?.memory_rss_bytes || 0))} <span class="muted">(${escapeHtml(formatPercent(item?.memory_percent || 0))})</span>`
+        })
+      )
     };
   }
 

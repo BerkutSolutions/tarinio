@@ -29,6 +29,7 @@ DDOS_MODEL_CONTAINER="${DDOS_MODEL_CONTAINER:-tarinio-ddos-model}"
 UI_CONTAINER="${UI_CONTAINER:-tarinio-ui}"
 FILTER_HOST="${FILTER_HOST:-}"
 FILTER_IP="${FILTER_IP:-}"
+FILTER_URI="${FILTER_URI:-}"
 NON_INTERACTIVE="${NON_INTERACTIVE:-0}"
 
 prompt_value() {
@@ -45,6 +46,7 @@ prompt_value() {
 prompt_value SINCE "Collect logs since (example: 30m, 6h, 24h): "
 prompt_value FILTER_HOST "Filter host (optional, example: example.com): "
 prompt_value FILTER_IP "Filter client IPs (optional, multiple allowed): "
+prompt_value FILTER_URI "Filter request URIs / paths (optional, multiple allowed): "
 
 TS="$(date +%Y%m%d_%H%M%S)"
 OUT_BASE_DIR="${OUT_BASE_DIR:-/tmp}"
@@ -74,17 +76,20 @@ run() {
 }
 
 N_FILTER_IP="$(normalize_multi "$FILTER_IP")"
+N_FILTER_URI="$(normalize_multi "$FILTER_URI")"
 
 run "runtime_logs_since.log" docker logs --since="$SINCE" "$RUNTIME_CONTAINER"
 run "control_plane_logs_since.log" docker logs --since="$SINCE" "$CONTROL_PLANE_CONTAINER"
 run "ddos_model_logs_since.log" docker logs --since="$SINCE" "$DDOS_MODEL_CONTAINER"
 run "ui_logs_since.log" docker logs --since="$SINCE" "$UI_CONTAINER"
+run "runtime_access_recent.log" docker exec "$RUNTIME_CONTAINER" sh -lc "tail -n 12000 /var/log/nginx/access.log"
 
 {
   echo "# runtime focus"
   echo "since=$SINCE"
   echo "filter_host=$FILTER_HOST"
   echo "filter_ip=$N_FILTER_IP"
+  echo "filter_uri=$N_FILTER_URI"
   echo
   grep -nEi " \\[error\\] | \\[warn\\] | \\[notice\\] |ModSecurity-nginx|variables_hash|acme-challenge|signal process started|open\\(|failed \\(2: No such file or directory\\)" "$OUT/runtime_logs_since.log" || true
 } >"$OUT/runtime_errors_focus.txt" 2>&1
@@ -116,7 +121,33 @@ run "ui_logs_since.log" docker logs --since="$SINCE" "$UI_CONTAINER"
       grep -nF "$ip" "$OUT/control_plane_logs_since.log" || true
     done
   fi
+  if [[ -n "$N_FILTER_URI" ]]; then
+    for uri in $N_FILTER_URI; do
+      echo
+      echo "## runtime uri: $uri"
+      grep -nF "$uri" "$OUT/runtime_logs_since.log" || true
+      echo
+      echo "## access uri: $uri"
+      grep -nF "$uri" "$OUT/runtime_access_recent.log" || true
+      echo
+      echo "## control-plane uri: $uri"
+      grep -nF "$uri" "$OUT/control_plane_logs_since.log" || true
+    done
+  fi
 } >"$OUT/filters_focus.txt" 2>&1
+
+{
+  echo "# control-plane request access logs"
+  grep -nF '"component":"control-plane.http"' "$OUT/control_plane_logs_since.log" || true
+} >"$OUT/control_plane_requests_focus.txt" 2>&1
+
+{
+  echo "# runtime request status summary"
+  grep -Eo '\"status\":[0-9]+' "$OUT/runtime_access_recent.log" | sort | uniq -c | sort -nr || true
+  echo
+  echo "# interesting request patterns"
+  grep -nEi '\"uri\":\"/(api(/[0-9]+)?/(envelope|store|minidump)|api/2/envelope)\"|buffered to a temporary file|limit_req|too many requests|temporary unavailability' "$OUT/runtime_logs_since.log" || true
+} >"$OUT/request_focus.txt" 2>&1
 
 {
   runtime_error_count="$(grep -Eci " \\[error\\] " "$OUT/runtime_logs_since.log" || true)"

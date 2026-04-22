@@ -337,7 +337,7 @@
   "app.sites": "Services",
   "app.tls": "TLS / Certificates",
   "app.user.noRoles": "No roles",
-  "app.version": "v2.0.3",
+  "app.version": "v2.0.4",
   "auth.2fa.challengeMissing": "2FA challenge is missing. Please sign in again.",
   "auth.2fa.code": "2FA code",
   "auth.2fa.codeRequired": "2FA code is required",
@@ -514,7 +514,7 @@
   "dashboard.detail.ipSubtitle": "Request and page profile for the selected IP.",
   "dashboard.detail.countrySubtitle": "Attacks grouped by country.",
   "dashboard.detail.urlSubtitle": "Attacks grouped by pages.",
-  "dashboard.detail.loadSubtitle": "Current usage and likely load sources by site.",
+  "dashboard.detail.loadSubtitle": "Current usage and the processes contributing the most system load.",
   "dashboard.detail.site": "Site",
   "dashboard.detail.requests": "Requests",
   "dashboard.detail.page": "Page",
@@ -526,9 +526,14 @@
   "dashboard.detail.method": "Method",
   "dashboard.detail.uniqueIPs": "Unique IPs",
   "dashboard.detail.cpuLoad": "CPU load",
+  "dashboard.detail.cpuPercent": "CPU",
   "dashboard.detail.memoryUsedBytes": "Memory used",
   "dashboard.detail.memoryFreeBytes": "Memory free",
   "dashboard.detail.memoryTotalBytes": "Memory total",
+  "dashboard.detail.process": "Process",
+  "dashboard.detail.processesByCPU": "Top processes by CPU",
+  "dashboard.detail.processesByMemory": "Top processes by memory",
+  "dashboard.detail.threads": "Threads",
   "dashboard.detail.loadBySites": "Top sites by requests",
   "dashboard.detail.loadByPages": "Top pages by requests",
   "dashboard.detail.loadByIPs": "Top IPs by requests",
@@ -1112,8 +1117,15 @@
   "sites.manualBan.title": "Manual ban / unban",
   "sites.mode.advanced": "Advanced",
   "sites.mode.easy": "Easy",
-  "sites.mode.note": "Easy mode is available now. Advanced and Raw are reserved for future expert workflows.",
+  "sites.mode.note": "Easy mode is the guided editor. Use Raw mode when you need direct env-style control over the same service model.",
   "sites.mode.raw": "Raw",
+  "sites.mode.rawNote": "Raw mode edits the service as WAF env parameters and still saves through the same validation and apply pipeline.",
+  "sites.raw.description": "Edit the full WAF service definition as env-style parameters. Unknown keys are rejected, and missing keys fall back to product defaults.",
+  "sites.raw.label": "Raw WAF env",
+  "sites.raw.missingFieldsTitle": "Default values will be applied for omitted parameters",
+  "sites.raw.parseError": "Raw configuration could not be parsed",
+  "sites.raw.syncHint": "Switching from Easy to Raw exports the current service state. Saving from Raw still uses the standard service validation and revision flow.",
+  "sites.raw.title": "Raw service editor",
   "sites.search.empty": "No settings found for current query.",
   "sites.search.placeholder": "Find setting by name",
   "sites.search.title": "Search settings",
@@ -1498,7 +1510,3 @@
   "compat.details.settings": "Checks settings compatibility schema and behavior.",
   "compat.details.profile": "Checks profile compatibility schema and behavior."
 }
-
-
-
-

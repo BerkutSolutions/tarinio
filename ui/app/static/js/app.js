@@ -482,12 +482,16 @@ function bindNotificationsUI() {
 async function loadMeta() {
   try {
     const meta = await api.get("/api/app/meta");
+    const sharedLanguage = String(meta?.ui_language || "").trim().toLowerCase();
+    if (sharedLanguage && sharedLanguage !== getLanguage()) {
+      await setLanguage(sharedLanguage);
+    }
     if (meta?.app_version) {
       setVersion(`v${meta.app_version}`);
     }
     renderUpdateBadge(meta);
   } catch {
-    setVersion("v2.0.3");
+    setVersion("v2.0.4");
     renderUpdateBadge(null);
   }
 }
@@ -518,7 +522,7 @@ function startSessionPing() {
 
 async function bootstrap() {
   await applyTranslations(getLanguage());
-  setVersion("v2.0.3");
+  setVersion("v2.0.4");
 
   const access = await checkEntryAccess("app");
   if (!access.allowed) {
@@ -552,6 +556,5 @@ async function bootstrap() {
 }
 
 bootstrap();
-
 
 

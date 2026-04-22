@@ -358,7 +358,7 @@
   "app.sites": "Dienste",
   "app.tls": "TLS / Zertifikate",
   "app.user.noRoles": "Keine Rollen",
-  "app.version": "v2.0.3",
+  "app.version": "v2.0.4",
   "auth.2fa.challengeMissing": "2FA challenge is missing. Bitte melden Sie sich erneut an.",
   "auth.2fa.code": "2FA code",
   "auth.2fa.codeRequired": "2FA code is required",
@@ -1496,5 +1496,17 @@
   "toast.siteSaved": "Service gespeichert",
   "toast.upstreamDeleted": "Upstream deleted",
   "toast.upstreamSaved": "Upstream gespeichert",
-  "ui.close": "Schließen"
+  "ui.close": "Schließen",
+  "sites.mode.rawNote": "Raw mode edits the service as WAF env parameters and still saves through the same validation and apply pipeline.",
+  "sites.raw.title": "Raw service editor",
+  "sites.raw.description": "Edit the full WAF service definition as env-style parameters. Unknown keys are rejected, and missing keys fall back to product defaults.",
+  "sites.raw.label": "Raw WAF env",
+  "sites.raw.missingFieldsTitle": "Default values will be applied for omitted parameters",
+  "sites.raw.parseError": "Raw configuration could not be parsed",
+  "sites.raw.syncHint": "Switching from Easy to Raw exports the current service state. Saving from Raw still uses the standard service validation and revision flow.",
+  "dashboard.detail.cpuPercent": "CPU",
+  "dashboard.detail.process": "Process",
+  "dashboard.detail.processesByCPU": "Top processes by CPU",
+  "dashboard.detail.processesByMemory": "Top processes by memory",
+  "dashboard.detail.threads": "Threads"
 }

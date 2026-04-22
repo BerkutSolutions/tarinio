@@ -22,6 +22,22 @@ func TestUIContract_OnboardingAndSidebarMarkers(t *testing.T) {
 			},
 		},
 		{
+			file: filepath.Join("..", "app", "static", "js", "onboarding.js"),
+			markers: []string{
+				`"X-WAF-Auto-Apply-Disabled": "1"`,
+				`/api/revisions/compile`,
+				`/apply`,
+				`has_active_revision`,
+			},
+		},
+		{
+			file: filepath.Join("..", "app", "static", "js", "guard.js"),
+			markers: []string{
+				`const initializationIncomplete = Boolean(setup && !setup.has_active_revision);`,
+				`replace(httpUrl("/onboarding/user-creation"));`,
+			},
+		},
+		{
 			file: filepath.Join("..", "app", "index.html"),
 			markers: []string{
 				`class="sidebar-logo-collapsed`,
@@ -63,6 +79,9 @@ func TestUIContract_OnboardingAndSidebarMarkers(t *testing.T) {
 				`<div class="waf-upstream-target-row">`,
 				`function draftToEnvText(draft)`,
 				`function envToDraft(text)`,
+				`function renderRawEditor(state, ctx, isNew)`,
+				`data-mode-tab="raw"`,
+				`async function hydrateSiteDraft(ctx, site, upstream, tlsConfig, accessPolicy = null)`,
 				`id="services-select-all"`,
 			},
 		},

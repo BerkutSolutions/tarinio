@@ -1,12 +1,5 @@
-import { applyTranslations, availableLanguages } from "../i18n.js";
 import { availableTimeZones, formatDateTimeInZone, loadPreferences, savePreferences } from "../preferences.js";
 import { escapeHtml } from "../ui.js";
-
-function renderLanguageOptions() {
-  return availableLanguages()
-    .map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.label)}</option>`)
-    .join("");
-}
 
 function showAlert(el, msg, success = false) {
   if (!el) return;
@@ -206,24 +199,13 @@ export async function renderProfile(container, ctx) {
       <section class="waf-card">
         <div class="waf-card-head">
           <div>
-            <h3>${escapeHtml(ctx.t("settings.language"))}</h3>
-            <div class="muted">${escapeHtml(ctx.t("settings.languageHint"))}</div>
+            <h3>${escapeHtml(ctx.t("settings.general"))}</h3>
+            <div class="muted">${escapeHtml(ctx.t("profile.preferences.saved"))}</div>
           </div>
         </div>
         <div class="waf-card-body waf-stack">
           <form id="settings-form" class="waf-form">
             <div class="waf-grid two">
-              <div class="waf-list-item">
-                <div class="waf-list-head">
-                  <div class="waf-list-title">${escapeHtml(ctx.t("settings.language"))}</div>
-                </div>
-                <div class="waf-field">
-                  <label for="settings-language">${escapeHtml(ctx.t("settings.language"))}</label>
-                  <select id="settings-language" name="language">
-                    ${renderLanguageOptions()}
-                  </select>
-                </div>
-              </div>
               <div class="waf-list-item">
                 <div class="waf-list-head">
                   <div class="waf-list-title">${escapeHtml(ctx.t("settings.timezone.label"))}</div>
@@ -388,10 +370,8 @@ export async function renderProfile(container, ctx) {
   setText("profile-trusted-ip", me?.frequent_login_ip || "-");
   setText("password-last-changed", me?.password_changed_at ? `${ctx.t("accounts.passwordLastChanged")}: ${formatDateTime(me.password_changed_at, prefs)}` : "");
 
-  const lang = container.querySelector("#settings-language");
   const tz = container.querySelector("#settings-timezone");
   const autoLogout = container.querySelector("#settings-auto-logout");
-  lang.value = prefs.language || "en";
   autoLogout.checked = !!prefs.autoLogout;
   tz.innerHTML = availableTimeZones().map((zone) => `<option value="${escapeHtml(zone)}">${escapeHtml(zone)}</option>`).join("");
   tz.value = prefs.timeZone || "Europe/Moscow";
@@ -399,11 +379,9 @@ export async function renderProfile(container, ctx) {
   container.querySelector("#settings-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const next = savePreferences({
-      language: lang.value || "en",
       timeZone: tz.value || "Europe/Moscow",
       autoLogout: !!autoLogout.checked,
     });
-    await ctx.setLanguage(next.language || "en");
     showAlert(alertEl, ctx.t("settings.saved"), true);
     ctx.notify(ctx.t("settings.saved"));
   });

@@ -1,5 +1,4 @@
 import { availableLanguages } from "../i18n.js";
-import { loadPreferences, savePreferences } from "../preferences.js";
 import { escapeHtml } from "../ui.js";
 
 const SETTINGS_TABS = [
@@ -142,6 +141,9 @@ export async function renderSettings(container, ctx) {
                     ${renderLanguageOptions()}
                   </select>
                 </div>
+                <div class="waf-actions" style="margin-top:10px;">
+                  <button id="settings-language-save" class="btn primary btn-sm" type="button">${escapeHtml(ctx.t("common.save"))}</button>
+                </div>
               </div>
 
               <div class="waf-list-item">
@@ -250,10 +252,10 @@ export async function renderSettings(container, ctx) {
   const storageSave = container.querySelector("#settings-storage-save");
   const storageIndexesNode = container.querySelector("#settings-storage-indexes");
   const languageSelect = container.querySelector("#settings-language-select");
+  const languageSave = container.querySelector("#settings-language-save");
   const runtimeSave = container.querySelector("#settings-runtime-save");
-  const prefs = loadPreferences();
   if (languageSelect) {
-    languageSelect.value = String(prefs?.language || ctx.getLanguage?.() || "en");
+    languageSelect.value = String(ctx.getLanguage?.() || "en");
   }
 
   const setAlert = (message, success = false) => {
@@ -378,6 +380,9 @@ export async function renderSettings(container, ctx) {
         runtime = await ctx.api.get("/api/settings/runtime");
         const mode = String(runtime?.deployment_mode || "-");
         runtimeStatus.textContent = ctx.t("settings.runtime.loaded", { mode });
+        if (languageSelect) {
+          languageSelect.value = String(runtime?.language || ctx.getLanguage?.() || "en");
+        }
         if (updatesEnabled) {
           updatesEnabled.checked = !!runtime?.update_checks_enabled;
         }
@@ -444,16 +449,24 @@ export async function renderSettings(container, ctx) {
     }
   });
 
-  runtimeSave?.addEventListener("click", async () => {
+  languageSave?.addEventListener("click", async () => {
     setAlert("");
     try {
       const nextLanguage = String(languageSelect?.value || "en");
-      savePreferences({ language: nextLanguage });
-      const currentLanguage = String(ctx.getLanguage?.() || "en");
-      const languageChanged = nextLanguage !== currentLanguage;
-      if (languageChanged && typeof ctx.setLanguage === "function") {
-        await ctx.setLanguage(nextLanguage);
+      const result = await ctx.api.put("/api/settings/runtime", { language: nextLanguage });
+      if (typeof ctx.setLanguage === "function") {
+        await ctx.setLanguage(String(result?.language || nextLanguage || "en"));
       }
+      setAlert(ctx.t("settings.saved"), true);
+      await renderRuntime();
+    } catch (error) {
+      setAlert(error?.message || ctx.t("common.error"));
+    }
+  });
+
+  runtimeSave?.addEventListener("click", async () => {
+    setAlert("");
+    try {
       const payload = {
         update_checks_enabled: !!updatesEnabled?.checked,
       };

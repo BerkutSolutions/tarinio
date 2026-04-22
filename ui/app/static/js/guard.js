@@ -137,15 +137,16 @@ export async function checkEntryAccess(mode) {
     throw error;
   }
   const onboardingRequired = Boolean(setup.needs_bootstrap);
+  const initializationIncomplete = Boolean(setup && !setup.has_active_revision);
   const onboardingRedirecting = isOnboardingRedirecting();
   let user = null;
 
   if (mode === "onboarding") {
-    if (onboardingRequired && window.location.protocol !== "http:") {
+    if ((onboardingRequired || initializationIncomplete) && window.location.protocol !== "http:") {
       replace(httpUrl("/onboarding/user-creation"));
       return { setup, user, allowed: false };
     }
-    if (onboardingRequired) {
+    if (onboardingRequired || initializationIncomplete) {
       return { setup, user, allowed: true };
     }
     if (onboardingRedirecting) {
@@ -158,7 +159,7 @@ export async function checkEntryAccess(mode) {
   }
 
   if (mode === "login") {
-    if (onboardingRequired) {
+    if (onboardingRequired || initializationIncomplete) {
       replace(httpUrl("/onboarding/user-creation"));
       return { setup, user, allowed: false };
     }
@@ -183,7 +184,7 @@ export async function checkEntryAccess(mode) {
   }
 
   if (mode === "login-2fa") {
-    if (onboardingRequired) {
+    if (onboardingRequired || initializationIncomplete) {
       replace(httpUrl("/onboarding/user-creation"));
       return { setup, user, allowed: false };
     }
@@ -208,7 +209,7 @@ export async function checkEntryAccess(mode) {
   }
 
   if (mode === "app") {
-    if (onboardingRequired) {
+    if (onboardingRequired || initializationIncomplete) {
       replace(httpUrl("/onboarding/user-creation"));
       return { setup, user, allowed: false };
     }

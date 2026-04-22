@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -64,6 +65,39 @@ func TestValidateCandidateBundle(t *testing.T) {
 
 	if err := validateCandidateBundle(root); err != nil {
 		t.Fatalf("expected valid bundle, got %v", err)
+	}
+}
+
+func TestWriteBootstrapNginxConfig(t *testing.T) {
+	root := t.TempDir()
+	if err := writeBootstrapNginxConfig(root, bootstrapUIUpstream); err != nil {
+		t.Fatalf("write bootstrap config failed: %v", err)
+	}
+
+	rawConf, err := os.ReadFile(filepath.Join(root, "nginx.conf"))
+	if err != nil {
+		t.Fatalf("read nginx.conf failed: %v", err)
+	}
+	if !strings.Contains(string(rawConf), "include /etc/waf/nginx/conf.d/*.conf;") {
+		t.Fatalf("unexpected nginx.conf content: %s", string(rawConf))
+	}
+
+	rawBootstrap, err := os.ReadFile(filepath.Join(root, "conf.d", "bootstrap.conf"))
+	if err != nil {
+		t.Fatalf("read bootstrap.conf failed: %v", err)
+	}
+	text := string(rawBootstrap)
+	for _, fragment := range []string{
+		"listen 80 default_server;",
+		"proxy_pass http://ui:80;",
+		"proxy_set_header X-Forwarded-Proto $scheme;",
+	} {
+		if !strings.Contains(text, fragment) {
+			t.Fatalf("expected bootstrap config to contain %q, got %s", fragment, text)
+		}
+	}
+	if strings.Contains(text, "listen 443") {
+		t.Fatalf("bootstrap config must not expose 443 before first apply: %s", text)
 	}
 }
 

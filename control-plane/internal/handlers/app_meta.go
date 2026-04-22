@@ -33,6 +33,7 @@ func (h *AppMetaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		"product_name":    appmeta.ProductName,
 		"repository_url":  appmeta.RepositoryURL,
 		"github_releases": appmeta.GitHubAPIReleases,
+		"ui_language":     CurrentRuntimeLanguage(),
 		"ha_enabled":      h.haEnabled,
 		"ha_node_id":      h.haNodeID,
 	})

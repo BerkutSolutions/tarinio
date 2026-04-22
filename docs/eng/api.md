@@ -2,7 +2,7 @@
 
 This page belongs to the current documentation branch.
 
-This document describes the current control-plane HTTP API for version `2.0.3`. The catalog is aligned with the routes registered in `control-plane/internal/httpserver/server.go`.
+This document describes the current control-plane HTTP API for version `2.0.4`. The catalog is aligned with the routes registered in `control-plane/internal/httpserver/server.go`.
 
 ## General Rules
 
@@ -260,7 +260,7 @@ Also accepts the hourly auto-update toggle path used by the UI.
 
 ### `GET /api/revisions`
 
-The new aggregated revision catalog in `2.0.3`.
+The new aggregated revision catalog in `2.0.4`.
 
 It powers the `Revisions` UI and returns:
 

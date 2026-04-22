@@ -959,6 +959,34 @@ function applyEasyProfileToDraft(draft, profile) {
   };
 }
 
+async function hydrateSiteDraft(ctx, site, upstream, tlsConfig, accessPolicy = null) {
+  let draft = site ? siteDraftFromData(site, upstream, tlsConfig) : defaultSiteDraft();
+  if (site?.id) {
+    try {
+      const profile = await ctx.api.get(`/api/easy-site-profiles/${encodeURIComponent(site.id)}`);
+      draft = applyEasyProfileToDraft(draft, profile);
+    } catch (error) {
+      const secondaryDump = await tryGetJSON("/api-app/easy-site-profiles");
+      const secondaryProfile = findEasyProfile(secondaryDump, site.id);
+      if (secondaryProfile) {
+        draft = applyEasyProfileToDraft(draft, secondaryProfile);
+      } else if (error?.status !== 404) {
+        console.warn("failed to load easy-site-profile", error);
+      }
+    }
+  }
+  draft.access_allowlist = normalizeStringArray(accessPolicy?.allowlist);
+  draft.access_denylist = normalizeStringArray(accessPolicy?.denylist);
+  draft.use_allowlist = draft.access_allowlist.length > 0;
+  if (!normalizeStringArray(draft.exceptions_ip).length) {
+    draft.exceptions_ip = [...draft.access_allowlist];
+  }
+  if (!draft.use_exceptions) {
+    draft.use_exceptions = normalizeStringArray(draft.exceptions_ip).length > 0;
+  }
+  return draft;
+}
+
 function draftToEasyProfile(draft) {
   const siteID = String(draft.id || "").trim().toLowerCase();
   const primaryHost = String(draft.primary_host || "").trim().toLowerCase();
@@ -1529,14 +1557,15 @@ function renderListView(state, ctx) {
   `;
 }
 
-function renderModeTabs(ctx) {
+function renderModeTabs(activeMode, ctx) {
+  const mode = String(activeMode || "easy").trim().toLowerCase() === "raw" ? "raw" : "easy";
   return `
     <div class="waf-mode-switch">
-      <button class="btn primary btn-sm" type="button">${escapeHtml(ctx.t("sites.mode.easy"))}</button>
+      <button class="btn ${mode === "easy" ? "primary" : "ghost"} btn-sm" type="button" data-mode-tab="easy">${escapeHtml(ctx.t("sites.mode.easy"))}</button>
       <button class="btn ghost btn-sm" type="button" disabled>${escapeHtml(ctx.t("sites.mode.advanced"))}</button>
-      <button class="btn ghost btn-sm" type="button" disabled>${escapeHtml(ctx.t("sites.mode.raw"))}</button>
+      <button class="btn ${mode === "raw" ? "primary" : "ghost"} btn-sm" type="button" data-mode-tab="raw">${escapeHtml(ctx.t("sites.mode.raw"))}</button>
     </div>
-    <div class="waf-note">${escapeHtml(ctx.t("sites.mode.note"))}</div>
+    ${mode === "raw" ? "" : `<div class="waf-note">${escapeHtml(ctx.t("sites.mode.note"))}</div>`}
   `;
 }
 
@@ -1572,6 +1601,35 @@ function renderWizardNav(activeTab, ctx) {
   `;
 }
 
+function renderRawEditor(state, ctx, isNew) {
+  const missingFields = normalizeArray(state.rawMissingFields);
+  return `
+    <section class="waf-card waf-service-editor-card">
+      <div class="waf-card-body waf-stack">
+        <div id="sites-feedback"></div>
+        <form id="service-editor-form" class="waf-form waf-stack">
+          <div class="waf-list-title">${escapeHtml(ctx.t("sites.raw.title"))}</div>
+          <div class="waf-note">${escapeHtml(ctx.t("sites.raw.description"))}</div>
+          ${missingFields.length ? `
+            <div class="waf-empty">
+              <strong>${escapeHtml(ctx.t("sites.raw.missingFieldsTitle"))}</strong>
+              <pre class="waf-code">${escapeHtml(missingFields.map((field) => toEnvKey(field)).join("\n"))}</pre>
+            </div>
+          ` : ""}
+          <div class="waf-field full">
+            <label for="service-raw-env">${escapeHtml(ctx.t("sites.raw.label"))}</label>
+            <textarea id="service-raw-env" rows="32" class="waf-code">${escapeHtml(state.rawEnvText || draftToEnvText(state.draft))}</textarea>
+          </div>
+          <div class="waf-actions waf-actions-between">
+            <button class="btn ghost btn-sm" type="button" id="service-back-bottom">${escapeHtml(ctx.t("common.back"))}</button>
+            <button class="btn primary btn-sm" type="submit">${escapeHtml(ctx.t(isNew ? "sites.action.createSite" : "sites.action.saveSite"))}</button>
+          </div>
+        </form>
+      </div>
+    </section>
+  `;
+}
+
 function renderDetailView(state, ctx) {
   const draft = state.draft;
   const isNew = state.route.mode === "create";
@@ -1600,22 +1658,25 @@ function renderDetailView(state, ctx) {
           </div>
         </div>
         <div class="waf-card-body waf-stack">
-          ${renderModeTabs(ctx)}
-          <div class="waf-field waf-service-settings-search">
-            <label for="service-settings-search">${escapeHtml(ctx.t("sites.search.title"))}</label>
-            <input id="service-settings-search" value="${escapeHtml(state.settingsSearch)}" placeholder="${escapeHtml(ctx.t("sites.search.placeholder"))}">
-            ${searchQuery ? `
-              <div class="waf-service-settings-search-dropdown">
-                ${searchMatches.length ? searchMatches.map((item) => `
-                  <button type="button" class="waf-service-settings-search-item" data-settings-result="${escapeHtml(item.id)}" data-settings-tab="${escapeHtml(item.tab)}" data-settings-selector="${escapeHtml(item.selector)}">
-                    ${escapeHtml(ctx.t(item.labelKey))}
-                  </button>
-                `).join("") : `<div class="waf-note">${escapeHtml(ctx.t("sites.search.empty"))}</div>`}
-              </div>
-            ` : ""}
-          </div>
+          ${renderModeTabs(state.editorMode, ctx)}
+          ${state.editorMode === "raw" ? "" : `
+            <div class="waf-field waf-service-settings-search">
+              <label for="service-settings-search">${escapeHtml(ctx.t("sites.search.title"))}</label>
+              <input id="service-settings-search" value="${escapeHtml(state.settingsSearch)}" placeholder="${escapeHtml(ctx.t("sites.search.placeholder"))}">
+              ${searchQuery ? `
+                <div class="waf-service-settings-search-dropdown">
+                  ${searchMatches.length ? searchMatches.map((item) => `
+                    <button type="button" class="waf-service-settings-search-item" data-settings-result="${escapeHtml(item.id)}" data-settings-tab="${escapeHtml(item.tab)}" data-settings-selector="${escapeHtml(item.selector)}">
+                      ${escapeHtml(ctx.t(item.labelKey))}
+                    </button>
+                  `).join("") : `<div class="waf-note">${escapeHtml(ctx.t("sites.search.empty"))}</div>`}
+                </div>
+              ` : ""}
+            </div>
+          `}
         </div>
       </section>
+      ${state.editorMode === "raw" ? renderRawEditor(state, ctx, isNew) : `
       <div class="waf-service-editor-layout">
         ${renderWizardNav(state.activeTab, ctx)}
         <section class="waf-card waf-service-editor-card">
@@ -2081,6 +2142,7 @@ function renderDetailView(state, ctx) {
           </div>
         </section>
       </div>
+      `}
     </div>
   `;
 }
@@ -2774,22 +2836,13 @@ function shouldUpsertBaseResources(draft, existingSite, existingUpstream, existi
   return false;
 }
 
-async function exportSelectedServicesEnv(ctx, sites, upstreamsBySite, tlsBySite, selectedSiteIDs) {
+async function exportSelectedServicesEnv(ctx, sites, upstreamsBySite, tlsBySite, accessBySite, selectedSiteIDs) {
   const targets = sites.filter((site) => selectedSiteIDs.has(site.id));
   for (const site of targets) {
     const upstream = upstreamsBySite.get(site.id)?.[0] || null;
     const tlsConfig = tlsBySite.get(site.id) || null;
-    let draft = siteDraftFromData(site, upstream, tlsConfig);
-    try {
-      const profile = await ctx.api.get(`/api/easy-site-profiles/${encodeURIComponent(site.id)}`);
-      draft = applyEasyProfileToDraft(draft, profile);
-    } catch (error) {
-      const secondaryDump = await tryGetJSON("/api-app/easy-site-profiles");
-      const secondaryProfile = findEasyProfile(secondaryDump, site.id);
-      if (secondaryProfile) {
-        draft = applyEasyProfileToDraft(draft, secondaryProfile);
-      }
-    }
+    const accessPolicy = accessBySite.get(normalizeSiteID(site.id)) || null;
+    const draft = await hydrateSiteDraft(ctx, site, upstream, tlsConfig, accessPolicy);
     downloadText(`${site.id}.env`, draftToEnvText(draft));
   }
   return targets.length;
@@ -2840,10 +2893,13 @@ export async function renderSites(container, ctx) {
     geoCatalog: buildGeoCatalogFallback(),
     search: "",
     sort: "updated-desc",
+    editorMode: "easy",
     activeTab: "front",
     settingsSearch: "",
     settingsMatches: [],
     highlightedSelector: "",
+    rawEnvText: "",
+    rawMissingFields: [],
     filteredSites: [],
     selectedSiteIDs: new Set(),
     upstreamsBySite: new Map(),
@@ -2930,6 +2986,9 @@ export async function renderSites(container, ctx) {
     }
     if (state.route.mode === "create") {
       state.draft = defaultSiteDraft();
+      state.rawEnvText = draftToEnvText(state.draft);
+      state.rawMissingFields = [];
+      state.editorMode = "easy";
       state.listTemplateSelection.blacklist_user_agent = [];
       state.listTemplateSelection.blacklist_uri = [];
       state.activeTab = "front";
@@ -2942,32 +3001,12 @@ export async function renderSites(container, ctx) {
     const upstream = state.upstreamsBySite.get(state.route.siteID)?.[0] || null;
     const tlsConfig = state.tlsBySite.get(state.route.siteID) || null;
     const accessPolicy = state.accessBySite.get(normalizeSiteID(state.route.siteID)) || null;
-    state.draft = site ? siteDraftFromData(site, upstream, tlsConfig) : defaultSiteDraft();
+    state.draft = await hydrateSiteDraft(ctx, site, upstream, tlsConfig, accessPolicy);
     state.listTemplateSelection.blacklist_user_agent = [];
     state.listTemplateSelection.blacklist_uri = [];
-    if (site?.id) {
-      try {
-        const profile = await ctx.api.get(`/api/easy-site-profiles/${encodeURIComponent(site.id)}`);
-        state.draft = applyEasyProfileToDraft(state.draft, profile);
-      } catch (error) {
-        const secondaryDump = await tryGetJSON("/api-app/easy-site-profiles");
-        const secondaryProfile = findEasyProfile(secondaryDump, site.id);
-        if (secondaryProfile) {
-          state.draft = applyEasyProfileToDraft(state.draft, secondaryProfile);
-        } else if (error?.status !== 404) {
-          console.warn("failed to load easy-site-profile", error);
-        }
-      }
-    }
-    state.draft.access_allowlist = normalizeStringArray(accessPolicy?.allowlist);
-    state.draft.access_denylist = normalizeStringArray(accessPolicy?.denylist);
-    state.draft.use_allowlist = state.draft.access_allowlist.length > 0;
-    if (!normalizeStringArray(state.draft.exceptions_ip).length) {
-      state.draft.exceptions_ip = [...state.draft.access_allowlist];
-    }
-    if (!state.draft.use_exceptions) {
-      state.draft.use_exceptions = normalizeStringArray(state.draft.exceptions_ip).length > 0;
-    }
+    state.rawEnvText = draftToEnvText(state.draft);
+    state.rawMissingFields = [];
+    state.editorMode = "easy";
     state.activeTab = "front";
     state.settingsSearch = "";
     state.settingsMatches = [];
@@ -3024,7 +3063,7 @@ export async function renderSites(container, ctx) {
         return;
       }
       try {
-        const exportedCount = await exportSelectedServicesEnv(ctx, state.sites, state.upstreamsBySite, state.tlsBySite, state.selectedSiteIDs);
+        const exportedCount = await exportSelectedServicesEnv(ctx, state.sites, state.upstreamsBySite, state.tlsBySite, state.accessBySite, state.selectedSiteIDs);
         ctx.notify(ctx.t("sites.toast.exportedEnv", { count: exportedCount }));
       } catch (error) {
         setError(feedback, `${ctx.t("sites.error.exportEnv")}: ${String(error?.message || error)}`);
@@ -3141,11 +3180,44 @@ export async function renderSites(container, ctx) {
 
   const bindDetail = () => {
     const feedback = container.querySelector("#sites-feedback");
+    const parseRawDraft = () => {
+      const rawEnvText = String(container.querySelector("#service-raw-env")?.value || state.rawEnvText || "").trim();
+      const parsed = envToDraft(rawEnvText);
+      state.rawEnvText = rawEnvText ? `${rawEnvText}\n` : "";
+      state.rawMissingFields = normalizeArray(parsed.missingFields);
+      state.draft = parsed.draft;
+      return parsed.draft;
+    };
     container.querySelectorAll("[data-wizard-tab]").forEach((button) => {
       button.addEventListener("click", () => {
         state.draft = getDraft();
         state.activeTab = button.dataset.wizardTab || "front";
         render();
+      });
+    });
+    container.querySelectorAll("[data-mode-tab]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const nextMode = String(button.dataset.modeTab || "easy").trim().toLowerCase() === "raw" ? "raw" : "easy";
+        if (nextMode === state.editorMode) {
+          return;
+        }
+        if (nextMode === "raw") {
+          if (state.editorMode === "easy") {
+            syncStateDraftFromForm();
+          }
+          state.rawEnvText = draftToEnvText(ensureControlPlaneAccessManagementMethods({ ...state.draft }));
+          state.rawMissingFields = [];
+          state.editorMode = "raw";
+          render();
+          return;
+        }
+        try {
+          parseRawDraft();
+          state.editorMode = "easy";
+          render();
+        } catch (error) {
+          setError(feedback, `${ctx.t("sites.raw.parseError")}: ${String(error?.message || error)}`);
+        }
       });
     });
 
@@ -3296,6 +3368,10 @@ export async function renderSites(container, ctx) {
     }
     container.querySelector("#service-back")?.addEventListener("click", back);
     container.querySelector("#service-back-bottom")?.addEventListener("click", back);
+    container.querySelector("#service-raw-env")?.addEventListener("input", (event) => {
+      state.rawEnvText = String(event.target.value || "");
+      state.rawMissingFields = [];
+    });
     container.querySelector("#service-host")?.addEventListener("input", (event) => {
       const host = event.target.value.trim().toLowerCase();
       if (idInput && !idInput.dataset.dirty) {
@@ -3722,8 +3798,18 @@ export async function renderSites(container, ctx) {
 
     container.querySelector("#service-editor-form")?.addEventListener("submit", async (event) => {
       event.preventDefault();
-      syncStateDraftFromForm();
-      const draft = ensureControlPlaneAccessManagementMethods(getDraft());
+      let draft;
+      try {
+        if (state.editorMode === "raw") {
+          draft = ensureControlPlaneAccessManagementMethods(parseRawDraft());
+        } else {
+          syncStateDraftFromForm();
+          draft = ensureControlPlaneAccessManagementMethods(getDraft());
+        }
+      } catch (error) {
+        setError(feedback, `${ctx.t("sites.raw.parseError")}: ${String(error?.message || error)}`);
+        return;
+      }
       const validationError = validateDraft(draft, ctx);
       if (validationError) {
         setError(feedback, validationError);
