@@ -41,25 +41,30 @@ func TestE2ESmoke_LoginHealthcheckDashboard(t *testing.T) {
 	}
 	if strings.HasPrefix(strings.ToLower(baseURL), "https://") {
 		transport := &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			Proxy:                 nil,
+			ForceAttemptHTTP2:     false,
+			TLSHandshakeTimeout:   15 * time.Second,
+			ResponseHeaderTimeout: 15 * time.Second,
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+				ServerName:         "localhost",
+			},
 		}
-		if baseParsed, parseErr := url.Parse(baseURL); parseErr == nil && strings.EqualFold(baseParsed.Hostname(), "localhost") {
-			dialer := &net.Dialer{Timeout: 15 * time.Second}
-			transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
-				host, port, err := net.SplitHostPort(addr)
-				if err != nil {
-					return dialer.DialContext(ctx, network, addr)
-				}
-				if strings.EqualFold(host, "localhost") {
-					host = "127.0.0.1"
-				}
-				return dialer.DialContext(ctx, network, net.JoinHostPort(host, port))
+		dialer := &net.Dialer{Timeout: 15 * time.Second}
+		transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+			host, port, err := net.SplitHostPort(addr)
+			if err != nil {
+				return dialer.DialContext(ctx, network, addr)
 			}
+			if strings.EqualFold(host, "localhost") {
+				host = "127.0.0.1"
+			}
+			return dialer.DialContext(ctx, network, net.JoinHostPort(host, port))
 		}
 		client.Transport = transport
 	}
 
-	if err := waitForHTTP(client, baseURL+"/login", 90*time.Second); err != nil {
+	if err := waitForHTTP(client, baseURL+"/login", "", 90*time.Second); err != nil {
 		t.Fatalf("ui is not ready: %v", err)
 	}
 
@@ -67,7 +72,7 @@ func TestE2ESmoke_LoginHealthcheckDashboard(t *testing.T) {
 		"username": username,
 		"password": password,
 	}
-	loginResp := postJSON(t, client, baseURL+"/api/auth/login", loginPayload)
+	loginResp := postJSON(t, client, baseURL+"/api/auth/login", "", loginPayload)
 	if loginResp.StatusCode != http.StatusOK {
 		t.Fatalf("login failed: status=%d body=%s", loginResp.StatusCode, mustReadBody(t, loginResp.Body))
 	}
@@ -95,7 +100,7 @@ func TestE2ESmoke_LoginHealthcheckDashboard(t *testing.T) {
 		t.Fatalf("expected waf_session cookie after login")
 	}
 
-	healthcheckPage := getWithAuth(t, client, baseURL+"/healthcheck")
+	healthcheckPage := getWithAuth(t, client, baseURL+"/healthcheck", "")
 	if healthcheckPage.StatusCode != http.StatusOK {
 		t.Fatalf("healthcheck page failed: status=%d", healthcheckPage.StatusCode)
 	}
@@ -104,7 +109,7 @@ func TestE2ESmoke_LoginHealthcheckDashboard(t *testing.T) {
 		t.Fatalf("healthcheck page contract mismatch: missing current page markers")
 	}
 
-	compatResp := getWithAuth(t, client, baseURL+"/api/app/compat")
+	compatResp := getWithAuth(t, client, baseURL+"/api/app/compat", "")
 	if compatResp.StatusCode != http.StatusOK {
 		t.Fatalf("compat api failed: status=%d body=%s", compatResp.StatusCode, mustReadBody(t, compatResp.Body))
 	}
@@ -122,7 +127,7 @@ func TestE2ESmoke_LoginHealthcheckDashboard(t *testing.T) {
 		t.Fatalf("compat api returned empty module_id")
 	}
 
-	fixResp := postJSON(t, client, baseURL+"/api/app/compat/fix", map[string]any{"module_id": firstModuleID})
+	fixResp := postJSON(t, client, baseURL+"/api/app/compat/fix", "", map[string]any{"module_id": firstModuleID})
 	if fixResp.StatusCode != http.StatusOK {
 		t.Fatalf("compat fix failed: status=%d body=%s", fixResp.StatusCode, mustReadBody(t, fixResp.Body))
 	}
@@ -134,7 +139,7 @@ func TestE2ESmoke_LoginHealthcheckDashboard(t *testing.T) {
 		t.Fatalf("compat fix response expected ok=true, got: %#v", fixData)
 	}
 
-	dashboardPage := getWithAuth(t, client, baseURL+"/dashboard")
+	dashboardPage := getWithAuth(t, client, baseURL+"/dashboard", "")
 	if dashboardPage.StatusCode != http.StatusOK {
 		t.Fatalf("dashboard page failed: status=%d body=%s", dashboardPage.StatusCode, mustReadBody(t, dashboardPage.Body))
 	}
@@ -143,7 +148,7 @@ func TestE2ESmoke_LoginHealthcheckDashboard(t *testing.T) {
 		t.Fatalf("dashboard page contract mismatch: missing content area marker")
 	}
 
-	dashboardStatsResp := getWithAuth(t, client, baseURL+"/api/dashboard/stats")
+	dashboardStatsResp := getWithAuth(t, client, baseURL+"/api/dashboard/stats", "")
 	if dashboardStatsResp.StatusCode != http.StatusOK {
 		t.Fatalf("dashboard stats failed: status=%d body=%s", dashboardStatsResp.StatusCode, mustReadBody(t, dashboardStatsResp.Body))
 	}
@@ -158,22 +163,36 @@ func TestE2ESmoke_LoginHealthcheckDashboard(t *testing.T) {
 	}
 }
 
-func waitForHTTP(client *http.Client, target string, timeout time.Duration) error {
+func waitForHTTP(client *http.Client, target string, hostOverride string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
+	lastErr := ""
 	for time.Now().Before(deadline) {
-		resp, err := client.Get(target)
+		req, err := http.NewRequest(http.MethodGet, target, nil)
+		if err != nil {
+			return fmt.Errorf("create readiness request: %w", err)
+		}
+		if hostOverride != "" {
+			req.Host = hostOverride
+		}
+		resp, err := client.Do(req)
 		if err == nil {
 			_ = resp.Body.Close()
 			if resp.StatusCode >= 200 && resp.StatusCode < 500 {
 				return nil
 			}
+			lastErr = fmt.Sprintf("status=%d", resp.StatusCode)
+		} else {
+			lastErr = err.Error()
 		}
 		time.Sleep(2 * time.Second)
 	}
-	return fmt.Errorf("timeout waiting for %s", target)
+	if lastErr == "" {
+		lastErr = "no response"
+	}
+	return fmt.Errorf("timeout waiting for %s (%s)", target, lastErr)
 }
 
-func postJSON(t *testing.T, client *http.Client, endpoint string, payload any) *http.Response {
+func postJSON(t *testing.T, client *http.Client, endpoint string, hostOverride string, payload any) *http.Response {
 	t.Helper()
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -185,6 +204,9 @@ func postJSON(t *testing.T, client *http.Client, endpoint string, payload any) *
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
+	if hostOverride != "" {
+		req.Host = hostOverride
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		t.Fatalf("request failed %s: %v", endpoint, err)
@@ -192,13 +214,16 @@ func postJSON(t *testing.T, client *http.Client, endpoint string, payload any) *
 	return resp
 }
 
-func getWithAuth(t *testing.T, client *http.Client, endpoint string) *http.Response {
+func getWithAuth(t *testing.T, client *http.Client, endpoint string, hostOverride string) *http.Response {
 	t.Helper()
 	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
 	if err != nil {
 		t.Fatalf("create request %s: %v", endpoint, err)
 	}
 	req.Header.Set("Accept", "application/json,text/html")
+	if hostOverride != "" {
+		req.Host = hostOverride
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		t.Fatalf("request failed %s: %v", endpoint, err)
