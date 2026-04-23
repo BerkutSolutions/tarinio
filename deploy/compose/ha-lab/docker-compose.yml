@@ -193,7 +193,7 @@ services:
     restart: unless-stopped
     depends_on:
       api-lb:
-        condition: service_healthy
+        condition: service_started
     ports:
       - "${HA_UI_PORT:-18080}:80"
     expose:

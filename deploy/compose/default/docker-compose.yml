@@ -214,7 +214,7 @@ services:
     restart: unless-stopped
     depends_on:
       control-plane:
-        condition: service_healthy
+        condition: service_started
     expose:
       - "80"
     networks:
