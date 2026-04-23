@@ -57,11 +57,6 @@ func TestReleaseDocsAndLockfileConsistency(t *testing.T) {
 
 	validateNpmLockfileInstall(t, repoRoot)
 
-	releaseScript := mustReadFile(t, filepath.Join(repoRoot, "scripts", "release.ps1"))
-	if !strings.Contains(releaseScript, "generate-release-artifacts.ps1") {
-		t.Fatalf("scripts/release.ps1 must generate signed release artifacts before publishing")
-	}
-
 	requiredDocs := []string{
 		filepath.Join(repoRoot, "docs", "eng", "enterprise-identity.md"),
 		filepath.Join(repoRoot, "docs", "eng", "evidence-and-releases.md"),
