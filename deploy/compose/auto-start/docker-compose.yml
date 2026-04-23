@@ -9,6 +9,7 @@ services:
       - .env
     environment:
       CONTROL_PLANE_HTTP_ADDR: 0.0.0.0:8080
+      CONTROL_PLANE_STARTUP_SELF_TEST_ENABLED: ${CONTROL_PLANE_STARTUP_SELF_TEST_ENABLED:-false}
       WAF_RUNTIME_ROOT: /var/lib/waf
       CONTROL_PLANE_REDIS_ADDR: redis:6379
       WAF_RUNTIME_HEALTH_URL: http://runtime:8081/readyz
