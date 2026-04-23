@@ -1,17 +1,15 @@
-## [2.0.11] - 23.04.2026
-
-### Security hardening
-- Hardened administration support scripts input validation to block shell metacharacter injection in script environment fields.
-- Restricted `/api/dashboard/containers/logs` access by requiring `administration.read` in addition to dashboard/report read permissions.
-- Added container-name allowlist checks for container log retrieval.
-- Removed insecure control-plane default pepper value and made compose secrets for pepper/runtime token/postgres password explicit required inputs.
-- Added stricter Easy profile validation for header and host fields used in NGINX templates to reduce config/template injection risk.
-- Added centralized runtime `security` settings with a new UI tab `Settings -> Security`:
-  - login brute-force rate limiting controls;
-  - policy gate for Vault insecure TLS mode.
-- Enforced Vault TLS skip-verify policy checks when saving runtime logging settings.
-
 ## [2.0.10] - 23.04.2026
+
+### Усиление безопасности
+- Усилена административная поддержка проверки ввода скриптов, чтобы блокировать внедрение метасимволов оболочки в поля среды скрипта.
+- Ограничен доступ к /api/dashboard/контейнерам/журналам, для чего требуется "administration.read" в дополнение к разрешениям на чтение панели мониторинга/отчетов.
+- Добавлены проверки списка разрешенных имен контейнеров для поиска журнала контейнеров.
+- Удалено небезопасное значение pepper по умолчанию для уровня управления и добавлены явные обязательные входные данные для секретов создания для pepper/токена времени выполнения/ пароля postgres.
+- Добавлена более строгая и простая проверка профиля для полей заголовка и хоста, используемых в шаблонах NGINX, чтобы снизить риск внедрения конфигурации / шаблона.
+- Добавлены централизованные настройки "безопасности" среды выполнения с новой вкладкой пользовательского интерфейса "Настройки -> Безопасность`:
+  - элементы управления, ограничивающие скорость входа в систему методом перебора.;
+  - управление политикой для небезопасного режима Vault TLS.
+- Принудительный пропуск Vault TLS -проверка политики при сохранении настроек ведения журнала во время выполнения.
 
 ### Готовность Enterprise
 - Введено разделение прав для операций ревизий: `revisions.write` для `apply/delete` и отдельное `revisions.approve` для согласования.

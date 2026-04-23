@@ -30,6 +30,8 @@ jobs:
           cat >> deploy/compose/auto-start/.env <<'EOF'
           POSTGRES_PASSWORD=waf
           POSTGRES_DSN=postgres://waf:waf@postgres:5432/waf?sslmode=disable
+          CONTROL_PLANE_SECURITY_PEPPER=smoke-e2e-security-pepper
+          WAF_RUNTIME_API_TOKEN=smoke-e2e-runtime-api-token
           CONTROL_PLANE_BOOTSTRAP_ADMIN_ENABLED=true
           CONTROL_PLANE_BOOTSTRAP_ADMIN_ID=admin
           CONTROL_PLANE_BOOTSTRAP_ADMIN_USERNAME=admin

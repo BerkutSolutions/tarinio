@@ -168,6 +168,7 @@ ensure_secure_env_defaults() {
   clickhouse_password="$(read_env_value CLICKHOUSE_PASSWORD)"
   opensearch_password="$(read_env_value OPENSEARCH_PASSWORD)"
   security_pepper="$(read_env_value CONTROL_PLANE_SECURITY_PEPPER)"
+  runtime_api_token="$(read_env_value WAF_RUNTIME_API_TOKEN)"
   postgres_dsn="$(read_env_value POSTGRES_DSN)"
 
   if [ -z "$postgres_user" ]; then
@@ -198,11 +199,17 @@ ensure_secure_env_defaults() {
     changed=1
     ok "generated secure OPENSEARCH_PASSWORD"
   fi
-  if [ "$ENV_CREATED" -eq 1 ] && is_placeholder_secret "$security_pepper"; then
+  if is_placeholder_secret "$security_pepper"; then
     security_pepper="$(generate_secret 64)"
     write_env_value CONTROL_PLANE_SECURITY_PEPPER "$security_pepper"
     changed=1
     ok "generated secure CONTROL_PLANE_SECURITY_PEPPER"
+  fi
+  if is_placeholder_secret "$runtime_api_token"; then
+    runtime_api_token="$(generate_secret 48)"
+    write_env_value WAF_RUNTIME_API_TOKEN "$runtime_api_token"
+    changed=1
+    ok "generated secure WAF_RUNTIME_API_TOKEN"
   fi
 
   target_postgres_dsn="postgres://${postgres_user}:${postgres_password}@postgres:5432/${postgres_db}?sslmode=disable"

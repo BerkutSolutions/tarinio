@@ -36,7 +36,7 @@ func (s *SiteService) Create(ctx context.Context, site sites.Site) (created site
 	}()
 	created, err = s.store.Create(site)
 	if err == nil {
-		created.ID = created.ID
+		site.ID = created.ID
 		if applyErr := runAutoApply(ctx); applyErr != nil {
 			return sites.Site{}, applyErr
 		}

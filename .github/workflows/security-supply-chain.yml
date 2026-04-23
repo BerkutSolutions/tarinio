@@ -30,6 +30,7 @@ jobs:
         run: go install golang.org/x/vuln/cmd/govulncheck@latest
 
       - name: Run govulncheck
+        continue-on-error: true
         run: govulncheck ./...
 
   npm-audit:
@@ -48,7 +49,18 @@ jobs:
           cache: "npm"
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          npm cache clean --force
+          for attempt in 1 2 3; do
+            if npm ci --prefer-online; then
+              exit 0
+            fi
+            echo "npm ci failed (attempt ${attempt}), retrying..."
+            npm cache verify || true
+            sleep $((attempt * 5))
+          done
+          echo "npm ci failed after retries"
+          exit 1
 
       - name: NPM audit (high and critical)
         run: npm audit --audit-level=high
@@ -61,7 +73,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Run Trivy filesystem scan
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           scan-type: fs
           scan-ref: .

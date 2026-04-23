@@ -35,7 +35,18 @@ jobs:
         uses: actions/configure-pages@v6
 
       - name: Install docs dependencies
-        run: npm ci
+        run: |
+          npm cache clean --force
+          for attempt in 1 2 3; do
+            if npm ci --prefer-online; then
+              exit 0
+            fi
+            echo "npm ci failed (attempt ${attempt}), retrying..."
+            npm cache verify || true
+            sleep $((attempt * 5))
+          done
+          echo "npm ci failed after retries"
+          exit 1
 
       - name: Build Docusaurus site
         env:
