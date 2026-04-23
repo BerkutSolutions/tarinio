@@ -199,7 +199,7 @@ ensure_secure_env_defaults() {
   fi
 
   target_postgres_dsn="postgres://${postgres_user}:${postgres_password}@postgres:5432/${postgres_db}?sslmode=disable"
-  if [ -z "$postgres_dsn" ] || printf "%s" "$postgres_dsn" | grep -q "change-me"; then
+  if [ "$postgres_dsn" != "$target_postgres_dsn" ]; then
     write_env_value POSTGRES_DSN "$target_postgres_dsn"
     changed=1
     ok "normalized POSTGRES_DSN for current credentials"
@@ -278,6 +278,7 @@ ensure_postgres_password_alignment() {
   desired_password="$(read_env_value POSTGRES_PASSWORD)"
   postgres_dsn="$(read_env_value POSTGRES_DSN)"
   dsn_password="$(postgres_dsn_password "$postgres_dsn")"
+  target_postgres_dsn=""
 
   if [ -z "$postgres_user" ]; then
     postgres_user="waf"
@@ -288,8 +289,21 @@ ensure_postgres_password_alignment() {
   if [ -z "$desired_password" ]; then
     desired_password="waf"
   fi
+  target_postgres_dsn="postgres://${postgres_user}:${desired_password}@postgres:5432/${postgres_db}?sslmode=disable"
 
-  if postgres_probe_password "$desired_password" "$postgres_user" "$postgres_db"; then
+  if [ "$postgres_dsn" != "$target_postgres_dsn" ]; then
+    warn "POSTGRES_DSN does not match current POSTGRES_* values; normalizing runtime DSN"
+    write_env_value POSTGRES_DSN "$target_postgres_dsn"
+    postgres_dsn="$target_postgres_dsn"
+    dsn_password="$desired_password"
+    if run_logged $COMPOSE_CMD -f docker-compose.yml restart control-plane; then
+      ok "control-plane restarted after POSTGRES_DSN normalization"
+    else
+      warn "failed to restart control-plane after POSTGRES_DSN normalization"
+    fi
+  fi
+
+  if [ "$dsn_password" = "$desired_password" ] && postgres_probe_password "$desired_password" "$postgres_user" "$postgres_db"; then
     ok "postgres credentials verified"
     return 0
   fi
@@ -314,7 +328,6 @@ ensure_postgres_password_alignment() {
   postgres_set_password "$recovered_password" "$desired_password" "$postgres_user" "$postgres_db"
   ok "postgres user password updated to match current .env"
 
-  target_postgres_dsn="postgres://${postgres_user}:${desired_password}@postgres:5432/${postgres_db}?sslmode=disable"
   write_env_value POSTGRES_DSN "$target_postgres_dsn"
   ok "POSTGRES_DSN normalized after postgres password recovery"
 
