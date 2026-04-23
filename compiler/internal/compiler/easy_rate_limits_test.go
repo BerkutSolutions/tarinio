@@ -52,8 +52,14 @@ func TestRenderEasyRateLimitArtifacts_GeneratesRouteSpecificArtifacts(t *testing
 	}
 
 	locationsConf := byPath["nginx/easy-locations/control-plane-access.conf"]
-	if !strings.Contains(locationsConf, "location = /challenge") || !strings.Contains(locationsConf, "Set-Cookie \"waf_antibot_") {
+	if !strings.Contains(locationsConf, "location = /challenge") || !strings.Contains(locationsConf, "location = /challenge/verify") || !strings.Contains(locationsConf, "Set-Cookie \"waf_antibot_") {
 		t.Fatalf("expected antibot challenge location in easy locations conf, got: %s", locationsConf)
+	}
+	if !strings.Contains(locationsConf, "alias /etc/waf/errors/control-plane-access/antibot.html;") {
+		t.Fatalf("expected antibot interstitial alias in easy locations conf, got: %s", locationsConf)
+	}
+	if !strings.Contains(locationsConf, "return 302 $scheme://$host$waf_antibot_return_path$waf_antibot_return_query;") {
+		t.Fatalf("expected antibot verify redirect in easy locations conf, got: %s", locationsConf)
 	}
 	if !strings.Contains(locationsConf, "location = /login {") {
 		t.Fatalf("expected exact location for /login, got: %s", locationsConf)

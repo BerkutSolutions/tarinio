@@ -73,6 +73,9 @@ func TestRenderEasyArtifacts_GeneratesSiteAndAuthBasicFiles(t *testing.T) {
 	if !strings.Contains(siteConf, "if ($cookie_waf_antibot_") {
 		t.Fatalf("expected site-scoped antibot cookie rule, got: %s", siteConf)
 	}
+	if !strings.Contains(siteConf, "if ($waf_antibot_guard = \"0:0:1\") { return 302 /challenge?return_uri=$uri&return_args=$args; }") {
+		t.Fatalf("expected antibot redirect challenge in easy template, got: %s", siteConf)
+	}
 	if !strings.Contains(siteConf, `if ($uri ~* "^/(`) || !strings.Contains(siteConf, `api/.*`) || !strings.Contains(siteConf, `static/.*`) || !strings.Contains(siteConf, `dashboard(?:/.*)?`) || !strings.Contains(siteConf, `login/2fa`) {
 		t.Fatalf("expected admin path bypass guard in easy template, got: %s", siteConf)
 	}
@@ -108,6 +111,17 @@ func TestRenderEasyArtifacts_GeneratesSiteAndAuthBasicFiles(t *testing.T) {
 	}
 	if !strings.Contains(l4guardConfig, "\"conn_limit\": 200") || !strings.Contains(l4guardConfig, "\"rate_per_second\": 100") {
 		t.Fatalf("expected high default l4guard limits, got: %s", l4guardConfig)
+	}
+
+	var challengePage string
+	for _, item := range artifacts {
+		if item.Path == "errors/site-a/antibot.html" {
+			challengePage = string(item.Content)
+			break
+		}
+	}
+	if !strings.Contains(challengePage, `var verifyURI = "/challenge/verify";`) {
+		t.Fatalf("expected antibot interstitial artifact with verify uri, got: %s", challengePage)
 	}
 }
 

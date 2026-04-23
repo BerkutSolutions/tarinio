@@ -2,8 +2,28 @@
 location = {{ .AntibotURI }} {
     proxy_intercept_errors off;
     modsecurity off;
+{{- if .AntibotUsesInterstitial }}
+    default_type text/html;
+    alias /etc/waf/errors/{{ .SiteID }}/antibot.html;
+{{- else }}
     add_header Set-Cookie "{{ .AntibotCookieName }}={{ .AntibotCookieValue }}; Max-Age=600; Path=/; SameSite=Lax; Secure; HttpOnly" always;
     return 204;
+{{- end }}
+}
+location = {{ .AntibotVerifyURI }} {
+    proxy_intercept_errors off;
+    modsecurity off;
+    set $waf_antibot_return_path /;
+    set $waf_antibot_return_query "";
+    if ($arg_return_uri != "") {
+        set $waf_antibot_return_path $arg_return_uri;
+    }
+    if ($arg_return_args != "") {
+        set $waf_antibot_return_query ?$arg_return_args;
+    }
+    add_header Cache-Control "no-store" always;
+    add_header Set-Cookie "{{ .AntibotCookieName }}={{ .AntibotCookieValue }}; Max-Age=600; Path=/; SameSite=Lax; Secure; HttpOnly" always;
+    return 302 $scheme://$host$waf_antibot_return_path$waf_antibot_return_query;
 }
 {{- end }}
 {{- range .Rules }}

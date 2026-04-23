@@ -43,8 +43,11 @@ type easySiteData struct {
 	AuthBasicUserFile string
 
 	AntibotEnabled       bool
+	AntibotUsesInterstitial bool
 	AntibotChallenge     string
 	AntibotURI           string
+	AntibotVerifyURI     string
+	AntibotRedirectURI   string
 	AntibotCookieName    string
 	AntibotCookieValue   string
 	AntibotRecaptchaHint string
@@ -73,6 +76,10 @@ type l4GuardConfigData struct {
 	Ports         []int  `json:"ports"`
 	Target        string `json:"target"`
 	DestinationIP string `json:"destination_ip"`
+}
+
+type antibotChallengePageData struct {
+	VerifyURI string
 }
 
 // RenderEasyArtifacts compiles Easy-mode site directives into per-site nginx snippets.
@@ -221,8 +228,11 @@ func RenderEasyArtifacts(sites []SiteInput, profiles []EasyProfileInput) ([]Arti
 			AuthBasicRealm:               profile.AuthBasicText,
 			AuthBasicUserFile:            fmt.Sprintf("/etc/waf/nginx/auth-basic/%s.htpasswd", site.ID),
 			AntibotEnabled:               profile.AntibotChallenge != "" && profile.AntibotChallenge != "no",
+			AntibotUsesInterstitial:      antibotUsesInterstitial(profile.AntibotChallenge),
 			AntibotChallenge:             profile.AntibotChallenge,
 			AntibotURI:                   profile.AntibotURI,
+			AntibotVerifyURI:             antibotVerifyURI(profile.AntibotURI),
+			AntibotRedirectURI:           antibotRedirectURI(profile.AntibotChallenge, profile.AntibotURI),
 			AntibotCookieName:            antibotCookieName(site.ID),
 			AntibotCookieValue:           antibotCookieValue(site.ID, profile),
 			AntibotRecaptchaHint:         strings.TrimSpace(profile.AntibotRecaptchaKey),
@@ -273,6 +283,19 @@ func RenderEasyArtifacts(sites []SiteInput, profiles []EasyProfileInput) ([]Arti
 				[]byte(data.ModSecurityEasyRules),
 			))
 		}
+		if data.AntibotUsesInterstitial {
+			challengePage, err := renderTemplate(filepath.Join(templatesRoot(), "..", "errors", "antibot.html.tmpl"), antibotChallengePageData{
+				VerifyURI: data.AntibotVerifyURI,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("render antibot challenge page for %s: %w", site.ID, err)
+			}
+			artifacts = append(artifacts, newArtifact(
+				fmt.Sprintf("errors/%s/antibot.html", site.ID),
+				ArtifactKindNginxConfig,
+				challengePage,
+			))
+		}
 	}
 	if l4Enabled {
 		l4 := l4GuardConfigData{
@@ -321,6 +344,31 @@ func rateLimitBanSeconds(profile EasyProfileInput) int {
 
 func antibotCookieName(siteID string) string {
 	return "waf_antibot_" + shortStableHash(siteID)
+}
+
+func antibotUsesInterstitial(mode string) bool {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case "javascript", "captcha", "recaptcha", "hcaptcha", "turnstile", "mcaptcha":
+		return true
+	default:
+		return false
+	}
+}
+
+func antibotVerifyURI(challengeURI string) string {
+	trimmed := strings.TrimSpace(challengeURI)
+	if trimmed == "" || trimmed == "/" {
+		return "/challenge/verify"
+	}
+	trimmed = strings.TrimRight(trimmed, "/")
+	return trimmed + "/verify"
+}
+
+func antibotRedirectURI(mode string, challengeURI string) string {
+	if antibotUsesInterstitial(mode) {
+		return strings.TrimSpace(challengeURI)
+	}
+	return antibotVerifyURI(challengeURI)
 }
 
 func antibotCookieValue(siteID string, profile EasyProfileInput) string {

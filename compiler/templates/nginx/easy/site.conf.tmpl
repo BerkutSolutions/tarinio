@@ -109,8 +109,12 @@ modsecurity_rules_file /etc/waf/modsecurity/easy/{{ .SiteID }}.conf;
 # Easy antibot guard: requests are challenged unless a site-scoped challenge cookie is present.
 set $waf_antibot_verified 0;
 if ($cookie_{{ .AntibotCookieName }} = "{{ .AntibotCookieValue }}") { set $waf_antibot_verified 1; }
-set $waf_antibot_guard "$waf_easy_exception_guard:$waf_antibot_verified";
-if ($waf_antibot_guard = "0:0") { return 403; }
+set $waf_antibot_safe_method 0;
+if ($request_method = GET) { set $waf_antibot_safe_method 1; }
+if ($request_method = HEAD) { set $waf_antibot_safe_method 1; }
+set $waf_antibot_guard "$waf_easy_exception_guard:$waf_antibot_verified:$waf_antibot_safe_method";
+if ($waf_antibot_guard = "0:0:1") { return 302 {{ .AntibotRedirectURI }}?return_uri=$uri&return_args=$args; }
+if ($waf_antibot_guard ~ "^0:0:") { return 403; }
 add_header X-WAF-Antibot-Mode "{{ .AntibotChallenge }}" always;
 {{- if .AntibotRecaptchaHint }}
 add_header X-WAF-Antibot-Provider "recaptcha" always;

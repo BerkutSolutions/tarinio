@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Security Check</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #08111d;
+      --panel: rgba(18, 28, 44, 0.96);
+      --line: rgba(122, 164, 255, 0.16);
+      --text: #eef4ff;
+      --muted: rgba(238, 244, 255, 0.72);
+      --accent: #8ab4ff;
+      --accent-soft: rgba(138, 180, 255, 0.14);
+      --ok: #74d8a4;
+      --warn: #ffcd72;
+      --bad: #ff8d8d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", Inter, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top, rgba(86, 148, 255, 0.2), transparent 34%),
+        radial-gradient(circle at 80% 10%, rgba(84, 211, 162, 0.12), transparent 26%),
+        var(--bg);
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+    .shell {
+      width: min(760px, 100%);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: var(--panel);
+      box-shadow: 0 28px 64px rgba(0, 0, 0, 0.32);
+      overflow: hidden;
+    }
+    .hero {
+      padding: 28px 30px 18px;
+      border-bottom: 1px solid var(--line);
+    }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 0 0 rgba(138, 180, 255, 0.5);
+      animation: pulse 1.7s ease-out infinite;
+    }
+    h1 {
+      margin: 18px 0 0;
+      font-size: clamp(30px, 4vw, 44px);
+      line-height: 1.05;
+    }
+    .sub {
+      margin: 12px 0 0;
+      max-width: 640px;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.6;
+    }
+    .body {
+      padding: 22px 30px 30px;
+      display: grid;
+      gap: 18px;
+    }
+    .status {
+      display: grid;
+      gap: 12px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 18px;
+      background: linear-gradient(180deg, var(--accent-soft), transparent);
+    }
+    .status strong {
+      font-size: 15px;
+    }
+    .status-line {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      border: 2px solid rgba(255, 255, 255, 0.14);
+      border-top-color: var(--accent);
+      animation: spin 1s linear infinite;
+      flex: 0 0 auto;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .tile {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .tile h2 {
+      margin: 0 0 8px;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+    .tile p {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.55;
+      color: var(--text);
+    }
+    .footer {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+    .btn {
+      appearance: none;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+      padding: 10px 14px;
+      border-radius: 12px;
+      font: inherit;
+      cursor: pointer;
+    }
+    .btn[hidden] {
+      display: none;
+    }
+    .hint-ok { color: var(--ok); }
+    .hint-warn { color: var(--warn); }
+    .hint-bad { color: var(--bad); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(138, 180, 255, 0.5); }
+      70% { box-shadow: 0 0 0 12px rgba(138, 180, 255, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(138, 180, 255, 0); }
+    }
+    @media (max-width: 760px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <div class="eyebrow"><span class="dot"></span><span>Security Check In Progress</span></div>
+      <h1>Performing browser verification</h1>
+      <p class="sub">This site is protected by TARINIO anti-bot challenge mode. The verification runs automatically and sends you back to the requested page as soon as the challenge cookie is issued.</p>
+    </section>
+    <section class="body">
+      <article class="status">
+        <strong id="status-title">Preparing challenge</strong>
+        <div class="status-line"><span class="spinner" aria-hidden="true"></span><span id="status-text">Checking browser capabilities and setting the site-scoped anti-bot cookie.</span></div>
+      </article>
+      <section class="grid">
+        <article class="tile">
+          <h2>Browser</h2>
+          <p id="browser-state">Waiting for client checks.</p>
+        </article>
+        <article class="tile">
+          <h2>Cookie</h2>
+          <p id="cookie-state">Cookie not issued yet.</p>
+        </article>
+        <article class="tile">
+          <h2>Return</h2>
+          <p id="return-state">The original path will open automatically after verification.</p>
+        </article>
+      </section>
+      <div class="actions">
+        <button id="retry-btn" class="btn" type="button" hidden>Retry check</button>
+      </div>
+      <div class="footer">If the page does not advance, review your browser privacy extensions and cookie settings, then retry the verification.</div>
+    </section>
+  </main>
+  <script>
+    (function () {
+      var verifyURI = "{{ .VerifyURI }}";
+      var retryBtn = document.getElementById("retry-btn");
+      var statusTitle = document.getElementById("status-title");
+      var statusText = document.getElementById("status-text");
+      var browserState = document.getElementById("browser-state");
+      var cookieState = document.getElementById("cookie-state");
+      var returnState = document.getElementById("return-state");
+
+      function readReturnTarget() {
+        var params = new URLSearchParams(window.location.search || "");
+        var returnURI = String(params.get("return_uri") || "/").trim();
+        var returnArgs = String(params.get("return_args") || "").trim();
+        if (!returnURI || returnURI.charAt(0) !== "/") {
+          returnURI = "/";
+        }
+        return { uri: returnURI, args: returnArgs };
+      }
+
+      function buildVerifyURL(target) {
+        var url = new URL(verifyURI, window.location.origin);
+        url.searchParams.set("return_uri", target.uri);
+        if (target.args) {
+          url.searchParams.set("return_args", target.args);
+        }
+        return url.toString();
+      }
+
+      function reportFailure(message) {
+        statusTitle.textContent = "Verification did not complete";
+        statusText.textContent = message;
+        cookieState.textContent = "Challenge cookie was not issued.";
+        cookieState.className = "hint-bad";
+        retryBtn.hidden = false;
+      }
+
+      function performChecks() {
+        if (!window.fetch || !window.URL || !window.URLSearchParams || !window.crypto) {
+          browserState.textContent = "Required browser APIs are unavailable.";
+          browserState.className = "hint-bad";
+          reportFailure("The browser does not expose the APIs required for the JavaScript challenge.");
+          return;
+        }
+        if (!navigator.cookieEnabled) {
+          browserState.textContent = "Cookies are disabled.";
+          browserState.className = "hint-bad";
+          reportFailure("Cookies are disabled, so the site cannot persist the anti-bot verification result.");
+          return;
+        }
+
+        browserState.textContent = "Browser checks passed.";
+        browserState.className = "hint-ok";
+
+        var target = readReturnTarget();
+        returnState.textContent = target.uri + (target.args ? "?" + target.args : "");
+        returnState.className = "hint-ok";
+
+        statusTitle.textContent = "Issuing challenge cookie";
+        statusText.textContent = "The browser check passed. Completing verification and returning to the requested page.";
+
+        window.setTimeout(function () {
+          window.fetch(buildVerifyURL(target), {
+            method: "GET",
+            credentials: "same-origin",
+            cache: "no-store",
+            redirect: "follow"
+          }).then(function (response) {
+            if (!response.ok) {
+              throw new Error("Verification endpoint returned " + response.status);
+            }
+            cookieState.textContent = "Challenge cookie issued. Redirecting now.";
+            cookieState.className = "hint-ok";
+            window.location.replace(response.url || (target.uri + (target.args ? "?" + target.args : "")));
+          }).catch(function (error) {
+            reportFailure(error && error.message ? error.message : "The verification request failed.");
+          });
+        }, 1200);
+      }
+
+      if (retryBtn) {
+        retryBtn.addEventListener("click", function () {
+          retryBtn.hidden = true;
+          cookieState.className = "";
+          browserState.className = "";
+          returnState.className = "";
+          performChecks();
+        });
+      }
+
+      performChecks();
+    })();
+  </script>
+</body>
+</html>
