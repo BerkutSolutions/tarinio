@@ -18,9 +18,9 @@
 Читайте в таком порядке:
 
 1. [Матрица совместимости](compatibility-matrix.md)
-2. [Sizing Guide](sizing.md)
+2. [Руководство по планированию ресурсов](sizing.md)
 3. [Развёртывание](deploy.md)
-4. [Hardening Guide](hardening.md)
+4. [Руководство по усилению защиты](hardening.md)
 5. [Обновление](upgrade.md)
 
 ## Если вы хотите ежедневно эксплуатировать TARINIO
@@ -28,9 +28,9 @@
 Читайте в таком порядке:
 
 1. [Эксплуатация](runbook.md)
-2. [Руководство по troubleshooting](troubleshooting.md)
-3. [Operations Cookbook](cookbook.md)
-4. [Observability](observability.md)
+2. [Руководство по устранению неполадок](troubleshooting.md)
+3. [Операционный сборник практик](cookbook.md)
+4. [Наблюдаемость](observability.md)
 5. [Резервные копии](backups.md)
 
 ## Если вам нужен enterprise-уровень доверия
@@ -39,16 +39,16 @@
 
 1. [Политика поддержки и жизненного цикла](support-lifecycle.md)
 2. [Известные ограничения](limitations.md)
-3. [Threat Model](threat-model.md)
-4. [Compliance Mapping](compliance-mapping.md)
-5. [Политика release notes](release-policy.md)
+3. [Модель угроз](threat-model.md)
+4. [Карта соответствия требованиям](compliance-mapping.md)
+5. [Политика заметок о релизах](release-policy.md)
 
-## Если вам нужен HA и восстановление
+## Если вам нужна высокая доступность и восстановление
 
 Читайте в таком порядке:
 
-1. [HA / Multi-Node](ha.md)
-2. [Disaster Recovery Guide](disaster-recovery.md)
+1. [Высокая доступность и многонодовый режим](ha.md)
+2. [Руководство по аварийному восстановлению](disaster-recovery.md)
 3. [Резервные копии](backups.md)
 4. [Обновление](upgrade.md)
 
@@ -56,9 +56,9 @@
 
 Читайте в таком порядке:
 
-1. [Observability](observability.md)
-2. [Benchmarks](benchmarks.md)
-3. [Stage 1 E2E Validation](operators/stage-1-e2e-validation.md)
+1. [Наблюдаемость](observability.md)
+2. [Набор бенчмарков](benchmarks.md)
+3. [Проверка Stage 1 E2E](operators/stage-1-e2e-validation.md)
 
 ## Языковые ветки
 

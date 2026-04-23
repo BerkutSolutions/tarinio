@@ -2,78 +2,58 @@
 
 This page belongs to the current documentation branch.
 
-## Release Philosophy
+TARINIO `2.0.10` uses explicit support channels so enterprise operations are not based on implicit assumptions.
 
-TARINIO follows a forward-moving release model:
+## Release Channels
 
-- the newest release becomes the supported product baseline;
-- upgrades are expected to go through `scripts/install-aio.sh`;
-- upgrades are protected by backups, post-upgrade checks, and data-safe migration paths;
-- the project does not maintain a long tail of concurrent legacy release lines.
+- `Current`: latest release, full functional and security fixes.
+- `Stable`: previous minor line, bug and security fixes only.
+- `LTS`: designated long-lived line for conservative production programs.
 
-## What This Means Operationally
+## Support Windows
 
-For operators, the practical rule is:
+For `2.0.10`, the support windows are:
 
-- run the newest validated release you are prepared to operate;
-- do not plan for long-term production stay on outdated builds;
-- treat upgrade readiness and rollback safety as part of normal operations.
+- `Current`: from April 23, 2026 until the next minor release.
+- `Stable` (`latest-1`): 180 days after the next minor release is published.
+- `LTS 2.0`: until April 30, 2027 (security and critical resilience fixes only).
 
-## Supported Deployment Assumption
+## SLA Targets
 
-The support baseline assumes:
+Initial response targets:
 
-- deployment through the documented Docker / Docker Compose flows;
-- upgrade through the AIO installer or equivalent documented sequence;
-- backups before upgrade;
-- no manual mutation of runtime artifacts outside the product workflows.
+- `P1` (control-plane outage or active risk of losing protected traffic): within 1 hour.
+- `P2` (critical security-function degradation without full outage): within 4 hours.
+- `P3` (non-critical functional defect): within 1 business day.
+- `P4` (advisory and improvement requests): within 3 business days.
 
-## Upgrade Safety Baseline
+## In-Scope Support
 
-TARINIO `2.0.9` expects upgrades to be safe because:
+- incident analysis for documented deployment topologies;
+- safe-upgrade and rollback guidance;
+- migration and post-upgrade validation support;
+- verification guidance for release artifacts and evidence bundles.
 
-- the AIO installer takes lightweight backups before upgrade;
-- PostgreSQL-backed state migrations are versioned;
-- legacy state migration is non-destructive;
-- post-upgrade smoke validation can be enforced;
-- HA control-plane upgrades can be validated through the rolling upgrade helpers.
+## Out-Of-Scope Support
+
+- undocumented topologies and manual runtime mutations outside revision workflows;
+- arbitrary leapfrog upgrades across multiple lines without staged validation;
+- obsolete releases outside declared support windows.
+
+## Supported Operational Profile
+
+Support assumes:
+
+- documented Docker / Docker Compose deployment patterns;
+- documented upgrade flow (`install-aio` or equivalent documented sequence);
+- backup before upgrade;
+- post-upgrade smoke validation (`/healthz`, `/api/app/meta`, login, compile/apply).
 
 ## Operator Responsibilities
 
-Operators are expected to:
+Operators must:
 
-- keep deployment artifacts aligned with the current release;
-- run the documented backup and smoke checks;
-- verify resource headroom before upgrading;
-- maintain a known-good rollback point.
-
-## What Is Not Promised
-
-This policy does not promise:
-
-- indefinite parallel support for old releases;
-- arbitrary upgrade paths across many skipped versions without operator validation;
-- support for undocumented deployment layouts.
-
-## Recommended Enterprise Practice
-
-For enterprise-style usage:
-
-- promote through lab -> preprod -> prod;
-- keep the HA lab as a rehearsal environment;
-- treat upgrade validation as mandatory change control;
-- archive release notes and benchmark results with each promotion;
-- archive `release-manifest.json`, `signature.json`, `sbom.cdx.json`, and `provenance.json` with each promoted build.
-
-## Release Evidence In 2.0.9
-
-The release workflow now generates signed release artifacts in `build/release/<version>/`.
-
-These artifacts are meant to travel with the promoted release:
-
-- `release-manifest.json`
-- `signature.json`
-- `checksums.txt`
-- `sbom.cdx.json`
-- `provenance.json`
-- `release-public-key.pem`
+- maintain and rehearse a rollback point;
+- keep change records with product version and active revision;
+- archive `release-manifest.json`, `signature.json`, `sbom.cdx.json`, and `provenance.json` for each promoted build;
+- run restore validation at least once per month.

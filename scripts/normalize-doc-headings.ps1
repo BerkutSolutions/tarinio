@@ -82,12 +82,12 @@ $headingMap = [ordered]@{
 }
 
 $lineMap = @{
-  'Wiki baseline: `2.0.9`' = 'Эта страница относится к текущей ветке документации.'
-  'Version baseline: `2.0.9`' = 'This page belongs to the current documentation branch.'
-  'Базовая версия: `2.0.9`' = 'Эта страница относится к текущей ветке документации.'
-  'Версия: `2.0.9`' = 'Эта страница относится к текущей ветке документации.'
-  'Wiki baseline: `2.0.9`  ' = 'Эта страница относится к текущей ветке документации.'
-  'Version baseline: `2.0.9`  ' = 'This page belongs to the current documentation branch.'
+  'Wiki baseline: `2.0.10`' = 'Эта страница относится к текущей ветке документации.'
+  'Version baseline: `2.0.10`' = 'This page belongs to the current documentation branch.'
+  'Базовая версия: `2.0.10`' = 'Эта страница относится к текущей ветке документации.'
+  'Версия: `2.0.10`' = 'Эта страница относится к текущей ветке документации.'
+  'Wiki baseline: `2.0.10`  ' = 'Эта страница относится к текущей ветке документации.'
+  'Version baseline: `2.0.10`  ' = 'This page belongs to the current documentation branch.'
 }
 
 $ruBranchLine = 'Эта страница относится к текущей ветке документации.'
@@ -130,3 +130,4 @@ foreach ($path in $headingMap.Keys) {
 [System.IO.File]::WriteAllText((Join-Path (Get-Location) 'docs/ru/oss/_category_.json'), '{"label":"Документы OSS","position":90,"collapsed":true}', $utf8NoBom)
 [System.IO.File]::WriteAllText((Join-Path (Get-Location) 'docs/eng/operators/_category_.json'), '{"label":"Operator Guides","position":50,"collapsed":true}', $utf8NoBom)
 [System.IO.File]::WriteAllText((Join-Path (Get-Location) 'docs/eng/oss/_category_.json'), '{"label":"OSS Documents","position":90,"collapsed":true}', $utf8NoBom)
+

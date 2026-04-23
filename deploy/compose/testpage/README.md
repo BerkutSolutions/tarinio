@@ -1,4 +1,4 @@
-﻿# Testpage Profile (One Command)
+# Testpage Profile (One Command)
 
 Start:
 

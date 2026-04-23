@@ -86,7 +86,7 @@ func TestReleaseDocsAndLockfileConsistency(t *testing.T) {
 	}
 	for _, content := range loggingDocs {
 		if strings.Contains(content, "default profile now includes `OpenSearch`, `ClickHouse`, and `Vault`") {
-			t.Fatalf("logging and migration docs must not describe ClickHouse as part of the default 2.0.9 profile")
+			t.Fatalf("logging and migration docs must not describe ClickHouse as part of the default 2.0.10 profile")
 		}
 	}
 
@@ -168,3 +168,4 @@ func mustReadFile(t *testing.T, path string) string {
 	}
 	return string(raw)
 }
+

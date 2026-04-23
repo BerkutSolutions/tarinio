@@ -109,6 +109,8 @@ type ContainerRuntimeService struct {
 	hasCachedOverview bool
 }
 
+var safeContainerNamePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}$`)
+
 func NewContainerRuntimeService() *ContainerRuntimeService {
 	return &ContainerRuntimeService{runner: osCommandRunner{}}
 }
@@ -231,6 +233,16 @@ func (s *ContainerRuntimeService) Logs(req DashboardContainerLogsRequest) (Dashb
 	if container == "" {
 		return DashboardContainerLogs{}, errors.New("container is required")
 	}
+	if !safeContainerNamePattern.MatchString(container) {
+		return DashboardContainerLogs{}, errors.New("invalid container name")
+	}
+	allowed, err := s.allowedDashboardContainers()
+	if err != nil {
+		return DashboardContainerLogs{}, err
+	}
+	if _, ok := allowed[container]; !ok {
+		return DashboardContainerLogs{}, errors.New("container is not allowed")
+	}
 	tail := req.Tail
 	if tail <= 0 {
 		tail = 1000
@@ -271,6 +283,23 @@ func (s *ContainerRuntimeService) Logs(req DashboardContainerLogsRequest) (Dashb
 		FetchedAt: now.Format(time.RFC3339Nano),
 		Lines:     lines,
 	}, nil
+}
+
+func (s *ContainerRuntimeService) allowedDashboardContainers() (map[string]struct{}, error) {
+	psOut, err := s.runDockerPS()
+	if err != nil {
+		return nil, err
+	}
+	containers := filterDashboardContainers(parseDockerPS(psOut))
+	out := make(map[string]struct{}, len(containers))
+	for _, container := range containers {
+		name := strings.TrimSpace(container.Name)
+		if name == "" {
+			continue
+		}
+		out[name] = struct{}{}
+	}
+	return out, nil
 }
 
 func (s *ContainerRuntimeService) Issues() (DashboardContainerIssuesSummary, error) {

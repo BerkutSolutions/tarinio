@@ -1,8 +1,8 @@
 # Documentation
 
-Version baseline: `2.0.9`
+Version baseline: `2.0.10`
 
-This directory is the release-synced documentation set for TARINIO `2.0.9`.
+This directory is the release-synced documentation set for TARINIO `2.0.10`.
 The Russian and English branches are intended to mirror the same product map and complement each other as one bilingual wiki: UI sections, workflows, API catalog, deployment, security, backups, upgrades, and operator runbooks.
 
 ## Main Entry Points
@@ -10,7 +10,7 @@ The Russian and English branches are intended to mirror the same product map and
 - Russian wiki: `docs/ru/README.md`
 - English index: `docs/eng/README.md`
 - Root product overview: `README.md`
-- CLI commands: `docs/CLI_COMMANDS.md`
+- CLI commands: `docs/ru/cli-commands.md` (RU) / `docs/eng/cli-commands.md` (EN)
 - Compose profiles: `deploy/compose/README.md`
 - Architecture source of truth: `docs/architecture/`
 
@@ -46,3 +46,4 @@ The Russian and English branches are intended to mirror the same product map and
 
 - RU: `docs/ru/oss/SECURITY.md`, `docs/ru/oss/CONTRIBUTING.md`, `docs/ru/oss/CODE_OF_CONDUCT.md`, `docs/ru/oss/SUPPORT.md`
 - EN: `docs/eng/oss/SECURITY.md`, `docs/eng/oss/CONTRIBUTING.md`, `docs/eng/oss/CODE_OF_CONDUCT.md`, `docs/eng/oss/SUPPORT.md`
+

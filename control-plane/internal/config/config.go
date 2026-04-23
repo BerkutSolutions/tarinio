@@ -99,7 +99,7 @@ func LoadFromEnv() (Config, error) {
 		AuthIssuer:       "WAF",
 		StartupSelfTest:  true,
 		Security: SecurityConfig{
-			Pepper: "waf-dev-pepper-change-me",
+			Pepper: "",
 			WebAuthn: WebAuthnConfig{
 				Enabled: true,
 				RPName:  "TARINIO",

@@ -1,4 +1,4 @@
-﻿# MVP UI Information Architecture
+# MVP UI Information Architecture
 
 Status: Finalized for Stage 0 task `Freeze MVP UI information architecture`
 Date: 2026-03-31

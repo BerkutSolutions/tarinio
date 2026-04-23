@@ -4,7 +4,7 @@ This page belongs to the current documentation branch.
 
 ## Scope
 
-This matrix describes the deployment combinations TARINIO is designed and tested around.
+This matrix defines the deployment combinations TARINIO `2.0.10` is designed, tested, and supported for.
 
 ## Runtime Platform
 
@@ -24,7 +24,7 @@ Supported product-aligned services:
 
 Recommended rule:
 
-- keep close to the documented major versions unless you validate newer ones in lab first.
+- stay close to documented major versions unless newer lines are validated in lab first.
 
 ## Deployment Modes
 
@@ -36,33 +36,29 @@ Documented and supported patterns:
 - observability-enabled HA lab;
 - AIO-driven upgrades.
 
-## Related Documents
+## Supported Version Channels
 
-- [Deployment](deploy.md)
-- [Sizing Guide](sizing.md)
-- [Reference Architectures](reference-architectures.md)
+- `Current`: full functional and security support.
+- `Stable`: bugfix and security support, no feature expansion.
+- `LTS 2.0`: security and critical resilience support until April 30, 2027.
 
 ## Browser Support
 
-The operator UI is intended for current evergreen browsers:
+The operator UI targets evergreen browsers:
 
 - current Chrome / Chromium;
 - current Microsoft Edge;
 - current Firefox.
 
-## Environment Assumptions
+## Not Covered By This Matrix
 
-Expected production conditions:
+- arbitrary Kubernetes distributions without separate validation;
+- unsupported database major versions;
+- custom runtime image mutations outside documented deployment paths.
 
-- persistent volumes for data services and runtime artifacts;
-- explicit TLS and secret management;
-- stable internal networking between control-plane, runtime, PostgreSQL, and Redis.
+## Related Documents
 
-## Not A Compatibility Promise For
-
-This matrix should not be read as a support promise for:
-
-- arbitrary Kubernetes distributions;
-- unsupported database majors;
-- non-Docker local emulation layers;
-- heavily modified custom runtime images.
+- [Deployment](deploy.md)
+- [Support and Lifecycle Policy](support-lifecycle.md)
+- [Sizing Guide](sizing.md)
+- [Reference Architectures](reference-architectures.md)

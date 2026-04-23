@@ -1,4 +1,4 @@
-﻿# MVP Deployment Topology
+# MVP Deployment Topology
 
 Status: Finalized for Stage 0 task `Define MVP deployment topology`
 Date: 2026-03-31

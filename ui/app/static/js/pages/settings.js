@@ -4,6 +4,7 @@ import { escapeHtml } from "../ui.js";
 const SETTINGS_TABS = [
   { id: "general", path: "/settings/general", labelKey: "settings.tabs.general", permissions: ["settings.general.read", "settings.general.write"] },
   { id: "storage", path: "/settings/storage", labelKey: "settings.tabs.storage", permissions: ["settings.storage.read", "settings.storage.write"] },
+  { id: "security", path: "/settings/security", labelKey: "settings.tabs.security", permissions: ["settings.general.read", "settings.general.write"] },
   { id: "logging", path: "/settings/logging", labelKey: "settings.tabs.logging", permissions: ["settings.general.read", "settings.general.write", "settings.storage.read", "settings.storage.write"] },
   { id: "secrets", path: "/settings/secrets", labelKey: "settings.tabs.secrets", permissions: ["settings.general.read", "settings.general.write", "settings.storage.read", "settings.storage.write"] },
   { id: "about", path: "/settings/about", labelKey: "settings.tabs.about", permissions: ["settings.about.read"] },
@@ -98,6 +99,10 @@ export async function renderSettings(container, ctx) {
   let storageIndexesOffset = 0;
   const storageIndexesLimit = 10;
   let storageIndexesStream = "requests";
+  const loginRateLimitHint = String(ctx.t("settings.security.loginRateLimit.hint") || "").trim();
+  const vaultTlsHint = String(ctx.t("settings.security.vaultTls.hint") || "").trim();
+  const hasLoginRateLimitHint = loginRateLimitHint && loginRateLimitHint !== "__HIDE__";
+  const hasVaultTLSHint = vaultTlsHint && vaultTlsHint !== "__HIDE__";
   const tabs = availableTabs(ctx);
   const currentTab = tabs.find((tab) => tab.id === activeTabFromPath()) || tabs[0] || SETTINGS_TABS.find((tab) => tab.id === "about");
   if (!currentTab) {
@@ -213,6 +218,58 @@ export async function renderSettings(container, ctx) {
             </div>
             <div class="waf-actions">
               <button id="settings-storage-save" class="btn primary btn-sm" type="button">${escapeHtml(ctx.t("common.save"))}</button>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="settings-panel" data-settings-panel="security" hidden>
+        <section class="waf-card">
+          <div class="waf-card-head">
+            <div>
+              <h3>${escapeHtml(ctx.t("settings.security.title"))}</h3>
+              <div class="muted">${escapeHtml(ctx.t("settings.security.subtitle"))}</div>
+            </div>
+          </div>
+          <div class="waf-card-body waf-stack">
+            <section class="waf-list-item">
+              <div class="waf-list-head">
+                <div class="waf-list-title">${escapeHtml(ctx.t("settings.security.loginRateLimit.title"))}</div>
+              </div>
+              ${hasLoginRateLimitHint ? `<div class="waf-note">${escapeHtml(loginRateLimitHint)}</div>` : ""}
+              <label class="waf-checkbox" for="settings-security-login-rate-enabled">
+                <input type="checkbox" id="settings-security-login-rate-enabled" checked>
+                <span>${escapeHtml(ctx.t("settings.security.loginRateLimit.enabled"))}</span>
+              </label>
+              <div class="waf-form-grid three">
+                <div class="waf-field">
+                  <label for="settings-security-login-rate-attempts">${escapeHtml(ctx.t("settings.security.loginRateLimit.maxAttempts"))}</label>
+                  <input id="settings-security-login-rate-attempts" type="number" min="3" max="100" step="1" value="10">
+                </div>
+                <div class="waf-field">
+                  <label for="settings-security-login-rate-window">${escapeHtml(ctx.t("settings.security.loginRateLimit.windowSeconds"))}</label>
+                  <input id="settings-security-login-rate-window" type="number" min="60" max="86400" step="1" value="300">
+                </div>
+                <div class="waf-field">
+                  <label for="settings-security-login-rate-block">${escapeHtml(ctx.t("settings.security.loginRateLimit.blockSeconds"))}</label>
+                  <input id="settings-security-login-rate-block" type="number" min="60" max="86400" step="1" value="600">
+                </div>
+              </div>
+            </section>
+
+            <section class="waf-list-item">
+              <div class="waf-list-head">
+                <div class="waf-list-title">${escapeHtml(ctx.t("settings.security.vaultTls.title"))}</div>
+              </div>
+              ${hasVaultTLSHint ? `<div class="waf-note">${escapeHtml(vaultTlsHint)}</div>` : ""}
+              <label class="waf-checkbox" for="settings-security-allow-insecure-vault-tls">
+                <input type="checkbox" id="settings-security-allow-insecure-vault-tls">
+                <span>${escapeHtml(ctx.t("settings.security.vaultTls.allowInsecure"))}</span>
+              </label>
+            </section>
+
+            <div class="waf-actions">
+              <button id="settings-security-save" class="btn primary btn-sm" type="button">${escapeHtml(ctx.t("common.save"))}</button>
             </div>
           </div>
         </section>
@@ -431,6 +488,12 @@ export async function renderSettings(container, ctx) {
   const storageHotIndexDays = container.querySelector("#settings-storage-hot-index-days");
   const storageColdIndexDays = container.querySelector("#settings-storage-cold-index-days");
   const storageSave = container.querySelector("#settings-storage-save");
+  const securityLoginRateEnabled = container.querySelector("#settings-security-login-rate-enabled");
+  const securityLoginRateAttempts = container.querySelector("#settings-security-login-rate-attempts");
+  const securityLoginRateWindow = container.querySelector("#settings-security-login-rate-window");
+  const securityLoginRateBlock = container.querySelector("#settings-security-login-rate-block");
+  const securityAllowInsecureVaultTLS = container.querySelector("#settings-security-allow-insecure-vault-tls");
+  const securitySave = container.querySelector("#settings-security-save");
   const secretsSave = container.querySelector("#settings-secrets-save");
   const loggingHotBackend = container.querySelector("#settings-logging-hot-backend");
   const loggingColdBackend = container.querySelector("#settings-logging-cold-backend");
@@ -482,6 +545,16 @@ export async function renderSettings(container, ctx) {
     alert.hidden = false;
     alert.textContent = text;
     alert.classList.toggle("success", !!success);
+  };
+
+  const syncVaultTLSControls = () => {
+    const allowInsecure = !!securityAllowInsecureVaultTLS?.checked;
+    if (loggingVaultTLSSkipVerify) {
+      if (!allowInsecure) {
+        loggingVaultTLSSkipVerify.checked = false;
+      }
+      loggingVaultTLSSkipVerify.disabled = !allowInsecure;
+    }
   };
 
   const renderStorageIndexes = (indexes) => {
@@ -696,6 +769,7 @@ export async function renderSettings(container, ctx) {
         const mode = String(runtime?.deployment_mode || "-");
         const logging = runtime?.logging || {};
         const loggingSummary = runtime?.logging_summary || {};
+        const security = runtime?.security || {};
         const clickhouse = logging?.clickhouse || {};
         const opensearch = logging?.opensearch || {};
         const routing = logging?.routing || {};
@@ -815,6 +889,22 @@ export async function renderSettings(container, ctx) {
         if (loggingVaultTLSSkipVerify) {
           loggingVaultTLSSkipVerify.checked = !!vault?.tls_skip_verify;
         }
+        if (securityLoginRateEnabled) {
+          securityLoginRateEnabled.checked = security?.login_rate_limit_enabled !== false;
+        }
+        if (securityLoginRateAttempts) {
+          securityLoginRateAttempts.value = String(Number(security?.login_rate_limit_max_attempts || 10));
+        }
+        if (securityLoginRateWindow) {
+          securityLoginRateWindow.value = String(Number(security?.login_rate_limit_window_seconds || 300));
+        }
+        if (securityLoginRateBlock) {
+          securityLoginRateBlock.value = String(Number(security?.login_rate_limit_block_seconds || 600));
+        }
+        if (securityAllowInsecureVaultTLS) {
+          securityAllowInsecureVaultTLS.checked = !!security?.allow_insecure_vault_tls;
+        }
+        syncVaultTLSControls();
         if (loggingStatus) {
           loggingStatus.textContent = renderLoggingStatusText(logging, loggingSummary);
         }
@@ -851,6 +941,10 @@ export async function renderSettings(container, ctx) {
       clearRuntimeAutoCheckTimer();
     }
   };
+
+  securityAllowInsecureVaultTLS?.addEventListener("change", () => {
+    syncVaultTLSControls();
+  });
 
   container.querySelector("#settings-update-check")?.addEventListener("click", async () => {
     setAlert("");
@@ -912,6 +1006,27 @@ export async function renderSettings(container, ctx) {
         },
       };
       await ctx.api.put("/api/settings/runtime", payload);
+      setAlert(ctx.t("settings.saved"), true);
+      await renderRuntime();
+    } catch (error) {
+      setAlert(error?.message || ctx.t("common.error"));
+    }
+  });
+
+  securitySave?.addEventListener("click", async () => {
+    setAlert("");
+    try {
+      const payload = {
+        security: {
+          allow_insecure_vault_tls: !!securityAllowInsecureVaultTLS?.checked,
+          login_rate_limit_enabled: !!securityLoginRateEnabled?.checked,
+          login_rate_limit_max_attempts: Number(securityLoginRateAttempts?.value || "10"),
+          login_rate_limit_window_seconds: Number(securityLoginRateWindow?.value || "300"),
+          login_rate_limit_block_seconds: Number(securityLoginRateBlock?.value || "600"),
+        },
+      };
+      await ctx.api.put("/api/settings/runtime", payload);
+      syncVaultTLSControls();
       setAlert(ctx.t("settings.saved"), true);
       await renderRuntime();
     } catch (error) {

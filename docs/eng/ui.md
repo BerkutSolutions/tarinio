@@ -2,7 +2,7 @@
 
 This page belongs to the current documentation branch.
 
-This document describes the real TARINIO administrative interface for version `2.0.9`: login, onboarding, healthcheck, the sidebar sections, and the practical workflows behind each screen.
+This document describes the real TARINIO administrative interface for version `2.0.10`: login, onboarding, healthcheck, the sidebar sections, and the practical workflows behind each screen.
 
 ## Interface Map
 
@@ -346,7 +346,7 @@ Typical use cases:
 
 ## Revisions
 
-This is the core change-management screen in `2.0.9`.
+This is the core change-management screen in `2.0.10`.
 
 It includes:
 
@@ -439,6 +439,9 @@ The settings section is split into tabs:
 
 - `General`
 - `Storage`
+- `Security`
+- `Logging`
+- `Secrets`
 - `About`
 
 ### `General`
@@ -458,6 +461,30 @@ Allows operators to:
 - configure retention for activity, events, and bans;
 - review storage indexes;
 - delete individual storage index entries.
+
+### `Security`
+
+Allows operators to:
+
+- enable login brute-force protection with configurable thresholds;
+- configure max failed attempts, window size, and block duration for login throttling;
+- control whether insecure Vault TLS mode can be used at all.
+
+### `Logging`
+
+Allows operators to:
+
+- configure hot/cold logging backends and retention windows;
+- tune routing between hot and cold streams;
+- manage OpenSearch and ClickHouse connection settings.
+
+### `Secrets`
+
+Allows operators to:
+
+- select a secret provider (`encrypted_file` or Vault);
+- configure Vault endpoint, mount, and path prefix;
+- provide a Vault token without exposing existing secrets in plain text.
 
 ### `About`
 
@@ -527,3 +554,4 @@ Across the application, TARINIO uses:
 4. Use `Bans` for block decisions and manual intervention.
 5. Use `Activity` to understand whether the incident overlaps with a recent administrative change.
 6. Export a signed support bundle from `Administration -> Enterprise` when evidence needs to leave the system.
+

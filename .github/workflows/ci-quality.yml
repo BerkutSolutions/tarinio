@@ -1,0 +1,86 @@
+name: ci-quality
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+jobs:
+  go-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Go vet
+        run: go vet ./...
+
+      - name: Go unit and integration tests
+        run: go test ./... -count=1
+
+  docs-and-ui-quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Run docs and i18n quality tests
+        run: |
+          go test ./ui/tests -run "TestDocs|TestRelease|TestI18n|TestI18N|TestRepoEncoding" -count=1 -v
+
+      - name: Install docs dependencies
+        run: npm ci
+
+      - name: Build docs site
+        run: npm run docs:build
+
+  release-artifacts-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Generate release artifacts
+        run: |
+          go run ./cmd/release-artifacts \
+            -repo-root . \
+            -version 2.0.10-ci \
+            -commit "${GITHUB_SHA}" \
+            -tag "ci-${GITHUB_RUN_ID}" \
+            -docker-tags "ghcr.io/berkutsolutions/tarinio:ci-${GITHUB_RUN_ID}"
+
+      - name: Verify release artifact files
+        run: |
+          test -f build/release/2.0.10-ci/release-manifest.json
+          test -f build/release/2.0.10-ci/signature.json
+          test -f build/release/2.0.10-ci/checksums.txt
+          test -f build/release/2.0.10-ci/sbom.cdx.json
+          test -f build/release/2.0.10-ci/provenance.json

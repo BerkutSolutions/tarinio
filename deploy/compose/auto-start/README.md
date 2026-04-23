@@ -1,4 +1,4 @@
-﻿# TARINIO Compose Profile - auto-start (localhost)
+# TARINIO Compose Profile - auto-start (localhost)
 
 `auto-start` is the localhost operator profile for quick environment startup.
 

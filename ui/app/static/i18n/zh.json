@@ -359,7 +359,7 @@
   "app.sites": "服务",
   "app.tls": "TLS / 证书",
   "app.user.noRoles": "暂无角色",
-  "app.version": "v2.0.9",
+  "app.version": "v2.0.10",
   "auth.2fa.challengeMissing": "2FA challenge is missing. 请重新登录。",
   "auth.2fa.code": "2FA code",
   "auth.2fa.codeRequired": "2FA code is required",
@@ -1083,6 +1083,18 @@
   "settings.tabs.about": "关于项目",
   "settings.tabs.general": "常规",
   "settings.tabs.storage": "存储",
+  "settings.tabs.security": "Security",
+  "settings.security.title": "Security policy",
+  "settings.security.subtitle": "Manage brute-force protection and privileged TLS exceptions.",
+  "settings.security.loginRateLimit.title": "Login brute-force protection",
+  "settings.security.loginRateLimit.hint": "Rate-limit repeated failed login attempts per username and source IP.",
+  "settings.security.loginRateLimit.enabled": "Enable login rate-limiting",
+  "settings.security.loginRateLimit.maxAttempts": "Max failed attempts",
+  "settings.security.loginRateLimit.windowSeconds": "Window (seconds)",
+  "settings.security.loginRateLimit.blockSeconds": "Block duration (seconds)",
+  "settings.security.vaultTls.title": "Vault TLS policy",
+  "settings.security.vaultTls.hint": "By default, Vault TLS certificates are always verified.",
+  "settings.security.vaultTls.allowInsecure": "Allow insecure Vault TLS mode",
   "settings.tabs.logging": "日志",
   "settings.logging.title": "日志",
   "settings.logging.subtitle": "Configure hot search storage, cold analytics storage, routing, retention, and enterprise secret handling.",
@@ -1612,3 +1624,4 @@
   "revisions.revision.approvals": "Approvals",
   "revisions.revision.compiledBy": "Compiled by"
 }
+

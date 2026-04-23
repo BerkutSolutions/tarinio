@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -74,6 +75,15 @@ type AdminScriptService struct {
 	runsRoot    string
 	catalog     map[string]AdminScriptDefinition
 }
+
+var (
+	adminScriptSincePattern       = regexp.MustCompile(`^[0-9]+[smhdw]$`)
+	adminScriptContainerPattern   = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}$`)
+	adminScriptPathPattern        = regexp.MustCompile(`^[a-zA-Z0-9/_\.-]{1,256}$`)
+	adminScriptBinaryPathPattern  = regexp.MustCompile(`^[a-zA-Z0-9/_\.-]{1,128}$`)
+	adminScriptStatusCodePattern  = regexp.MustCompile(`^[0-9\s,;|]{1,256}$`)
+	adminScriptUnsafeShellPattern = regexp.MustCompile(`[\"'\\$` + "`" + `|&<>]`)
+)
 
 func NewAdminScriptService(revisionStoreDir string, scriptsRoot string) *AdminScriptService {
 	definitions := []AdminScriptDefinition{
@@ -255,9 +265,55 @@ func (s *AdminScriptService) buildEnvironment(definition AdminScriptDefinition, 
 		if value == "" {
 			continue
 		}
-		env = append(env, field.Name+"="+value)
+		safeValue, err := validateAdminScriptFieldValue(field.Name, value)
+		if err != nil {
+			return nil, err
+		}
+		env = append(env, field.Name+"="+safeValue)
 	}
 	return env, nil
+}
+
+func validateAdminScriptFieldValue(fieldName, value string) (string, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return "", nil
+	}
+	if strings.ContainsAny(trimmed, "\r\n") && fieldName != "FILTER_IP" && fieldName != "FILTER_SITE" && fieldName != "FILTER_URI" {
+		return "", fmt.Errorf("%s contains unsupported line breaks", fieldName)
+	}
+	if adminScriptUnsafeShellPattern.MatchString(trimmed) {
+		return "", fmt.Errorf("%s contains unsupported characters", fieldName)
+	}
+
+	switch fieldName {
+	case "SINCE":
+		if !adminScriptSincePattern.MatchString(trimmed) {
+			return "", errors.New("SINCE must match <number><s|m|h|d|w>, for example 24h")
+		}
+	case "RUNTIME_CONTAINER", "CONTROL_PLANE_CONTAINER", "DDOS_MODEL_CONTAINER", "UI_CONTAINER", "CLICKHOUSE_CONTAINER", "OPENSEARCH_CONTAINER", "VAULT_CONTAINER":
+		if !adminScriptContainerPattern.MatchString(trimmed) {
+			return "", fmt.Errorf("%s must be a safe container name", fieldName)
+		}
+	case "DEPLOY_DIR":
+		if !adminScriptPathPattern.MatchString(trimmed) || strings.Contains(trimmed, "..") {
+			return "", errors.New("DEPLOY_DIR must be a safe absolute or relative path without traversal")
+		}
+	case "WAF_CLI_BIN":
+		if !adminScriptBinaryPathPattern.MatchString(trimmed) {
+			return "", errors.New("WAF_CLI_BIN must be a safe binary path")
+		}
+	case "FILTER_STATUS":
+		if !adminScriptStatusCodePattern.MatchString(trimmed) {
+			return "", errors.New("FILTER_STATUS supports only status codes and separators")
+		}
+	case "FILTER_IP", "FILTER_SITE", "FILTER_URI", "FILTER_HOST":
+		if len(trimmed) > 2000 {
+			return "", fmt.Errorf("%s is too long", fieldName)
+		}
+	}
+
+	return trimmed, nil
 }
 
 func (s *AdminScriptService) resolveScriptPath(fileName string) (string, error) {

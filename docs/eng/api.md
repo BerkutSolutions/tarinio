@@ -2,7 +2,7 @@
 
 This page belongs to the current documentation branch.
 
-This document describes the current control-plane HTTP API for version `2.0.9`. The catalog is aligned with the routes registered in `control-plane/internal/httpserver/server.go`.
+This document describes the current control-plane HTTP API for version `2.0.10`. The catalog is aligned with the routes registered in `control-plane/internal/httpserver/server.go`.
 
 ## General Rules
 
@@ -263,7 +263,7 @@ Also accepts the hourly auto-update toggle path used by the UI.
 
 ### `GET /api/revisions`
 
-The new aggregated revision catalog in `2.0.9`.
+The new aggregated revision catalog in `2.0.10`.
 
 It powers the `Revisions` UI and returns:
 
@@ -280,15 +280,27 @@ Compiles a new revision.
 
 Applies the selected revision.
 
+Required permission:
+
+- `revisions.write`
+
 ### `POST /api/revisions/{revisionID}/approve`
 
 Approves a revision that is blocked by the configured approval workflow.
+
+Required permission:
+
+- `revisions.approve`
 
 ### `DELETE /api/revisions/{revisionID}`
 
 Deletes an inactive revision.
 
 Related snapshot/job data is removed together with the inactive revision. Active revisions are not deletable.
+
+Required permission:
+
+- `revisions.write`
 
 ### `DELETE /api/revisions/statuses`
 
@@ -376,10 +388,11 @@ Downloads the archived execution result.
 - `OWASP CRS`: `owasp-crs/*`
 - `TLS`: `certificates`, `tls-configs`, `tls/auto-renew`, `certificate-materials/*`, `certificates/acme/*`
 - `Requests`: `requests`, `settings/runtime`, `sites`
-- `Revisions`: `revisions`, `revisions/{id}/apply`, `revisions/statuses`
+- `Revisions`: `revisions`, `revisions/{id}/apply`, `revisions/{id}/approve`, `revisions/statuses`
 - `Events`: `events`, `sites`
 - `Bans`: `sites/{id}/ban`, `sites/{id}/unban`, `events`, `access-policies`
 - `Administration`: `administration/users*`, `administration/roles*`, `administration/zero-trust/health`, `administration/scripts*`
 - `Activity`: `audit`
 - `Settings`: `settings/runtime`, `app/meta`
 - `Profile`: `auth/me`, `auth/change-password`, `auth/2fa/*`, `auth/passkeys/*`
+

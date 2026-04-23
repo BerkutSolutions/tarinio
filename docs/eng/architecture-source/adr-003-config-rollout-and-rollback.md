@@ -1,4 +1,4 @@
-﻿# ADR-003: Config Rollout and Rollback Flow
+# ADR-003: Config Rollout and Rollback Flow
 
 Status: Accepted
 Date: 2026-03-31

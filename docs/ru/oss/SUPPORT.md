@@ -1,4 +1,4 @@
-﻿# Поддержка
+# Поддержка
 
 Продукт: **Berkut Solutions - TARINIO**
 

@@ -1,4 +1,4 @@
-﻿# Logging and Reporting Model
+# Logging and Reporting Model
 
 Status: Finalized for Stage 0 task `Define logging and reporting model`
 Date: 2026-03-31

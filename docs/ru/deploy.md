@@ -90,7 +90,7 @@ docker compose -f deploy/compose/default/docker-compose.yml up -d --build
 
 - `/healthz` отвечает стабильно;
 - вход и первичная настройка работают без ошибок;
-- `GET /api/app/meta` возвращает версию `2.0.9`;
+- `GET /api/app/meta` возвращает версию `2.0.10`;
 - удаётся создать сайт и выпустить рабочую ревизию;
 - после применения ревизии runtime обслуживает нужный хост;
 - в интерфейсе появляются события, запросы и аудит.
@@ -102,3 +102,4 @@ docker compose -f deploy/compose/default/docker-compose.yml up -d --build
 - `docs/ru/upgrade.md`
 - `docs/ru/backups.md`
 - `docs/ru/ui.md`
+

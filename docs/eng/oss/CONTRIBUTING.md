@@ -1,4 +1,4 @@
-﻿# Contributing
+# Contributing
 
 Product: **Berkut Solutions - TARINIO**
 

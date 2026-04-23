@@ -46,7 +46,7 @@ func TestParseLoggingSettingsPreservesMaskedPassword(t *testing.T) {
 			"password":          loggingconfig.MaskedSecretValue,
 			"migration_enabled": true,
 		},
-	}, current, pepper)
+	}, current, pepper, true)
 	if err != nil {
 		t.Fatalf("parse logging settings: %v", err)
 	}
@@ -76,7 +76,7 @@ func TestParseLoggingSettingsEncryptsNewPassword(t *testing.T) {
 			"password":          "new-password",
 			"migration_enabled": true,
 		},
-	}, loggingconfig.Settings{}, pepper)
+	}, loggingconfig.Settings{}, pepper, true)
 	if err != nil {
 		t.Fatalf("parse logging settings: %v", err)
 	}
@@ -105,7 +105,7 @@ func TestParseLoggingSettingsRequiresEndpointForClickHouse(t *testing.T) {
 			"database": "waf_logs",
 			"table":    "request_logs",
 		},
-	}, loggingconfig.Settings{}, "pepper-for-tests")
+	}, loggingconfig.Settings{}, "pepper-for-tests", true)
 	if err == nil {
 		t.Fatalf("expected clickhouse validation error")
 	}
@@ -139,7 +139,7 @@ func TestReconcileLoggingSettingsFromEnvFallsBackToFileWithoutSecret(t *testing.
 			Table:    "request_logs",
 		},
 	})
-	next := reconcileLoggingSettingsFromEnv(current)
+	next := reconcileLoggingSettingsFromEnv(current, RuntimeSecuritySettings{AllowInsecureVaultTLS: true})
 	if next.Backend != loggingconfig.BackendOpenSearch {
 		t.Fatalf("expected backend to fall back to opensearch, got %q", next.Backend)
 	}
@@ -167,7 +167,7 @@ func TestReconcileLoggingSettingsFromEnvEncryptsSecretWhenAvailable(t *testing.T
 			Table:    "request_logs",
 		},
 	})
-	next := reconcileLoggingSettingsFromEnv(current)
+	next := reconcileLoggingSettingsFromEnv(current, RuntimeSecuritySettings{AllowInsecureVaultTLS: true})
 	if next.Backend != loggingconfig.BackendClickHouse {
 		t.Fatalf("expected clickhouse backend to remain enabled, got %q", next.Backend)
 	}
@@ -210,7 +210,7 @@ func TestParseLoggingSettingsPreservesMaskedOpenSearchSecrets(t *testing.T) {
 			"password":     loggingconfig.MaskedSecretValue,
 			"api_key":      loggingconfig.MaskedSecretValue,
 		},
-	}, current, pepper)
+	}, current, pepper, true)
 	if err != nil {
 		t.Fatalf("parse logging settings: %v", err)
 	}
@@ -229,7 +229,7 @@ func TestParseLoggingSettingsRequiresVaultAddressWhenEnabled(t *testing.T) {
 			"enabled": true,
 			"token":   "vault-token",
 		},
-	}, loggingconfig.Settings{}, "pepper-for-tests")
+	}, loggingconfig.Settings{}, "pepper-for-tests", true)
 	if err == nil {
 		t.Fatalf("expected vault validation error")
 	}
@@ -266,7 +266,7 @@ func TestParseLoggingSettingsStoresSecretsInVault(t *testing.T) {
 			"password":     "os-password",
 			"api_key":      "os-api-key",
 		},
-	}, loggingconfig.Settings{}, "pepper-for-tests")
+	}, loggingconfig.Settings{}, "pepper-for-tests", true)
 	if err != nil {
 		t.Fatalf("parse logging settings: %v", err)
 	}
@@ -278,6 +278,30 @@ func TestParseLoggingSettingsStoresSecretsInVault(t *testing.T) {
 	}
 	if next.SecretProvider != loggingconfig.SecretProviderVault {
 		t.Fatalf("expected vault secret provider")
+	}
+}
+
+func TestParseLoggingSettingsRejectsVaultTLSSkipVerifyWhenPolicyDisallowsIt(t *testing.T) {
+	_, err := parseLoggingSettings(map[string]any{
+		"secret_provider": "vault",
+		"vault": map[string]any{
+			"enabled":         true,
+			"address":         "http://vault:8200",
+			"token":           "vault-token",
+			"tls_skip_verify": true,
+		},
+	}, loggingconfig.Settings{}, "pepper-for-tests", false)
+	if err == nil {
+		t.Fatalf("expected security policy error for vault tls_skip_verify")
+	}
+}
+
+func TestParseRuntimeSecuritySettingsValidatesRanges(t *testing.T) {
+	_, err := parseRuntimeSecuritySettings(map[string]any{
+		"login_rate_limit_max_attempts": 1,
+	}, RuntimeSecuritySettings{})
+	if err == nil {
+		t.Fatalf("expected range validation error")
 	}
 }
 
@@ -311,7 +335,7 @@ func TestDefaultLoggingSettingsFromEnvReadsVaultTokenFile(t *testing.T) {
 	t.Setenv("VAULT_TOKEN_FILE", tokenFile)
 	runtimeSettingsState.pepper = pepper
 
-	next := defaultLoggingSettingsFromEnv(loggingconfig.Settings{})
+	next := defaultLoggingSettingsFromEnv(loggingconfig.Settings{}, RuntimeSecuritySettings{AllowInsecureVaultTLS: true})
 	if next.Vault.TokenEnc == "" {
 		t.Fatalf("expected vault token from file to be encrypted into settings")
 	}
@@ -335,7 +359,7 @@ func TestDefaultLoggingSettingsFromEnvUsesOpenSearchForHotAndColdByDefault(t *te
 	t.Setenv("VAULT_TOKEN", "vault-token")
 	runtimeSettingsState.pepper = "pepper-for-tests"
 
-	next := defaultLoggingSettingsFromEnv(loggingconfig.Settings{})
+	next := defaultLoggingSettingsFromEnv(loggingconfig.Settings{}, RuntimeSecuritySettings{AllowInsecureVaultTLS: true})
 	if next.Hot.Backend != loggingconfig.BackendOpenSearch {
 		t.Fatalf("expected hot backend opensearch, got %q", next.Hot.Backend)
 	}

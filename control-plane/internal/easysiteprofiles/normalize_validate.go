@@ -13,6 +13,9 @@ import (
 
 var rateRegexp = regexp.MustCompile(`^\d+r/s$`)
 var crsVersionRegexp = regexp.MustCompile(`^[0-9]+(\.[0-9]+)?$`)
+var safeHeaderValueRegexp = regexp.MustCompile(`^[^\r\n"]+$`)
+var safeHostHeaderRegexp = regexp.MustCompile(`^(?i:[a-z0-9][a-z0-9.-]*[a-z0-9]|[a-z0-9])(:[0-9]{1,5})?$`)
+var safeCORSOriginRegexp = regexp.MustCompile(`^(?:\*|null|https?://[a-z0-9][a-z0-9.-]*(:[0-9]{1,5})?)$`)
 
 var allowedCountrySelectors = map[string]struct{}{
 	"AF": {}, "AN": {}, "AS": {}, "EU": {}, "NA": {}, "OC": {}, "SA": {},
@@ -265,6 +268,37 @@ func validateProfile(profile EasySiteProfile) error {
 	if profile.SecurityAuthBasic.AuthBasicText == "" {
 		return errors.New("easy site profile security_auth_basic.auth_basic_text is required")
 	}
+	if !isSafeHeaderValue(profile.SecurityAuthBasic.AuthBasicText) {
+		return errors.New("easy site profile security_auth_basic.auth_basic_text contains unsupported characters")
+	}
+
+	if profile.HTTPHeaders.ReferrerPolicy != "" {
+		if !isAllowedReferrerPolicy(profile.HTTPHeaders.ReferrerPolicy) {
+			return errors.New("easy site profile http_headers.referrer_policy contains unsupported value")
+		}
+		if !isSafeHeaderValue(profile.HTTPHeaders.ReferrerPolicy) {
+			return errors.New("easy site profile http_headers.referrer_policy contains unsupported characters")
+		}
+	}
+	if profile.HTTPHeaders.ContentSecurityPolicy != "" && !isSafeHeaderValue(profile.HTTPHeaders.ContentSecurityPolicy) {
+		return errors.New("easy site profile http_headers.content_security_policy contains unsupported characters")
+	}
+	for _, item := range profile.HTTPHeaders.CORSAllowedOrigins {
+		if !safeCORSOriginRegexp.MatchString(strings.ToLower(strings.TrimSpace(item))) {
+			return fmt.Errorf("easy site profile http_headers.cors_allowed_origins contains invalid origin %s", item)
+		}
+	}
+	for _, item := range profile.HTTPHeaders.PermissionsPolicy {
+		if !isSafeHeaderValue(item) {
+			return errors.New("easy site profile http_headers.permissions_policy contains unsupported characters")
+		}
+	}
+	if profile.UpstreamRouting.ReverseProxyCustomHost != "" && !safeHostHeaderRegexp.MatchString(strings.TrimSpace(profile.UpstreamRouting.ReverseProxyCustomHost)) {
+		return errors.New("easy site profile upstream_routing.reverse_proxy_custom_host must be host or host:port")
+	}
+	if profile.UpstreamRouting.ReverseProxySSLSNIName != "" && !safeHostHeaderRegexp.MatchString(strings.TrimSpace(profile.UpstreamRouting.ReverseProxySSLSNIName)) {
+		return errors.New("easy site profile upstream_routing.reverse_proxy_ssl_sni_name must be host or host:port")
+	}
 
 	for _, value := range profile.SecurityCountryPolicy.BlacklistCountry {
 		if !isValidCountrySelector(value) {
@@ -437,4 +471,28 @@ func isValidCountrySelector(value string) bool {
 		return true
 	}
 	return len(value) == 2 && value[0] >= 'A' && value[0] <= 'Z' && value[1] >= 'A' && value[1] <= 'Z'
+}
+
+func isSafeHeaderValue(value string) bool {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return true
+	}
+	return safeHeaderValueRegexp.MatchString(trimmed)
+}
+
+func isAllowedReferrerPolicy(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "no-referrer",
+		"no-referrer-when-downgrade",
+		"same-origin",
+		"origin",
+		"strict-origin",
+		"origin-when-cross-origin",
+		"strict-origin-when-cross-origin",
+		"unsafe-url":
+		return true
+	default:
+		return false
+	}
 }

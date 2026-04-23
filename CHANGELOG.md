@@ -1,26 +1,39 @@
-## [2.0.9] - 23.04.2026
+## [2.0.11] - 23.04.2026
 
-### Установка и релиз
-- Release-синхронизация доведена до `2.0.9`: версия продукта, UI, документации и release metadata обновлены согласованно.
-- Release summary в `CHANGELOG.md` сокращён и пересобран под актуальное состояние релиза без накопленного шума из промежуточных фиксов.
-- Добавлены лёгкие `scripts/push.ps1` и `scripts/push.sh` для обычного source push без полного release-контура с тегами и Docker publish.
+### Security hardening
+- Hardened administration support scripts input validation to block shell metacharacter injection in script environment fields.
+- Restricted `/api/dashboard/containers/logs` access by requiring `administration.read` in addition to dashboard/report read permissions.
+- Added container-name allowlist checks for container log retrieval.
+- Removed insecure control-plane default pepper value and made compose secrets for pepper/runtime token/postgres password explicit required inputs.
+- Added stricter Easy profile validation for header and host fields used in NGINX templates to reduce config/template injection risk.
+- Added centralized runtime `security` settings with a new UI tab `Settings -> Security`:
+  - login brute-force rate limiting controls;
+  - policy gate for Vault insecure TLS mode.
+- Enforced Vault TLS skip-verify policy checks when saving runtime logging settings.
 
-### Anti-bot challenge
-- Easy anti-bot interstitial доведён до полноценного browser-redirect flow: после client-side проверки страница переводит браузер на verify endpoint обычным переходом, а не фоновым `fetch`.
-- Verify endpoint продолжает ставить site-scoped anti-bot cookie и возвращать пользователя на исходный URL, включая исходный path и query string.
-- Challenge page оформлена как полноценная status/interstitial страница с явным состоянием проверки и визуальным progress/spinner вместо пустого ответа на `/challenge`.
+## [2.0.10] - 23.04.2026
 
-### Admin UI и ложные атаки
-- В runtime request archive больше не попадает служебный TARINIO admin-трафик с публичного admin host: служебные `/api/*`, `/static/*`, `favicon`, dashboard/menu routes и challenge-маршруты не раздувают пользовательскую request-статистику.
-- Генерация security events обновлена так, чтобы admin UI активность на публичном host не выглядела как атаки и блокировки по боевому сайту.
-- Dashboard backend перестал считать служебные TARINIO admin routes за пользовательские атаки и заблокированные запросы, даже если admin UI опубликован как обычный site вроде `waf.hantico.ru`.
-- Клиентская детализация dashboard синхронизирована с backend-логикой и теперь не показывает админские `/api/*`, `/static/*`, SPA routes и challenge endpoints как атакующие страницы/IP.
+### Готовность Enterprise
+- Введено разделение прав для операций ревизий: `revisions.write` для `apply/delete` и отдельное `revisions.approve` для согласования.
+- Контур документации синхронизирован с фактической enterprise-моделью (OIDC/SCIM, approval flow, support bundle, HA).
+- Политика поддержки усилена до формальной модели `Current` / `Stable` / `LTS 2.0` с фиксированными окнами поддержки и SLA-целями реакции.
 
-### Onboarding, импорт и совместимость
-- Standalone onboarding сохраняет исправленный порядок первого `compile/apply`, ACME `http-01` и финального TLS cutover.
-- Первый apply поверх bootstrap-runtime по-прежнему корректно заменяет bootstrap-каталоги и не падает на непустых директориях.
-- Импорт `.env` и `.json` остаётся staged: без промежуточного auto-apply на каждом `POST/PUT`, с одним финальным `compile/apply`.
+### Контроль качества
+- Закрыт quality regression в RU wiki: устранены смешанные английские фрагменты в обязательных страницах.
+- Добавлены дополнительные проверки качества в CI: `go vet`, полный `go test ./...`, doc/i18n quality suite и сборка docs-сайта.
+- Дополнительно вычищены смешанные RU/EN формулировки в расширенном наборе wiki-страниц (`secret-management`, `logging-architecture`, `evidence-and-releases`, `enterprise-identity`, `cookbook`).
 
-### Диагностика
-- Ошибки `waf-runtime-l4-guard` продолжают подниматься с реальным stderr helper-а вместо одного только `exit status 1`.
-- Ошибки failed apply в onboarding по-прежнему показывают фактическую причину failed-job, а не общий `Initial apply failed`.
+### CI/CD и цепочка поставки
+- Добавлен workflow `ci-quality` с валидацией кода, документации и контрактов release-артефактов.
+- Добавлен workflow `security-supply-chain` с `govulncheck`, `npm audit`, `trivy` и secret scanning.
+- Усилена доказательная база релизного процесса через обязательные pipeline-проверки release-артефактов.
+
+### Документация и согласованность
+- Полностью синхронизированы RU/EN документы под релиз `2.0.10`.
+- Устранено противоречие в HA-доках по enterprise-интеграциям: SSO/SCIM отражены как реализованные возможности, SIEM остаётся вне текущего релиза.
+- API-документация обновлена с явным описанием permissions для маршрутов `apply/approve/delete`.
+- В `docs/ru/cli-commands.md` добавлены Linux-примеры (bash) для запуска CLI и проверочных сценариев test-профиля.
+- Удалён дублирующий англоязычный файл `docs/CLI_COMMANDS.md`; ссылки перенаправлены на веточные CLI-страницы RU/EN.
+
+### Синхронизация версий
+- Версия продукта и документации обновлена до `2.0.10` в коде и публичных манифестах.

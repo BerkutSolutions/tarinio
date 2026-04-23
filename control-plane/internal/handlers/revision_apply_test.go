@@ -6,7 +6,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"waf/control-plane/internal/auth"
 	"waf/control-plane/internal/jobs"
+	"waf/control-plane/internal/rbac"
 	"waf/control-plane/internal/revisions"
 )
 
@@ -52,6 +54,12 @@ func TestRevisionApplyHandler_Apply(t *testing.T) {
 	handler := NewRevisionApplyHandler(&fakeRevisionApplyService{}, &fakeRevisionDeleteService{}, &fakeRevisionApproveService{})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/revisions/rev-000001/apply", nil)
+	req = req.WithContext(auth.ContextWithSession(req.Context(), auth.SessionView{
+		SessionID:   "s1",
+		UserID:      "u1",
+		Username:    "writer",
+		Permissions: []string{string(rbac.PermissionRevisionsWrite)},
+	}))
 	resp := httptest.NewRecorder()
 	handler.ServeHTTP(resp, req)
 	if resp.Code != http.StatusCreated {
@@ -63,6 +71,12 @@ func TestRevisionApplyHandler_ApplyFailedJob(t *testing.T) {
 	handler := NewRevisionApplyHandler(&fakeFailedRevisionApplyService{}, &fakeRevisionDeleteService{}, &fakeRevisionApproveService{})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/revisions/rev-000001/apply", nil)
+	req = req.WithContext(auth.ContextWithSession(req.Context(), auth.SessionView{
+		SessionID:   "s1",
+		UserID:      "u1",
+		Username:    "writer",
+		Permissions: []string{string(rbac.PermissionRevisionsWrite)},
+	}))
 	resp := httptest.NewRecorder()
 	handler.ServeHTTP(resp, req)
 	if resp.Code != http.StatusBadRequest {
@@ -75,6 +89,12 @@ func TestRevisionApplyHandler_Delete(t *testing.T) {
 	handler := NewRevisionApplyHandler(&fakeRevisionApplyService{}, deleteService, &fakeRevisionApproveService{})
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/revisions/rev-000001", nil)
+	req = req.WithContext(auth.ContextWithSession(req.Context(), auth.SessionView{
+		SessionID:   "s1",
+		UserID:      "u1",
+		Username:    "writer",
+		Permissions: []string{string(rbac.PermissionRevisionsWrite)},
+	}))
 	resp := httptest.NewRecorder()
 	handler.ServeHTTP(resp, req)
 	if resp.Code != http.StatusOK {
@@ -82,5 +102,37 @@ func TestRevisionApplyHandler_Delete(t *testing.T) {
 	}
 	if deleteService.deleted != "rev-000001" {
 		t.Fatalf("expected revision delete to be requested, got %q", deleteService.deleted)
+	}
+}
+
+func TestRevisionApplyHandler_ApproveRequiresApprovePermission(t *testing.T) {
+	handler := NewRevisionApplyHandler(&fakeRevisionApplyService{}, &fakeRevisionDeleteService{}, &fakeRevisionApproveService{})
+	req := httptest.NewRequest(http.MethodPost, "/api/revisions/rev-000001/approve", nil)
+	req = req.WithContext(auth.ContextWithSession(req.Context(), auth.SessionView{
+		SessionID:   "s1",
+		UserID:      "u1",
+		Username:    "operator",
+		Permissions: []string{string(rbac.PermissionRevisionsWrite)},
+	}))
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, req)
+	if resp.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d", resp.Code)
+	}
+}
+
+func TestRevisionApplyHandler_ApproveWithPermission(t *testing.T) {
+	handler := NewRevisionApplyHandler(&fakeRevisionApplyService{}, &fakeRevisionDeleteService{}, &fakeRevisionApproveService{})
+	req := httptest.NewRequest(http.MethodPost, "/api/revisions/rev-000001/approve", nil)
+	req = req.WithContext(auth.ContextWithSession(req.Context(), auth.SessionView{
+		SessionID:   "s1",
+		UserID:      "u1",
+		Username:    "approver",
+		Permissions: []string{string(rbac.PermissionRevisionsApprove)},
+	}))
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
 	}
 }

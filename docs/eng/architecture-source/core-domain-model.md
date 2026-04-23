@@ -1,4 +1,4 @@
-﻿# Core Domain Model
+# Core Domain Model
 
 Status: Finalized for Stage 0 task `Define core domain model`
 Date: 2026-03-31

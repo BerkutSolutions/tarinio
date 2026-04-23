@@ -1,4 +1,4 @@
-﻿# Stage 1 Execution Backlog
+# Stage 1 Execution Backlog
 
 Status: Finalized for Stage 0 task `Convert Stage 1 into execution backlog`
 Date: 2026-03-31

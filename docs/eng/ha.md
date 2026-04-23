@@ -4,7 +4,7 @@ This page belongs to the current documentation branch.
 
 ## Scope
 
-TARINIO `2.0.9` now supports a practical multi-node control-plane topology on one Docker host:
+TARINIO `2.0.10` now supports a practical multi-node control-plane topology on one Docker host:
 
 - shared PostgreSQL state;
 - shared Redis coordination;
@@ -16,7 +16,7 @@ This closes the earlier gap where the product was documented as PostgreSQL-backe
 
 ## What Is HA Today
 
-The supported HA shape in `2.0.9` is:
+The supported HA shape in `2.0.10` is:
 
 ```text
 ui -> api-lb -> control-plane-a / control-plane-b
@@ -208,7 +208,7 @@ Still outside this release:
 - multi-region orchestration;
 - cross-host shared filesystem abstraction without operator-provided storage;
 - full fleet management;
-- SIEM / SSO / SCIM / advanced enterprise integrations.
+- SIEM-grade external pipelines and centralized data-lake integrations.
 
 ## Production Guidance
 
@@ -219,3 +219,4 @@ For production:
 - keep PostgreSQL and Redis on persistent storage;
 - monitor lock contention, runtime health, and revision apply results;
 - use the HA lab as the operator rehearsal environment before promotion.
+

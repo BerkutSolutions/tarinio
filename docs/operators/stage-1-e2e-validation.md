@@ -1,4 +1,4 @@
-﻿# Stage 1 End-to-End Validation
+# Stage 1 End-to-End Validation
 
 Date: `2026-04-01`
 

@@ -2,7 +2,7 @@
 
 Эта страница относится к текущей ветке документации.
 
-Документ описывает актуальный HTTP API control-plane для версии `2.0.9`. Каталог собран по реально зарегистрированным маршрутам из `control-plane/internal/httpserver/server.go`.
+Документ описывает актуальный HTTP API control-plane для версии `2.0.10`. Каталог собран по реально зарегистрированным маршрутам из `control-plane/internal/httpserver/server.go`.
 
 ## Общие правила
 
@@ -38,7 +38,7 @@
 - название продукта;
 - ссылка на репозиторий;
 - сведения о проверке обновлений;
-- признаки HA-режима и идентификатор текущего узла.
+- признаки режима высокой доступности и идентификатор текущего узла.
 
 ### `POST /api/app/ping`
 
@@ -46,17 +46,17 @@
 
 ### `GET /api/app/compat`
 
-Отчёт о совместимости компонентов приложения и runtime.
+Отчёт о совместимости компонентов приложения и рантайма.
 
 ### `POST /api/app/compat/fix`
 
 Попытка автоматически исправить обнаруженную проблему совместимости.
 
-## Системные настройки runtime
+## Системные настройки рантайма
 
 ### `GET /api/settings/runtime`
 
-Чтение настроек runtime для раздела `Настройки -> Общие`.
+Чтение настроек рантайма для раздела `Настройки -> Общие`.
 
 Используется для отображения:
 
@@ -66,7 +66,7 @@
 
 ### `PUT /api/settings/runtime`
 
-Обновление настроек runtime. Через интерфейс изменяются:
+Обновление настроек рантайма. Через интерфейс изменяются:
 
 - `update_checks_enabled`;
 - сроки хранения `logs`, `activity`, `events`, `bans`.
@@ -266,9 +266,25 @@
 
 Применение выбранной ревизии.
 
+Требуемое право:
+
+- `revisions.write`
+
+### `POST /api/revisions/{revisionID}/approve`
+
+Согласование ревизии, если в enterprise-настройках включена политика согласований.
+
+Требуемое право:
+
+- `revisions.approve`
+
 ### `DELETE /api/revisions/{revisionID}`
 
 Удаление неактивной ревизии. Связанные снимки и служебные данные удаляются вместе с ней, но активную ревизию удалить нельзя.
+
+Требуемое право:
+
+- `revisions.write`
 
 ### `DELETE /api/revisions/statuses`
 
@@ -312,10 +328,11 @@
 - `OWASP CRS`: `owasp-crs/*`
 - `TLS`: `certificates`, `tls-configs`, `tls/auto-renew`, `certificate-materials/*`, `certificates/acme/*`
 - `Запросы`: `requests`, `settings/runtime`, `sites`
-- `Ревизии`: `revisions`, `revisions/{id}/apply`, `revisions/statuses`
+- `Ревизии`: `revisions`, `revisions/{id}/apply`, `revisions/{id}/approve`, `revisions/statuses`
 - `События`: `events`, `sites`
 - `Баны`: `sites/{id}/ban`, `sites/{id}/unban`, `events`, `access-policies`
 - `Администрирование`: `administration/users*`, `administration/roles*`, `administration/zero-trust/health`, `administration/scripts*`
 - `Активность`: `audit`
 - `Настройки`: `settings/runtime`, `app/meta`
 - `Профиль`: `auth/me`, `auth/change-password`, `auth/2fa/*`, `auth/passkeys/*`
+

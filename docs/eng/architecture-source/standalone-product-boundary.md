@@ -1,4 +1,4 @@
-﻿# Standalone Product Boundary
+# Standalone Product Boundary
 
 Status: Finalized for Stage 0 task `Define standalone product boundary`
 

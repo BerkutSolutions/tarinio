@@ -5,9 +5,11 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"waf/control-plane/internal/services"
 )
@@ -19,7 +21,18 @@ const sessionCookieMaxAgeSeconds = 12 * 60 * 60
 var (
 	sessionBootToken   = generateSessionBootToken()
 	sessionBootTokenMu sync.RWMutex
+	loginRateLimiter   = &authLoginRateLimiter{state: map[string]authLoginAttemptState{}}
 )
+
+type authLoginAttemptState struct {
+	FailTimestamps []time.Time
+	BlockedUntil   time.Time
+}
+
+type authLoginRateLimiter struct {
+	mu    sync.Mutex
+	state map[string]authLoginAttemptState
+}
 
 type authService interface {
 	Bootstrap(ctx context.Context, username, email, password string) (services.SessionResult, error)
@@ -170,11 +183,22 @@ func (h *AuthHandler) login(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
 		return
 	}
+	username := strings.ToLower(strings.TrimSpace(req.Username))
+	clientIP := normalizedClientIP(r)
+	if blocked, retryAfter := loginRateLimiter.IsBlocked(username, clientIP, CurrentRuntimeSecuritySettings()); blocked {
+		writeJSON(w, http.StatusTooManyRequests, map[string]any{
+			"error":               "too many login attempts; please retry later",
+			"retry_after_seconds": retryAfter,
+		})
+		return
+	}
 	result, err := h.auth.Login(withActorIP(r), req.Username, req.Password)
 	if err != nil {
+		loginRateLimiter.RegisterAttempt(username, clientIP, false, CurrentRuntimeSecuritySettings())
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": err.Error()})
 		return
 	}
+	loginRateLimiter.RegisterAttempt(username, clientIP, true, CurrentRuntimeSecuritySettings())
 	if !result.RequiresTwoFactor && result.Session.ID != "" {
 		SetSessionCookieForRequest(w, r, result.Session.ID)
 	}
@@ -636,4 +660,86 @@ func requestIsSecure(r *http.Request) bool {
 		}
 	}
 	return false
+}
+
+func normalizedClientIP(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+	host, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr))
+	if err != nil {
+		return strings.TrimSpace(r.RemoteAddr)
+	}
+	return strings.TrimSpace(host)
+}
+
+func (l *authLoginRateLimiter) key(username, ip string) string {
+	return strings.TrimSpace(strings.ToLower(username)) + "|" + strings.TrimSpace(ip)
+}
+
+func (l *authLoginRateLimiter) IsBlocked(username, ip string, settings RuntimeSecuritySettings) (bool, int) {
+	settings = normalizeRuntimeSecuritySettings(settings)
+	if !settings.LoginRateLimitEnabled || l == nil {
+		return false, 0
+	}
+	now := time.Now().UTC()
+	windowStart := now.Add(-time.Duration(settings.LoginRateLimitWindowSecond) * time.Second)
+	key := l.key(username, ip)
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	entry, ok := l.state[key]
+	if !ok {
+		return false, 0
+	}
+	entry = pruneLoginAttempts(entry, windowStart)
+	if entry.BlockedUntil.After(now) {
+		retry := int(entry.BlockedUntil.Sub(now).Seconds())
+		if retry < 1 {
+			retry = 1
+		}
+		l.state[key] = entry
+		return true, retry
+	}
+	entry.BlockedUntil = time.Time{}
+	l.state[key] = entry
+	return false, 0
+}
+
+func (l *authLoginRateLimiter) RegisterAttempt(username, ip string, success bool, settings RuntimeSecuritySettings) {
+	settings = normalizeRuntimeSecuritySettings(settings)
+	if !settings.LoginRateLimitEnabled || l == nil {
+		return
+	}
+	now := time.Now().UTC()
+	windowStart := now.Add(-time.Duration(settings.LoginRateLimitWindowSecond) * time.Second)
+	key := l.key(username, ip)
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	entry := pruneLoginAttempts(l.state[key], windowStart)
+	if success {
+		delete(l.state, key)
+		return
+	}
+	entry.FailTimestamps = append(entry.FailTimestamps, now)
+	if len(entry.FailTimestamps) >= settings.LoginRateLimitMaxAttempts {
+		entry.BlockedUntil = now.Add(time.Duration(settings.LoginRateLimitBlockSecond) * time.Second)
+		entry.FailTimestamps = nil
+	}
+	l.state[key] = entry
+}
+
+func pruneLoginAttempts(entry authLoginAttemptState, windowStart time.Time) authLoginAttemptState {
+	if len(entry.FailTimestamps) == 0 {
+		return entry
+	}
+	kept := entry.FailTimestamps[:0]
+	for _, ts := range entry.FailTimestamps {
+		if ts.After(windowStart) {
+			kept = append(kept, ts)
+		}
+	}
+	entry.FailTimestamps = kept
+	return entry
 }

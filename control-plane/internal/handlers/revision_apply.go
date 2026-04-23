@@ -6,7 +6,9 @@ import (
 	"net/http"
 	"strings"
 
+	"waf/control-plane/internal/auth"
 	"waf/control-plane/internal/jobs"
+	"waf/control-plane/internal/rbac"
 	"waf/control-plane/internal/revisions"
 )
 
@@ -45,6 +47,15 @@ func (h *RevisionApplyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "revision id is required"})
 			return
 		}
+		session, ok := auth.SessionFromContext(r.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "authentication required"})
+			return
+		}
+		if !sessionHasPermission(session, rbac.PermissionRevisionsWrite) {
+			writeJSON(w, http.StatusForbidden, map[string]any{"error": "permission denied"})
+			return
+		}
 
 		job, err := h.apply.Apply(withActorIP(r), revisionID)
 		if err != nil {
@@ -76,6 +87,15 @@ func (h *RevisionApplyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "revision id is required"})
 			return
 		}
+		session, ok := auth.SessionFromContext(r.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "authentication required"})
+			return
+		}
+		if !sessionHasPermission(session, rbac.PermissionRevisionsApprove) {
+			writeJSON(w, http.StatusForbidden, map[string]any{"error": "permission denied"})
+			return
+		}
 		if h.approve == nil {
 			writeJSON(w, http.StatusNotImplemented, map[string]any{"error": "revision approve is unavailable"})
 			return
@@ -105,6 +125,15 @@ func (h *RevisionApplyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
+		session, ok := auth.SessionFromContext(r.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "authentication required"})
+			return
+		}
+		if !sessionHasPermission(session, rbac.PermissionRevisionsWrite) {
+			writeJSON(w, http.StatusForbidden, map[string]any{"error": "permission denied"})
+			return
+		}
 		if h.delete == nil {
 			writeJSON(w, http.StatusNotImplemented, map[string]any{"error": "revision delete is unavailable"})
 			return
@@ -125,4 +154,17 @@ func (h *RevisionApplyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	w.WriteHeader(http.StatusNotFound)
+}
+
+func sessionHasPermission(session auth.SessionView, permission rbac.Permission) bool {
+	required := strings.TrimSpace(string(permission))
+	if required == "" {
+		return true
+	}
+	for _, item := range session.Permissions {
+		if strings.TrimSpace(item) == required {
+			return true
+		}
+	}
+	return false
 }

@@ -10,31 +10,31 @@
 
 TARINIO в первую очередь помогает защищать:
 
-- application ingress;
-- policy-controlled request handling;
-- контролируемый rollout настроек защиты;
-- операторскую видимость security и rollout events.
+- входящий контур приложений;
+- обработку запросов под управлением политик;
+- контролируемое внедрение настроек защиты;
+- операторскую видимость событий безопасности и внедрения изменений.
 
-## Основные trust boundaries
+## Основные границы доверия
 
-- public client -> runtime ingress;
-- runtime -> upstream applications;
-- operator -> control-plane;
-- control-plane -> PostgreSQL / Redis / runtime API.
+- публичный клиент -> входящий контур рантайма;
+- рантайм -> upstream-приложения;
+- оператор -> control-plane;
+- control-plane -> PostgreSQL / Redis / API рантайма.
 
 ## Какие угрозы TARINIO помогает закрывать
 
-- типовой web attack traffic через WAF/CRS;
-- abusive request patterns и brute-force-подобные сценарии;
-- враждебные L4/L7 traffic patterns через Anti-DDoS;
-- опасный configuration drift через revision-based change flow.
+- типовой веб-атакующий трафик через WAF/CRS;
+- вредоносные шаблоны запросов и сценарии, похожие на brute force;
+- враждебные L4/L7-шаблоны трафика через Anti-DDoS;
+- опасный дрейф конфигурации через поток изменений на основе ревизий.
 
-## Shared responsibility
+## Разделение ответственности
 
 TARINIO не заменяет:
 
-- безопасный application code;
+- безопасный код приложений;
 - сетевую сегментацию;
-- secret management;
+- управление секретами;
 - backup и disaster recovery;
-- hardening хоста и контейнеров.
+- усиление защиты хоста и контейнеров.

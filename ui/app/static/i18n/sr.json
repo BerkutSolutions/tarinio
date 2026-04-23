@@ -359,7 +359,7 @@
   "app.sites": "Сервиси",
   "app.tls": "TLS / Сертификати",
   "app.user.noRoles": "Нема улоге",
-  "app.version": "v2.0.9",
+  "app.version": "v2.0.10",
   "auth.2fa.challengeMissing": "2FA challenge is missing. Пријавите се поново.",
   "auth.2fa.code": "2FA code",
   "auth.2fa.codeRequired": "2FA code is required",
@@ -1083,6 +1083,18 @@
   "settings.tabs.about": "О пројекту",
   "settings.tabs.general": "Опште",
   "settings.tabs.storage": "Складиште",
+  "settings.tabs.security": "Security",
+  "settings.security.title": "Security policy",
+  "settings.security.subtitle": "Manage brute-force protection and privileged TLS exceptions.",
+  "settings.security.loginRateLimit.title": "Login brute-force protection",
+  "settings.security.loginRateLimit.hint": "Rate-limit repeated failed login attempts per username and source IP.",
+  "settings.security.loginRateLimit.enabled": "Enable login rate-limiting",
+  "settings.security.loginRateLimit.maxAttempts": "Max failed attempts",
+  "settings.security.loginRateLimit.windowSeconds": "Window (seconds)",
+  "settings.security.loginRateLimit.blockSeconds": "Block duration (seconds)",
+  "settings.security.vaultTls.title": "Vault TLS policy",
+  "settings.security.vaultTls.hint": "By default, Vault TLS certificates are always verified.",
+  "settings.security.vaultTls.allowInsecure": "Allow insecure Vault TLS mode",
   "settings.tabs.logging": "Логовање",
   "settings.logging.title": "Логовање",
   "settings.logging.subtitle": "Configure hot search storage, cold analytics storage, routing, retention, and enterprise secret handling.",
@@ -1611,3 +1623,4 @@
   "revisions.revision.approvals": "Approvals",
   "revisions.revision.compiledBy": "Compiled by"
 }
+

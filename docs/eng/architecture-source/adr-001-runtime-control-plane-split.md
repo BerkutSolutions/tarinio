@@ -1,4 +1,4 @@
-﻿# ADR-001: Runtime / Control-Plane Split
+# ADR-001: Runtime / Control-Plane Split
 
 Status: Accepted
 Date: 2026-03-31

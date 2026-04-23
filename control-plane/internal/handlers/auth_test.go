@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -87,6 +88,14 @@ func (f *fakeAuthService) RenamePasskey(sessionID, id, name string) (services.Pa
 func (f *fakeAuthService) DeletePasskey(sessionID, id string) error { return nil }
 
 func TestAuthHandler_LoginSetsCookie(t *testing.T) {
+	runtimeSettingsState.mu.Lock()
+	runtimeSettingsState.security = RuntimeSecuritySettings{
+		LoginRateLimitEnabled:      false,
+		LoginRateLimitMaxAttempts:  10,
+		LoginRateLimitWindowSecond: 300,
+		LoginRateLimitBlockSecond:  600,
+	}
+	runtimeSettingsState.mu.Unlock()
 	handler := NewAuthHandler(&fakeAuthService{})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"username":"admin","password":"admin"}`))
@@ -102,6 +111,14 @@ func TestAuthHandler_LoginSetsCookie(t *testing.T) {
 }
 
 func TestAuthHandler_BootstrapSetsCookie(t *testing.T) {
+	runtimeSettingsState.mu.Lock()
+	runtimeSettingsState.security = RuntimeSecuritySettings{
+		LoginRateLimitEnabled:      false,
+		LoginRateLimitMaxAttempts:  10,
+		LoginRateLimitWindowSecond: 300,
+		LoginRateLimitBlockSecond:  600,
+	}
+	runtimeSettingsState.mu.Unlock()
 	handler := NewAuthHandler(&fakeAuthService{})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/bootstrap", bytes.NewBufferString(`{"username":"admin","email":"admin@example.test","password":"admin"}`))
@@ -136,6 +153,14 @@ func TestSetSessionCookieForRequest_UsesForwardedProto(t *testing.T) {
 }
 
 func TestAuthHandler_UpdateMePreferences(t *testing.T) {
+	runtimeSettingsState.mu.Lock()
+	runtimeSettingsState.security = RuntimeSecuritySettings{
+		LoginRateLimitEnabled:      false,
+		LoginRateLimitMaxAttempts:  10,
+		LoginRateLimitWindowSecond: 300,
+		LoginRateLimitBlockSecond:  600,
+	}
+	runtimeSettingsState.mu.Unlock()
 	handler := NewAuthHandler(&fakeAuthService{})
 
 	req := httptest.NewRequest(http.MethodPut, "/api/auth/me", bytes.NewBufferString(`{"language":"ru"}`))
@@ -152,5 +177,44 @@ func TestAuthHandler_UpdateMePreferences(t *testing.T) {
 	}
 	if payload.Language != "ru" {
 		t.Fatalf("expected language ru, got %q", payload.Language)
+	}
+}
+
+type fakeAuthServiceFailLogin struct{ fakeAuthService }
+
+func (f *fakeAuthServiceFailLogin) Login(ctx context.Context, username, password string) (services.LoginResult, error) {
+	return services.LoginResult{}, errors.New("invalid credentials")
+}
+
+func TestAuthHandler_LoginRateLimitBlocksBruteForce(t *testing.T) {
+	loginRateLimiter.mu.Lock()
+	loginRateLimiter.state = map[string]authLoginAttemptState{}
+	loginRateLimiter.mu.Unlock()
+	runtimeSettingsState.mu.Lock()
+	runtimeSettingsState.security = RuntimeSecuritySettings{
+		LoginRateLimitEnabled:      true,
+		LoginRateLimitMaxAttempts:  3,
+		LoginRateLimitWindowSecond: 300,
+		LoginRateLimitBlockSecond:  300,
+	}
+	runtimeSettingsState.mu.Unlock()
+
+	handler := NewAuthHandler(&fakeAuthServiceFailLogin{})
+	for i := 0; i < 3; i++ {
+		req := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"username":"admin","password":"bad"}`))
+		req.RemoteAddr = "203.0.113.20:1234"
+		resp := httptest.NewRecorder()
+		handler.ServeHTTP(resp, req)
+		if resp.Code != http.StatusUnauthorized {
+			t.Fatalf("expected unauthorized before block, got %d", resp.Code)
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"username":"admin","password":"bad"}`))
+	req.RemoteAddr = "203.0.113.20:1234"
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, req)
+	if resp.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected rate limit block, got %d", resp.Code)
 	}
 }

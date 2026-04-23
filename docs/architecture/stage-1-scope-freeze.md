@@ -1,4 +1,4 @@
-﻿# Stage 1 Scope Freeze
+# Stage 1 Scope Freeze
 
 Status: Finalized for Stage 0 task `Freeze Stage 1 scope`
 Date: 2026-03-31

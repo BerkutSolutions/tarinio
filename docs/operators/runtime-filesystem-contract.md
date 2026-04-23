@@ -1,4 +1,4 @@
-﻿# Runtime Filesystem Contract
+# Runtime Filesystem Contract
 
 Status: Stage 1 runtime contract for `S1-17`
 

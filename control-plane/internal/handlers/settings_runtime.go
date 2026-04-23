@@ -47,15 +47,24 @@ type StorageRetention struct {
 	ColdIndexDays int `json:"cold_index_days,omitempty"`
 }
 
+type RuntimeSecuritySettings struct {
+	AllowInsecureVaultTLS      bool `json:"allow_insecure_vault_tls"`
+	LoginRateLimitEnabled      bool `json:"login_rate_limit_enabled"`
+	LoginRateLimitMaxAttempts  int  `json:"login_rate_limit_max_attempts"`
+	LoginRateLimitWindowSecond int  `json:"login_rate_limit_window_seconds"`
+	LoginRateLimitBlockSecond  int  `json:"login_rate_limit_block_seconds"`
+}
+
 type persistedRuntimeSettings struct {
-	UpdateChecksEnabled bool                   `json:"update_checks_enabled"`
-	Language            string                 `json:"language,omitempty"`
-	LastCheckedAt       string                 `json:"last_checked_at,omitempty"`
-	LatestVersion       string                 `json:"latest_version,omitempty"`
-	ReleaseURL          string                 `json:"release_url,omitempty"`
-	HasUpdate           bool                   `json:"has_update"`
-	Storage             StorageRetention       `json:"storage"`
-	Logging             loggingconfig.Settings `json:"logging,omitempty"`
+	UpdateChecksEnabled bool                    `json:"update_checks_enabled"`
+	Language            string                  `json:"language,omitempty"`
+	LastCheckedAt       string                  `json:"last_checked_at,omitempty"`
+	LatestVersion       string                  `json:"latest_version,omitempty"`
+	ReleaseURL          string                  `json:"release_url,omitempty"`
+	HasUpdate           bool                    `json:"has_update"`
+	Storage             StorageRetention        `json:"storage"`
+	Security            RuntimeSecuritySettings `json:"security,omitempty"`
+	Logging             loggingconfig.Settings  `json:"logging,omitempty"`
 }
 
 var runtimeSettingsState = struct {
@@ -71,6 +80,7 @@ var runtimeSettingsState = struct {
 	releaseURL          string
 	hasUpdate           bool
 	storage             StorageRetention
+	security            RuntimeSecuritySettings
 	logging             loggingconfig.Settings
 }{
 	updateChecksEnabled: true,
@@ -86,6 +96,13 @@ var runtimeSettingsState = struct {
 		BansDays:      30,
 		HotIndexDays:  loggingconfig.DefaultHotDays,
 		ColdIndexDays: loggingconfig.DefaultColdDays,
+	},
+	security: RuntimeSecuritySettings{
+		AllowInsecureVaultTLS:      false,
+		LoginRateLimitEnabled:      true,
+		LoginRateLimitMaxAttempts:  10,
+		LoginRateLimitWindowSecond: 300,
+		LoginRateLimitBlockSecond:  600,
 	},
 	logging: loggingconfig.Normalize(loggingconfig.Settings{
 		Backend: loggingconfig.BackendOpenSearch,
@@ -124,7 +141,7 @@ var runtimeRequestIndexes = &runtimeIndexFetcher{
 	client: &http.Client{Timeout: 3 * time.Second},
 }
 
-func defaultLoggingSettingsFromEnv(current loggingconfig.Settings) loggingconfig.Settings {
+func defaultLoggingSettingsFromEnv(current loggingconfig.Settings, security RuntimeSecuritySettings) loggingconfig.Settings {
 	current = loggingconfig.Normalize(current)
 	clickhouseEndpoint := strings.TrimRight(strings.TrimSpace(os.Getenv("CLICKHOUSE_ENDPOINT")), "/")
 	clickhouseUser := strings.TrimSpace(os.Getenv("CLICKHOUSE_USER"))
@@ -188,7 +205,7 @@ func defaultLoggingSettingsFromEnv(current loggingconfig.Settings) loggingconfig
 		current.Vault.Address = vaultAddr
 		current.Vault.Mount = vaultMount
 		current.Vault.PathPrefix = vaultPathPrefix
-		current.Vault.TLSSkipVerify = parseEnvBool(os.Getenv("VAULT_TLS_SKIP_VERIFY"))
+		current.Vault.TLSSkipVerify = security.AllowInsecureVaultTLS && parseEnvBool(os.Getenv("VAULT_TLS_SKIP_VERIFY"))
 	}
 	if strings.TrimSpace(current.ClickHouse.PasswordEnc) == "" && clickhousePassword != "" {
 		if encrypted, err := secretcrypto.Encrypt("waf:logging:clickhouse", clickhousePassword, strings.TrimSpace(runtimeSettingsState.pepper)); err == nil {
@@ -227,10 +244,13 @@ func defaultLoggingSettingsFromEnv(current loggingconfig.Settings) loggingconfig
 	if current.Retention.ColdDays <= 0 {
 		current.Retention.ColdDays = loggingconfig.DefaultColdDays
 	}
+	if !security.AllowInsecureVaultTLS {
+		current.Vault.TLSSkipVerify = false
+	}
 	return loggingconfig.Normalize(current)
 }
 
-func reconcileLoggingSettingsFromEnv(current loggingconfig.Settings) loggingconfig.Settings {
+func reconcileLoggingSettingsFromEnv(current loggingconfig.Settings, security RuntimeSecuritySettings) loggingconfig.Settings {
 	current = loggingconfig.Normalize(current)
 	clickhousePassword := strings.TrimSpace(os.Getenv("CLICKHOUSE_PASSWORD"))
 	opensearchPassword := strings.TrimSpace(os.Getenv("OPENSEARCH_PASSWORD"))
@@ -311,7 +331,7 @@ func reconcileLoggingSettingsFromEnv(current loggingconfig.Settings) loggingconf
 	if prefix := strings.TrimSpace(os.Getenv("VAULT_PATH_PREFIX")); prefix != "" {
 		current.Vault.PathPrefix = prefix
 	}
-	current.Vault.TLSSkipVerify = current.Vault.TLSSkipVerify || parseEnvBool(os.Getenv("VAULT_TLS_SKIP_VERIFY"))
+	current.Vault.TLSSkipVerify = security.AllowInsecureVaultTLS && (current.Vault.TLSSkipVerify || parseEnvBool(os.Getenv("VAULT_TLS_SKIP_VERIFY")))
 	current.Routing.KeepLocalFallback = true
 	if current.Hot.Backend == loggingconfig.BackendOpenSearch {
 		current.Backend = loggingconfig.BackendOpenSearch
@@ -324,6 +344,9 @@ func reconcileLoggingSettingsFromEnv(current loggingconfig.Settings) loggingconf
 	}
 	if strings.TrimSpace(current.ClickHouse.Table) == "" {
 		current.ClickHouse.Table = "request_logs"
+	}
+	if !security.AllowInsecureVaultTLS {
+		current.Vault.TLSSkipVerify = false
 	}
 	return loggingconfig.Normalize(current)
 }
@@ -361,7 +384,8 @@ func NewSettingsRuntimeHandlerWithBackend(settingsRoot string, runtimeHealthURL 
 	defer runtimeSettingsState.mu.Unlock()
 	runtimeSettingsState.pepper = strings.TrimSpace(pepper)
 	if !runtimeSettingsState.initialized {
-		runtimeSettingsState.logging = defaultLoggingSettingsFromEnv(runtimeSettingsState.logging)
+		runtimeSettingsState.security = normalizeRuntimeSecuritySettings(runtimeSettingsState.security)
+		runtimeSettingsState.logging = defaultLoggingSettingsFromEnv(runtimeSettingsState.logging, runtimeSettingsState.security)
 	}
 
 	if strings.TrimSpace(runtimeSettingsState.statePath) == "" {
@@ -382,6 +406,7 @@ func NewSettingsRuntimeHandlerWithBackend(settingsRoot string, runtimeHealthURL 
 				runtimeSettingsState.releaseURL = stored.ReleaseURL
 				runtimeSettingsState.hasUpdate = stored.HasUpdate
 				runtimeSettingsState.storage = stored.Storage
+				runtimeSettingsState.security = normalizeRuntimeSecuritySettings(stored.Security)
 				runtimeSettingsState.logging = loggingconfig.Normalize(stored.Logging)
 				normalizePersistedUpdateStateLocked()
 				runtimeSettingsState.initialized = true
@@ -392,7 +417,8 @@ func NewSettingsRuntimeHandlerWithBackend(settingsRoot string, runtimeHealthURL 
 		loadPersistedRuntimeSettingsLocked()
 		runtimeSettingsState.initialized = true
 	}
-	runtimeSettingsState.logging = reconcileLoggingSettingsFromEnv(runtimeSettingsState.logging)
+	runtimeSettingsState.security = normalizeRuntimeSecuritySettings(runtimeSettingsState.security)
+	runtimeSettingsState.logging = reconcileLoggingSettingsFromEnv(runtimeSettingsState.logging, runtimeSettingsState.security)
 	savePersistedRuntimeSettingsLocked()
 	if runtimeRequestIndexes != nil {
 		runtimeRequestIndexes.url = deriveRuntimeIndexesURL(runtimeHealthURL)
@@ -404,6 +430,12 @@ func CurrentStorageRetention() StorageRetention {
 	runtimeSettingsState.mu.RLock()
 	defer runtimeSettingsState.mu.RUnlock()
 	return runtimeSettingsState.storage
+}
+
+func CurrentRuntimeSecuritySettings() RuntimeSecuritySettings {
+	runtimeSettingsState.mu.RLock()
+	defer runtimeSettingsState.mu.RUnlock()
+	return normalizeRuntimeSecuritySettings(runtimeSettingsState.security)
 }
 
 func CurrentRuntimeLanguage() string {
@@ -447,6 +479,7 @@ func responsePayloadLocked(indexes map[string]any) map[string]any {
 		"update_checks_enabled": runtimeSettingsState.updateChecksEnabled,
 		"language":              normalizeRuntimeLanguage(runtimeSettingsState.language),
 		"storage":               runtimeSettingsState.storage,
+		"security":              normalizeRuntimeSecuritySettings(runtimeSettingsState.security),
 		"logging":               loggingconfig.MaskSecrets(runtimeSettingsState.logging),
 		"logging_summary":       currentLoggingSummaryLocked(),
 		"update": map[string]any{
@@ -846,13 +879,32 @@ func (h *SettingsRuntimeHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "logging must be object"})
 				return
 			}
-			next, err := parseLoggingSettings(typed, runtimeSettingsState.logging, runtimeSettingsState.pepper)
+			next, err := parseLoggingSettings(typed, runtimeSettingsState.logging, runtimeSettingsState.pepper, runtimeSettingsState.security.AllowInsecureVaultTLS)
 			if err != nil {
 				runtimeSettingsState.mu.Unlock()
 				writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 				return
 			}
 			runtimeSettingsState.logging = next
+			updated = true
+		}
+		if raw, exists := body["security"]; exists {
+			typed, typeOK := raw.(map[string]any)
+			if !typeOK {
+				runtimeSettingsState.mu.Unlock()
+				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "security must be object"})
+				return
+			}
+			next, err := parseRuntimeSecuritySettings(typed, runtimeSettingsState.security)
+			if err != nil {
+				runtimeSettingsState.mu.Unlock()
+				writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+				return
+			}
+			runtimeSettingsState.security = next
+			if !runtimeSettingsState.security.AllowInsecureVaultTLS {
+				runtimeSettingsState.logging.Vault.TLSSkipVerify = false
+			}
 			updated = true
 		}
 		if raw, exists := body["storage"]; exists {
@@ -1195,12 +1247,15 @@ func currentVaultClient(settings loggingconfig.Settings, pepper string) (vaultkv
 		}
 		token = decrypted
 	}
+	runtimeSettingsState.mu.RLock()
+	security := normalizeRuntimeSecuritySettings(runtimeSettingsState.security)
+	runtimeSettingsState.mu.RUnlock()
 	return vaultkv.Client{
 		Address:       settings.Vault.Address,
 		Token:         token,
 		Mount:         settings.Vault.Mount,
 		PathPrefix:    settings.Vault.PathPrefix,
-		TLSSkipVerify: settings.Vault.TLSSkipVerify,
+		TLSSkipVerify: settings.Vault.TLSSkipVerify && security.AllowInsecureVaultTLS,
 	}, nil
 }
 
@@ -1296,7 +1351,11 @@ func loadPersistedRuntimeSettingsLocked() {
 	runtimeSettingsState.releaseURL = strings.TrimSpace(stored.ReleaseURL)
 	runtimeSettingsState.hasUpdate = stored.HasUpdate
 	runtimeSettingsState.storage = normalizeStorageRetention(stored.Storage)
+	runtimeSettingsState.security = normalizeRuntimeSecuritySettings(stored.Security)
 	runtimeSettingsState.logging = loggingconfig.Normalize(stored.Logging)
+	if !runtimeSettingsState.security.AllowInsecureVaultTLS {
+		runtimeSettingsState.logging.Vault.TLSSkipVerify = false
+	}
 	if runtimeSettingsState.storage.HotIndexDays <= 0 {
 		runtimeSettingsState.storage.HotIndexDays = runtimeSettingsState.logging.Retention.HotDays
 	}
@@ -1322,6 +1381,7 @@ func savePersistedRuntimeSettingsLocked() {
 		ReleaseURL:          runtimeSettingsState.releaseURL,
 		HasUpdate:           runtimeSettingsState.hasUpdate,
 		Storage:             normalizeStorageRetention(runtimeSettingsState.storage),
+		Security:            normalizeRuntimeSecuritySettings(runtimeSettingsState.security),
 		Logging:             loggingconfig.Normalize(runtimeSettingsState.logging),
 	}
 	content, err := json.MarshalIndent(payload, "", "  ")
@@ -1357,7 +1417,52 @@ func normalizeRuntimeLanguage(value string) string {
 	}
 }
 
-func parseLoggingSettings(raw map[string]any, current loggingconfig.Settings, pepper string) (loggingconfig.Settings, error) {
+func normalizeRuntimeSecuritySettings(input RuntimeSecuritySettings) RuntimeSecuritySettings {
+	out := input
+	if out.LoginRateLimitMaxAttempts <= 0 {
+		out.LoginRateLimitMaxAttempts = 10
+	}
+	if out.LoginRateLimitWindowSecond <= 0 {
+		out.LoginRateLimitWindowSecond = 300
+	}
+	if out.LoginRateLimitBlockSecond <= 0 {
+		out.LoginRateLimitBlockSecond = 600
+	}
+	if out.LoginRateLimitMaxAttempts > 100 {
+		out.LoginRateLimitMaxAttempts = 100
+	}
+	if out.LoginRateLimitWindowSecond > 24*60*60 {
+		out.LoginRateLimitWindowSecond = 24 * 60 * 60
+	}
+	if out.LoginRateLimitBlockSecond > 24*60*60 {
+		out.LoginRateLimitBlockSecond = 24 * 60 * 60
+	}
+	return out
+}
+
+func parseRuntimeSecuritySettings(raw map[string]any, current RuntimeSecuritySettings) (RuntimeSecuritySettings, error) {
+	content, err := json.Marshal(raw)
+	if err != nil {
+		return RuntimeSecuritySettings{}, fmt.Errorf("encode security settings: %w", err)
+	}
+	next := normalizeRuntimeSecuritySettings(current)
+	if err := json.Unmarshal(content, &next); err != nil {
+		return RuntimeSecuritySettings{}, fmt.Errorf("decode security settings: %w", err)
+	}
+	next = normalizeRuntimeSecuritySettings(next)
+	if next.LoginRateLimitMaxAttempts < 3 || next.LoginRateLimitMaxAttempts > 100 {
+		return RuntimeSecuritySettings{}, fmt.Errorf("security.login_rate_limit_max_attempts must be between 3 and 100")
+	}
+	if next.LoginRateLimitWindowSecond < 60 || next.LoginRateLimitWindowSecond > 24*60*60 {
+		return RuntimeSecuritySettings{}, fmt.Errorf("security.login_rate_limit_window_seconds must be between 60 and 86400")
+	}
+	if next.LoginRateLimitBlockSecond < 60 || next.LoginRateLimitBlockSecond > 24*60*60 {
+		return RuntimeSecuritySettings{}, fmt.Errorf("security.login_rate_limit_block_seconds must be between 60 and 86400")
+	}
+	return next, nil
+}
+
+func parseLoggingSettings(raw map[string]any, current loggingconfig.Settings, pepper string, allowInsecureVaultTLS bool) (loggingconfig.Settings, error) {
 	content, err := json.Marshal(raw)
 	if err != nil {
 		return loggingconfig.Settings{}, fmt.Errorf("encode logging settings: %w", err)
@@ -1437,6 +1542,9 @@ func parseLoggingSettings(raw map[string]any, current loggingconfig.Settings, pe
 	}
 	if incoming.SecretProvider == loggingconfig.SecretProviderVault && incoming.Vault.Enabled && strings.TrimSpace(incoming.Vault.Address) == "" {
 		return loggingconfig.Settings{}, fmt.Errorf("vault address is required when vault secret provider is enabled")
+	}
+	if incoming.Vault.TLSSkipVerify && !allowInsecureVaultTLS {
+		return loggingconfig.Settings{}, fmt.Errorf("vault tls_skip_verify is disabled by security policy")
 	}
 	if incoming.SecretProvider == loggingconfig.SecretProviderVault && incoming.Vault.Enabled {
 		if err := storeLoggingSecretsInVault(incoming); err != nil {

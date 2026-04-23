@@ -1,4 +1,4 @@
-﻿# ADR-002: Config Compilation Model
+# ADR-002: Config Compilation Model
 
 Status: Accepted
 Date: 2026-03-31

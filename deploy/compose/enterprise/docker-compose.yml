@@ -41,12 +41,12 @@ services:
       CONTROL_PLANE_HA_LEADER_LOCK_TTL_SECONDS: ${CONTROL_PLANE_HA_LEADER_LOCK_TTL_SECONDS:-45}
       WAF_RUNTIME_ROOT: /var/lib/waf
       CONTROL_PLANE_REDIS_ADDR: redis:6379
-      CONTROL_PLANE_SECURITY_PEPPER: ${CONTROL_PLANE_SECURITY_PEPPER:-waf-dev-pepper-change-me}
+      CONTROL_PLANE_SECURITY_PEPPER: ${CONTROL_PLANE_SECURITY_PEPPER:?set CONTROL_PLANE_SECURITY_PEPPER in .env}
       CONTROL_PLANE_METRICS_TOKEN: ${CONTROL_PLANE_METRICS_TOKEN:-ha-lab-metrics}
       WAF_RUNTIME_HEALTH_URL: http://runtime:8081/readyz
       WAF_RUNTIME_RELOAD_URL: http://runtime:8081/reload
-      WAF_RUNTIME_API_TOKEN: ${WAF_RUNTIME_API_TOKEN:-ha-lab-runtime-shared-token}
-      POSTGRES_DSN: postgres://${POSTGRES_USER:-waf}:${POSTGRES_PASSWORD:-waf}@postgres:5432/${POSTGRES_DB:-waf}?sslmode=disable
+      WAF_RUNTIME_API_TOKEN: ${WAF_RUNTIME_API_TOKEN:?set WAF_RUNTIME_API_TOKEN in .env}
+      POSTGRES_DSN: postgres://${POSTGRES_USER:-waf}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-waf}?sslmode=disable
       CLICKHOUSE_ENDPOINT: ${CLICKHOUSE_ENDPOINT:-http://clickhouse:8123}
       CLICKHOUSE_DB: ${CLICKHOUSE_DB:-waf_logs}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-waf}
@@ -107,12 +107,12 @@ services:
       CONTROL_PLANE_HA_LEADER_LOCK_TTL_SECONDS: ${CONTROL_PLANE_HA_LEADER_LOCK_TTL_SECONDS:-45}
       WAF_RUNTIME_ROOT: /var/lib/waf
       CONTROL_PLANE_REDIS_ADDR: redis:6379
-      CONTROL_PLANE_SECURITY_PEPPER: ${CONTROL_PLANE_SECURITY_PEPPER:-waf-dev-pepper-change-me}
+      CONTROL_PLANE_SECURITY_PEPPER: ${CONTROL_PLANE_SECURITY_PEPPER:?set CONTROL_PLANE_SECURITY_PEPPER in .env}
       CONTROL_PLANE_METRICS_TOKEN: ${CONTROL_PLANE_METRICS_TOKEN:-ha-lab-metrics}
       WAF_RUNTIME_HEALTH_URL: http://runtime:8081/readyz
       WAF_RUNTIME_RELOAD_URL: http://runtime:8081/reload
-      WAF_RUNTIME_API_TOKEN: ${WAF_RUNTIME_API_TOKEN:-ha-lab-runtime-shared-token}
-      POSTGRES_DSN: postgres://${POSTGRES_USER:-waf}:${POSTGRES_PASSWORD:-waf}@postgres:5432/${POSTGRES_DB:-waf}?sslmode=disable
+      WAF_RUNTIME_API_TOKEN: ${WAF_RUNTIME_API_TOKEN:?set WAF_RUNTIME_API_TOKEN in .env}
+      POSTGRES_DSN: postgres://${POSTGRES_USER:-waf}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-waf}?sslmode=disable
       CLICKHOUSE_ENDPOINT: ${CLICKHOUSE_ENDPOINT:-http://clickhouse:8123}
       CLICKHOUSE_DB: ${CLICKHOUSE_DB:-waf_logs}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-waf}
@@ -169,9 +169,9 @@ services:
       WAF_RUNTIME_ROOT: /var/lib/waf
       WAF_REQUEST_ARCHIVE_ROOT: /var/lib/waf-request-archive
       WAF_RUNTIME_HEALTH_ADDR: 0.0.0.0:8081
-      WAF_RUNTIME_API_TOKEN: ${WAF_RUNTIME_API_TOKEN:-ha-lab-runtime-shared-token}
+      WAF_RUNTIME_API_TOKEN: ${WAF_RUNTIME_API_TOKEN:?set WAF_RUNTIME_API_TOKEN in .env}
       WAF_RUNTIME_METRICS_TOKEN: ${WAF_RUNTIME_METRICS_TOKEN:-ha-lab-runtime-metrics}
-      CONTROL_PLANE_SECURITY_PEPPER: ${CONTROL_PLANE_SECURITY_PEPPER:-waf-dev-pepper-change-me}
+      CONTROL_PLANE_SECURITY_PEPPER: ${CONTROL_PLANE_SECURITY_PEPPER:?set CONTROL_PLANE_SECURITY_PEPPER in .env}
       CLICKHOUSE_ENDPOINT: ${CLICKHOUSE_ENDPOINT:-http://clickhouse:8123}
       CLICKHOUSE_DB: ${CLICKHOUSE_DB:-waf_logs}
       CLICKHOUSE_USER: ${CLICKHOUSE_USER:-waf}
@@ -234,7 +234,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-waf}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-waf}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: ${POSTGRES_DB:-waf}
       POSTGRES_INITDB_ARGS: ${POSTGRES_INITDB_ARGS:---auth-local=scram-sha-256 --auth-host=scram-sha-256 --locale=C.UTF-8}
     volumes:
@@ -489,7 +489,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      DATA_SOURCE_NAME: postgresql://${POSTGRES_USER:-waf}:${POSTGRES_PASSWORD:-waf}@postgres:5432/${POSTGRES_DB:-waf}?sslmode=disable
+      DATA_SOURCE_NAME: postgresql://${POSTGRES_USER:-waf}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-waf}?sslmode=disable
     expose:
       - "9187"
     networks:

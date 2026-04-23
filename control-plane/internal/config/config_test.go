@@ -10,6 +10,7 @@ func TestLoadFromEnv_Defaults(t *testing.T) {
 	t.Setenv("WAF_RUNTIME_ROOT", "")
 	t.Setenv("CONTROL_PLANE_REVISION_STORE_DIR", "")
 	t.Setenv("CONTROL_PLANE_STARTUP_SELF_TEST_ENABLED", "")
+	t.Setenv("CONTROL_PLANE_SECURITY_PEPPER", "test-pepper")
 
 	cfg, err := LoadFromEnv()
 	if err != nil {
@@ -33,6 +34,7 @@ func TestLoadFromEnv_Overrides(t *testing.T) {
 	t.Setenv("CONTROL_PLANE_REDIS_ADDR", "127.0.0.1:6380")
 	t.Setenv("CONTROL_PLANE_REDIS_DB", "2")
 	t.Setenv("CONTROL_PLANE_STARTUP_SELF_TEST_ENABLED", "false")
+	t.Setenv("CONTROL_PLANE_SECURITY_PEPPER", "test-pepper")
 
 	cfg, err := LoadFromEnv()
 	if err != nil {
@@ -54,6 +56,7 @@ func TestLoadFromEnv_Overrides(t *testing.T) {
 
 func TestLoadFromEnv_InvalidAddr(t *testing.T) {
 	t.Setenv("CONTROL_PLANE_HTTP_ADDR", "invalid")
+	t.Setenv("CONTROL_PLANE_SECURITY_PEPPER", "test-pepper")
 	_, err := LoadFromEnv()
 	if err == nil {
 		t.Fatal("expected invalid addr error")
@@ -63,6 +66,7 @@ func TestLoadFromEnv_InvalidAddr(t *testing.T) {
 func TestLoadFromEnv_RequiresRedisOnlyInHA(t *testing.T) {
 	t.Setenv("CONTROL_PLANE_HA_ENABLED", "true")
 	t.Setenv("CONTROL_PLANE_REDIS_ADDR", "")
+	t.Setenv("CONTROL_PLANE_SECURITY_PEPPER", "test-pepper")
 	_, err := LoadFromEnv()
 	if err == nil {
 		t.Fatal("expected redis validation error when HA is enabled")

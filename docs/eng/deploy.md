@@ -88,7 +88,7 @@ The deployment should be considered complete only when:
 
 - `/healthz` is stable;
 - login and onboarding work;
-- `GET /api/app/meta` returns `2.0.9`;
+- `GET /api/app/meta` returns `2.0.10`;
 - a site can be created and turned into a working revision;
 - runtime serves the expected host after apply;
 - events, requests, and audit entries appear in the UI.
@@ -100,3 +100,4 @@ The deployment should be considered complete only when:
 - `docs/eng/upgrade.md`
 - `docs/eng/backups.md`
 - `docs/eng/ui.md`
+

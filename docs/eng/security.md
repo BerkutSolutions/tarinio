@@ -15,7 +15,7 @@ This document defines the minimum production baseline and the main secure-operat
 
 ## Authentication And Access
 
-In version `2.0.9`, the platform supports:
+In version `2.0.10`, the platform supports:
 
 - session-based login;
 - enterprise login through `OIDC`;
@@ -27,7 +27,7 @@ In version `2.0.9`, the platform supports:
 Important boundary:
 
 - directory-backed `LDAP/AD` group mapping is supported when groups are projected into `OIDC` or `SCIM`;
-- standalone direct `LDAP` password login is not part of `2.0.9`.
+- standalone direct `LDAP` password login is not part of `2.0.10`.
 
 Recommendations:
 
@@ -35,6 +35,7 @@ Recommendations:
 - enable a second factor for privileged operators;
 - remove unused passkeys;
 - review the roles and permissions granted to operators regularly.
+- keep login brute-force protection enabled in `Settings -> Security`.
 
 ## Secrets And Sensitive Data
 
@@ -42,6 +43,7 @@ Recommendations:
 - keep secrets in a dedicated protected store;
 - restrict access to keys and certificate materials;
 - do not paste EAB values, DNS API tokens, or private keys into tickets or chats.
+- never rely on development defaults for `CONTROL_PLANE_SECURITY_PEPPER`, `WAF_RUNTIME_API_TOKEN`, and `POSTGRES_PASSWORD`.
 
 ## Network Model
 
@@ -59,6 +61,7 @@ Recommended baseline:
 - test certificate renewal flows before they are needed;
 - treat exported certificate archives as sensitive artifacts;
 - document which mode is in use: import, self-signed, ACME `http-01`, or ACME `dns-01`.
+- keep Vault TLS verification enabled; insecure skip-verify mode should be disabled unless a temporary emergency exception is approved.
 
 ## Change Safety
 
@@ -98,3 +101,4 @@ Secure operation also requires:
 - `docs/eng/ui.md`
 - `docs/eng/enterprise-identity.md`
 - `docs/eng/evidence-and-releases.md`
+

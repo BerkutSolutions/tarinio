@@ -26,10 +26,10 @@
 | Параметр | Назначение | Что можно указать | По умолчанию | Пример |
 | --- | --- | --- | --- | --- |
 | `WAF_SITE_TLS_ENABLED` | Включает HTTPS для сервиса. | `true`, `false` | `true` | `true` |
-| `WAF_SITE_TLS_SELF_SIGNED` | Пометка, что используется self-signed fallback для локальной среды. | `true`, `false` | `false` | `false` |
+| `WAF_SITE_TLS_SELF_SIGNED` | Пометка, что используется самоподписанный резервный сертификат для локальной среды. | `true`, `false` | `false` | `false` |
 | `WAF_SITE_CERTIFICATE_ID` | Идентификатор сертификата, который привязывается к сервису. | Строка | Производное от `site_id`: `<site_id>-tls` | `app-example-com-tls` |
 | `WAF_SITE_AUTO_LETS_ENCRYPT` | Автоматически выпускать сертификат через ACME. | `true`, `false` | `true` | `true` |
-| `WAF_SITE_USE_LETS_ENCRYPT_STAGING` | Использовать staging ACME endpoint вместо production. | `true`, `false` | `false` | `false` |
+| `WAF_SITE_USE_LETS_ENCRYPT_STAGING` | Использовать тестовый ACME-эндпоинт вместо рабочего. | `true`, `false` | `false` | `false` |
 | `WAF_SITE_USE_LETS_ENCRYPT_WILDCARD` | Выпускать wildcard-сертификат, если сценарий это поддерживает. | `true`, `false` | `false` | `false` |
 | `WAF_SITE_CERTIFICATE_AUTHORITY_SERVER` | Какой CA использовать для управляемого сертификата. | `letsencrypt`, `zerossl`, `custom`, `import` | `letsencrypt` | `letsencrypt` |
 | `WAF_SITE_ACME_ACCOUNT_EMAIL` | Email ACME-аккаунта для выпуска и обновления сертификатов. | Валидный email | Пусто | `ops@example.com` |
@@ -48,7 +48,7 @@
 | `WAF_SITE_REVERSE_PROXY_CUSTOM_HOST` | Пользовательский `Host` при проксировании, если он нужен приложению. | FQDN или пусто | Пусто | `backend.internal.example` |
 | `WAF_SITE_REVERSE_PROXY_SSL_SNI` | Включает SNI при HTTPS-проксировании к upstream. | `true`, `false` | `false` | `true` |
 | `WAF_SITE_REVERSE_PROXY_SSL_SNI_NAME` | Имя SNI для TLS upstream-соединения. | FQDN | Пусто | `backend.internal.example` |
-| `WAF_SITE_REVERSE_PROXY_WEBSOCKET` | Разрешает websocket-upgrade до upstream. | `true`, `false` | `true` | `true` |
+| `WAF_SITE_REVERSE_PROXY_WEBSOCKET` | Разрешает обновление соединения до WebSocket при проксировании в upstream. | `true`, `false` | `true` | `true` |
 | `WAF_SITE_REVERSE_PROXY_KEEPALIVE` | Включает keepalive-соединения до upstream. | `true`, `false` | `true` | `true` |
 | `WAF_SITE_PASS_HOST_HEADER` | Передавать исходный `Host` заголовок на upstream. | `true`, `false` | `true` | `true` |
 | `WAF_SITE_SEND_X_FORWARDED_FOR` | Добавлять `X-Forwarded-For`. | `true`, `false` | `true` | `true` |
@@ -65,7 +65,7 @@
 | `WAF_SITE_HTTP3` | Включает HTTP/3 на фронте. | `true`, `false` | `false` | `false` |
 | `WAF_SITE_SSL_PROTOCOLS` | Разрешённые TLS-протоколы. | JSON-массив строк | `["TLSv1.2","TLSv1.3"]` | `["TLSv1.3"]` |
 
-## HTTP-заголовки и browser security
+## HTTP-заголовки и безопасность браузера
 
 | Параметр | Назначение | Что можно указать | По умолчанию | Пример |
 | --- | --- | --- | --- | --- |
@@ -117,7 +117,7 @@
 | `WAF_SITE_BLACKLIST_USER_AGENT_URLS` | URL-источники для внешних User-Agent blacklist-списков. | JSON-массив URL | `[]` | `["https://lists.example.net/ua-deny.txt"]` |
 | `WAF_SITE_BLACKLIST_URI_URLS` | URL-источники для внешних URI blacklist-списков. | JSON-массив URL | `[]` | `["https://lists.example.net/uri-deny.txt"]` |
 
-## Connection limiting и request limiting
+## Ограничение соединений и запросов
 
 | Параметр | Назначение | Что можно указать | По умолчанию | Пример |
 | --- | --- | --- | --- | --- |
@@ -130,19 +130,19 @@
 | `WAF_SITE_LIMIT_REQ_RATE` | Общая ставка rate-limit в формате `Nr/s`. | Строка вида `20r/s` | `120r/s` | `20r/s` |
 | `WAF_SITE_CUSTOM_LIMIT_RULES` | Точечные rate-limit правила по отдельным путям. | JSON-массив объектов `{ "path": "/...", "rate": "Nr/s" }` | `[]` | `[{"path":"/login","rate":"10r/s"},{"path":"/api/2/envelope/","rate":"30r/s"}]` |
 
-## Anti-bot и challenge
+## Anti-bot и проверка браузера
 
 | Параметр | Назначение | Что можно указать | По умолчанию | Пример |
 | --- | --- | --- | --- | --- |
 | `WAF_SITE_ANTIBOT_CHALLENGE` | Тип антибот-поведения. | `no`, `js`, `recaptcha`, `hcaptcha`, `turnstile` | `no` | `turnstile` |
-| `WAF_SITE_ANTIBOT_URI` | Путь challenge-страницы. | Путь | `/challenge` | `/challenge` |
+| `WAF_SITE_ANTIBOT_URI` | Путь страницы проверки anti-bot. | Путь | `/challenge` | `/challenge` |
 | `WAF_SITE_ANTIBOT_RECAPTCHA_SCORE` | Порог score для reCAPTCHA. | Число `0..1` | `0.7` | `0.8` |
 | `WAF_SITE_ANTIBOT_RECAPTCHA_SITEKEY` | Site key reCAPTCHA. | Строка или пусто | Пусто | `recaptcha-site-key` |
-| `WAF_SITE_ANTIBOT_RECAPTCHA_SECRET` | Secret reCAPTCHA. | Строка или пусто | Пусто | `recaptcha-secret` |
+| `WAF_SITE_ANTIBOT_RECAPTCHA_SECRET` | Секрет reCAPTCHA. | Строка или пусто | Пусто | `recaptcha-secret` |
 | `WAF_SITE_ANTIBOT_HCAPTCHA_SITEKEY` | Site key hCaptcha. | Строка или пусто | Пусто | `hcaptcha-site-key` |
-| `WAF_SITE_ANTIBOT_HCAPTCHA_SECRET` | Secret hCaptcha. | Строка или пусто | Пусто | `hcaptcha-secret` |
+| `WAF_SITE_ANTIBOT_HCAPTCHA_SECRET` | Секрет hCaptcha. | Строка или пусто | Пусто | `hcaptcha-secret` |
 | `WAF_SITE_ANTIBOT_TURNSTILE_SITEKEY` | Site key Cloudflare Turnstile. | Строка или пусто | Пусто | `turnstile-site-key` |
-| `WAF_SITE_ANTIBOT_TURNSTILE_SECRET` | Secret Cloudflare Turnstile. | Строка или пусто | Пусто | `turnstile-secret` |
+| `WAF_SITE_ANTIBOT_TURNSTILE_SECRET` | Секрет Cloudflare Turnstile. | Строка или пусто | Пусто | `turnstile-secret` |
 
 ## HTTP Basic Auth
 
@@ -170,7 +170,7 @@
 | `WAF_SITE_USE_MODSECURITY_CUSTOM_CONFIGURATION` | Разрешает отдельный кастомный ModSecurity-конфиг. | `true`, `false` | `false` | `false` |
 | `WAF_SITE_MODSECURITY_CRS_VERSION` | Версия CRS, которую нужно использовать. | Строка/номер, поддерживаемый продуктом | `4` | `4` |
 | `WAF_SITE_MODSECURITY_CRS_PLUGINS` | Список CRS plugin IDs. | JSON-массив строк | `[]` | `["plugin-php","plugin-wordpress"]` |
-| `WAF_SITE_MODSECURITY_CUSTOM_PATH` | Путь кастомного ModSecurity-конфига внутри runtime bundle. | Строка | `modsec/anomaly_score.conf` | `modsec/custom-rules.conf` |
+| `WAF_SITE_MODSECURITY_CUSTOM_PATH` | Путь кастомного ModSecurity-конфига внутри пакета рантайма. | Строка | `modsec/anomaly_score.conf` | `modsec/custom-rules.conf` |
 | `WAF_SITE_MODSECURITY_CUSTOM_CONTENT` | Содержимое кастомного ModSecurity-конфига. | Многострочная строка или пусто | Пусто | `SecRuleEngine On` |
 
 ## Практические рекомендации

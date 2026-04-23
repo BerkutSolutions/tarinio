@@ -57,3 +57,15 @@ func TestAdminScriptBuildEnvironmentCollectWAFEventsUsesNoAuthByDefault(t *testi
 		t.Fatalf("expected default SINCE value in env, got %q", joined)
 	}
 }
+
+func TestAdminScriptBuildEnvironmentRejectsShellMetacharacters(t *testing.T) {
+	service := NewAdminScriptService(t.TempDir(), "")
+	definition := service.catalog["collect-waf-events"]
+
+	_, err := service.buildEnvironment(definition, map[string]string{
+		"FILTER_SITE": "safe.example ' && rm -rf /",
+	}, t.TempDir())
+	if err == nil {
+		t.Fatalf("expected validation error for unsafe shell characters")
+	}
+}

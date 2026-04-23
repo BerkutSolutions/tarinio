@@ -1,4 +1,4 @@
-﻿# Adaptive DDoS Model (Independent Container)
+# Adaptive DDoS Model (Independent Container)
 
 ## Why this exists
 

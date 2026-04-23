@@ -253,7 +253,7 @@ func New(
 		http.MethodGet: {rbac.PermissionDashboardRead, rbac.PermissionReportsRead},
 	}, handlers.NewDashboardContainersHandler(containerRuntimeService)))
 	mux.Handle("/api/dashboard/containers/logs", withMethodAllPermissions(authService, map[string][]rbac.Permission{
-		http.MethodGet: {rbac.PermissionDashboardRead, rbac.PermissionReportsRead},
+		http.MethodGet: {rbac.PermissionDashboardRead, rbac.PermissionReportsRead, rbac.PermissionAdministrationRead},
 	}, handlers.NewDashboardContainersHandler(containerRuntimeService)))
 	mux.Handle("/api/dashboard/containers/issues", withMethodAllPermissions(authService, map[string][]rbac.Permission{
 		http.MethodGet: {rbac.PermissionDashboardRead, rbac.PermissionReportsRead},

@@ -1,4 +1,4 @@
-﻿# Easy Site Profile Contract (T2-01)
+# Easy Site Profile Contract (T2-01)
 
 Status: Completed contract definition for `T2-01` (extended)  
 Date: 2026-04-01

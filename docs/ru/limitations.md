@@ -10,23 +10,23 @@
 
 TARINIO — это:
 
-- self-hosted traffic protection and control platform;
-- revision-driven WAF и Anti-DDoS control surface;
-- операторский runtime/control-plane продукт.
+- самостоятельно размещаемая платформа защиты и управления трафиком;
+- WAF и Anti-DDoS, управляемые через ревизии;
+- операторский продукт с разделением на рантайм и control-plane.
 
 TARINIO — это не:
 
 - SIEM;
 - directory service;
-- application security testing suite;
+- комплекс для тестирования безопасности приложений;
 - универсальная замена любому edge-компоненту.
 
 ## Эксплуатационные границы
 
 Оператору всё равно нужны:
 
-- корректный network design;
-- ответственность за backup и DR;
-- secure application code;
-- secret management;
-- monitoring и incident response procedures.
+- корректное сетевое проектирование;
+- ответственность за резервное копирование и аварийное восстановление;
+- безопасный код приложений;
+- управление секретами;
+- мониторинг и процедуры реагирования на инциденты.
