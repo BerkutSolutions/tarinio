@@ -40,7 +40,7 @@ $composeFile = Join-Path $composeDir "docker-compose.yml"
 $envFile = Join-Path $composeDir ".env"
 $envBackup = "$envFile.preflight-backup"
 $createdTempEnv = $false
-$releaseVersion = "preflight-local-2.0.10"
+$releaseVersion = "preflight-local-2.0.11"
 $releaseDir = Join-Path $repoRoot ("build\release\" + $releaseVersion)
 $smokeContainers = @(
     "tarinio-control-plane",
@@ -75,9 +75,43 @@ try {
 
     if (-not $SkipDocs) {
         Step "Docs and lockfile install" {
-            Invoke-Native "npm.cmd" @("cache", "clean", "--force")
-            Invoke-Native "npm.cmd" @("ci", "--prefer-online")
-            Invoke-Native "npm.cmd" @("run", "docs:build")
+            $localNpmCache = Join-Path $repoRoot ".tmp\npm-cache"
+            New-Item -ItemType Directory -Path $localNpmCache -Force | Out-Null
+            $prevNpmCache = $env:npm_config_cache
+            $env:npm_config_cache = $localNpmCache
+            try {
+                Invoke-Native "npm.cmd" @("cache", "clean", "--force")
+            } catch {
+                Write-Warning "npm cache clean failed, continuing: $($_.Exception.Message)"
+            }
+            try {
+                $installed = $false
+                for ($attempt = 1; $attempt -le 3; $attempt++) {
+                    try {
+                        Invoke-Native "npm.cmd" @("ci", "--prefer-online")
+                        $installed = $true
+                        break
+                    } catch {
+                        Write-Warning "npm ci failed on attempt ${attempt}: $($_.Exception.Message)"
+                        try {
+                            Invoke-Native "npm.cmd" @("cache", "verify")
+                        } catch {
+                            Write-Warning "npm cache verify failed, continuing"
+                        }
+                        Start-Sleep -Seconds (5 * $attempt)
+                    }
+                }
+                if (-not $installed) {
+                    throw "npm ci failed after retries"
+                }
+                Invoke-Native "npm.cmd" @("run", "docs:build")
+            } finally {
+                if ($null -eq $prevNpmCache) {
+                    Remove-Item Env:\npm_config_cache -ErrorAction SilentlyContinue
+                } else {
+                    $env:npm_config_cache = $prevNpmCache
+                }
+            }
         }
     }
 
@@ -185,3 +219,4 @@ CONTROL_PLANE_DEV_FAST_START_UPSTREAM_PORT=80
 } finally {
     Pop-Location
 }
+

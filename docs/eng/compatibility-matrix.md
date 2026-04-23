@@ -4,7 +4,7 @@ This page belongs to the current documentation branch.
 
 ## Scope
 
-This matrix defines the deployment combinations TARINIO `2.0.10` is designed, tested, and supported for.
+This matrix defines the deployment combinations TARINIO `2.0.11` is designed, tested, and supported for.
 
 ## Runtime Platform
 

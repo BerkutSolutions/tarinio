@@ -287,7 +287,9 @@ func (s *DashboardService) collectRequests() ([]map[string]any, error) {
 	}
 	items, err := s.requests.Collect()
 	if err != nil {
-		return nil, err
+		// Dashboard must stay available even when runtime request telemetry
+		// is temporarily unavailable during startup or reload.
+		return []map[string]any{}, nil
 	}
 	return items, nil
 }

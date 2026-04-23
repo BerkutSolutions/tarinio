@@ -135,6 +135,41 @@ func TestDashboardService_RuntimeProbeFailureMarksRuntimeDown(t *testing.T) {
 	}
 }
 
+func TestDashboardService_RuntimeRequestsFailureDoesNotFailStats(t *testing.T) {
+	now := time.Now().UTC()
+	service := NewDashboardService(
+		&fakeDashboardEventReader{
+			items: []events.Event{
+				{
+					ID:         "evt-1",
+					Type:       events.TypeSecurityWAF,
+					SiteID:     "site-a",
+					OccurredAt: now.Format(time.RFC3339),
+					Details: map[string]any{
+						"blocked":   true,
+						"status":    403,
+						"client_ip": "203.0.113.10",
+						"path":      "/checkout",
+					},
+				},
+			},
+		},
+		&fakeDashboardRequestCollector{err: errors.New("runtime requests unavailable")},
+		&fakeDashboardRuntimeProbe{},
+	)
+
+	stats, err := service.Stats()
+	if err != nil {
+		t.Fatalf("stats failed: %v", err)
+	}
+	if stats.RequestsDay != 0 {
+		t.Fatalf("expected requests_day=0 on request collector failure, got %d", stats.RequestsDay)
+	}
+	if stats.AttacksDay != 1 {
+		t.Fatalf("expected attack stats from events to stay available, got %d", stats.AttacksDay)
+	}
+}
+
 func TestDashboardService_FallsBackToBlockedRequestsForAttackWidgets(t *testing.T) {
 	now := time.Now().UTC()
 	service := NewDashboardService(

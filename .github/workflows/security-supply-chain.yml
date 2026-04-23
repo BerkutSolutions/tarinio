@@ -13,6 +13,9 @@ permissions:
   contents: read
   security-events: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   go-vulnerability-scan:
     runs-on: ubuntu-latest
@@ -29,15 +32,12 @@ jobs:
       - name: Install govulncheck
         run: go install golang.org/x/vuln/cmd/govulncheck@latest
 
-      - name: Run govulncheck
-        continue-on-error: true
+      - name: Run govulncheck (fail on findings)
         run: govulncheck ./...
 
   npm-audit:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -62,9 +62,8 @@ jobs:
           echo "npm ci failed after retries"
           exit 1
 
-      - name: NPM audit (high and critical)
-        continue-on-error: true
-        run: npm audit --audit-level=high
+      - name: NPM audit (fail on moderate+ vulnerabilities)
+        run: npm audit --audit-level=moderate
 
   trivy-fs-scan:
     runs-on: ubuntu-latest
@@ -80,9 +79,11 @@ jobs:
           scan-ref: .
           format: sarif
           output: trivy-results.sarif
-          severity: CRITICAL,HIGH
+          severity: MEDIUM,HIGH,CRITICAL
+          exit-code: "1"
 
       - name: Upload Trivy SARIF
+        if: always()
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-results.sarif
