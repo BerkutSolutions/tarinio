@@ -235,6 +235,58 @@ func TestRenderSiteUpstreamArtifacts_WiresErrorPagesAndRateLimitIncludes(t *test
 	}
 }
 
+func TestRenderSiteUpstreamArtifacts_DefaultServerKeepsAdminRoutesReachable(t *testing.T) {
+	artifacts, err := RenderSiteUpstreamArtifacts(
+		[]SiteInput{
+			{
+				ID:                "site-a",
+				Enabled:           true,
+				PrimaryHost:       "a.example.com",
+				ListenHTTP:        true,
+				ListenHTTPS:       true,
+				DefaultUpstreamID: "up-a",
+			},
+		},
+		[]UpstreamInput{
+			{
+				ID:             "up-a",
+				SiteID:         "site-a",
+				Scheme:         "http",
+				Host:           "app-a",
+				Port:           8080,
+				BasePath:       "/",
+				PassHostHeader: true,
+			},
+		},
+	)
+	if err != nil {
+		t.Fatalf("render failed: %v", err)
+	}
+
+	var baseArtifact ArtifactOutput
+	for _, artifact := range artifacts {
+		if artifact.Path == "nginx/conf.d/base.conf" {
+			baseArtifact = artifact
+			break
+		}
+	}
+
+	content := string(baseArtifact.Content)
+	for _, fragment := range []string{
+		"location ^~ /api/ {",
+		"proxy_pass http://control-plane:8080;",
+		"location = /login {",
+		"location = /login/2fa {",
+		"location ^~ /onboarding/ {",
+		"location ^~ /static/ {",
+		"return 308 https://$host$request_uri;",
+	} {
+		if !strings.Contains(content, fragment) {
+			t.Fatalf("expected base config to contain %q, got: %s", fragment, content)
+		}
+	}
+}
+
 func TestRenderSiteUpstreamArtifacts_UsesValidUpstreamServerAddress(t *testing.T) {
 	artifacts, err := RenderSiteUpstreamArtifacts(
 		[]SiteInput{
