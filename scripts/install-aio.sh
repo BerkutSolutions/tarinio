@@ -14,8 +14,8 @@ BACKUP_MAX_TOTAL_MB="${BACKUP_MAX_TOTAL_MB:-1024}"
 BACKUP_MAX_VOLUME_MB="${BACKUP_MAX_VOLUME_MB:-512}"
 BACKUP_HELPER_IMAGE="${BACKUP_HELPER_IMAGE:-busybox:1.36}"
 RUN_STRICT_POST_UPGRADE_VALIDATION="${RUN_STRICT_POST_UPGRADE_VALIDATION:-0}"
-CONTAINER_PROBE_ATTEMPTS="${CONTAINER_PROBE_ATTEMPTS:-120}"
-HOST_PROBE_ATTEMPTS="${HOST_PROBE_ATTEMPTS:-90}"
+CONTAINER_PROBE_ATTEMPTS="${CONTAINER_PROBE_ATTEMPTS:-45}"
+HOST_PROBE_ATTEMPTS="${HOST_PROBE_ATTEMPTS:-45}"
 FAILED=0
 
 if [ -t 1 ]; then
@@ -237,6 +237,97 @@ compose_capture() {
     docker-compose "$@" 2>>"$LOG_FILE"
   else
     docker compose "$@" 2>>"$LOG_FILE"
+  fi
+}
+
+shell_quote() {
+  printf "'%s'" "$(printf "%s" "$1" | sed "s/'/'\\\\''/g")"
+}
+
+postgres_dsn_password() {
+  dsn="$1"
+  if [ -z "$dsn" ]; then
+    return 0
+  fi
+  printf "%s" "$dsn" | sed -n 's#^postgres://[^:]*:\([^@]*\)@.*#\1#p' | head -n 1
+}
+
+postgres_probe_password() {
+  password="$1"
+  user="$2"
+  db="$3"
+  pwd_q="$(shell_quote "$password")"
+  user_q="$(shell_quote "$user")"
+  db_q="$(shell_quote "$db")"
+  cmd="PGPASSWORD=$pwd_q psql -h 127.0.0.1 -U $user_q -d $db_q -v ON_ERROR_STOP=1 -tAc 'select 1' >/dev/null 2>&1"
+  run_logged $COMPOSE_CMD -f docker-compose.yml exec -T postgres sh -lc "$cmd"
+}
+
+postgres_set_password() {
+  current_password="$1"
+  desired_password="$2"
+  user="$3"
+  db="$4"
+  desired_sql="$(printf "%s" "$desired_password" | sed "s/'/''/g")"
+  sql="ALTER ROLE \"$user\" WITH PASSWORD '$desired_sql';"
+  current_q="$(shell_quote "$current_password")"
+  user_q="$(shell_quote "$user")"
+  db_q="$(shell_quote "$db")"
+  sql_q="$(shell_quote "$sql")"
+  cmd="PGPASSWORD=$current_q psql -h 127.0.0.1 -U $user_q -d $db_q -v ON_ERROR_STOP=1 -tAc $sql_q"
+  run_logged $COMPOSE_CMD -f docker-compose.yml exec -T postgres sh -lc "$cmd"
+}
+
+ensure_postgres_password_alignment() {
+  postgres_user="$(read_env_value POSTGRES_USER)"
+  postgres_db="$(read_env_value POSTGRES_DB)"
+  desired_password="$(read_env_value POSTGRES_PASSWORD)"
+  postgres_dsn="$(read_env_value POSTGRES_DSN)"
+  dsn_password="$(postgres_dsn_password "$postgres_dsn")"
+
+  if [ -z "$postgres_user" ]; then
+    postgres_user="waf"
+  fi
+  if [ -z "$postgres_db" ]; then
+    postgres_db="waf"
+  fi
+  if [ -z "$desired_password" ]; then
+    desired_password="waf"
+  fi
+
+  if postgres_probe_password "$desired_password" "$postgres_user" "$postgres_db"; then
+    ok "postgres credentials verified"
+    return 0
+  fi
+
+  recovered_password=""
+  for candidate in "$dsn_password" "waf" "change-me-strong-password"; do
+    if [ -z "$candidate" ] || [ "$candidate" = "$desired_password" ]; then
+      continue
+    fi
+    if postgres_probe_password "$candidate" "$postgres_user" "$postgres_db"; then
+      recovered_password="$candidate"
+      break
+    fi
+  done
+
+  if [ -z "$recovered_password" ]; then
+    warn "postgres credentials probe failed for configured password and known legacy fallbacks"
+    return 0
+  fi
+
+  warn "postgres password mismatch detected; aligning database user password with current .env"
+  postgres_set_password "$recovered_password" "$desired_password" "$postgres_user" "$postgres_db"
+  ok "postgres user password updated to match current .env"
+
+  target_postgres_dsn="postgres://${postgres_user}:${desired_password}@postgres:5432/${postgres_db}?sslmode=disable"
+  write_env_value POSTGRES_DSN "$target_postgres_dsn"
+  ok "POSTGRES_DSN normalized after postgres password recovery"
+
+  if run_logged $COMPOSE_CMD -f docker-compose.yml restart control-plane; then
+    ok "control-plane restarted after postgres credential recovery"
+  else
+    warn "failed to restart control-plane after postgres credential recovery"
   fi
 }
 
@@ -509,6 +600,9 @@ ok "images built"
 step "Starting containers"
 run_logged $COMPOSE_CMD -f docker-compose.yml up -d
 ok "containers started"
+
+step "Verifying Postgres credentials"
+ensure_postgres_password_alignment
 
 step "Checking container status"
 run_logged $COMPOSE_CMD -f docker-compose.yml ps
