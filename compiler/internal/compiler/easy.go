@@ -36,6 +36,7 @@ type easySiteData struct {
 	SendXForwardedProto    bool
 	SendXRealIP            bool
 	RateLimitBanSeconds    int
+	AdminBypassPathPattern string
 
 	UseAuthBasic      bool
 	AuthBasicRealm    string
@@ -215,6 +216,7 @@ func RenderEasyArtifacts(sites []SiteInput, profiles []EasyProfileInput) ([]Arti
 			SendXForwardedProto:          profile.SendXForwardedProto,
 			SendXRealIP:                  profile.SendXRealIP,
 			RateLimitBanSeconds:          rateLimitBanSeconds(profile),
+			AdminBypassPathPattern:       easyAdminBypassPathPattern(),
 			UseAuthBasic:                 profile.UseAuthBasic && profile.AuthBasicUser != "" && profile.AuthBasicPassword != "",
 			AuthBasicRealm:               profile.AuthBasicText,
 			AuthBasicUserFile:            fmt.Sprintf("/etc/waf/nginx/auth-basic/%s.htpasswd", site.ID),

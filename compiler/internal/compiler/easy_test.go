@@ -73,6 +73,12 @@ func TestRenderEasyArtifacts_GeneratesSiteAndAuthBasicFiles(t *testing.T) {
 	if !strings.Contains(siteConf, "if ($cookie_waf_antibot_") {
 		t.Fatalf("expected site-scoped antibot cookie rule, got: %s", siteConf)
 	}
+	if !strings.Contains(siteConf, `if ($uri ~* "^/(`) || !strings.Contains(siteConf, `api/.*`) || !strings.Contains(siteConf, `static/.*`) || !strings.Contains(siteConf, `dashboard(?:/.*)?`) || !strings.Contains(siteConf, `login/2fa`) {
+		t.Fatalf("expected admin path bypass guard in easy template, got: %s", siteConf)
+	}
+	if !strings.Contains(siteConf, `if ($cookie_waf_session != "")`) || !strings.Contains(siteConf, `if ($cookie_waf_session_boot != "")`) {
+		t.Fatalf("expected admin session cookie bypass guard in easy template, got: %s", siteConf)
+	}
 	if !strings.Contains(siteConf, "if ($waf_allow_bypass_site_a = 1)") {
 		t.Fatalf("expected allowlist bypass guard in easy template, got: %s", siteConf)
 	}

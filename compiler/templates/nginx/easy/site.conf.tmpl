@@ -5,7 +5,20 @@ set $waf_rate_limited_max_age {{ .RateLimitBanSeconds }};
 set $waf_rate_limited_active 0;
 set $waf_rate_limited_escalated 0;
 set $waf_easy_exception_guard 0;
+set $waf_easy_admin_guard 0;
+if ($uri ~* "{{ .AdminBypassPathPattern }}") {
+    set $waf_easy_admin_guard 1;
+}
+if ($cookie_waf_session != "") {
+    set $waf_easy_admin_guard 1;
+}
+if ($cookie_waf_session_boot != "") {
+    set $waf_easy_admin_guard 1;
+}
 if (${{ .ExceptionVar }} = 1) {
+    set $waf_easy_exception_guard 1;
+}
+if ($waf_easy_admin_guard = 1) {
     set $waf_easy_exception_guard 1;
 }
 

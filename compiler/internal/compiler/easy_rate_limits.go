@@ -205,7 +205,7 @@ func easyCustomReqZoneName(siteID string, index int) string {
 
 func isReservedBaseLocationPath(path string) bool {
 	canonical := customLimitCanonicalPath(path)
-	return canonical == "/" || canonical == "/api/"
+	return isReservedEasyLimitPath(canonical)
 }
 
 func customLimitCanonicalPath(path string) string {

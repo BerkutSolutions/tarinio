@@ -98,6 +98,8 @@ func TestRenderEasyRateLimitArtifacts_SkipsReservedBaseLocations(t *testing.T) {
 			SiteID: "control-plane-access",
 			CustomLimitRules: []CustomRateLimitRuleInput{
 				{Path: "/api/", Rate: "30r/s"},
+				{Path: "/static/", Rate: "30r/s"},
+				{Path: "/dashboard", Rate: "20r/s"},
 				{Path: "/", Rate: "50r/s"},
 				{Path: "/api/auth/", Rate: "12r/s"},
 			},
@@ -113,15 +115,15 @@ func TestRenderEasyRateLimitArtifacts_SkipsReservedBaseLocations(t *testing.T) {
 	}
 
 	httpConf := byPath["nginx/conf.d/easy-ratelimits.conf"]
-	if strings.Contains(httpConf, "rate=30r/s") || strings.Contains(httpConf, "rate=50r/s") {
-		t.Fatalf("expected reserved /api/ and / paths to be skipped, got: %s", httpConf)
+	if strings.Contains(httpConf, "rate=30r/s") || strings.Contains(httpConf, "rate=20r/s") || strings.Contains(httpConf, "rate=50r/s") {
+		t.Fatalf("expected reserved admin paths to be skipped, got: %s", httpConf)
 	}
 	if !strings.Contains(httpConf, "rate=12r/s") {
 		t.Fatalf("expected non-reserved route rate to remain, got: %s", httpConf)
 	}
 
 	locationsConf := byPath["nginx/easy-locations/control-plane-access.conf"]
-	if strings.Contains(locationsConf, "location ^~ /api/ {") || strings.Contains(locationsConf, "location ^~ / {") || strings.Contains(locationsConf, "location = / {") {
+	if strings.Contains(locationsConf, "location ^~ /api/ {") || strings.Contains(locationsConf, "location ^~ /static/ {") || strings.Contains(locationsConf, "location = /dashboard {") || strings.Contains(locationsConf, "location ^~ / {") || strings.Contains(locationsConf, "location = / {") {
 		t.Fatalf("expected reserved locations to be skipped, got: %s", locationsConf)
 	}
 	if !strings.Contains(locationsConf, "location ^~ /api/auth/ {") {
