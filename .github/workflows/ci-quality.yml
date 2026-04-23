@@ -79,6 +79,12 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Installer script and UI toolchain sanity
+        run: |
+          sh -n scripts/install-aio.sh
+          sh -n scripts/install-aio-enterprise.sh
+          grep -q '^RUN GOTOOLCHAIN=auto go test ./ui/tests$' ui/Dockerfile
+
       - name: Generate release artifacts
         run: |
           go run ./cmd/release-artifacts \

@@ -364,6 +364,53 @@ should_backup_volume() {
   esac
 }
 
+extract_declared_volumes_from_compose() {
+  compose_file="$1"
+  awk '
+    BEGIN { in_volumes = 0 }
+    /^volumes:[[:space:]]*$/ {
+      in_volumes = 1
+      next
+    }
+    in_volumes == 1 {
+      if ($0 ~ /^[^[:space:]]/) {
+        exit
+      }
+      if ($0 ~ /^[[:space:]]+[A-Za-z0-9_.-]+:[[:space:]]*$/) {
+        key = $0
+        sub(/^[[:space:]]+/, "", key)
+        sub(/:[[:space:]]*$/, "", key)
+        print key
+      }
+    }
+  ' "$compose_file"
+}
+
+resolve_existing_volume_name() {
+  logical_volume="$1"
+  if docker volume inspect "$logical_volume" >/dev/null 2>&1; then
+    printf "%s\n" "$logical_volume"
+    return 0
+  fi
+
+  stack_name="$(read_env_value WAF_STACK_NAME)"
+  if [ -z "$stack_name" ]; then
+    stack_name="waf"
+  fi
+
+  case "$logical_volume" in
+    waf-*)
+      candidate="${stack_name}-${logical_volume#waf-}"
+      if docker volume inspect "$candidate" >/dev/null 2>&1; then
+        printf "%s\n" "$candidate"
+        return 0
+      fi
+      ;;
+  esac
+
+  return 1
+}
+
 safe_data_backup() {
   profile_dir="$INSTALL_DIR/deploy/compose/$PROFILE"
   compose_file="$profile_dir/docker-compose.yml"
@@ -377,9 +424,14 @@ safe_data_backup() {
   : >"$manifest"
 
   volumes="$(cd "$profile_dir" && compose_capture -f docker-compose.yml config --volumes || true)"
+  volumes="$(printf "%s" "$volumes" | tr -d '\r')"
   if [ -z "$volumes" ]; then
-    warn "no named volumes found in compose config, skipping volume backup"
-    return 0
+    volumes="$(extract_declared_volumes_from_compose "$compose_file" || true)"
+    if [ -z "$volumes" ]; then
+      warn "no named volumes found in compose config, skipping volume backup"
+      return 0
+    fi
+    warn "compose --volumes returned empty; using docker-compose.yml volumes section fallback"
   fi
 
   total_estimated_mb=0
@@ -391,13 +443,14 @@ safe_data_backup() {
       continue
     fi
 
-    if ! docker volume inspect "$volume" >/dev/null 2>&1; then
+    resolved_volume="$(resolve_existing_volume_name "$volume" || true)"
+    if [ -z "$resolved_volume" ]; then
       skipped_count=$((skipped_count + 1))
       printf "skip %s: volume not found\n" "$volume" >>"$manifest"
       continue
     fi
 
-    estimated_mb="$(docker run --rm -v "${volume}:/data:ro" "$BACKUP_HELPER_IMAGE" sh -lc "du -sm /data 2>/dev/null | awk '{print \$1}'" 2>>"$LOG_FILE" || true)"
+    estimated_mb="$(docker run --rm -v "${resolved_volume}:/data:ro" "$BACKUP_HELPER_IMAGE" sh -lc "du -sm /data 2>/dev/null | awk '{print \$1}'" 2>>"$LOG_FILE" || true)"
     estimated_mb="$(printf "%s" "$estimated_mb" | tr -d '\r' | awk 'NF{print $1; exit}')"
     case "$estimated_mb" in
       ''|*[!0-9]*) estimated_mb=0 ;;
@@ -418,17 +471,17 @@ safe_data_backup() {
       continue
     fi
 
-    safe_name="$(printf "%s" "$volume" | tr '/:' '__')"
+    safe_name="$(printf "%s" "$resolved_volume" | tr '/:' '__')"
     target_file="$BACKUP_DIR/volumes/${safe_name}.tar.gz"
-    if docker run --rm -v "${volume}:/data:ro" -v "$BACKUP_DIR/volumes:/backup" "$BACKUP_HELPER_IMAGE" sh -lc "cd /data && tar -czf '/backup/${safe_name}.tar.gz' ." >>"$LOG_FILE" 2>&1; then
+    if docker run --rm -v "${resolved_volume}:/data:ro" -v "$BACKUP_DIR/volumes:/backup" "$BACKUP_HELPER_IMAGE" sh -lc "cd /data && tar -czf '/backup/${safe_name}.tar.gz' ." >>"$LOG_FILE" 2>&1; then
       total_estimated_mb="$projected_total"
       saved_count=$((saved_count + 1))
-      ok "backup saved: $volume -> $target_file (~${estimated_mb}MB)"
-      printf "saved %s: %s (~%sMB)\n" "$volume" "$target_file" "$estimated_mb" >>"$manifest"
+      ok "backup saved: $volume (${resolved_volume}) -> $target_file (~${estimated_mb}MB)"
+      printf "saved %s (%s): %s (~%sMB)\n" "$volume" "$resolved_volume" "$target_file" "$estimated_mb" >>"$manifest"
     else
       skipped_count=$((skipped_count + 1))
-      warn "failed to backup volume $volume (see log: $LOG_FILE)"
-      printf "skip %s: backup command failed\n" "$volume" >>"$manifest"
+      warn "failed to backup volume $volume (${resolved_volume}) (see log: $LOG_FILE)"
+      printf "skip %s (%s): backup command failed\n" "$volume" "$resolved_volume" >>"$manifest"
     fi
   done
 

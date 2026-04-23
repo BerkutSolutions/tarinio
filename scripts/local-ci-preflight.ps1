@@ -53,6 +53,42 @@ $smokeContainers = @(
 
 Push-Location $repoRoot
 try {
+    Step "Installer scripts sanity checks" {
+        $syntaxChecked = $false
+        $shCommand = Get-Command "sh" -ErrorAction SilentlyContinue
+        $bashCommand = Get-Command "bash" -ErrorAction SilentlyContinue
+        if ($null -ne $shCommand) {
+            try {
+                Invoke-Native "sh" @("-n", "scripts/install-aio.sh")
+                Invoke-Native "sh" @("-n", "scripts/install-aio-enterprise.sh")
+                $syntaxChecked = $true
+            } catch {
+                Write-Warning "sh -n failed, trying fallback: $($_.Exception.Message)"
+            }
+        }
+        if ((-not $syntaxChecked) -and ($null -ne $bashCommand)) {
+            try {
+                Invoke-Native "bash" @("-n", "scripts/install-aio.sh")
+                Invoke-Native "bash" @("-n", "scripts/install-aio-enterprise.sh")
+                $syntaxChecked = $true
+            } catch {
+                Write-Warning "bash -n failed, trying fallback: $($_.Exception.Message)"
+            }
+        }
+        if ((-not $syntaxChecked) -and (Get-Command "docker" -ErrorAction SilentlyContinue)) {
+            $repoMount = $repoRoot.Replace('\', '/')
+            Invoke-Native "docker" @("run", "--rm", "-v", "${repoMount}:/repo", "busybox:1.36", "sh", "-n", "/repo/scripts/install-aio.sh")
+            Invoke-Native "docker" @("run", "--rm", "-v", "${repoMount}:/repo", "busybox:1.36", "sh", "-n", "/repo/scripts/install-aio-enterprise.sh")
+            $syntaxChecked = $true
+        }
+        if (-not $syntaxChecked) {
+            throw "neither sh/bash nor docker is available for installer script syntax checks"
+        }
+        if (-not (Select-String -Path (Join-Path $repoRoot "ui\Dockerfile") -Pattern "^RUN GOTOOLCHAIN=auto go test ./ui/tests$" -Quiet)) {
+            throw "ui/Dockerfile is missing required 'RUN GOTOOLCHAIN=auto go test ./ui/tests' check"
+        }
+    }
+
     if (-not $SkipGoTest) {
         Step "Go tests (full)" {
             Invoke-Native "go" @("test", "./...", "-count=1")

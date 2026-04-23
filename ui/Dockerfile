@@ -14,7 +14,7 @@ COPY ui/app ./ui/app
 COPY ui/nginx.conf ./ui/nginx.conf
 COPY ui/tests ./ui/tests
 
-RUN go test ./ui/tests
+RUN GOTOOLCHAIN=auto go test ./ui/tests
 
 FROM nginx:1.27-alpine
 
