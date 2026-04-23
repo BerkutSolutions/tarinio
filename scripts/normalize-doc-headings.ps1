@@ -82,12 +82,12 @@ $headingMap = [ordered]@{
 }
 
 $lineMap = @{
-  'Wiki baseline: `2.0.7`' = 'Эта страница относится к текущей ветке документации.'
-  'Version baseline: `2.0.7`' = 'This page belongs to the current documentation branch.'
-  'Базовая версия: `2.0.7`' = 'Эта страница относится к текущей ветке документации.'
-  'Версия: `2.0.7`' = 'Эта страница относится к текущей ветке документации.'
-  'Wiki baseline: `2.0.7`  ' = 'Эта страница относится к текущей ветке документации.'
-  'Version baseline: `2.0.7`  ' = 'This page belongs to the current documentation branch.'
+  'Wiki baseline: `2.0.8`' = 'Эта страница относится к текущей ветке документации.'
+  'Version baseline: `2.0.8`' = 'This page belongs to the current documentation branch.'
+  'Базовая версия: `2.0.8`' = 'Эта страница относится к текущей ветке документации.'
+  'Версия: `2.0.8`' = 'Эта страница относится к текущей ветке документации.'
+  'Wiki baseline: `2.0.8`  ' = 'Эта страница относится к текущей ветке документации.'
+  'Version baseline: `2.0.8`  ' = 'This page belongs to the current documentation branch.'
 }
 
 $ruBranchLine = 'Эта страница относится к текущей ветке документации.'

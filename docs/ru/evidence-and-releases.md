@@ -2,11 +2,11 @@
 
 Эта страница относится к текущей ветке документации.
 
-Документ описывает evidence-grade механизмы в TARINIO `2.0.7`: цепочку аудита, подписи ревизий, signed support bundle и release artifacts.
+Документ описывает evidence-grade механизмы в TARINIO `2.0.8`: цепочку аудита, подписи ревизий, signed support bundle и release artifacts.
 
 ## Что реализовано
 
-В TARINIO `2.0.7` реализованы:
+В TARINIO `2.0.8` реализованы:
 
 - tamper-evident цепочка аудита
 - подпись manifest-полей ревизии

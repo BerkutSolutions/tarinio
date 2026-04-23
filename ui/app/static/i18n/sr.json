@@ -359,7 +359,7 @@
   "app.sites": "Сервиси",
   "app.tls": "TLS / Сертификати",
   "app.user.noRoles": "Нема улоге",
-  "app.version": "v2.0.7",
+  "app.version": "v2.0.8",
   "auth.2fa.challengeMissing": "2FA challenge is missing. Пријавите се поново.",
   "auth.2fa.code": "2FA code",
   "auth.2fa.codeRequired": "2FA code is required",
