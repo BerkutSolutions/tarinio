@@ -563,6 +563,27 @@ async function ensureSiteAndTLS() {
       await api.put(`/api/upstreams/${encodeURIComponent(upstream.id)}`, upstream, onboardingNoAutoApplyOptions);
     }
   }
+
+  state.site = sites.find((item) => item.id === site.id) || site;
+  state.upstream = upstreams.find((item) => item.id === upstream.id) || upstream;
+  state.certificateID = certificates.find((item) => item.id === certificateID)?.id || certificateID;
+  state.tlsMode = tlsMode;
+  state.siteDraft.accountEmail = acmeEmail;
+  state.siteDraft.challengeType = challengeType;
+  state.siteDraft.dnsProvider = dnsProvider;
+  state.siteDraft.dnsProviderEnv = dnsProviderEnvRaw;
+  state.siteDraft.dnsPropagationSeconds = dnsPropagationSeconds;
+  state.siteDraft.zeroSSLEABKID = zeroSSLEABKID;
+  state.siteDraft.zeroSSLEABHMAC = zeroSSLEABHMAC;
+  persistDraft();
+  await ensureFirstInitEasyProfileTemplate(site, upstream, tlsMode, acmeEmail);
+
+  // HTTP-01 requires the first applied runtime config to expose the ACME challenge
+  // path before the actual issuance request is sent.
+  if (tlsMode !== "self-signed" && challengeType === "http-01") {
+    await compileAndApplyRevision();
+  }
+
   if (tlsMode === "self-signed") {
     await api.post("/api/certificates/self-signed/issue", {
       certificate_id: certificateID,
@@ -586,7 +607,9 @@ async function ensureSiteAndTLS() {
     }, onboardingNoAutoApplyOptions);
   }
 
-  if (!tlsConfigs.some((item) => item.site_id === site.id)) {
+  const refreshedTLSConfigsResponse = await api.get("/api/tls-configs");
+  const refreshedTLSConfigs = Array.isArray(refreshedTLSConfigsResponse) ? refreshedTLSConfigsResponse : [];
+  if (!refreshedTLSConfigs.some((item) => item.site_id === site.id)) {
     const tlsPayload = {
       site_id: site.id,
       certificate_id: certificateID
@@ -601,20 +624,8 @@ async function ensureSiteAndTLS() {
       await api.put(`/api/tls-configs/${encodeURIComponent(site.id)}`, tlsPayload, onboardingNoAutoApplyOptions);
     }
   }
-  await ensureFirstInitEasyProfileTemplate(site, upstream, tlsMode, acmeEmail);
 
-  state.site = sites.find((item) => item.id === site.id) || site;
-  state.upstream = upstreams.find((item) => item.id === upstream.id) || upstream;
-  state.certificateID = certificates.find((item) => item.id === certificateID)?.id || certificateID;
-  state.tlsMode = tlsMode;
-  state.siteDraft.accountEmail = acmeEmail;
-  state.siteDraft.challengeType = challengeType;
-  state.siteDraft.dnsProvider = dnsProvider;
-  state.siteDraft.dnsProviderEnv = dnsProviderEnvRaw;
-  state.siteDraft.dnsPropagationSeconds = dnsPropagationSeconds;
-  state.siteDraft.zeroSSLEABKID = zeroSSLEABKID;
-  state.siteDraft.zeroSSLEABHMAC = zeroSSLEABHMAC;
-  persistDraft();
+  await compileAndApplyRevision();
 }
 
 async function runApply() {
@@ -652,7 +663,6 @@ async function runApply() {
     }
 
     await ensureSiteAndTLS();
-    await compileAndApplyRevision();
     renderSummary();
 
     notify(t("toast.initialSetupCompleted"));
