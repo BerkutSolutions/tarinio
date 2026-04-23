@@ -55,6 +55,17 @@ func (h *RevisionApplyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 			writeJSON(w, status, map[string]any{"error": err.Error()})
 			return
 		}
+		if job.Status == jobs.StatusFailed {
+			message := strings.TrimSpace(job.Result)
+			if message == "" {
+				message = "apply failed"
+			}
+			writeJSON(w, http.StatusBadRequest, map[string]any{
+				"error": message,
+				"job":   job,
+			})
+			return
+		}
 		writeJSON(w, http.StatusCreated, job)
 		return
 	}

@@ -21,6 +21,18 @@ func (f *fakeRevisionApplyService) Apply(ctx context.Context, revisionID string)
 	}, nil
 }
 
+type fakeFailedRevisionApplyService struct{}
+
+func (f *fakeFailedRevisionApplyService) Apply(ctx context.Context, revisionID string) (jobs.Job, error) {
+	return jobs.Job{
+		ID:               "apply-" + revisionID,
+		Type:             jobs.TypeApply,
+		TargetRevisionID: revisionID,
+		Status:           jobs.StatusFailed,
+		Result:           "runtime reload failed",
+	}, nil
+}
+
 type fakeRevisionDeleteService struct {
 	deleted string
 }
@@ -44,6 +56,17 @@ func TestRevisionApplyHandler_Apply(t *testing.T) {
 	handler.ServeHTTP(resp, req)
 	if resp.Code != http.StatusCreated {
 		t.Fatalf("expected 201, got %d", resp.Code)
+	}
+}
+
+func TestRevisionApplyHandler_ApplyFailedJob(t *testing.T) {
+	handler := NewRevisionApplyHandler(&fakeFailedRevisionApplyService{}, &fakeRevisionDeleteService{}, &fakeRevisionApproveService{})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/revisions/rev-000001/apply", nil)
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, req)
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", resp.Code)
 	}
 }
 

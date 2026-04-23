@@ -200,7 +200,10 @@ async function compileAndApplyRevision(options = {}) {
     throw new Error(t("onboarding.error.apply"));
   }
   setLoading(document.getElementById("onboarding-feedback"), t("onboarding.apply.loading"));
-  await api.post(`/api/revisions/${encodeURIComponent(revisionID)}/apply`, {});
+  const applyResponse = await api.post(`/api/revisions/${encodeURIComponent(revisionID)}/apply`, {});
+  if (String(applyResponse?.status || "").trim().toLowerCase() === "failed") {
+    throw new Error(String(applyResponse?.result || "").trim() || t("onboarding.error.apply"));
+  }
   if (expectProtocolCutover) {
     return;
   }
