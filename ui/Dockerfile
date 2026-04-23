@@ -7,7 +7,9 @@ RUN apk add --no-cache nodejs npm
 COPY go.mod go.sum ./
 COPY CHANGELOG.md README.md README.en.md ./
 COPY package.json package-lock.json ./
-COPY scripts ./scripts
+COPY scripts/check-docs-lockfile.js ./scripts/check-docs-lockfile.js
+COPY scripts/release.ps1 ./scripts/release.ps1
+COPY scripts/generate-release-artifacts.ps1 ./scripts/generate-release-artifacts.ps1
 COPY control-plane/internal/appmeta ./control-plane/internal/appmeta
 COPY docs ./docs
 COPY ui/app ./ui/app
