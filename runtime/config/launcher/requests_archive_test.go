@@ -141,7 +141,7 @@ func TestRequestArchiveFallsBackWhenClickHouseConfigIsMissing(t *testing.T) {
 		withRequestClickHouse(settingsPath, "pepper-for-tests"),
 	)
 
-	line := `{"timestamp":"2026-04-22T11:09:00Z","request_id":"req-1","client_ip":"1.1.1.1","method":"GET","uri":"/requests","status":200,"site":"localhost","host":"localhost","upstream_addr":"172.18.0.6:80"}`
+	line := `{"timestamp":"2026-04-22T11:09:00Z","request_id":"req-1","client_ip":"1.1.1.1","method":"GET","uri":"/catalog","status":200,"site":"localhost","host":"localhost","upstream_addr":"172.18.0.6:80"}`
 	if err := os.WriteFile(logPath, []byte(line+"\n"), 0o644); err != nil {
 		t.Fatalf("write log fixture: %v", err)
 	}

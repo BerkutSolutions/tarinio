@@ -1,33 +1,26 @@
-## [2.0.8] - 23.04.2026
+## [2.0.9] - 23.04.2026
 
-### Установка и обновление
-- Release-синхронизация доведена до `2.0.8`: версия продукта, UI и release metadata обновлены согласованно.
-- `install-aio.sh` и `install-aio-enterprise.sh` дополнительно упрощены в финальном footer-блоке, чтобы сценарий `curl | sh` не завершался ложным `[FAIL]` после успешно пройденного health gate.
-- Сохраняется безопасный upgrade-путь для существующих standalone-инсталляций: старые секреты не ротируются без необходимости, `POSTGRES_DSN` нормализуется под фактические текущие credentials.
+### Установка и релиз
+- Release-синхронизация доведена до `2.0.9`: версия продукта, UI, документации и release metadata обновлены согласованно.
+- Release summary в `CHANGELOG.md` сокращён и пересобран под актуальное состояние релиза без накопленного шума из промежуточных фиксов.
+- Добавлены лёгкие `scripts/push.ps1` и `scripts/push.sh` для обычного source push без полного release-контура с тегами и Docker publish.
 
-### Onboarding и первый apply
-- Onboarding standalone-контура уже включает исправленный порядок `ACME http-01`: первый `compile/apply`, затем выпуск сертификата, затем финальный TLS cutover.
-- Первый apply поверх bootstrap-runtime остаётся исправленным: relink корректно заменяет bootstrap-каталоги и больше не валит `/reload` на непустых директориях.
-- Во время onboarding после первого apply сохраняется доступность служебных admin-маршрутов (`/api/*`, `/login`, `/onboarding/*`, `/static/*`), чтобы браузер не упирался в `Failed to fetch`.
+### Anti-bot challenge
+- Easy anti-bot interstitial доведён до полноценного browser-redirect flow: после client-side проверки страница переводит браузер на verify endpoint обычным переходом, а не фоновым `fetch`.
+- Verify endpoint продолжает ставить site-scoped anti-bot cookie и возвращать пользователя на исходный URL, включая исходный path и query string.
+- Challenge page оформлена как полноценная status/interstitial страница с явным состоянием проверки и визуальным progress/spinner вместо пустого ответа на `/challenge`.
 
-### Импорт сервисов
-- Импорт `.env` и `.json` продолжает работать в staged-режиме без промежуточного auto-apply на каждом `POST/PUT`.
-- После завершения импорта выполняется один финальный `compile/apply`, поэтому импорт не создаёт каскад промежуточных ревизий и не шумит частично собранными конфигурациями.
-- Проверка существующих site/upstream/tls-ресурсов при импорте опирается на инвентарь списков, а не на серию лишних `404` probe-запросов.
+### Admin UI и ложные атаки
+- В runtime request archive больше не попадает служебный TARINIO admin-трафик с публичного admin host: служебные `/api/*`, `/static/*`, `favicon`, dashboard/menu routes и challenge-маршруты не раздувают пользовательскую request-статистику.
+- Генерация security events обновлена так, чтобы admin UI активность на публичном host не выглядела как атаки и блокировки по боевому сайту.
+- Dashboard backend перестал считать служебные TARINIO admin routes за пользовательские атаки и заблокированные запросы, даже если admin UI опубликован как обычный site вроде `waf.hantico.ru`.
+- Клиентская детализация dashboard синхронизирована с backend-логикой и теперь не показывает админские `/api/*`, `/static/*`, SPA routes и challenge endpoints как атакующие страницы/IP.
 
-### Anti-bot: ранее сделанные исправления
-- Easy anti-bot и rate-limit protection уже исключают служебные admin UI маршруты, чтобы залогиненный администратор не мог случайно заблокировать себе доступ статикой, SPA-route навигацией и частыми `/api/*` запросами.
-- Для admin host сохраняются bypass-правила по `waf_session` и `waf_session_boot`, чтобы anti-bot и easy access-guard не стреляли по самому control-plane.
+### Onboarding, импорт и совместимость
+- Standalone onboarding сохраняет исправленный порядок первого `compile/apply`, ACME `http-01` и финального TLS cutover.
+- Первый apply поверх bootstrap-runtime по-прежнему корректно заменяет bootstrap-каталоги и не падает на непустых директориях.
+- Импорт `.env` и `.json` остаётся staged: без промежуточного auto-apply на каждом `POST/PUT`, с одним финальным `compile/apply`.
 
-### Anti-bot: новые изменения в 2.0.8
-- Для easy anti-bot добавлен interstitial browser-check flow вместо жёсткого `403` на GET/HEAD-запросах без challenge-cookie.
-- Режим `javascript` теперь реально открывает challenge-страницу в стиле Cloudflare/Pastebin: страница выполняет client-side проверку, вызывает verify endpoint, получает site-scoped anti-bot cookie и возвращает пользователя на исходный URL.
-- Easy challenge routes расширены verify endpoint-ом, который завершает проверку, ставит cookie и делает redirect обратно на исходный путь.
-- Провайдерные режимы (`captcha`, `recaptcha`, `hcaptcha`, `turnstile`, `mcaptcha`) пока ведут через тот же interstitial/browser-check flow, а не через полноценную backend-валидацию внешнего challenge token.
-
-### Диагностика runtime
+### Диагностика
 - Ошибки `waf-runtime-l4-guard` продолжают подниматься с реальным stderr helper-а вместо одного только `exit status 1`.
-- Ошибки failed apply в onboarding уже показывают фактическую причину failed-job, а не общий `Initial apply failed`.
-
-### Документация
-- `CHANGELOG.md` очищен до компактного release-summary и теперь явно разделяет ранее внесённые anti-bot исправления и новый challenge interstitial flow.
+- Ошибки failed apply в onboarding по-прежнему показывают фактическую причину failed-job, а не общий `Initial apply failed`.

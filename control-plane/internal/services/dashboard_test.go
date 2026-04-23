@@ -253,3 +253,78 @@ func TestDashboardService_SkipsInternalManagementTraffic(t *testing.T) {
 		t.Fatalf("expected internal security events to be skipped, got %d", stats.AttacksDay)
 	}
 }
+
+func TestDashboardService_SkipsAdminAppTrafficOnPublicHost(t *testing.T) {
+	now := time.Now().UTC()
+	service := NewDashboardService(
+		&fakeDashboardEventReader{
+			items: []events.Event{
+				{
+					ID:         "evt-admin-host",
+					Type:       events.TypeSecurityAccess,
+					SiteID:     "waf_hantico_ru",
+					OccurredAt: now.Format(time.RFC3339),
+					Details: map[string]any{
+						"path":      "/api/events",
+						"host":      "waf.hantico.ru",
+						"status":    403,
+						"client_ip": "46.159.189.39",
+					},
+				},
+				{
+					ID:         "evt-site",
+					Type:       events.TypeSecurityAccess,
+					SiteID:     "shop_example_com",
+					OccurredAt: now.Format(time.RFC3339),
+					Details: map[string]any{
+						"path":      "/checkout",
+						"host":      "shop.example.com",
+						"status":    403,
+						"client_ip": "198.51.100.7",
+					},
+				},
+			},
+		},
+		&fakeDashboardRequestCollector{
+			items: []map[string]any{
+				{
+					"ingested_at": now.Format(time.RFC3339),
+					"entry": map[string]any{
+						"timestamp": now.Format(time.RFC3339),
+						"site":      "waf_hantico_ru",
+						"host":      "waf.hantico.ru",
+						"uri":       "/api/dashboard/stats",
+						"status":    200,
+						"client_ip": "46.159.189.39",
+					},
+				},
+				{
+					"ingested_at": now.Format(time.RFC3339),
+					"entry": map[string]any{
+						"timestamp": now.Format(time.RFC3339),
+						"site":      "shop_example_com",
+						"host":      "shop.example.com",
+						"uri":       "/checkout",
+						"status":    200,
+						"client_ip": "198.51.100.7",
+					},
+				},
+			},
+		},
+		&fakeDashboardRuntimeProbe{},
+	)
+
+	stats, err := service.Stats()
+	if err != nil {
+		t.Fatalf("stats failed: %v", err)
+	}
+	if stats.RequestsDay != 1 {
+		t.Fatalf("expected admin app requests on public host to be skipped, got %d", stats.RequestsDay)
+	}
+	if stats.AttacksDay != 1 {
+		t.Fatalf("expected only real site attack to remain, got %d", stats.AttacksDay)
+	}
+	if len(stats.TopAttackerIPs) == 0 || stats.TopAttackerIPs[0].Key != "198.51.100.7" {
+		t.Fatalf("expected admin host event to be skipped from attacker IPs, got %#v", stats.TopAttackerIPs)
+	}
+}

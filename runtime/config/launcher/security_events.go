@@ -20,6 +20,55 @@ import (
 
 var accessLogPattern = regexp.MustCompile(`^(\S+) \S+ \S+ \[([^\]]+)\] "([A-Z]+) ([^"]*?) HTTP/[^"]*" (\d{3}) (\S+) "([^"]*)" "([^"]*)" "([^"]*)"$`)
 
+var tarinioAdminExactPaths = []string{
+	"/",
+	"/login",
+	"/login/2fa",
+	"/challenge",
+	"/challenge/verify",
+}
+
+var tarinioAdminPrefixPaths = []string{
+	"/static/",
+	"/api/app/",
+	"/api/auth/",
+	"/api/dashboard/",
+	"/api/reports/",
+	"/api/sites",
+	"/api/upstreams",
+	"/api/certificates",
+	"/api/tls-configs",
+	"/api/easy-site-profiles",
+	"/api/access-policies",
+	"/api/requests",
+	"/api/revisions",
+	"/api/events",
+	"/api/bans",
+	"/api/jobs",
+	"/api/settings",
+	"/api/administration",
+}
+
+var tarinioAdminSegmentPrefixes = []string{
+	"/dashboard",
+	"/sites",
+	"/services",
+	"/anti-ddos",
+	"/tls",
+	"/requests",
+	"/revisions",
+	"/events",
+	"/bans",
+	"/jobs",
+	"/administration",
+	"/activity",
+	"/settings",
+	"/about",
+	"/profile",
+	"/healthcheck",
+	"/onboarding",
+}
+
 type securityEvent struct {
 	Type            string         `json:"type"`
 	Severity        string         `json:"severity"`
@@ -994,12 +1043,12 @@ func (s *requestStreamSource) indexesFromBackendsLocked(options requestQueryOpti
 		end = start + options.Limit
 	}
 	return map[string]any{
-		"items":        mergedItems[start:end],
-		"total":        len(mergedItems),
-		"limit":        options.Limit,
-		"offset":       options.Offset,
-		"archive_root": s.archiveRoot,
-		"storage_type": "tiered",
+		"items":             mergedItems[start:end],
+		"total":             len(mergedItems),
+		"limit":             options.Limit,
+		"offset":            options.Offset,
+		"archive_root":      s.archiveRoot,
+		"storage_type":      "tiered",
 		"last_ingest_error": s.lastIngestError,
 	}, true
 }
@@ -1136,34 +1185,35 @@ func (s *securityEventSource) next() ([]securityEvent, error) {
 		if !ok {
 			continue
 		}
-		if !shouldTrackRequestBurst(item) {
+		if shouldSkipInternalManagementRequest(item) {
 			continue
 		}
-
-		second := item.when.UTC().Format("2006-01-02T15:04:05Z")
-		scopeKey := burstScopeKey(item)
-		burstKey := item.ip + "|" + scopeKey + "|" + second
-		burstBySecond[burstKey]++
-		burstPath := normalizeBurstPath(item.path)
-		burstPathKey := item.ip + "|" + scopeKey + "|" + burstPath + "|" + second
-		burstBySecondAndPath[burstPathKey]++
-		if _, exists := burstMeta[burstKey]; !exists {
-			burstMeta[burstKey] = map[string]string{
-				"ip":      item.ip,
-				"ts":      second,
-				"site_id": item.siteID,
-				"host":    item.host,
-				"country": item.country,
+		if shouldTrackRequestBurst(item) {
+			second := item.when.UTC().Format("2006-01-02T15:04:05Z")
+			scopeKey := burstScopeKey(item)
+			burstKey := item.ip + "|" + scopeKey + "|" + second
+			burstBySecond[burstKey]++
+			burstPath := normalizeBurstPath(item.path)
+			burstPathKey := item.ip + "|" + scopeKey + "|" + burstPath + "|" + second
+			burstBySecondAndPath[burstPathKey]++
+			if _, exists := burstMeta[burstKey]; !exists {
+				burstMeta[burstKey] = map[string]string{
+					"ip":      item.ip,
+					"ts":      second,
+					"site_id": item.siteID,
+					"host":    item.host,
+					"country": item.country,
+				}
 			}
-		}
-		if _, exists := burstMeta[burstPathKey]; !exists {
-			burstMeta[burstPathKey] = map[string]string{
-				"ip":      item.ip,
-				"path":    burstPath,
-				"ts":      second,
-				"site_id": item.siteID,
-				"host":    item.host,
-				"country": item.country,
+			if _, exists := burstMeta[burstPathKey]; !exists {
+				burstMeta[burstPathKey] = map[string]string{
+					"ip":      item.ip,
+					"path":    burstPath,
+					"ts":      second,
+					"site_id": item.siteID,
+					"host":    item.host,
+					"country": item.country,
+				}
 			}
 		}
 
@@ -1429,11 +1479,40 @@ func shouldSkipInternalManagementRequest(item parsedAccess) bool {
 		return true
 	}
 	path := normalizeBurstPath(item.path)
-	if path == "" || !isInternalManagementPath(path) {
+	if path == "" {
+		return false
+	}
+	if isTarinioAdminAppPath(path) {
+		return true
+	}
+	if !isInternalManagementPath(path) {
 		return false
 	}
 	host := strings.ToLower(strings.TrimSpace(item.host))
 	return host == "" || isInternalManagementHost(host) || sanitizeSiteID(item.siteID) == ""
+}
+
+func isTarinioAdminAppPath(path string) bool {
+	canonical := normalizeBurstPath(path)
+	if canonical == "" {
+		return false
+	}
+	for _, exact := range tarinioAdminExactPaths {
+		if canonical == exact {
+			return true
+		}
+	}
+	for _, prefix := range tarinioAdminPrefixPaths {
+		if strings.HasPrefix(canonical, prefix) {
+			return true
+		}
+	}
+	for _, prefix := range tarinioAdminSegmentPrefixes {
+		if canonical == prefix || strings.HasPrefix(canonical, prefix+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 func isInternalManagementHost(host string) bool {

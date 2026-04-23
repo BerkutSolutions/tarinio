@@ -114,6 +114,55 @@ type processSample struct {
 	cpuJiffies uint64
 }
 
+var tarinioAdminExactPaths = []string{
+	"/",
+	"/login",
+	"/login/2fa",
+	"/challenge",
+	"/challenge/verify",
+}
+
+var tarinioAdminPrefixPaths = []string{
+	"/static/",
+	"/api/app/",
+	"/api/auth/",
+	"/api/dashboard/",
+	"/api/reports/",
+	"/api/sites",
+	"/api/upstreams",
+	"/api/certificates",
+	"/api/tls-configs",
+	"/api/easy-site-profiles",
+	"/api/access-policies",
+	"/api/requests",
+	"/api/revisions",
+	"/api/events",
+	"/api/bans",
+	"/api/jobs",
+	"/api/settings",
+	"/api/administration",
+}
+
+var tarinioAdminSegmentPrefixes = []string{
+	"/dashboard",
+	"/sites",
+	"/services",
+	"/anti-ddos",
+	"/tls",
+	"/requests",
+	"/revisions",
+	"/events",
+	"/bans",
+	"/jobs",
+	"/administration",
+	"/activity",
+	"/settings",
+	"/about",
+	"/profile",
+	"/healthcheck",
+	"/onboarding",
+}
+
 var cpuUsageState struct {
 	mu          sync.Mutex
 	lastSample  cpuTimesSample
@@ -452,11 +501,37 @@ func shouldSkipInternalRequest(uri string, siteID string, host string) bool {
 	if path == "" {
 		return false
 	}
+	if isTarinioAdminAppPath(path) {
+		return true
+	}
 	if !isInternalManagementPath(path) {
 		return false
 	}
 	host = strings.ToLower(strings.TrimSpace(host))
 	return host == "" || host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "control-plane" || host == "ui" || site == ""
+}
+
+func isTarinioAdminAppPath(path string) bool {
+	canonical := strings.ToLower(strings.TrimSpace(path))
+	if canonical == "" {
+		return false
+	}
+	for _, exact := range tarinioAdminExactPaths {
+		if canonical == exact {
+			return true
+		}
+	}
+	for _, prefix := range tarinioAdminPrefixPaths {
+		if strings.HasPrefix(canonical, prefix) {
+			return true
+		}
+	}
+	for _, prefix := range tarinioAdminSegmentPrefixes {
+		if canonical == prefix || strings.HasPrefix(canonical, prefix+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 func isInternalManagementPath(path string) bool {

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Security Check</title>
+  <title>Security Check In Progress</title>
   <style>
     :root {
       color-scheme: dark;
@@ -177,12 +177,12 @@
     <section class="hero">
       <div class="eyebrow"><span class="dot"></span><span>Security Check In Progress</span></div>
       <h1>Performing browser verification</h1>
-      <p class="sub">This site is protected by TARINIO anti-bot challenge mode. The verification runs automatically and sends you back to the requested page as soon as the challenge cookie is issued.</p>
+      <p class="sub">This site is protected by TARINIO anti-bot challenge mode. The check runs automatically, issues a site-scoped verification cookie, and returns you to the page you originally requested.</p>
     </section>
     <section class="body">
       <article class="status">
         <strong id="status-title">Preparing challenge</strong>
-        <div class="status-line"><span class="spinner" aria-hidden="true"></span><span id="status-text">Checking browser capabilities and setting the site-scoped anti-bot cookie.</span></div>
+        <div class="status-line"><span class="spinner" aria-hidden="true"></span><span id="status-text">Checking browser capabilities and preparing a short redirect through the verification endpoint.</span></div>
       </article>
       <section class="grid">
         <article class="tile">
@@ -263,24 +263,12 @@
         returnState.className = "hint-ok";
 
         statusTitle.textContent = "Issuing challenge cookie";
-        statusText.textContent = "The browser check passed. Completing verification and returning to the requested page.";
+        statusText.textContent = "The browser check passed. Redirecting through the verification endpoint and back to the requested page.";
 
         window.setTimeout(function () {
-          window.fetch(buildVerifyURL(target), {
-            method: "GET",
-            credentials: "same-origin",
-            cache: "no-store",
-            redirect: "follow"
-          }).then(function (response) {
-            if (!response.ok) {
-              throw new Error("Verification endpoint returned " + response.status);
-            }
-            cookieState.textContent = "Challenge cookie issued. Redirecting now.";
-            cookieState.className = "hint-ok";
-            window.location.replace(response.url || (target.uri + (target.args ? "?" + target.args : "")));
-          }).catch(function (error) {
-            reportFailure(error && error.message ? error.message : "The verification request failed.");
-          });
+          cookieState.textContent = "Challenge cookie will be issued during the redirect.";
+          cookieState.className = "hint-ok";
+          window.location.replace(buildVerifyURL(target));
         }, 1200);
       }
 

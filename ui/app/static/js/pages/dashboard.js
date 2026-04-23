@@ -207,6 +207,55 @@ function shouldSkipInternalSite(siteID) {
   return site === "control-plane-access" || site === "control-plane" || site === "ui";
 }
 
+const TARINIO_ADMIN_EXACT_PATHS = new Set([
+  "/",
+  "/login",
+  "/login/2fa",
+  "/challenge",
+  "/challenge/verify"
+]);
+
+const TARINIO_ADMIN_PREFIX_PATHS = [
+  "/static/",
+  "/api/app/",
+  "/api/auth/",
+  "/api/dashboard/",
+  "/api/reports/",
+  "/api/sites",
+  "/api/upstreams",
+  "/api/certificates",
+  "/api/tls-configs",
+  "/api/easy-site-profiles",
+  "/api/access-policies",
+  "/api/requests",
+  "/api/revisions",
+  "/api/events",
+  "/api/bans",
+  "/api/jobs",
+  "/api/settings",
+  "/api/administration"
+];
+
+const TARINIO_ADMIN_SEGMENT_PREFIXES = [
+  "/dashboard",
+  "/sites",
+  "/services",
+  "/anti-ddos",
+  "/tls",
+  "/requests",
+  "/revisions",
+  "/events",
+  "/bans",
+  "/jobs",
+  "/administration",
+  "/activity",
+  "/settings",
+  "/about",
+  "/profile",
+  "/healthcheck",
+  "/onboarding"
+];
+
 function isInternalManagementHost(host) {
   const value = String(host || "").trim().toLowerCase();
   return !value || value === "localhost" || value === "127.0.0.1" || value === "::1" || value === "control-plane" || value === "ui";
@@ -227,6 +276,20 @@ function isInternalManagementPath(path) {
     path.startsWith("/site.webmanifest");
 }
 
+function isTarinioAdminAppPath(path) {
+  const normalized = String(path || "").trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+  if (TARINIO_ADMIN_EXACT_PATHS.has(normalized)) {
+    return true;
+  }
+  if (TARINIO_ADMIN_PREFIX_PATHS.some((prefix) => normalized.startsWith(prefix))) {
+    return true;
+  }
+  return TARINIO_ADMIN_SEGMENT_PREFIXES.some((prefix) => normalized === prefix || normalized.startsWith(`${prefix}/`));
+}
+
 function shouldSkipInternalRequest(uri, siteID, host = "") {
   if (shouldSkipInternalSite(siteID)) {
     return true;
@@ -234,6 +297,9 @@ function shouldSkipInternalRequest(uri, siteID, host = "") {
   const path = String(uri || "").trim().toLowerCase();
   if (!path) {
     return false;
+  }
+  if (isTarinioAdminAppPath(path)) {
+    return true;
   }
   if (!isInternalManagementPath(path)) {
     return false;
@@ -635,7 +701,8 @@ function buildDetailModel(stats, requestRows, eventRows) {
     }
     const details = item?.details && typeof item.details === "object" ? item.details : {};
     const site = resolveSiteLabel(item?.site_id, details?.host);
-    if (shouldSkipInternalSite(site)) {
+    const path = String(details.path || details.uri || "-").trim() || "-";
+    if (shouldSkipInternalRequest(path, item?.site_id, details?.host)) {
       return;
     }
     const rawBlocked = details.blocked;
@@ -645,7 +712,6 @@ function buildDetailModel(stats, requestRows, eventRows) {
     eventAttackCount += 1;
 
     const ip = String(details.client_ip || details.ip || "").trim();
-    const path = String(details.path || details.uri || "-").trim() || "-";
     const status = parseStatus(details.status);
     const countryCode = normalizeCountryCode(details.country || details.client_country || details.country_code || details.geo_country);
 

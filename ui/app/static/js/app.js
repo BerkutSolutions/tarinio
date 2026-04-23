@@ -501,7 +501,7 @@ async function loadMeta() {
     }
     renderUpdateBadge(meta);
   } catch {
-    setVersion("v2.0.8");
+    setVersion("v2.0.9");
     renderUpdateBadge(null);
   }
 }
@@ -532,7 +532,7 @@ function startSessionPing() {
 
 async function bootstrap() {
   await applyTranslations(getLanguage());
-  setVersion("v2.0.8");
+  setVersion("v2.0.9");
 
   const access = await checkEntryAccess("app");
   if (!access.allowed) {

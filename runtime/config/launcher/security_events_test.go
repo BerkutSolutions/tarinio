@@ -93,6 +93,44 @@ func TestSecurityEventSourceDetectsDynamicBurst(t *testing.T) {
 	}
 }
 
+func TestSecurityEventSourceSkipsAdminAppTrafficOnPublicHost(t *testing.T) {
+	lines := []string{
+		mustMarshalAccessLogLine(t, map[string]any{
+			"timestamp":  "2026-04-23T11:21:00Z",
+			"client_ip":  "46.159.189.39",
+			"method":     "GET",
+			"uri":        "/api/events",
+			"status":     403,
+			"site":       "waf_hantico_ru",
+			"host":       "waf.hantico.ru",
+			"country":    "RU",
+			"user_agent": "Mozilla/5.0",
+		}),
+		mustMarshalAccessLogLine(t, map[string]any{
+			"timestamp":  "2026-04-23T11:21:00Z",
+			"client_ip":  "198.51.100.7",
+			"method":     "GET",
+			"uri":        "/checkout",
+			"status":     403,
+			"site":       "shop_example_com",
+			"host":       "shop.example.com",
+			"country":    "DE",
+			"user_agent": "Mozilla/5.0",
+		}),
+	}
+
+	events := readSecurityEventsFromLines(t, lines)
+	if len(events) != 1 {
+		t.Fatalf("expected only non-admin security event to remain, got %+v", events)
+	}
+	if got := events[0].Summary; got != "access blocked" {
+		t.Fatalf("expected surviving event to be access blocked, got %q", got)
+	}
+	if got := events[0].Details["path"]; got != "/checkout" {
+		t.Fatalf("expected surviving event path to be /checkout, got %#v", got)
+	}
+}
+
 func readSecurityEventsFromLines(t *testing.T, lines []string) []securityEvent {
 	t.Helper()
 	root := t.TempDir()
