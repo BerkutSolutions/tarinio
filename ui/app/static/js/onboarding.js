@@ -191,7 +191,8 @@ async function ensureFirstInitEasyProfileTemplate(site, upstream, tlsMode, acmeA
   return api.put(endpoint, next, onboardingNoAutoApplyOptions);
 }
 
-async function compileAndApplyRevision() {
+async function compileAndApplyRevision(options = {}) {
+  const expectProtocolCutover = Boolean(options.expectProtocolCutover);
   setLoading(document.getElementById("onboarding-feedback"), t("onboarding.apply.loading"));
   const compileResponse = await api.post("/api/revisions/compile", {}, onboardingNoAutoApplyOptions);
   const revisionID = String(compileResponse?.revision?.id || "").trim();
@@ -200,6 +201,9 @@ async function compileAndApplyRevision() {
   }
   setLoading(document.getElementById("onboarding-feedback"), t("onboarding.apply.loading"));
   await api.post(`/api/revisions/${encodeURIComponent(revisionID)}/apply`, {});
+  if (expectProtocolCutover) {
+    return;
+  }
   state.setup = await loadSetupStatus();
   if (!state.setup?.has_active_revision) {
     throw new Error(t("onboarding.error.apply"));
@@ -625,7 +629,7 @@ async function ensureSiteAndTLS() {
     }
   }
 
-  await compileAndApplyRevision();
+  await compileAndApplyRevision({ expectProtocolCutover: true });
 }
 
 async function runApply() {
