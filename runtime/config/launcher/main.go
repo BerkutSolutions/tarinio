@@ -822,11 +822,14 @@ func relink(target, linkPath string) error {
 	}
 
 	tempLink := linkPath + ".tmp"
-	_ = os.Remove(tempLink)
-	_ = os.Remove(linkPath)
+	_ = os.RemoveAll(tempLink)
 
 	if err := os.Symlink(target, tempLink); err != nil {
 		return fmt.Errorf("create symlink %s -> %s: %w", linkPath, target, err)
+	}
+	if err := os.RemoveAll(linkPath); err != nil {
+		_ = os.Remove(tempLink)
+		return fmt.Errorf("remove existing path %s: %w", linkPath, err)
 	}
 	if err := os.Rename(tempLink, linkPath); err != nil {
 		_ = os.Remove(tempLink)

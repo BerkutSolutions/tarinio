@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -37,7 +38,12 @@ func (e HTTPReloadExecutor) Run(name string, args []string, workdir string) erro
 
 	if resp.StatusCode != http.StatusNoContent {
 		telemetry.Default().RecordRuntimeReload("runtime", "failed")
-		return fmt.Errorf("runtime reload endpoint returned %d", resp.StatusCode)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		message := strings.TrimSpace(string(body))
+		if message == "" {
+			return fmt.Errorf("runtime reload endpoint returned %d", resp.StatusCode)
+		}
+		return fmt.Errorf("runtime reload endpoint returned %d: %s", resp.StatusCode, message)
 	}
 	telemetry.Default().RecordRuntimeReload("runtime", "succeeded")
 	return nil

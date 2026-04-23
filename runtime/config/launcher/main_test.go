@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -98,6 +99,47 @@ func TestWriteBootstrapNginxConfig(t *testing.T) {
 	}
 	if strings.Contains(text, "listen 443") {
 		t.Fatalf("bootstrap config must not expose 443 before first apply: %s", text)
+	}
+}
+
+func TestRelinkReplacesPopulatedDirectory(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation requires elevated privileges on Windows test environments")
+	}
+	root := t.TempDir()
+	target := filepath.Join(root, "candidate", "nginx", "conf.d")
+	if err := os.MkdirAll(target, 0o755); err != nil {
+		t.Fatalf("mkdir target failed: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(target, "site.conf"), []byte("server {}"), 0o644); err != nil {
+		t.Fatalf("write target file failed: %v", err)
+	}
+
+	linkPath := filepath.Join(root, "runtime", "conf.d")
+	if err := os.MkdirAll(linkPath, 0o755); err != nil {
+		t.Fatalf("mkdir existing link path failed: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(linkPath, "bootstrap.conf"), []byte("bootstrap"), 0o644); err != nil {
+		t.Fatalf("write bootstrap file failed: %v", err)
+	}
+
+	if err := relink(target, linkPath); err != nil {
+		t.Fatalf("relink failed: %v", err)
+	}
+
+	info, err := os.Lstat(linkPath)
+	if err != nil {
+		t.Fatalf("stat relinked path failed: %v", err)
+	}
+	if info.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("expected symlink, got mode %v", info.Mode())
+	}
+	resolved, err := os.Readlink(linkPath)
+	if err != nil {
+		t.Fatalf("readlink failed: %v", err)
+	}
+	if resolved != target {
+		t.Fatalf("expected symlink target %s, got %s", target, resolved)
 	}
 }
 
