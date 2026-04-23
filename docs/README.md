@@ -1,8 +1,8 @@
 # Documentation
 
-Version baseline: `2.0.6`
+Version baseline: `2.0.7`
 
-This directory is the release-synced documentation set for TARINIO `2.0.6`.
+This directory is the release-synced documentation set for TARINIO `2.0.7`.
 The Russian and English branches are intended to mirror the same product map and complement each other as one bilingual wiki: UI sections, workflows, API catalog, deployment, security, backups, upgrades, and operator runbooks.
 
 ## Main Entry Points

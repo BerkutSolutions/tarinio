@@ -9,7 +9,7 @@ export default function Home() {
       description="Enterprise-grade self-hosted WAF platform documentation">
       <main className="hero-page">
         <section className="hero-panel">
-          <p className="eyebrow">TARINIO 2.0.6</p>
+          <p className="eyebrow">TARINIO 2.0.7</p>
           <h1>Документация TARINIO</h1>
           <p className="hero-copy">
             Единый портал по развёртыванию, ежедневной эксплуатации, обновлениям, HA, PostgreSQL,

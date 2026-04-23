@@ -844,10 +844,16 @@ func applyL4Guard() error {
 		return nil
 	}
 	cmd := exec.Command("/usr/local/bin/waf-runtime-l4-guard", "bootstrap")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		details := strings.TrimSpace(string(output))
+		if details != "" {
+			return fmt.Errorf("apply l4 guard: %w: %s", err, details)
+		}
 		return fmt.Errorf("apply l4 guard: %w", err)
+	}
+	if len(output) > 0 {
+		_, _ = os.Stdout.Write(output)
 	}
 	return nil
 }

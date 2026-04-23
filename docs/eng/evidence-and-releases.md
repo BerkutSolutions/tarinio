@@ -2,11 +2,11 @@
 
 This page belongs to the current documentation branch.
 
-This document describes the evidence-grade controls implemented in TARINIO `2.0.6`: audit chaining, revision signatures, support bundles, and release artifacts.
+This document describes the evidence-grade controls implemented in TARINIO `2.0.7`: audit chaining, revision signatures, support bundles, and release artifacts.
 
 ## What Is Implemented
 
-TARINIO `2.0.6` provides:
+TARINIO `2.0.7` provides:
 
 - tamper-evident audit chaining
 - revision manifest signatures

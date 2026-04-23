@@ -1397,15 +1397,77 @@ function diffObjects(previous, next, path = "") {
   return lines;
 }
 
-async function applyImportPayload(ctx, payload) {
+const importNoAutoApplyOptions = {
+  headers: {
+    "X-WAF-Auto-Apply-Disabled": "1"
+  }
+};
+
+function buildImportInventory(resources = {}) {
+  const sitesByID = new Map();
+  const upstreamsByID = new Map();
+  const tlsConfigsBySiteID = new Map();
+  for (const item of normalizeArray(resources.sites)) {
+    const id = normalizeSiteID(item?.id);
+    if (id) {
+      sitesByID.set(id, item);
+    }
+  }
+  for (const item of normalizeArray(resources.upstreams)) {
+    const id = normalizeSiteID(item?.id);
+    if (id) {
+      upstreamsByID.set(id, item);
+    }
+  }
+  for (const item of normalizeArray(resources.tlsConfigs)) {
+    const siteID = normalizeSiteID(item?.site_id);
+    if (siteID) {
+      tlsConfigsBySiteID.set(siteID, item);
+    }
+  }
+  return { sitesByID, upstreamsByID, tlsConfigsBySiteID };
+}
+
+async function loadImportInventory(ctx) {
+  const [sites, upstreams, tlsConfigs] = await Promise.all([
+    ctx.api.get("/api/sites").catch(() => []),
+    ctx.api.get("/api/upstreams").catch(() => []),
+    ctx.api.get("/api/tls-configs").catch(() => [])
+  ]);
+  return buildImportInventory({ sites, upstreams, tlsConfigs });
+}
+
+async function compileAndApplyImportedRevision(ctx) {
+  const compileResponse = await ctx.api.post("/api/revisions/compile", {}, importNoAutoApplyOptions);
+  const revisionID = String(compileResponse?.revision?.id || "").trim();
+  if (!revisionID) {
+    throw new Error("Import compile failed");
+  }
+  const applyResponse = await ctx.api.post(`/api/revisions/${encodeURIComponent(revisionID)}/apply`, {});
+  if (String(applyResponse?.status || "").trim().toLowerCase() === "failed") {
+    throw new Error(String(applyResponse?.result || "").trim() || "Import apply failed");
+  }
+  return revisionID;
+}
+
+async function applyImportPayload(ctx, payload, inventory = null) {
   const { draft, site, upstream, tls, easyProfile } = payload;
-  const existingSite = await ctx.api.get(`/api/sites/${encodeURIComponent(site.id)}`).catch((error) => (error?.status === 404 ? null : Promise.reject(error)));
-  const existingUpstream = await ctx.api.get(`/api/upstreams/${encodeURIComponent(upstream.id)}`).catch((error) => (error?.status === 404 ? null : Promise.reject(error)));
-  const existingTLSConfig = await ctx.api.get(`/api/tls-configs/${encodeURIComponent(site.id)}`).catch((error) => (error?.status === 404 ? null : Promise.reject(error)));
+  const existingSite = inventory?.sitesByID?.get(normalizeSiteID(site.id)) || null;
+  const existingUpstream = inventory?.upstreamsByID?.get(normalizeSiteID(upstream.id)) || null;
+  const existingTLSConfig = inventory?.tlsConfigsBySiteID?.get(normalizeSiteID(site.id)) || null;
   const existingEasy = await ctx.api.get(`/api/easy-site-profiles/${encodeURIComponent(site.id)}`).catch((error) => (error?.status === 404 ? null : Promise.reject(error)));
 
-  await upsertSiteResources(draft, ctx, existingSite, existingUpstream, existingTLSConfig);
-  await putWithPostFallback(ctx, `/api/easy-site-profiles/${encodeURIComponent(site.id)}`, easyProfile);
+  await upsertSiteResources(draft, ctx, existingSite, existingUpstream, existingTLSConfig, { requestOptions: importNoAutoApplyOptions });
+  await putWithPostFallback(ctx, `/api/easy-site-profiles/${encodeURIComponent(site.id)}`, easyProfile, { requestOptions: importNoAutoApplyOptions });
+  if (inventory) {
+    inventory.sitesByID.set(normalizeSiteID(site.id), site);
+    inventory.upstreamsByID.set(normalizeSiteID(upstream.id), upstream);
+    if (tls) {
+      inventory.tlsConfigsBySiteID.set(normalizeSiteID(site.id), tls);
+    } else {
+      inventory.tlsConfigsBySiteID.delete(normalizeSiteID(site.id));
+    }
+  }
 
   const diffLines = [];
   if (existingSite) {
@@ -1433,11 +1495,11 @@ async function importServicesJSON(file, ctx) {
   const upstreams = normalizeArray(payload.upstreams);
   for (const site of sites) {
     try {
-      await ctx.api.post("/api/sites", site);
+      await ctx.api.post("/api/sites", site, importNoAutoApplyOptions);
     } catch (error) {
       const message = String(error?.payload?.error || "");
       if (message.includes("already exists")) {
-        await ctx.api.put(`/api/sites/${encodeURIComponent(site.id)}`, site);
+        await ctx.api.put(`/api/sites/${encodeURIComponent(site.id)}`, site, importNoAutoApplyOptions);
       } else {
         throw error;
       }
@@ -1445,11 +1507,11 @@ async function importServicesJSON(file, ctx) {
   }
   for (const upstream of upstreams) {
     try {
-      await ctx.api.post("/api/upstreams", upstream);
+      await ctx.api.post("/api/upstreams", upstream, importNoAutoApplyOptions);
     } catch (error) {
       const message = String(error?.payload?.error || "");
       if (message.includes("already exists")) {
-        await ctx.api.put(`/api/upstreams/${encodeURIComponent(upstream.id)}`, upstream);
+        await ctx.api.put(`/api/upstreams/${encodeURIComponent(upstream.id)}`, upstream, importNoAutoApplyOptions);
       } else {
         throw error;
       }
@@ -2373,7 +2435,8 @@ function isAlreadyExistsError(error) {
   return (error?.status === 400 || error?.status === 409) && message.includes("already exists");
 }
 
-async function upsertSiteResources(draft, ctx, existingSite, existingUpstream, existingTLSConfig) {
+async function upsertSiteResources(draft, ctx, existingSite, existingUpstream, existingTLSConfig, options = {}) {
+  const requestOptions = options?.requestOptions || {};
   const sitePayload = {
     id: draft.id.trim().toLowerCase(),
     primary_host: draft.primary_host.trim().toLowerCase(),
@@ -2405,7 +2468,7 @@ async function upsertSiteResources(draft, ctx, existingSite, existingUpstream, e
   const isNotFound = (error) => error?.status === 404;
   const deleteIgnoreNotFound = async (path) => {
     try {
-      await ctx.api.delete(path);
+      await ctx.api.delete(path, requestOptions);
     } catch (error) {
       if (!isNotFound(error)) {
         throw error;
@@ -2413,15 +2476,15 @@ async function upsertSiteResources(draft, ctx, existingSite, existingUpstream, e
     }
   };
   const siteExists = async (siteID) => {
-    const sites = await ctx.api.get("/api/sites");
+    const sites = await ctx.api.get("/api/sites", requestOptions);
     return Array.isArray(sites) && sites.some((site) => normalizeSiteID(site?.id) === normalizeSiteID(siteID));
   };
   const upstreamExists = async (upstreamID) => {
-    const upstreams = await ctx.api.get("/api/upstreams");
+    const upstreams = await ctx.api.get("/api/upstreams", requestOptions);
     return Array.isArray(upstreams) && upstreams.some((upstream) => normalizeSiteID(upstream?.id) === normalizeSiteID(upstreamID));
   };
   const tlsConfigMatches = async (siteID, certificateID) => {
-    const tlsConfigs = await ctx.api.get("/api/tls-configs");
+    const tlsConfigs = await ctx.api.get("/api/tls-configs", requestOptions);
     if (!Array.isArray(tlsConfigs)) {
       return false;
     }
@@ -2430,18 +2493,18 @@ async function upsertSiteResources(draft, ctx, existingSite, existingUpstream, e
       String(item?.certificate_id || "").trim().toLowerCase() === String(certificateID || "").trim().toLowerCase());
   };
   const certificateExists = async (certificateID) => {
-    const certificates = await ctx.api.get("/api/certificates");
+    const certificates = await ctx.api.get("/api/certificates", requestOptions);
     return Array.isArray(certificates) && certificates.some((certificate) => String(certificate?.id || "").toLowerCase() === String(certificateID || "").toLowerCase());
   };
 
   try {
     if (existingSite) {
       try {
-        await ctx.api.put(`/api/sites/${encodeURIComponent(sitePayload.id)}`, sitePayload);
+        await ctx.api.put(`/api/sites/${encodeURIComponent(sitePayload.id)}`, sitePayload, requestOptions);
       } catch (error) {
         if (error?.status === 404) {
           try {
-            await ctx.api.post("/api/sites", sitePayload);
+            await ctx.api.post("/api/sites", sitePayload, requestOptions);
           } catch (postError) {
             if (!isAutoApplyFailureError(postError)) {
               throw postError;
@@ -2463,11 +2526,11 @@ async function upsertSiteResources(draft, ctx, existingSite, existingUpstream, e
     } else {
       let createdSite = false;
       try {
-        await ctx.api.post("/api/sites", sitePayload);
+        await ctx.api.post("/api/sites", sitePayload, requestOptions);
         createdSite = true;
       } catch (error) {
         if (isAlreadyExistsError(error)) {
-          await ctx.api.put(`/api/sites/${encodeURIComponent(sitePayload.id)}`, sitePayload);
+          await ctx.api.put(`/api/sites/${encodeURIComponent(sitePayload.id)}`, sitePayload, requestOptions);
           createdSite = false;
         } else if (!isAutoApplyFailureError(error)) {
           throw error;
@@ -2485,11 +2548,11 @@ async function upsertSiteResources(draft, ctx, existingSite, existingUpstream, e
 
     if (existingUpstream) {
       try {
-        await ctx.api.put(`/api/upstreams/${encodeURIComponent(upstreamPayload.id)}`, upstreamPayload);
+        await ctx.api.put(`/api/upstreams/${encodeURIComponent(upstreamPayload.id)}`, upstreamPayload, requestOptions);
       } catch (error) {
         if (error?.status === 404) {
           try {
-            await ctx.api.post("/api/upstreams", upstreamPayload);
+            await ctx.api.post("/api/upstreams", upstreamPayload, requestOptions);
           } catch (postError) {
             if (!isAutoApplyFailureError(postError)) {
               throw postError;
@@ -2511,11 +2574,11 @@ async function upsertSiteResources(draft, ctx, existingSite, existingUpstream, e
     } else {
       let createdUpstream = false;
       try {
-        await ctx.api.post("/api/upstreams", upstreamPayload);
+        await ctx.api.post("/api/upstreams", upstreamPayload, requestOptions);
         createdUpstream = true;
       } catch (error) {
         if (isAlreadyExistsError(error)) {
-          await ctx.api.put(`/api/upstreams/${encodeURIComponent(upstreamPayload.id)}`, upstreamPayload);
+          await ctx.api.put(`/api/upstreams/${encodeURIComponent(upstreamPayload.id)}`, upstreamPayload, requestOptions);
           createdUpstream = false;
         } else if (isAutoApplyFailureError(error)) {
           createdUpstream = await upstreamExists(upstreamPayload.id);
@@ -2554,7 +2617,7 @@ async function upsertSiteResources(draft, ctx, existingSite, existingUpstream, e
             certificate_authority_server: draft.certificate_authority_server,
             use_lets_encrypt_staging: Boolean(draft.use_lets_encrypt_staging),
             account_email: acmeAccountEmail
-          });
+          }, requestOptions);
         } catch (error) {
           if (!isAlreadyExistsError(error)) {
             throw error;
@@ -2567,11 +2630,11 @@ async function upsertSiteResources(draft, ctx, existingSite, existingUpstream, e
       const tlsPayload = { site_id: sitePayload.id, certificate_id: certificateID };
       if (existingTLSConfig) {
         try {
-          await ctx.api.put(`/api/tls-configs/${encodeURIComponent(sitePayload.id)}`, tlsPayload);
+          await ctx.api.put(`/api/tls-configs/${encodeURIComponent(sitePayload.id)}`, tlsPayload, requestOptions);
         } catch (error) {
           if (error?.status === 404) {
             try {
-              await ctx.api.post("/api/tls-configs", tlsPayload);
+              await ctx.api.post("/api/tls-configs", tlsPayload, requestOptions);
             } catch (postError) {
               if (!isAutoApplyFailureError(postError)) {
                 throw postError;
@@ -2592,12 +2655,12 @@ async function upsertSiteResources(draft, ctx, existingSite, existingUpstream, e
         }
       } else {
         try {
-          await ctx.api.post("/api/tls-configs", tlsPayload);
+          await ctx.api.post("/api/tls-configs", tlsPayload, requestOptions);
         } catch (error) {
           const message = String(error?.message || "").toLowerCase();
           const hasConflict = error?.status === 409 || message.includes("already exists");
           if (hasConflict) {
-            await ctx.api.put(`/api/tls-configs/${encodeURIComponent(sitePayload.id)}`, tlsPayload);
+            await ctx.api.put(`/api/tls-configs/${encodeURIComponent(sitePayload.id)}`, tlsPayload, requestOptions);
           } else if (isAutoApplyFailureError(error)) {
             const persisted = await tlsConfigMatches(sitePayload.id, certificateID);
             if (!persisted) {
@@ -2736,8 +2799,9 @@ async function deleteServiceWithResources(siteID, ctx, snapshot = null) {
 async function putWithPostFallback(ctx, path, payload, options = {}) {
   const tolerateAutoApplyError = Boolean(options?.tolerateAutoApplyError);
   const verifyPersisted = typeof options?.verifyPersisted === "function" ? options.verifyPersisted : null;
+  const requestOptions = options?.requestOptions || {};
   try {
-    await ctx.api.post(path, payload);
+    await ctx.api.post(path, payload, requestOptions);
     return;
   } catch (postError) {
     if (tolerateAutoApplyError && isAutoApplyFailureError(postError) && verifyPersisted) {
@@ -2751,7 +2815,7 @@ async function putWithPostFallback(ctx, path, payload, options = {}) {
     }
   }
   try {
-    await ctx.api.put(path, payload);
+    await ctx.api.put(path, payload, requestOptions);
   } catch (putError) {
     if (tolerateAutoApplyError && isAutoApplyFailureError(putError) && verifyPersisted) {
       const persisted = await verifyPersisted();
@@ -2850,6 +2914,7 @@ async function exportSelectedServicesEnv(ctx, sites, upstreamsBySite, tlsBySite,
 
 async function importServicesFiles(files, ctx) {
   const results = [];
+  let importInventory = null;
   for (const file of files) {
     const name = String(file?.name || "").toLowerCase();
     if (name.endsWith(".json")) {
@@ -2865,8 +2930,11 @@ async function importServicesFiles(files, ctx) {
       if (validationError) {
         throw new Error(`${file.name}: ${validationError}`);
       }
+      if (!importInventory) {
+        importInventory = await loadImportInventory(ctx);
+      }
       const payload = buildImportPayloadFromDraft(draft);
-      const applied = await applyImportPayload(ctx, payload);
+      const applied = await applyImportPayload(ctx, payload, importInventory);
       results.push({
         file: file.name,
         kind: "env",
@@ -2877,6 +2945,9 @@ async function importServicesFiles(files, ctx) {
       continue;
     }
     throw new Error(`${file.name}: unsupported extension`);
+  }
+  if (results.length) {
+    await compileAndApplyImportedRevision(ctx);
   }
   return results;
 }
