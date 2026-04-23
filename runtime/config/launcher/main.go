@@ -716,10 +716,24 @@ func resolveCandidatePath(runtimeRoot, candidatePath string) (string, error) {
 	if candidatePath == "" {
 		return "", errors.New("candidate path is required")
 	}
-	if filepath.IsAbs(candidatePath) {
+	if filepath.IsAbs(candidatePath) || isWindowsAbsPath(candidatePath) {
 		return candidatePath, nil
 	}
 	return filepath.Join(runtimeRoot, filepath.FromSlash(candidatePath)), nil
+}
+
+func isWindowsAbsPath(path string) bool {
+	if len(path) < 3 {
+		return false
+	}
+	drive := path[0]
+	if !((drive >= 'A' && drive <= 'Z') || (drive >= 'a' && drive <= 'z')) {
+		return false
+	}
+	if path[1] != ':' {
+		return false
+	}
+	return path[2] == '\\' || path[2] == '/'
 }
 
 func validateCandidateBundle(candidatePath string) error {

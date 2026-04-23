@@ -83,7 +83,17 @@ func (r RuntimeSyntaxRunner) Validate(bundle *RevisionBundle) error {
 		return run()
 	}
 
+	// CI and developer environments often execute tests as non-root, where
+	// creating /etc/waf symlinks is forbidden. In that case we still run nginx
+	// syntax validation against the materialized bundle root.
+	if os.Geteuid() != 0 {
+		return run()
+	}
+
 	if err := withTemporaryEtcWAF(bundleRoot, run); err != nil {
+		if errors.Is(err, os.ErrPermission) || strings.Contains(strings.ToLower(err.Error()), "permission denied") {
+			return run()
+		}
 		return err
 	}
 
