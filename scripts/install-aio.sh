@@ -14,6 +14,8 @@ BACKUP_MAX_TOTAL_MB="${BACKUP_MAX_TOTAL_MB:-1024}"
 BACKUP_MAX_VOLUME_MB="${BACKUP_MAX_VOLUME_MB:-512}"
 BACKUP_HELPER_IMAGE="${BACKUP_HELPER_IMAGE:-busybox:1.36}"
 RUN_STRICT_POST_UPGRADE_VALIDATION="${RUN_STRICT_POST_UPGRADE_VALIDATION:-0}"
+CONTAINER_PROBE_ATTEMPTS="${CONTAINER_PROBE_ATTEMPTS:-120}"
+HOST_PROBE_ATTEMPTS="${HOST_PROBE_ATTEMPTS:-90}"
 FAILED=0
 
 if [ -t 1 ]; then
@@ -514,11 +516,11 @@ ok "status collected"
 
 section "Post-Upgrade Health Gate"
 step "Probing control-plane health endpoint"
-probe_container_http control-plane "http://127.0.0.1:8080/healthz" 45
+probe_container_http control-plane "http://127.0.0.1:8080/healthz" "$CONTAINER_PROBE_ATTEMPTS"
 step "Probing runtime health endpoint"
-probe_container_http runtime "http://127.0.0.1:8081/healthz" 45
+probe_container_http runtime "http://127.0.0.1:8081/healthz" "$CONTAINER_PROBE_ATTEMPTS"
 step "Probing public runtime gateway route"
-probe_host_http "http://127.0.0.1/" 45
+probe_host_http "http://127.0.0.1/" "$HOST_PROBE_ATTEMPTS"
 ok "post-upgrade health gate passed"
 
 if [ "$RUN_STRICT_POST_UPGRADE_VALIDATION" = "1" ] || [ "$RUN_STRICT_POST_UPGRADE_VALIDATION" = "true" ]; then
