@@ -99,10 +99,6 @@ export async function renderSettings(container, ctx) {
   let storageIndexesOffset = 0;
   const storageIndexesLimit = 10;
   let storageIndexesStream = "requests";
-  const loginRateLimitHint = String(ctx.t("settings.security.loginRateLimit.hint") || "").trim();
-  const vaultTlsHint = String(ctx.t("settings.security.vaultTls.hint") || "").trim();
-  const hasLoginRateLimitHint = loginRateLimitHint && loginRateLimitHint !== "__HIDE__";
-  const hasVaultTLSHint = vaultTlsHint && vaultTlsHint !== "__HIDE__";
   const tabs = availableTabs(ctx);
   const currentTab = tabs.find((tab) => tab.id === activeTabFromPath()) || tabs[0] || SETTINGS_TABS.find((tab) => tab.id === "about");
   if (!currentTab) {
@@ -236,7 +232,6 @@ export async function renderSettings(container, ctx) {
               <div class="waf-list-head">
                 <div class="waf-list-title">${escapeHtml(ctx.t("settings.security.loginRateLimit.title"))}</div>
               </div>
-              ${hasLoginRateLimitHint ? `<div class="waf-note">${escapeHtml(loginRateLimitHint)}</div>` : ""}
               <label class="waf-checkbox" for="settings-security-login-rate-enabled">
                 <input type="checkbox" id="settings-security-login-rate-enabled" checked>
                 <span>${escapeHtml(ctx.t("settings.security.loginRateLimit.enabled"))}</span>
@@ -261,7 +256,6 @@ export async function renderSettings(container, ctx) {
               <div class="waf-list-head">
                 <div class="waf-list-title">${escapeHtml(ctx.t("settings.security.vaultTls.title"))}</div>
               </div>
-              ${hasVaultTLSHint ? `<div class="waf-note">${escapeHtml(vaultTlsHint)}</div>` : ""}
               <label class="waf-checkbox" for="settings-security-allow-insecure-vault-tls">
                 <input type="checkbox" id="settings-security-allow-insecure-vault-tls">
                 <span>${escapeHtml(ctx.t("settings.security.vaultTls.allowInsecure"))}</span>
