@@ -16,6 +16,7 @@ BACKUP_HELPER_IMAGE="${BACKUP_HELPER_IMAGE:-busybox:1.36}"
 RUN_STRICT_POST_UPGRADE_VALIDATION="${RUN_STRICT_POST_UPGRADE_VALIDATION:-0}"
 CONTAINER_PROBE_ATTEMPTS="${CONTAINER_PROBE_ATTEMPTS:-45}"
 HOST_PROBE_ATTEMPTS="${HOST_PROBE_ATTEMPTS:-45}"
+ENV_CREATED=0
 FAILED=0
 
 if [ -t 1 ]; then
@@ -179,25 +180,25 @@ ensure_secure_env_defaults() {
     write_env_value POSTGRES_DB "$postgres_db"
     changed=1
   fi
-  if is_placeholder_secret "$postgres_password"; then
+  if [ "$ENV_CREATED" -eq 1 ] && is_placeholder_secret "$postgres_password"; then
     postgres_password="$(generate_secret 40)"
     write_env_value POSTGRES_PASSWORD "$postgres_password"
     changed=1
     ok "generated secure POSTGRES_PASSWORD"
   fi
-  if [ "$needs_clickhouse" -eq 1 ] && is_placeholder_secret "$clickhouse_password"; then
+  if [ "$needs_clickhouse" -eq 1 ] && [ "$ENV_CREATED" -eq 1 ] && is_placeholder_secret "$clickhouse_password"; then
     clickhouse_password="$(generate_secret 40)"
     write_env_value CLICKHOUSE_PASSWORD "$clickhouse_password"
     changed=1
     ok "generated secure CLICKHOUSE_PASSWORD"
   fi
-  if is_placeholder_secret "$opensearch_password"; then
+  if [ "$ENV_CREATED" -eq 1 ] && is_placeholder_secret "$opensearch_password"; then
     opensearch_password="$(generate_secret 40)"
     write_env_value OPENSEARCH_PASSWORD "$opensearch_password"
     changed=1
     ok "generated secure OPENSEARCH_PASSWORD"
   fi
-  if is_placeholder_secret "$security_pepper"; then
+  if [ "$ENV_CREATED" -eq 1 ] && is_placeholder_secret "$security_pepper"; then
     security_pepper="$(generate_secret 64)"
     write_env_value CONTROL_PLANE_SECURITY_PEPPER "$security_pepper"
     changed=1
@@ -577,6 +578,7 @@ ok "selected profile: $PROFILE"
 if [ ! -f .env ]; then
   step "Creating .env from .env.example"
   cp .env.example .env
+  ENV_CREATED=1
   ok ".env created"
 else
   ok ".env already exists"
