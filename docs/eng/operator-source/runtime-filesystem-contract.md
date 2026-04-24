@@ -1,4 +1,4 @@
-# Runtime Filesystem Contract
+﻿# Runtime Filesystem Contract
 
 Status: Stage 1 runtime contract for `S1-17`
 
@@ -115,11 +115,12 @@ Runtime does not own:
 
 ## Resulting Rule
 
-For the shared runtime-root contract used by both the single-node baseline and the HA control-plane topology:
+For the shared runtime-root contract used by both the single-node baseline and the High Availability control-plane topology:
 - `active/current.json` is authoritative
 - `/etc/waf/current` is derived
 - bundle-relative paths stay stable from compiler through runtime
 - identical artifacts must keep identical relative paths at every stage
+
 
 
 

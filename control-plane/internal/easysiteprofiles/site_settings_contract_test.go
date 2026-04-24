@@ -15,6 +15,7 @@ func TestSiteSettings_FieldContract(t *testing.T) {
 	want := []string{
 		"created_at",
 		"front_service.acme_account_email",
+		"front_service.adaptive_model_enabled",
 		"front_service.auto_lets_encrypt",
 		"front_service.certificate_authority_server",
 		"front_service.security_mode",

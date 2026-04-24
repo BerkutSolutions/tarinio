@@ -1,4 +1,4 @@
-# Let's Encrypt DNS-01 Operations
+﻿# Let's Encrypt DNS-01 Operations
 
 This document describes the DNS-01 certificate issuance flow and the operational checks around it.
 
@@ -41,6 +41,7 @@ DNS-01:
 
 ## Related Documents
 
-- `docs/eng/ui.md`
-- `docs/eng/runbook.md`
-- `docs/eng/security.md`
+- `docs/eng/core-docs/ui.md`
+- `docs/eng/core-docs/runbook.md`
+- `docs/eng/core-docs/security.md`
+

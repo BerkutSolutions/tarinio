@@ -95,6 +95,8 @@
 
 ## Связанные документы
 
-- `docs/ru/operators/anti-ddos-model.md`
-- `docs/ru/operators/runtime-l4-guard.md`
-- `docs/ru/runbook.md`
+- `docs/ru/model-docs/anti-ddos-model.md`
+- `docs/ru/model-docs/runtime-l4-guard.md`
+- `docs/ru/core-docs/runbook.md`
+
+

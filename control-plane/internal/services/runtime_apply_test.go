@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -481,5 +482,38 @@ func TestApplyAntiDDoSRateOverrides_SkipsManagementSite(t *testing.T) {
 		if item.SiteID == "site-a" && item.ID != "antiddos-global-site-a" {
 			t.Fatalf("expected anti-ddos override for site-a, got %+v", item)
 		}
+	}
+}
+
+func TestAdaptiveModelScopeUsesPerSiteFlag(t *testing.T) {
+	profiles := []easysiteprofiles.EasySiteProfile{
+		{
+			SiteID: "control-plane-access",
+			FrontService: easysiteprofiles.FrontServiceSettings{
+				ServerName:           "waf.example.test",
+				AdaptiveModelEnabled: true,
+			},
+		},
+		{
+			SiteID: "imported-site",
+			FrontService: easysiteprofiles.FrontServiceSettings{
+				ServerName:           "app.example.test",
+				AdaptiveModelEnabled: false,
+			},
+		},
+	}
+
+	enabled, sites := adaptiveModelScope(true, profiles)
+	if !enabled {
+		t.Fatal("expected adaptive model to stay enabled when at least one site opted in")
+	}
+	want := []string{"control-plane-access", "waf.example.test"}
+	if !reflect.DeepEqual(sites, want) {
+		t.Fatalf("expected enabled sites %+v, got %+v", want, sites)
+	}
+
+	enabled, sites = adaptiveModelScope(true, profiles[1:])
+	if enabled || len(sites) != 0 {
+		t.Fatalf("expected adaptive model disabled without opted-in sites, got enabled=%t sites=%+v", enabled, sites)
 	}
 }

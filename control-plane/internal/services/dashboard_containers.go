@@ -715,6 +715,8 @@ func classifyContainerLogIssue(message string) (string, bool) {
 		"master key is a required config for using create and update datasource apis.",
 		"opensearch security plugin installed but disabled. this can expose your configuration",
 		"failed to initialize logtype config index and builtin log types",
+		"tarinio-sentinel: emergency single-source flood detected:",
+		"tarinio-sentinel: emergency botnet burst detected:",
 	}
 	for _, pattern := range benignPatterns {
 		if strings.Contains(lower, pattern) {

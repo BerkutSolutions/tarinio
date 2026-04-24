@@ -84,23 +84,23 @@ const config = {
         src: 'img/logo.png',
       },
       items: [
-        {to: '/', label: 'Главная', position: 'left'},
-        {to: '/docs-overview', label: 'Навигатор', position: 'left'},
-        {to: '/ru/', label: 'Русская wiki', position: 'left'},
-        {to: '/en/', label: 'English wiki', position: 'left'},
+        {to: '/', label: 'Home', position: 'left'},
+        {to: '/docs-overview', label: 'Navigator', position: 'left'},
+        {to: '/ru/', label: 'Russian Wiki', position: 'left'},
+        {to: '/en/', label: 'English Wiki', position: 'left'},
         {
-          label: 'Язык',
+          label: 'Language',
           position: 'right',
           items: [
-            {label: 'Русский', to: '/ru/'},
+            {label: 'Russian', to: '/ru/'},
             {label: 'English', to: '/en/'},
           ],
         },
         {
-          label: 'Версия 2.0.11',
+          label: 'Version 3.0.0',
           position: 'right',
           items: [
-            {label: 'Текущий релиз 2.0.11', to: '/ru/release-policy/'},
+            {label: 'Current Release 3.0.0', to: '/ru/core-docs/release-policy/'},
             {label: 'CHANGELOG', href: 'https://github.com/BerkutSolutions/tarinio/blob/main/CHANGELOG.md'},
           ],
         },
@@ -116,26 +116,24 @@ const config = {
       style: 'dark',
       links: [
         {
-          title: 'Документация',
+          title: 'Documentation',
           items: [
-            {label: 'Русская wiki', to: '/ru/'},
-            {label: 'English wiki', to: '/en/'},
-            {label: 'Навигатор', to: '/docs-overview'},
+            {label: 'Russian Wiki', to: '/ru/'},
+            {label: 'English Wiki', to: '/en/'},
+            {label: 'Navigator', to: '/docs-overview'},
           ],
         },
         {
           title: 'Enterprise',
           items: [
-            {label: 'HA / Multi-Node', to: '/en/ha/'},
-            {label: 'Observability', to: '/en/observability/'},
-            {label: 'Benchmarks', to: '/en/benchmarks/'},
+            {label: 'High Availability / Multi-Node', to: '/en/high-availability-docs/high-availability/'},
+            {label: 'Observability', to: '/en/core-docs/observability/'},
+            {label: 'Benchmarks', to: '/en/core-docs/benchmarks/'},
           ],
         },
         {
           title: 'Source',
-          items: [
-            {label: 'GitHub', href: 'https://github.com/BerkutSolutions/tarinio'},
-          ],
+          items: [{label: 'GitHub', href: 'https://github.com/BerkutSolutions/tarinio'}],
         },
       ],
       copyright: `Copyright ${new Date().getFullYear()} Berkut Solutions`,
@@ -153,4 +151,3 @@ const config = {
 };
 
 module.exports = config;
-

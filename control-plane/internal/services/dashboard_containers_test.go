@@ -23,6 +23,8 @@ func TestClassifyContainerLogIssue_IgnoresBenignOpenSearchStartupNoise(t *testin
 		`WARNING: Please consider reporting this to the maintainers of org.opensearch.bootstrap.OpenSearch`,
 		`WARNING: System::setSecurityManager has been called by org.opensearch.bootstrap.OpenSearch (file:/usr/share/opensearch/lib/opensearch-2.18.0.jar)`,
 		`WARNING: Using incubator modules: jdk.incubator.vector`,
+		`2026/04/24 14:31:20 [warn] tarinio-sentinel: emergency single-source flood detected: ip=203.0.113.40 rps=140`,
+		`2026/04/24 14:31:20 [warn] tarinio-sentinel: emergency botnet burst detected: rps=240 unique_ips=240`,
 	}
 
 	for _, message := range cases {

@@ -338,7 +338,7 @@
   "app.sites": "Services",
   "app.tls": "TLS / Certificates",
   "app.user.noRoles": "No roles",
-  "app.version": "v2.0.11",
+  "app.version": "v3.0.0",
   "auth.2fa.challengeMissing": "2FA challenge is missing. Please sign in again.",
   "auth.2fa.code": "2FA code",
   "auth.2fa.codeRequired": "2FA code is required",
@@ -1015,6 +1015,7 @@
   "sites.easy.badStatusCodes": "Bad status codes",
   "sites.easy.badStatusCodesHint": "Select one or more status codes to trigger automatic bad-behavior ban.",
   "sites.easy.front.autoLetsEncrypt": "Automatic Let's Encrypt",
+  "sites.easy.front.adaptiveModelEnabled": "Adaptive model enabled",
   "sites.easy.front.caServer": "Certificate authority server",
   "sites.easy.front.letsEncryptStaging": "Use Let's Encrypt staging",
   "sites.easy.front.serverName": "Server name",
@@ -1627,4 +1628,3 @@
   "revisions.revision.approvals": "Approvals",
   "revisions.revision.compiledBy": "Compiled by"
 }
-

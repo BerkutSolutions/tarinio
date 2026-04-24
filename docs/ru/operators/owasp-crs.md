@@ -18,9 +18,9 @@
 ## API и управление
 
 Основные endpoints:
-- `GET /api/owasp-crs/status`
-- `POST /api/owasp-crs/check-updates`
-- `POST /api/owasp-crs/update`
+- `GET /core-docs/api/owasp-crs/status`
+- `POST /core-docs/api/owasp-crs/check-updates`
+- `POST /core-docs/api/owasp-crs/update`
 
 Особенности:
 - `check-updates` неразрушающий, может использоваться как dry-run;
@@ -54,3 +54,4 @@ Easy profile управляет CRS через:
 - что CRS действительно загружен;
 - что XSS smoke-пробы отрабатывают корректно;
 - что блокировки не стали массово ложноположительными.
+

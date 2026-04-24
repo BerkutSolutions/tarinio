@@ -373,7 +373,7 @@ func (s *ApplyService) compileBundle(revision revisions.Revision, snapshot revis
 	if err != nil {
 		return nil, err
 	}
-	easyArtifacts, err = upsertAdaptiveModelArtifact(easyArtifacts, antiDDoSSettings)
+	easyArtifacts, err = upsertAdaptiveModelArtifact(easyArtifacts, antiDDoSSettings, snapshot.EasySiteProfiles)
 	if err != nil {
 		return nil, err
 	}
@@ -508,13 +508,15 @@ func upsertAntiDDoSL4Artifact(items []pipeline.ArtifactOutput, settings antiddos
 	return out, nil
 }
 
-func upsertAdaptiveModelArtifact(items []pipeline.ArtifactOutput, settings antiddos.Settings) ([]pipeline.ArtifactOutput, error) {
+func upsertAdaptiveModelArtifact(items []pipeline.ArtifactOutput, settings antiddos.Settings, profiles []easysiteprofiles.EasySiteProfile) ([]pipeline.ArtifactOutput, error) {
 	normalized := antiddos.NormalizeSettings(settings)
 	if err := antiddos.ValidateSettings(normalized); err != nil {
 		return nil, err
 	}
+	modelEnabled, enabledSites := adaptiveModelScope(normalized.ModelEnabled, profiles)
 	payload := map[string]any{
-		"model_enabled":                  normalized.ModelEnabled,
+		"model_enabled":                  modelEnabled,
+		"model_enabled_sites":            enabledSites,
 		"conn_limit":                     normalized.ConnLimit,
 		"rate_per_second":                normalized.RatePerSecond,
 		"rate_burst":                     normalized.RateBurst,
@@ -558,6 +560,37 @@ func upsertAdaptiveModelArtifact(items []pipeline.ArtifactOutput, settings antid
 		out = append(out, artifact)
 	}
 	return out, nil
+}
+
+func adaptiveModelScope(globalEnabled bool, profiles []easysiteprofiles.EasySiteProfile) (bool, []string) {
+	if !globalEnabled {
+		return false, nil
+	}
+	if len(profiles) == 0 {
+		return true, nil
+	}
+	seen := map[string]struct{}{}
+	for _, profile := range profiles {
+		if !profile.FrontService.AdaptiveModelEnabled {
+			continue
+		}
+		for _, value := range []string{profile.SiteID, profile.FrontService.ServerName} {
+			value = strings.ToLower(strings.TrimSpace(value))
+			if value == "" {
+				continue
+			}
+			seen[value] = struct{}{}
+		}
+	}
+	if len(seen) == 0 {
+		return false, nil
+	}
+	out := make([]string, 0, len(seen))
+	for value := range seen {
+		out = append(out, value)
+	}
+	sort.Strings(out)
+	return true, out
 }
 
 func (s *ApplyService) mapTLSInputs(configs []tlsconfigs.TLSConfig, materials []revisionsnapshots.CertificateMaterialSnapshot) ([]pipeline.TLSConfigInput, []pipeline.CertificateInput, []pipeline.ArtifactOutput, error) {

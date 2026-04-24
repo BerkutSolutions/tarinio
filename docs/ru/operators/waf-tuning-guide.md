@@ -128,10 +128,10 @@ control-plane -> policy changes -> compile -> revision bundle -> apply -> runtim
 
 Используйте:
 - UI `Logs / Activity`;
-- `GET /api/audit`;
-- `GET /api/events`;
-- `GET /api/requests`;
-- `GET /api/reports/revisions`.
+- `GET /core-docs/api/audit`;
+- `GET /core-docs/api/events`;
+- `GET /core-docs/api/requests`;
+- `GET /core-docs/api/reports/revisions`.
 
 Эти источники позволяют ответить на вопросы:
 - кто изменил policy;
@@ -151,3 +151,4 @@ control-plane -> policy changes -> compile -> revision bundle -> apply -> runtim
 - зафиксируйте причину;
 - внесите более узкое изменение;
 - выпустите новую ревизию отдельно от остальных правок.
+

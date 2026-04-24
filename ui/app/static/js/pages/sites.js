@@ -826,6 +826,7 @@ function defaultSiteDraft() {
     tls_self_signed: false,
     certificate_id: "",
     security_mode: "block",
+    adaptive_model_enabled: false,
     upstream_id: "",
     upstream_host: "ui",
     upstream_port: 80,
@@ -952,6 +953,7 @@ function applyEasyProfileToDraft(draft, profile) {
     ...draft,
     primary_host: front.server_name || draft.primary_host,
     security_mode: front.security_mode || draft.security_mode,
+    adaptive_model_enabled: Boolean(front.adaptive_model_enabled ?? draft.adaptive_model_enabled),
     auto_lets_encrypt: Boolean(front.auto_lets_encrypt ?? draft.auto_lets_encrypt),
     use_lets_encrypt_staging: Boolean(front.use_lets_encrypt_staging ?? draft.use_lets_encrypt_staging),
     use_lets_encrypt_wildcard: Boolean(front.use_lets_encrypt_wildcard ?? draft.use_lets_encrypt_wildcard),
@@ -1097,6 +1099,7 @@ function draftToEasyProfile(draft) {
     front_service: {
       server_name: primaryHost,
       security_mode: securityMode,
+      adaptive_model_enabled: Boolean(draft.adaptive_model_enabled),
       auto_lets_encrypt: draft.auto_lets_encrypt,
       use_lets_encrypt_staging: draft.use_lets_encrypt_staging,
       use_lets_encrypt_wildcard: draft.use_lets_encrypt_wildcard,
@@ -1877,6 +1880,10 @@ function renderDetailView(state, ctx) {
                   <label class="waf-checkbox">
                     <input id="service-enabled" type="checkbox"${draft.enabled ? " checked" : ""}>
                     <span>${escapeHtml(ctx.t("sites.easy.front.serviceEnabled"))}</span>
+                  </label>
+                  <label class="waf-checkbox">
+                    <input id="service-adaptive-model-enabled" type="checkbox"${draft.adaptive_model_enabled ? " checked" : ""}>
+                    <span>${escapeHtml(ctx.t("sites.easy.front.adaptiveModelEnabled"))}</span>
                   </label>
                   <label class="waf-checkbox">
                     <input id="service-auto-lets-encrypt" type="checkbox"${draft.auto_lets_encrypt ? " checked" : ""}>
@@ -3421,6 +3428,7 @@ export async function renderSites(container, ctx) {
       id: container.querySelector("#service-id").value.trim().toLowerCase(),
       primary_host: container.querySelector("#service-host").value.trim().toLowerCase(),
       enabled: container.querySelector("#service-enabled").checked,
+      adaptive_model_enabled: container.querySelector("#service-adaptive-model-enabled")?.checked || false,
       tls_enabled: container.querySelector("#service-tls-enabled").checked,
       tls_self_signed: container.querySelector("#service-tls-self-signed").checked,
       certificate_id: container.querySelector("#service-certificate-id").value.trim().toLowerCase(),

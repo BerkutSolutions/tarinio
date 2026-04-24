@@ -68,6 +68,7 @@ func New(
 	rateLimitPolicyService *services.RateLimitPolicyService,
 	easySiteProfileService *services.EasySiteProfileService,
 	antiDDoSService *services.AntiDDoSService,
+	antiDDoSRuleSuggestionsService *services.AntiDDoSRuleSuggestionsService,
 	eventService *services.EventService,
 	revisionCompileService *services.RevisionCompileService,
 	applyService *services.ApplyService,
@@ -235,6 +236,16 @@ func New(
 		http.MethodPut:  {rbac.PermissionAntiDDoSWrite, rbac.PermissionPoliciesWrite},
 		http.MethodPost: {rbac.PermissionAntiDDoSWrite, rbac.PermissionPoliciesWrite},
 	}, handlers.NewAntiDDoSHandler(antiDDoSService)))
+	mux.Handle("/api/anti-ddos/rule-suggestions", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodGet:  {rbac.PermissionAntiDDoSRead, rbac.PermissionPoliciesRead},
+		http.MethodPut:  {rbac.PermissionAntiDDoSWrite, rbac.PermissionPoliciesWrite},
+		http.MethodPost: {rbac.PermissionAntiDDoSWrite, rbac.PermissionPoliciesWrite},
+	}, handlers.NewAntiDDoSRuleSuggestionsHandler(antiDDoSRuleSuggestionsService)))
+	mux.Handle("/api/anti-ddos/rule-suggestions/", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodGet:  {rbac.PermissionAntiDDoSRead, rbac.PermissionPoliciesRead},
+		http.MethodPut:  {rbac.PermissionAntiDDoSWrite, rbac.PermissionPoliciesWrite},
+		http.MethodPost: {rbac.PermissionAntiDDoSWrite, rbac.PermissionPoliciesWrite},
+	}, handlers.NewAntiDDoSRuleSuggestionsHandler(antiDDoSRuleSuggestionsService)))
 	mux.Handle("/api/events", withMethodAllPermissions(authService, map[string][]rbac.Permission{
 		http.MethodGet:  {rbac.PermissionEventsRead, rbac.PermissionReportsRead},
 		http.MethodPost: {rbac.PermissionEventsRead, rbac.PermissionReportsRead},

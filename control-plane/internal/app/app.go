@@ -11,6 +11,7 @@ import (
 
 	"waf/control-plane/internal/accesspolicies"
 	"waf/control-plane/internal/antiddos"
+	"waf/control-plane/internal/antiddossuggestions"
 	"waf/control-plane/internal/appcompat"
 	"waf/control-plane/internal/audits"
 	"waf/control-plane/internal/certificatematerials"
@@ -42,60 +43,62 @@ import (
 
 // App wires the minimal control-plane foundation without runtime coupling.
 type App struct {
-	Config                   config.Config
-	PostgresBackend          *storage.PostgresBackend
-	RedisBackend             *redis.Backend
-	Coordinator              services.DistributedCoordinator
-	RevisionStore            *revisions.Store
-	RevisionSnapshotStore    *revisionsnapshots.Store
-	SetupService             *services.SetupService
-	RevisionService          *services.RevisionService
-	RevisionCompileService   *services.RevisionCompileService
-	ApplyService             *services.ApplyService
-	RevisionCatalogService   *services.RevisionCatalogService
-	EventStore               *events.Store
-	EventService             *services.EventService
-	AdminScriptService       *services.AdminScriptService
-	AuditStore               *audits.Store
-	AuditService             *services.AuditService
-	EnterpriseStore          *enterprise.Store
-	EnterpriseService        *services.EnterpriseService
-	ReportService            *services.ReportService
-	DashboardService         *services.DashboardService
-	ContainerRuntimeService  *services.ContainerRuntimeService
-	JobStore                 *jobs.Store
-	JobService               *services.JobService
-	RoleStore                *roles.Store
-	SessionStore             *sessions.Store
-	SiteStore                *sites.Store
-	SiteService              *services.SiteService
-	ManualBanService         *services.ManualBanService
-	UpstreamStore            *upstreams.Store
-	UpstreamService          *services.UpstreamService
-	CertificateStore         *certificates.Store
-	CertificateService       *services.CertificateService
-	CertificateMaterialStore *certificatematerials.Store
-	CertificateUploadService *services.CertificateUploadService
-	LetsEncryptService       *services.LetsEncryptService
-	TLSConfigStore           *tlsconfigs.Store
-	TLSConfigService         *services.TLSConfigService
-	TLSAutoRenewService      *services.TLSAutoRenewService
-	WAFPolicyStore           *wafpolicies.Store
-	WAFPolicyService         *services.WAFPolicyService
-	AccessPolicyStore        *accesspolicies.Store
-	AccessPolicyService      *services.AccessPolicyService
-	RateLimitPolicyStore     *ratelimitpolicies.Store
-	RateLimitPolicyService   *services.RateLimitPolicyService
-	EasySiteProfileStore     *easysiteprofiles.Store
-	EasySiteProfileService   *services.EasySiteProfileService
-	AntiDDoSStore            *antiddos.Store
-	AntiDDoSService          *services.AntiDDoSService
-	RuntimeCRSService        *services.RuntimeCRSService
-	UserStore                *users.Store
-	AuthService              *services.AuthService
-	PasskeyStore             *passkeys.Store
-	DevFastStartBootstrapper *services.DevFastStartBootstrapper
-	HTTPServer               *httpserver.Server
+	Config                         config.Config
+	PostgresBackend                *storage.PostgresBackend
+	RedisBackend                   *redis.Backend
+	Coordinator                    services.DistributedCoordinator
+	RevisionStore                  *revisions.Store
+	RevisionSnapshotStore          *revisionsnapshots.Store
+	SetupService                   *services.SetupService
+	RevisionService                *services.RevisionService
+	RevisionCompileService         *services.RevisionCompileService
+	ApplyService                   *services.ApplyService
+	RevisionCatalogService         *services.RevisionCatalogService
+	EventStore                     *events.Store
+	EventService                   *services.EventService
+	AdminScriptService             *services.AdminScriptService
+	AuditStore                     *audits.Store
+	AuditService                   *services.AuditService
+	EnterpriseStore                *enterprise.Store
+	EnterpriseService              *services.EnterpriseService
+	ReportService                  *services.ReportService
+	DashboardService               *services.DashboardService
+	ContainerRuntimeService        *services.ContainerRuntimeService
+	JobStore                       *jobs.Store
+	JobService                     *services.JobService
+	RoleStore                      *roles.Store
+	SessionStore                   *sessions.Store
+	SiteStore                      *sites.Store
+	SiteService                    *services.SiteService
+	ManualBanService               *services.ManualBanService
+	UpstreamStore                  *upstreams.Store
+	UpstreamService                *services.UpstreamService
+	CertificateStore               *certificates.Store
+	CertificateService             *services.CertificateService
+	CertificateMaterialStore       *certificatematerials.Store
+	CertificateUploadService       *services.CertificateUploadService
+	LetsEncryptService             *services.LetsEncryptService
+	TLSConfigStore                 *tlsconfigs.Store
+	TLSConfigService               *services.TLSConfigService
+	TLSAutoRenewService            *services.TLSAutoRenewService
+	WAFPolicyStore                 *wafpolicies.Store
+	WAFPolicyService               *services.WAFPolicyService
+	AccessPolicyStore              *accesspolicies.Store
+	AccessPolicyService            *services.AccessPolicyService
+	RateLimitPolicyStore           *ratelimitpolicies.Store
+	RateLimitPolicyService         *services.RateLimitPolicyService
+	EasySiteProfileStore           *easysiteprofiles.Store
+	EasySiteProfileService         *services.EasySiteProfileService
+	AntiDDoSStore                  *antiddos.Store
+	AntiDDoSService                *services.AntiDDoSService
+	AntiDDoSRuleSuggestionsStore   *antiddossuggestions.Store
+	AntiDDoSRuleSuggestionsService *services.AntiDDoSRuleSuggestionsService
+	RuntimeCRSService              *services.RuntimeCRSService
+	UserStore                      *users.Store
+	AuthService                    *services.AuthService
+	PasskeyStore                   *passkeys.Store
+	DevFastStartBootstrapper       *services.DevFastStartBootstrapper
+	HTTPServer                     *httpserver.Server
 }
 
 func New(cfg config.Config) (*App, error) {
@@ -163,30 +166,32 @@ func New(cfg config.Config) (*App, error) {
 	rateLimitPoliciesRoot := filepath.Join(cfg.RevisionStoreDir, "ratelimitpolicies")
 	easySiteProfilesRoot := filepath.Join(cfg.RevisionStoreDir, "easysiteprofiles")
 	antiDDoSRoot := filepath.Join(cfg.RevisionStoreDir, "antiddos")
+	antiDDoSSuggestionsRoot := filepath.Join(cfg.RevisionStoreDir, "antiddos")
 	enterpriseRoot := filepath.Join(cfg.RevisionStoreDir, "enterprise")
 
 	var (
-		err                      error
-		revisionStore            *revisions.Store
-		revisionSnapshotStore    *revisionsnapshots.Store
-		eventStore               *events.Store
-		auditStore               *audits.Store
-		jobStore                 *jobs.Store
-		roleStore                *roles.Store
-		userStore                *users.Store
-		sessionStore             *sessions.Store
-		passkeyStore             *passkeys.Store
-		siteStore                *sites.Store
-		upstreamStore            *upstreams.Store
-		certificateStore         *certificates.Store
-		certificateMaterialStore *certificatematerials.Store
-		tlsConfigStore           *tlsconfigs.Store
-		wafPolicyStore           *wafpolicies.Store
-		accessPolicyStore        *accesspolicies.Store
-		rateLimitPolicyStore     *ratelimitpolicies.Store
-		easySiteProfileStore     *easysiteprofiles.Store
-		antiDDoSStore            *antiddos.Store
-		enterpriseStore          *enterprise.Store
+		err                          error
+		revisionStore                *revisions.Store
+		revisionSnapshotStore        *revisionsnapshots.Store
+		eventStore                   *events.Store
+		auditStore                   *audits.Store
+		jobStore                     *jobs.Store
+		roleStore                    *roles.Store
+		userStore                    *users.Store
+		sessionStore                 *sessions.Store
+		passkeyStore                 *passkeys.Store
+		siteStore                    *sites.Store
+		upstreamStore                *upstreams.Store
+		certificateStore             *certificates.Store
+		certificateMaterialStore     *certificatematerials.Store
+		tlsConfigStore               *tlsconfigs.Store
+		wafPolicyStore               *wafpolicies.Store
+		accessPolicyStore            *accesspolicies.Store
+		rateLimitPolicyStore         *ratelimitpolicies.Store
+		easySiteProfileStore         *easysiteprofiles.Store
+		antiDDoSStore                *antiddos.Store
+		antiDDoSRuleSuggestionsStore *antiddossuggestions.Store
+		enterpriseStore              *enterprise.Store
 	)
 
 	bootstrapUser := users.BootstrapUser{
@@ -275,6 +280,10 @@ func New(cfg config.Config) (*App, error) {
 		if err != nil {
 			return nil, err
 		}
+		antiDDoSRuleSuggestionsStore, err = antiddossuggestions.NewPostgresStore(antiDDoSSuggestionsRoot, postgresBackend)
+		if err != nil {
+			return nil, err
+		}
 		enterpriseStore, err = enterprise.NewPostgresStore(enterpriseRoot, postgresBackend)
 		if err != nil {
 			return nil, err
@@ -356,6 +365,10 @@ func New(cfg config.Config) (*App, error) {
 		if err != nil {
 			return nil, err
 		}
+		antiDDoSRuleSuggestionsStore, err = antiddossuggestions.NewStore(antiDDoSSuggestionsRoot)
+		if err != nil {
+			return nil, err
+		}
 		enterpriseStore, err = enterprise.NewStore(enterpriseRoot)
 		if err != nil {
 			return nil, err
@@ -432,6 +445,7 @@ func New(cfg config.Config) (*App, error) {
 	applyService.SetGovernance(enterpriseService)
 	easySiteProfileService := services.NewEasySiteProfileService(easySiteProfileStore, siteStore, wafPolicyStore, accessPolicyStore, rateLimitPolicyStore, revisionCompileService, applyService, auditService)
 	antiDDoSService := services.NewAntiDDoSService(antiDDoSStore, revisionCompileService, applyService, auditService)
+	antiDDoSRuleSuggestionsService := services.NewAntiDDoSRuleSuggestionsService(antiDDoSRuleSuggestionsStore, auditService)
 	services.ConfigureAutoApply(revisionCompileService, applyService, coord)
 	reportService := services.NewReportService(eventStore, jobStore, revisionStore)
 	runtimeRequestCollector := services.NewHTTPRuntimeRequestCollector(cfg.RuntimeHealthURL, cfg.RuntimeAPIToken)
@@ -440,7 +454,7 @@ func New(cfg config.Config) (*App, error) {
 	runtimeCRSService := services.NewRuntimeCRSService(services.RuntimeBaseURLFromHealthURL(cfg.RuntimeHealthURL), cfg.RuntimeAPIToken)
 	containerRuntimeService := services.NewContainerRuntimeService()
 	adminScriptService := services.NewAdminScriptService(cfg.RevisionStoreDir, detectScriptsRoot())
-	httpServer := httpserver.New(cfg.HTTPAddr, cfg.RuntimeRoot, cfg.RevisionStoreDir, cfg.RuntimeHealthURL, coord.Enabled(), coord.NodeID(), cfg.Metrics.Token, postgresBackend, setupService, revisionService, authService, enterpriseService, sessionStore, userStore, roleStore, siteService, manualBanService, upstreamService, certificateService, tlsConfigService, tlsAutoRenewService, certificateUploadService, certificateMaterialStore, letsEncryptService, selfSignedCertificateService, wafPolicyService, accessPolicyService, rateLimitPolicyService, easySiteProfileService, antiDDoSService, eventService, revisionCompileService, applyService, revisionCatalogService, auditService, reportService, dashboardService, containerRuntimeService, runtimeCRSService, runtimeRequestCollector, runtimeReadyProbe, runtimeSecurityCollector, runtimeRequestCollector, adminScriptService)
+	httpServer := httpserver.New(cfg.HTTPAddr, cfg.RuntimeRoot, cfg.RevisionStoreDir, cfg.RuntimeHealthURL, coord.Enabled(), coord.NodeID(), cfg.Metrics.Token, postgresBackend, setupService, revisionService, authService, enterpriseService, sessionStore, userStore, roleStore, siteService, manualBanService, upstreamService, certificateService, tlsConfigService, tlsAutoRenewService, certificateUploadService, certificateMaterialStore, letsEncryptService, selfSignedCertificateService, wafPolicyService, accessPolicyService, rateLimitPolicyService, easySiteProfileService, antiDDoSService, antiDDoSRuleSuggestionsService, eventService, revisionCompileService, applyService, revisionCatalogService, auditService, reportService, dashboardService, containerRuntimeService, runtimeCRSService, runtimeRequestCollector, runtimeReadyProbe, runtimeSecurityCollector, runtimeRequestCollector, adminScriptService)
 	var devFastStartBootstrapper *services.DevFastStartBootstrapper
 	if cfg.DevFastStart.Enabled {
 		devFastStartCertificateIssuer := letsEncryptService
@@ -466,60 +480,62 @@ func New(cfg config.Config) (*App, error) {
 	}
 
 	return &App{
-		Config:                   cfg,
-		PostgresBackend:          postgresBackend,
-		RedisBackend:             redisBackend,
-		Coordinator:              coord,
-		RevisionStore:            revisionStore,
-		RevisionSnapshotStore:    revisionSnapshotStore,
-		SetupService:             setupService,
-		RevisionService:          revisionService,
-		RevisionCompileService:   revisionCompileService,
-		ApplyService:             applyService,
-		RevisionCatalogService:   revisionCatalogService,
-		EventStore:               eventStore,
-		EventService:             eventService,
-		AdminScriptService:       adminScriptService,
-		AuditStore:               auditStore,
-		AuditService:             auditService,
-		EnterpriseStore:          enterpriseStore,
-		EnterpriseService:        enterpriseService,
-		ReportService:            reportService,
-		DashboardService:         dashboardService,
-		ContainerRuntimeService:  containerRuntimeService,
-		JobStore:                 jobStore,
-		JobService:               jobService,
-		RoleStore:                roleStore,
-		SessionStore:             sessionStore,
-		SiteStore:                siteStore,
-		SiteService:              siteService,
-		ManualBanService:         manualBanService,
-		UpstreamStore:            upstreamStore,
-		UpstreamService:          upstreamService,
-		CertificateStore:         certificateStore,
-		CertificateService:       certificateService,
-		CertificateMaterialStore: certificateMaterialStore,
-		CertificateUploadService: certificateUploadService,
-		LetsEncryptService:       letsEncryptService,
-		TLSConfigStore:           tlsConfigStore,
-		TLSConfigService:         tlsConfigService,
-		TLSAutoRenewService:      tlsAutoRenewService,
-		WAFPolicyStore:           wafPolicyStore,
-		WAFPolicyService:         wafPolicyService,
-		AccessPolicyStore:        accessPolicyStore,
-		AccessPolicyService:      accessPolicyService,
-		RateLimitPolicyStore:     rateLimitPolicyStore,
-		RateLimitPolicyService:   rateLimitPolicyService,
-		EasySiteProfileStore:     easySiteProfileStore,
-		EasySiteProfileService:   easySiteProfileService,
-		AntiDDoSStore:            antiDDoSStore,
-		AntiDDoSService:          antiDDoSService,
-		RuntimeCRSService:        runtimeCRSService,
-		UserStore:                userStore,
-		AuthService:              authService,
-		PasskeyStore:             passkeyStore,
-		DevFastStartBootstrapper: devFastStartBootstrapper,
-		HTTPServer:               httpServer,
+		Config:                         cfg,
+		PostgresBackend:                postgresBackend,
+		RedisBackend:                   redisBackend,
+		Coordinator:                    coord,
+		RevisionStore:                  revisionStore,
+		RevisionSnapshotStore:          revisionSnapshotStore,
+		SetupService:                   setupService,
+		RevisionService:                revisionService,
+		RevisionCompileService:         revisionCompileService,
+		ApplyService:                   applyService,
+		RevisionCatalogService:         revisionCatalogService,
+		EventStore:                     eventStore,
+		EventService:                   eventService,
+		AdminScriptService:             adminScriptService,
+		AuditStore:                     auditStore,
+		AuditService:                   auditService,
+		EnterpriseStore:                enterpriseStore,
+		EnterpriseService:              enterpriseService,
+		ReportService:                  reportService,
+		DashboardService:               dashboardService,
+		ContainerRuntimeService:        containerRuntimeService,
+		JobStore:                       jobStore,
+		JobService:                     jobService,
+		RoleStore:                      roleStore,
+		SessionStore:                   sessionStore,
+		SiteStore:                      siteStore,
+		SiteService:                    siteService,
+		ManualBanService:               manualBanService,
+		UpstreamStore:                  upstreamStore,
+		UpstreamService:                upstreamService,
+		CertificateStore:               certificateStore,
+		CertificateService:             certificateService,
+		CertificateMaterialStore:       certificateMaterialStore,
+		CertificateUploadService:       certificateUploadService,
+		LetsEncryptService:             letsEncryptService,
+		TLSConfigStore:                 tlsConfigStore,
+		TLSConfigService:               tlsConfigService,
+		TLSAutoRenewService:            tlsAutoRenewService,
+		WAFPolicyStore:                 wafPolicyStore,
+		WAFPolicyService:               wafPolicyService,
+		AccessPolicyStore:              accessPolicyStore,
+		AccessPolicyService:            accessPolicyService,
+		RateLimitPolicyStore:           rateLimitPolicyStore,
+		RateLimitPolicyService:         rateLimitPolicyService,
+		EasySiteProfileStore:           easySiteProfileStore,
+		EasySiteProfileService:         easySiteProfileService,
+		AntiDDoSStore:                  antiDDoSStore,
+		AntiDDoSService:                antiDDoSService,
+		AntiDDoSRuleSuggestionsStore:   antiDDoSRuleSuggestionsStore,
+		AntiDDoSRuleSuggestionsService: antiDDoSRuleSuggestionsService,
+		RuntimeCRSService:              runtimeCRSService,
+		UserStore:                      userStore,
+		AuthService:                    authService,
+		PasskeyStore:                   passkeyStore,
+		DevFastStartBootstrapper:       devFastStartBootstrapper,
+		HTTPServer:                     httpServer,
 	}, nil
 }
 

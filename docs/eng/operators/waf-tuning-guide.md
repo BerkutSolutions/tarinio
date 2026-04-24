@@ -47,7 +47,7 @@ Use it when:
 
 Use it when:
 
-- the site’s traffic profile is understood;
+- the site' traffic profile is understood;
 - the baseline policy has been validated;
 - false positives are under control.
 
@@ -144,10 +144,10 @@ Helpful discipline:
 Use:
 
 - UI `Activity` and related observability screens;
-- `GET /api/audit`
-- `GET /api/events`
-- `GET /api/requests`
-- `GET /api/reports/revisions`
+- `GET /core-docs/api/audit`
+- `GET /core-docs/api/events`
+- `GET /core-docs/api/requests`
+- `GET /core-docs/api/reports/revisions`
 
 These sources help answer:
 
@@ -170,3 +170,4 @@ After rollback:
 - record the reason;
 - make the next change narrower;
 - release the fix as a separate revision.
+

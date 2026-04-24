@@ -1,4 +1,4 @@
-# MVP WAF Tuning Guide
+﻿# MVP WAF Tuning Guide
 
 This guide is for a Stage 1 operator who already:
 
@@ -253,7 +253,7 @@ Use this as the main operator view for:
 - rollout activity
 - action history around a change
 
-### `/api/audit`
+### `/core-docs/api/audit`
 
 Use this when you need to answer:
 
@@ -263,7 +263,7 @@ Use this when you need to answer:
 
 This is the source of truth for operator actions.
 
-### `/api/reports/revisions`
+### `/core-docs/api/reports/revisions`
 
 Use this when you need to answer:
 
@@ -332,7 +332,7 @@ Be explicit about current limits:
 - no SIEM integration
 - limited rule-level visibility
 - no distributed protection
-- control-plane HA is available through the shared PostgreSQL + Redis topology documented in `docs/eng/ha.md`
+- control-plane High Availability is available through the shared PostgreSQL + Redis topology documented in `docs/eng/high-availability-docs/high-availability.md`
 - only baseline L4 anti-DDoS protection
 
 This means:
@@ -384,6 +384,9 @@ This guide is successful if an operator can:
 - recover from a bad policy change
 
 without reading the source code first.
+
+
+
 
 
 

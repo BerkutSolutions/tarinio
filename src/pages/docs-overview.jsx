@@ -21,11 +21,11 @@ export default function DocsOverviewPage() {
             <h2>English navigator</h2>
             <p>Task-based reading paths for deployment, operations, recovery, and validation.</p>
           </Link>
-          <Link className="portal-card" to="/ru/compatibility-matrix/">
+          <Link className="portal-card" to="/ru/core-docs/compatibility-matrix/">
             <h2>Совместимость и sizing</h2>
-            <p>Начни отсюда перед первым production rollout или HA-развёртыванием.</p>
+            <p>Начни отсюда перед первым production rollout или развёртыванием высокой доступности.</p>
           </Link>
-          <Link className="portal-card" to="/ru/troubleshooting/">
+          <Link className="portal-card" to="/ru/core-docs/troubleshooting/">
             <h2>Troubleshooting</h2>
             <p>Быстрый переход к типовым симптомам, причинам и рабочим действиям оператора.</p>
           </Link>

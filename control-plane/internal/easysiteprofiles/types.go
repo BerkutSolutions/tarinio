@@ -27,6 +27,7 @@ const (
 type FrontServiceSettings struct {
 	ServerName                 string `json:"server_name"`
 	SecurityMode               string `json:"security_mode"`
+	AdaptiveModelEnabled       bool   `json:"adaptive_model_enabled"`
 	AutoLetsEncrypt            bool   `json:"auto_lets_encrypt"`
 	UseLetsEncryptStaging      bool   `json:"use_lets_encrypt_staging"`
 	UseLetsEncryptWildcard     bool   `json:"use_lets_encrypt_wildcard"`
@@ -219,6 +220,7 @@ func DefaultProfile(siteID string) EasySiteProfile {
 		FrontService: FrontServiceSettings{
 			ServerName:                 siteID,
 			SecurityMode:               SecurityModeBlock,
+			AdaptiveModelEnabled:       isManagementSite,
 			AutoLetsEncrypt:            true,
 			UseLetsEncryptStaging:      false,
 			UseLetsEncryptWildcard:     false,

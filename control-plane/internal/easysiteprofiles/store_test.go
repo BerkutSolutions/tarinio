@@ -13,6 +13,9 @@ func TestDefaultProfile_HasExpectedDefaults(t *testing.T) {
 	if profile.FrontService.SecurityMode != SecurityModeBlock {
 		t.Fatalf("unexpected security mode: %s", profile.FrontService.SecurityMode)
 	}
+	if profile.FrontService.AdaptiveModelEnabled {
+		t.Fatal("expected adaptive model disabled for regular site default profile")
+	}
 	if profile.SecurityAntibot.AntibotChallenge != AntibotChallengeNo {
 		t.Fatalf("unexpected antibot default: %s", profile.SecurityAntibot.AntibotChallenge)
 	}
@@ -26,6 +29,9 @@ func TestDefaultProfile_HasExpectedDefaults(t *testing.T) {
 
 func TestDefaultProfile_ControlPlaneAccessIncludesAPIMethods(t *testing.T) {
 	profile := DefaultProfile("control-plane-access")
+	if !profile.FrontService.AdaptiveModelEnabled {
+		t.Fatal("expected adaptive model enabled for control-plane-access default profile")
+	}
 	required := []string{"PUT", "PATCH", "DELETE"}
 	for _, method := range required {
 		found := false

@@ -1,4 +1,4 @@
-# OWASP CRS Operations
+﻿# OWASP CRS Operations
 
 This document explains how TARINIO manages OWASP CRS versions and site-level CRS behavior.
 
@@ -31,9 +31,9 @@ Optional scheduled mode:
 
 Control-plane endpoints:
 
-- `GET /api/owasp-crs/status`
-- `POST /api/owasp-crs/check-updates`
-- `POST /api/owasp-crs/update`
+- `GET /core-docs/api/owasp-crs/status`
+- `POST /core-docs/api/owasp-crs/check-updates`
+- `POST /core-docs/api/owasp-crs/update`
 
 Notes:
 
@@ -84,6 +84,7 @@ Capabilities:
 
 ## Related Documents
 
-- `docs/eng/ui.md`
+- `docs/eng/core-docs/ui.md`
 - `docs/eng/operators/waf-tuning-guide.md`
-- `docs/eng/runbook.md`
+- `docs/eng/core-docs/runbook.md`
+

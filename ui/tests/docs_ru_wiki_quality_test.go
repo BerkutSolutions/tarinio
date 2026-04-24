@@ -151,10 +151,10 @@ func TestDocsRuWikiNoMixedEnglish(t *testing.T) {
 	mandatoryFiles := []string{
 		filepath.Join(repoRoot, "docs", "ru", "README.md"),
 		filepath.Join(repoRoot, "docs", "ru", "index.md"),
-		filepath.Join(repoRoot, "docs", "ru", "ui.md"),
-		filepath.Join(repoRoot, "docs", "ru", "upgrade.md"),
-		filepath.Join(repoRoot, "docs", "ru", "backups.md"),
-		filepath.Join(repoRoot, "docs", "ru", "waf-env-reference.md"),
+		filepath.Join(repoRoot, "docs", "ru", "core-docs", "ui.md"),
+		filepath.Join(repoRoot, "docs", "ru", "core-docs", "upgrade.md"),
+		filepath.Join(repoRoot, "docs", "ru", "core-docs", "backups.md"),
+		filepath.Join(repoRoot, "docs", "ru", "core-docs", "waf-env-reference.md"),
 	}
 	var issues []string
 	for _, path := range mandatoryFiles {

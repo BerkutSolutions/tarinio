@@ -1,4 +1,4 @@
-# Logging and Reporting Model
+﻿# Logging and Reporting Model
 
 Status: Finalized for Stage 0 task `Define logging and reporting model`
 Date: 2026-03-31
@@ -327,15 +327,15 @@ The UI does not need:
 ## Required API Endpoints
 
 The control plane will need MVP endpoints such as:
-- `GET /api/reports/traffic-summary`
-- `GET /api/reports/security-summary`
-- `GET /api/reports/top-ips`
-- `GET /api/reports/top-rules`
-- `GET /api/reports/cert-status`
-- `GET /api/reports/revisions`
-- `GET /api/events`
-- `GET /api/jobs`
-- `GET /api/audit`
+- `GET /core-docs/api/reports/traffic-summary`
+- `GET /core-docs/api/reports/security-summary`
+- `GET /core-docs/api/reports/top-ips`
+- `GET /core-docs/api/reports/top-rules`
+- `GET /core-docs/api/reports/cert-status`
+- `GET /core-docs/api/reports/revisions`
+- `GET /core-docs/api/events`
+- `GET /core-docs/api/jobs`
+- `GET /core-docs/api/audit`
 
 Exact route naming may change, but the API contract must cover these data shapes.
 
@@ -365,6 +365,7 @@ For MVP:
 - reports are aggregate-first, not raw-log-first
 - UI reads control-plane data only
 - no SIEM, no external log pipeline, and no full-text runtime log platform are introduced
+
 
 
 

@@ -1,12 +1,9 @@
-# Архитектурные документы
+# Архитектурный источник
 
-Этот раздел переносит архитектурные source-документы в русскую wiki, чтобы они были доступны из того же дерева, что и deploy, HA, troubleshooting и operators.
+Эта директория содержит исходные архитектурные материалы: ADR, доменные модели и границы продукта.
 
-## Что здесь находится
+Для чтения в операторском формате используйте:
 
-- ADR по границам runtime/control-plane, compile model и rollback;
-- доменная модель и продуктовые границы;
-- topology, UI IA, logging/reporting model;
-- backlog и scope freeze для stage 1.
-
-Если тебе нужен полный исходный текст архитектурного документа, английская зеркальная копия доступна в [English wiki](/en/architecture-source/).
+- [Архитектура](../architecture-docs/architecture.md)
+- [Референсные архитектуры](../architecture-docs/reference-architectures.md)
+- [Архитектура логирования](../architecture-docs/logging-architecture.md)

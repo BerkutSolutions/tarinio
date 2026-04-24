@@ -221,17 +221,20 @@ services:
     networks:
       - waf-net
 
-  ddos-model:
+  tarinio-sentinel:
     build:
       context: ../../..
       dockerfile: deploy/compose/default/ddos-model/Dockerfile
-    container_name: tarinio-ddos-model
+    container_name: tarinio-sentinel
     restart: unless-stopped
     environment:
+      MODEL_SOURCE_BACKEND: ${MODEL_SOURCE_BACKEND:-file}
       MODEL_LOG_PATH: /logs/access.log
       MODEL_STATE_PATH: /state/model-state.json
       MODEL_OUTPUT_PATH: /out/adaptive.json
-      MODEL_RUNTIME_ROOT: /var/lib/waf
+      MODEL_SUGGESTIONS_OUTPUT_PATH: /out/l7-suggestions.json
+      MODEL_RUNTIME_ROOT: ${DDOS_MODEL_RUNTIME_ROOT:-/var/lib/waf}
+      MODEL_PUBLISH_INTERVAL_SECONDS: ${DDOS_MODEL_PUBLISH_INTERVAL_SECONDS:-5}
       MODEL_POLL_INTERVAL_SECONDS: ${DDOS_MODEL_POLL_INTERVAL_SECONDS:-2}
       MODEL_DECAY_LAMBDA: ${DDOS_MODEL_DECAY_LAMBDA:-0.08}
       MODEL_THROTTLE_THRESHOLD: ${DDOS_MODEL_THROTTLE_THRESHOLD:-2.5}
@@ -248,13 +251,18 @@ services:
       MODEL_EMERGENCY_PER_IP_RPS: ${DDOS_MODEL_EMERGENCY_PER_IP_RPS:-60}
       MODEL_WEIGHT_EMERGENCY_BOTNET: ${DDOS_MODEL_WEIGHT_EMERGENCY_BOTNET:-6.0}
       MODEL_WEIGHT_EMERGENCY_SINGLE: ${DDOS_MODEL_WEIGHT_EMERGENCY_SINGLE:-4.0}
+      MODEL_MAX_ACTIVE_IPS: ${DDOS_MODEL_MAX_ACTIVE_IPS:-50000}
+      MODEL_MAX_PUBLISHED_ENTRIES: ${DDOS_MODEL_MAX_PUBLISHED_ENTRIES:-1000}
+      MODEL_MAX_ACTIONS_PER_MINUTE: ${DDOS_MODEL_MAX_ACTIONS_PER_MINUTE:-300}
+      MODEL_SUGGEST_MIN_HITS: ${DDOS_MODEL_SUGGEST_MIN_HITS:-20}
+      MODEL_SUGGEST_MIN_UNIQUE_IPS: ${DDOS_MODEL_SUGGEST_MIN_UNIQUE_IPS:-5}
     depends_on:
       runtime:
         condition: service_started
     volumes:
       - waf-nginx-logs:/logs:ro
       - waf-runtime-data:/var/lib/waf:ro
-      - waf-ddos-model-state:/state
+      - waf-sentinel-state:/state
       - waf-l4-adaptive:/out
     healthcheck:
       test: ["CMD-SHELL", "test -s /out/adaptive.json || exit 1"]
@@ -263,6 +271,8 @@ services:
       retries: 8
     networks:
       - waf-net
+    mem_limit: 256m
+    cpus: 0.5
 
   cli:
     build:
@@ -301,5 +311,5 @@ volumes:
     name: ${WAF_STACK_NAME:-waf}-vault-bootstrap-data
   waf-l4-adaptive:
     name: ${WAF_STACK_NAME:-waf}-l4-adaptive
-  waf-ddos-model-state:
-    name: ${WAF_STACK_NAME:-waf}-ddos-model-state
+  waf-sentinel-state:
+    name: ${WAF_STACK_NAME:-waf}-sentinel-state

@@ -1,4 +1,4 @@
-# OWASP CRS Operations
+﻿# OWASP CRS Operations
 
 Date: `2026-04-04`
 
@@ -19,9 +19,9 @@ Optional scheduled mode:
 ## 2. Runtime/API controls
 
 Control-plane endpoints:
-- `GET /api/owasp-crs/status`
-- `POST /api/owasp-crs/check-updates` (`dry_run` support)
-- `POST /api/owasp-crs/update`
+- `GET /core-docs/api/owasp-crs/status`
+- `POST /core-docs/api/owasp-crs/check-updates` (`dry_run` support)
+- `POST /core-docs/api/owasp-crs/update`
 
 Notes:
 - `check-updates` is non-destructive and returns latest metadata.
@@ -55,3 +55,4 @@ Capabilities:
 - supports container mode (avoids host TLS `schannel` issues),
 - verifies CRS rules are loaded from runtime logs (`local > 0`),
 - checks blocked ratio threshold.
+

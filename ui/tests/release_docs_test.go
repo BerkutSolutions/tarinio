@@ -58,14 +58,14 @@ func TestReleaseDocsAndLockfileConsistency(t *testing.T) {
 	validateNpmLockfileInstall(t, repoRoot)
 
 	requiredDocs := []string{
-		filepath.Join(repoRoot, "docs", "eng", "enterprise-identity.md"),
-		filepath.Join(repoRoot, "docs", "eng", "evidence-and-releases.md"),
-		filepath.Join(repoRoot, "docs", "eng", "logging-architecture.md"),
-		filepath.Join(repoRoot, "docs", "eng", "migration-compatibility.md"),
-		filepath.Join(repoRoot, "docs", "ru", "enterprise-identity.md"),
-		filepath.Join(repoRoot, "docs", "ru", "evidence-and-releases.md"),
-		filepath.Join(repoRoot, "docs", "ru", "logging-architecture.md"),
-		filepath.Join(repoRoot, "docs", "ru", "migration-compatibility.md"),
+		filepath.Join(repoRoot, "docs", "eng", "core-docs", "enterprise-identity.md"),
+		filepath.Join(repoRoot, "docs", "eng", "core-docs", "evidence-and-releases.md"),
+		filepath.Join(repoRoot, "docs", "eng", "architecture-docs", "logging-architecture.md"),
+		filepath.Join(repoRoot, "docs", "eng", "core-docs", "migration-compatibility.md"),
+		filepath.Join(repoRoot, "docs", "ru", "core-docs", "enterprise-identity.md"),
+		filepath.Join(repoRoot, "docs", "ru", "core-docs", "evidence-and-releases.md"),
+		filepath.Join(repoRoot, "docs", "ru", "architecture-docs", "logging-architecture.md"),
+		filepath.Join(repoRoot, "docs", "ru", "core-docs", "migration-compatibility.md"),
 	}
 	for _, path := range requiredDocs {
 		if _, err := os.Stat(path); err != nil {
@@ -79,14 +79,14 @@ func TestReleaseDocsAndLockfileConsistency(t *testing.T) {
 	}
 
 	loggingDocs := []string{
-		mustReadFile(t, filepath.Join(repoRoot, "docs", "eng", "logging-architecture.md")),
-		mustReadFile(t, filepath.Join(repoRoot, "docs", "eng", "migration-compatibility.md")),
-		mustReadFile(t, filepath.Join(repoRoot, "docs", "ru", "logging-architecture.md")),
-		mustReadFile(t, filepath.Join(repoRoot, "docs", "ru", "migration-compatibility.md")),
+		mustReadFile(t, filepath.Join(repoRoot, "docs", "eng", "architecture-docs", "logging-architecture.md")),
+		mustReadFile(t, filepath.Join(repoRoot, "docs", "eng", "core-docs", "migration-compatibility.md")),
+		mustReadFile(t, filepath.Join(repoRoot, "docs", "ru", "architecture-docs", "logging-architecture.md")),
+		mustReadFile(t, filepath.Join(repoRoot, "docs", "ru", "core-docs", "migration-compatibility.md")),
 	}
 	for _, content := range loggingDocs {
 		if strings.Contains(content, "default profile now includes `OpenSearch`, `ClickHouse`, and `Vault`") {
-			t.Fatalf("logging and migration docs must not describe ClickHouse as part of the default 2.0.11 profile")
+			t.Fatalf("logging and migration docs must not describe ClickHouse as part of the default 3.0.0 profile")
 		}
 	}
 
@@ -168,4 +168,3 @@ func mustReadFile(t *testing.T, path string) string {
 	}
 	return string(raw)
 }
-

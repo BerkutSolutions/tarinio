@@ -1,4 +1,4 @@
-# Security Policy
+﻿# Security Policy
 
 Product: **Berkut Solutions - TARINIO**
 
@@ -11,12 +11,13 @@ Security fixes are provided for the latest release and `latest-1`.
 Please report vulnerabilities privately to the Berkut Solutions team.
 
 Include:
-- product version (`/api/app/meta`)
+- product version (`/core-docs/api/app/meta`)
 - deployment details (single-node / compose, OS)
 - reproduction steps and expected impact
 - logs or screenshots (redact secrets)
 
 Do not disclose the issue publicly until a fix is released.
+
 
 
 
