@@ -46,11 +46,22 @@ export function listToMultiline(values) {
   return Array.isArray(values) ? values.join("\n") : "";
 }
 
-export function notify(message, tone = "success") {
+export function notify(message, toneOrOptions = "success", maybeOptions = {}) {
   const container = document.getElementById("app-toast-container");
   if (!container) {
     return;
   }
+  let tone = "success";
+  let options = {};
+  if (toneOrOptions && typeof toneOrOptions === "object" && !Array.isArray(toneOrOptions)) {
+    options = toneOrOptions;
+  } else {
+    tone = String(toneOrOptions || "success");
+    if (maybeOptions && typeof maybeOptions === "object") {
+      options = maybeOptions;
+    }
+  }
+  const sticky = Boolean(options.sticky);
   const node = document.createElement("div");
   node.className = `app-toast ${tone}`;
   node.innerHTML = `
@@ -64,7 +75,9 @@ export function notify(message, tone = "success") {
   };
   node.querySelector(".app-toast-close").addEventListener("click", close);
   window.setTimeout(() => node.classList.add("show"), 10);
-  window.setTimeout(close, 3200);
+  if (!sticky) {
+    window.setTimeout(close, 3200);
+  }
 }
 
 export function parseJSONLines(value) {

@@ -401,11 +401,12 @@ func NewSettingsRuntimeHandlerWithBackend(settingsRoot string, runtimeHealthURL 
 			var stored persistedRuntimeSettings
 			if jsonErr := json.Unmarshal(content, &stored); jsonErr == nil {
 				runtimeSettingsState.updateChecksEnabled = stored.UpdateChecksEnabled
+				runtimeSettingsState.language = normalizeRuntimeLanguage(stored.Language)
 				runtimeSettingsState.lastCheckedAt = stored.LastCheckedAt
 				runtimeSettingsState.latestVersion = stored.LatestVersion
 				runtimeSettingsState.releaseURL = stored.ReleaseURL
 				runtimeSettingsState.hasUpdate = stored.HasUpdate
-				runtimeSettingsState.storage = stored.Storage
+				runtimeSettingsState.storage = normalizeStorageRetention(stored.Storage)
 				runtimeSettingsState.security = normalizeRuntimeSecuritySettings(stored.Security)
 				runtimeSettingsState.logging = loggingconfig.Normalize(stored.Logging)
 				normalizePersistedUpdateStateLocked()

@@ -4705,28 +4705,40 @@
   justify-content: flex-end;
 }
 
+.requests-filter-panel {
+  border: 1px solid rgba(125, 155, 255, 0.2);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(16, 24, 42, 0.7), rgba(10, 17, 32, 0.65));
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+}
+
 .requests-filter-row {
   display: grid;
   gap: 12px;
-  justify-content: start;
+  justify-content: stretch;
 }
 
 .requests-filter-row-main {
-  grid-template-columns: repeat(4, minmax(180px, 280px));
+  grid-template-columns: repeat(4, minmax(180px, 1fr));
 }
 
 .requests-filter-row-secondary {
-  grid-template-columns: repeat(2, minmax(180px, 280px));
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
 }
 
 .requests-filter-row .waf-field {
   min-width: 180px;
-  max-width: 280px;
+}
+
+.requests-search-field {
+  width: 100%;
 }
 
 @media (max-width: 1280px) {
   .requests-filter-row-main {
-    grid-template-columns: repeat(2, minmax(180px, 280px));
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
   }
 }
 
@@ -4739,6 +4751,28 @@
   .requests-filter-row .waf-field {
     max-width: none;
   }
+}
+
+.waf-services-tls-cell {
+  display: flex;
+}
+
+.waf-services-tls-badge {
+  display: grid;
+  gap: 4px;
+  align-items: start;
+  justify-items: start;
+  line-height: 1.2;
+  min-width: 180px;
+}
+
+.waf-services-tls-badge-title {
+  font-weight: 600;
+}
+
+.waf-services-tls-badge-expire {
+  font-size: 12px;
+  opacity: 0.92;
 }
 
 #dashboard-page .dashboard-board {

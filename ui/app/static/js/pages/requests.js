@@ -14,6 +14,11 @@ function normalizeHostLike(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function isInternalGlobalService(value) {
+  const normalized = normalizeToken(value).replace(/^_+/, "");
+  return normalized === "global" || normalized === ".global";
+}
+
 function buildPageButtons(totalPages, currentPage, dataAttr) {
   const pages = [];
   for (let page = 1; page <= Math.min(10, totalPages); page += 1) {
@@ -147,6 +152,9 @@ export async function renderRequests(container, ctx) {
     const source = String(rawSite || "").trim();
     if (!source) {
       return "-";
+    }
+    if (isInternalGlobalService(source)) {
+      return "";
     }
     const mapped = siteHostMap.get(normalizeHostLike(source));
     if (mapped) {
@@ -332,53 +340,55 @@ export async function renderRequests(container, ctx) {
           <button class="btn ghost btn-sm" id="requests-refresh" type="button">${escapeHtml(ctx.t("common.refresh"))}</button>
         </div>
         <div class="waf-card-body waf-stack">
-          <div class="waf-form-grid requests-filter-row requests-filter-row-main">
-            <div class="waf-field">
-              <label for="requests-filter-service">${escapeHtml(ctx.t("requests.filter.service"))}</label>
-              <select id="requests-filter-service">
-                <option value="">${escapeHtml(ctx.t("requests.filter.all"))}</option>
-                ${state.serviceOptions.map((item) => `<option value="${escapeHtml(item)}"${state.selectedService === item ? " selected" : ""}>${escapeHtml(item)}</option>`).join("")}
-              </select>
+          <div class="requests-filter-panel">
+            <div class="waf-form-grid requests-filter-row requests-filter-row-main">
+              <div class="waf-field">
+                <label for="requests-filter-service">${escapeHtml(ctx.t("requests.filter.service"))}</label>
+                <select id="requests-filter-service">
+                  <option value="">${escapeHtml(ctx.t("requests.filter.all"))}</option>
+                  ${state.serviceOptions.map((item) => `<option value="${escapeHtml(item)}"${state.selectedService === item ? " selected" : ""}>${escapeHtml(item)}</option>`).join("")}
+                </select>
+              </div>
+              <div class="waf-field">
+                <label for="requests-filter-method">${escapeHtml(ctx.t("requests.filter.method"))}</label>
+                <select id="requests-filter-method">
+                  <option value="">${escapeHtml(ctx.t("requests.filter.all"))}</option>
+                  ${state.methodOptions.map((item) => `<option value="${escapeHtml(item)}"${state.selectedMethod === item ? " selected" : ""}>${escapeHtml(item)}</option>`).join("")}
+                </select>
+              </div>
+              <div class="waf-field">
+                <label for="requests-filter-status">${escapeHtml(ctx.t("requests.filter.status"))}</label>
+                <select id="requests-filter-status">
+                  <option value="">${escapeHtml(ctx.t("requests.filter.all"))}</option>
+                  ${state.statusOptions.map((item) => `<option value="${escapeHtml(item)}"${state.selectedStatus === item ? " selected" : ""}>${escapeHtml(item)}</option>`).join("")}
+                </select>
+              </div>
+              <div class="waf-field">
+                <label for="requests-filter-time">${escapeHtml(ctx.t("requests.filter.time"))}</label>
+                <select id="requests-filter-time">
+                  <option value="all"${timePreset === "all" ? " selected" : ""}>${escapeHtml(ctx.t("requests.time.all"))}</option>
+                  <option value="minute"${timePreset === "minute" ? " selected" : ""}>${escapeHtml(ctx.t("requests.time.minute"))}</option>
+                  <option value="day"${timePreset === "day" ? " selected" : ""}>${escapeHtml(ctx.t("requests.time.day"))}</option>
+                  <option value="month"${timePreset === "month" ? " selected" : ""}>${escapeHtml(ctx.t("requests.time.month"))}</option>
+                  <option value="date"${timePreset === "date" ? " selected" : ""}>${escapeHtml(ctx.t("requests.time.date"))}</option>
+                  <option value="datetime"${timePreset === "datetime" ? " selected" : ""}>${escapeHtml(ctx.t("requests.time.datetime"))}</option>
+                </select>
+              </div>
             </div>
-            <div class="waf-field">
-              <label for="requests-filter-method">${escapeHtml(ctx.t("requests.filter.method"))}</label>
-              <select id="requests-filter-method">
-                <option value="">${escapeHtml(ctx.t("requests.filter.all"))}</option>
-                ${state.methodOptions.map((item) => `<option value="${escapeHtml(item)}"${state.selectedMethod === item ? " selected" : ""}>${escapeHtml(item)}</option>`).join("")}
-              </select>
+            <div class="waf-form-grid requests-filter-row requests-filter-row-secondary">
+              <div class="waf-field${timePreset === "date" ? "" : " waf-hidden"}">
+                <label for="requests-filter-date">${escapeHtml(ctx.t("requests.filter.date"))}</label>
+                <input id="requests-filter-date" type="date" value="${escapeHtml(state.selectedDate)}">
+              </div>
+              <div class="waf-field${timePreset === "datetime" ? "" : " waf-hidden"}">
+                <label for="requests-filter-datetime">${escapeHtml(ctx.t("requests.filter.datetime"))}</label>
+                <input id="requests-filter-datetime" type="datetime-local" value="${escapeHtml(state.selectedDateTime)}">
+              </div>
             </div>
-            <div class="waf-field">
-              <label for="requests-filter-status">${escapeHtml(ctx.t("requests.filter.status"))}</label>
-              <select id="requests-filter-status">
-                <option value="">${escapeHtml(ctx.t("requests.filter.all"))}</option>
-                ${state.statusOptions.map((item) => `<option value="${escapeHtml(item)}"${state.selectedStatus === item ? " selected" : ""}>${escapeHtml(item)}</option>`).join("")}
-              </select>
+            <div class="waf-field requests-search-field">
+              <label for="requests-search">${escapeHtml(ctx.t("requests.search"))}</label>
+              <input id="requests-search" value="${escapeHtml(state.search)}" placeholder="${escapeHtml(ctx.t("requests.searchPlaceholder"))}">
             </div>
-            <div class="waf-field">
-              <label for="requests-filter-time">${escapeHtml(ctx.t("requests.filter.time"))}</label>
-              <select id="requests-filter-time">
-                <option value="all"${timePreset === "all" ? " selected" : ""}>${escapeHtml(ctx.t("requests.time.all"))}</option>
-                <option value="minute"${timePreset === "minute" ? " selected" : ""}>${escapeHtml(ctx.t("requests.time.minute"))}</option>
-                <option value="day"${timePreset === "day" ? " selected" : ""}>${escapeHtml(ctx.t("requests.time.day"))}</option>
-                <option value="month"${timePreset === "month" ? " selected" : ""}>${escapeHtml(ctx.t("requests.time.month"))}</option>
-                <option value="date"${timePreset === "date" ? " selected" : ""}>${escapeHtml(ctx.t("requests.time.date"))}</option>
-                <option value="datetime"${timePreset === "datetime" ? " selected" : ""}>${escapeHtml(ctx.t("requests.time.datetime"))}</option>
-              </select>
-            </div>
-          </div>
-          <div class="waf-form-grid requests-filter-row requests-filter-row-secondary">
-            <div class="waf-field${timePreset === "date" ? "" : " waf-hidden"}">
-              <label for="requests-filter-date">${escapeHtml(ctx.t("requests.filter.date"))}</label>
-              <input id="requests-filter-date" type="date" value="${escapeHtml(state.selectedDate)}">
-            </div>
-            <div class="waf-field${timePreset === "datetime" ? "" : " waf-hidden"}">
-              <label for="requests-filter-datetime">${escapeHtml(ctx.t("requests.filter.datetime"))}</label>
-              <input id="requests-filter-datetime" type="datetime-local" value="${escapeHtml(state.selectedDateTime)}">
-            </div>
-          </div>
-          <div class="waf-field">
-            <label for="requests-search">${escapeHtml(ctx.t("requests.search"))}</label>
-            <input id="requests-search" value="${escapeHtml(state.search)}" placeholder="${escapeHtml(ctx.t("requests.searchPlaceholder"))}">
           </div>
           <div id="requests-status" class="waf-empty">${escapeHtml(ctx.t("requests.total"))}: ${state.filteredRows.length}</div>
           <div class="waf-table-wrap">
@@ -387,7 +397,7 @@ export async function renderRequests(container, ctx) {
                 <tr>
                   ${columns.map((column) => {
                     const isActiveCol = state.sortBy === column.id;
-                    const marker = isActiveCol ? (state.sortDirection === "asc" ? " ↑" : " ↓") : "";
+                    const marker = isActiveCol ? (state.sortDirection === "asc" ? " ^" : " v") : "";
                     return `<th><button type="button" class="waf-table-sort" data-sort-col="${escapeHtml(column.id)}">${escapeHtml(ctx.t(column.labelKey))}${marker}</button></th>`;
                   }).join("")}
                 </tr>
@@ -645,7 +655,7 @@ export async function renderRequests(container, ctx) {
         const serviceDisplay = resolveServiceDisplay(entry.site, siteHostMap);
         const timestampDate = parseTimestamp(entry.timestamp || row?.ingested_at);
         return { ...row, entry, serviceDisplay, timestampDate };
-      });
+      }).filter((row) => !isInternalGlobalService(row?.entry?.site || row?.serviceDisplay));
       rebuildOptions();
       state.page = 1;
       render();

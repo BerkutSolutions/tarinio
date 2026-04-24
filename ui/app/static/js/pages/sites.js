@@ -1,5 +1,8 @@
 import { confirmAction, escapeHtml, formatDate, setError, setLoading, statusBadge } from "../ui.js";
 
+let pendingImportedDraft = null;
+const TLS_EXPIRY_ALERT_STORAGE_KEY = "waf_tls_expiry_alerted";
+
 function routeBase() {
   return "/services";
 }
@@ -21,6 +24,86 @@ function routeInfo() {
 function go(path) {
   window.history.pushState({}, "", path);
   window.dispatchEvent(new PopStateEvent("popstate"));
+}
+
+function formatCertificateExpiryByLanguage(value, language) {
+  const date = new Date(String(value || ""));
+  if (Number.isNaN(date.getTime())) {
+    return "-";
+  }
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = String(date.getFullYear());
+  const locale = String(language || "").trim().toLowerCase();
+  if (locale === "ru") {
+    return `${day}.${month}.${year}`;
+  }
+  return `${day}-${month}-${year}`;
+}
+
+function certificateDaysLeft(value) {
+  const date = new Date(String(value || ""));
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  const millisLeft = date.getTime() - Date.now();
+  return Math.ceil(millisLeft / (24 * 60 * 60 * 1000));
+}
+
+function readExpiryAlertState() {
+  try {
+    const raw = window.localStorage.getItem(TLS_EXPIRY_ALERT_STORAGE_KEY);
+    if (!raw) {
+      return {};
+    }
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch (_error) {
+    return {};
+  }
+}
+
+function writeExpiryAlertState(state) {
+  try {
+    window.localStorage.setItem(TLS_EXPIRY_ALERT_STORAGE_KEY, JSON.stringify(state));
+  } catch (_error) {
+    // ignore storage write errors
+  }
+}
+
+function notifyExpiringCertificates(ctx, certificates) {
+  const language = String(ctx.getLanguage?.() || "en").trim().toLowerCase();
+  const previous = readExpiryAlertState();
+  const next = {};
+  for (const certificate of normalizeArray(certificates)) {
+    const id = String(certificate?.id || "").trim().toLowerCase();
+    const notAfterRaw = String(certificate?.not_after || "").trim();
+    if (!id || !notAfterRaw) {
+      continue;
+    }
+    const key = `${id}|${notAfterRaw}`;
+    const daysLeft = certificateDaysLeft(notAfterRaw);
+    const shouldAlert = typeof daysLeft === "number" && daysLeft < 30;
+    if (!shouldAlert) {
+      continue;
+    }
+    next[key] = true;
+    if (previous[key]) {
+      continue;
+    }
+    const title = String(certificate?.common_name || certificate?.id || "certificate").trim();
+    const expiresAt = formatCertificateExpiryByLanguage(notAfterRaw, language);
+    ctx.notify(
+      ctx.t("sites.toast.tlsExpiringSoon", {
+        value: title,
+        count: String(Math.max(0, daysLeft)),
+        date: expiresAt,
+      }),
+      "error",
+      { sticky: true }
+    );
+  }
+  writeExpiryAlertState(next);
 }
 
 function normalizeArray(value) {
@@ -1564,8 +1647,8 @@ function renderListView(state, ctx) {
                   <th>${escapeHtml(ctx.t("sites.table.name"))}</th>
                   <th>${escapeHtml(ctx.t("sites.table.upstream"))}</th>
                   <th>${escapeHtml(ctx.t("sites.table.tls"))}</th>
-                  <th>${escapeHtml(ctx.t("sites.table.status"))}</th>
                   <th>${escapeHtml(ctx.t("sites.table.updated"))}</th>
+                  <th>${escapeHtml(ctx.t("sites.table.status"))}</th>
                   <th>${escapeHtml(ctx.t("sites.table.actions"))}</th>
                 </tr>
               </thead>
@@ -1573,10 +1656,24 @@ function renderListView(state, ctx) {
                 ${state.filteredSites.length ? state.filteredSites.map((site) => {
                   const upstream = state.upstreamsBySite.get(site.id)?.[0] || null;
                   const tls = state.tlsBySite.get(site.id);
+                  const language = String(ctx.getLanguage?.() || "en").trim().toLowerCase();
+                  const certificateFromID = state.certificates.find((item) => String(item?.id || "").trim().toLowerCase() === String(tls?.certificate_id || "").trim().toLowerCase());
+                  const certificateFallback = state.certificateBySiteID.get(site.id) || state.certificateByHost.get(normalizeHost(site.primary_host));
+                  const certificate = certificateFromID || certificateFallback || null;
                   const tlsState = tls
                     ? "managed"
-                    : (state.certificateBySiteID.get(site.id) || state.certificateByHost.get(normalizeHost(site.primary_host)) ? "detected" : "missing");
+                    : (certificate ? "detected" : "missing");
+                  const certificateTitle = String(certificate?.common_name || certificate?.id || "").trim();
+                  const certificateExpiry = formatCertificateExpiryByLanguage(certificate?.not_after, language);
+                  const certificateExpiryDays = certificateDaysLeft(certificate?.not_after);
+                  const certificateIsExpiring = typeof certificateExpiryDays === "number" && certificateExpiryDays < 30;
                   const serviceURL = resolvePublicServiceURL(site, tlsState);
+                  const tlsBadgeClass = tlsState === "missing"
+                    ? "badge-neutral"
+                    : (certificateIsExpiring ? "badge-danger" : "badge-success");
+                  const tlsBadgeTitle = tlsState === "missing"
+                    ? ctx.t("sites.state.tlsMissing")
+                    : (certificateTitle || ctx.t("sites.state.tlsManaged"));
                   return `
                     <tr class="waf-table-row-clickable" data-open-site-edit="${escapeHtml(site.id)}">
                       <td class="waf-check-col">
@@ -1587,17 +1684,21 @@ function renderListView(state, ctx) {
                       </td>
                       <td>${upstream ? `${escapeHtml(upstream.host)}:${escapeHtml(String(upstream.port))}` : escapeHtml(ctx.t("common.notSet"))}</td>
                       <td>
-                        ${tlsState === "managed"
-                          ? `<span class="badge badge-success">${escapeHtml(ctx.t("sites.state.tlsManaged"))}</span>`
-                          : tlsState === "detected"
-                            ? `<span class="badge badge-warning">${escapeHtml(ctx.t("sites.state.tlsDetected"))}</span>`
-                            : `<span class="badge badge-neutral">${escapeHtml(ctx.t("sites.state.tlsMissing"))}</span>`}
+                        <div class="waf-services-tls-cell">
+                          <div class="badge ${tlsBadgeClass} waf-services-tls-badge">
+                            <div class="waf-services-tls-badge-title">${escapeHtml(tlsBadgeTitle)}</div>
+                            ${tlsState !== "missing" && certificateTitle
+                              ? `<div class="waf-services-tls-badge-expire">${escapeHtml(ctx.t("sites.table.tlsValidTill"))}: ${escapeHtml(certificateExpiry)}</div>`
+                              : ""}
+                          </div>
+                        </div>
                       </td>
-                      <td>${statusBadge(site.enabled ? "active" : "failed")}</td>
                       <td>${escapeHtml(formatDate(site.updated_at || site.created_at))}</td>
+                      <td>${statusBadge(site.enabled ? "active" : "failed")}</td>
                       <td>
                         <div class="waf-actions">
                           <button class="btn ghost btn-sm" type="button" data-open-site="${escapeHtml(site.id)}">${escapeHtml(ctx.t("common.edit"))}</button>
+                          <button class="btn ghost btn-sm" type="button" data-toggle-site="${escapeHtml(site.id)}" data-toggle-enabled="${site.enabled ? "1" : "0"}">${escapeHtml(ctx.t(site.enabled ? "common.disable" : "common.enable"))}</button>
                         </div>
                       </td>
                     </tr>
@@ -1612,7 +1713,7 @@ function renderListView(state, ctx) {
               </tbody>
             </table>
           </div>
-          <input id="services-import-file" type="file" accept=".json,.env,application/json,text/plain" multiple class="waf-hidden">
+          <input id="services-import-file" type="file" accept=".env,text/plain" class="waf-hidden">
         </div>
       </section>
     </div>
@@ -2913,43 +3014,27 @@ async function exportSelectedServicesEnv(ctx, sites, upstreamsBySite, tlsBySite,
 }
 
 async function importServicesFiles(files, ctx) {
-  const results = [];
-  let importInventory = null;
-  for (const file of files) {
-    const name = String(file?.name || "").toLowerCase();
-    if (name.endsWith(".json")) {
-      const jsonResult = await importServicesJSON(file, ctx);
-      results.push({ file: file.name, kind: "json", ...jsonResult });
-      continue;
-    }
-    if (name.endsWith(".env")) {
-      requirePermissions(ctx, ["certificates.write", "tls.write"], "sites.error.importEnvPermissions");
-      const text = await file.text();
-      const { draft, missingFields } = envToDraft(text);
-      const validationError = validateDraft(draft, ctx);
-      if (validationError) {
-        throw new Error(`${file.name}: ${validationError}`);
-      }
-      if (!importInventory) {
-        importInventory = await loadImportInventory(ctx);
-      }
-      const payload = buildImportPayloadFromDraft(draft);
-      const applied = await applyImportPayload(ctx, payload, importInventory);
-      results.push({
-        file: file.name,
-        kind: "env",
-        siteID: payload.site.id,
-        missingFields,
-        ...applied
-      });
-      continue;
-    }
-    throw new Error(`${file.name}: unsupported extension`);
+  if (!Array.isArray(files) || files.length !== 1) {
+    throw new Error(ctx.t("sites.error.importSingleEnv"));
   }
-  if (results.length) {
-    await compileAndApplyImportedRevision(ctx);
+  const file = files[0];
+  const name = String(file?.name || "").toLowerCase();
+  if (!name.endsWith(".env")) {
+    throw new Error(`${file?.name || "file"}: ${ctx.t("sites.error.importEnvOnly")}`);
   }
-  return results;
+  requirePermissions(ctx, ["sites.write", "upstreams.write", "tls.write", "certificates.write"], "sites.error.importEnvPermissions");
+  const text = await file.text();
+  const { draft, missingFields } = envToDraft(text);
+  const validationError = validateDraft(draft, ctx);
+  if (validationError) {
+    throw new Error(`${file.name}: ${validationError}`);
+  }
+  return {
+    file: file.name,
+    draft,
+    missingFields,
+    rawEnvText: text,
+  };
 }
 
 export async function renderSites(container, ctx) {
@@ -3056,9 +3141,16 @@ export async function renderSites(container, ctx) {
       return;
     }
     if (state.route.mode === "create") {
-      state.draft = defaultSiteDraft();
-      state.rawEnvText = draftToEnvText(state.draft);
-      state.rawMissingFields = [];
+      if (pendingImportedDraft && pendingImportedDraft.draft) {
+        state.draft = ensureControlPlaneAccessManagementMethods({ ...pendingImportedDraft.draft });
+        state.rawEnvText = String(pendingImportedDraft.rawEnvText || draftToEnvText(state.draft));
+        state.rawMissingFields = normalizeArray(pendingImportedDraft.missingFields);
+        pendingImportedDraft = null;
+      } else {
+        state.draft = defaultSiteDraft();
+        state.rawEnvText = draftToEnvText(state.draft);
+        state.rawMissingFields = [];
+      }
       state.editorMode = "easy";
       state.listTemplateSelection.blacklist_user_agent = [];
       state.listTemplateSelection.blacklist_uri = [];
@@ -3111,6 +3203,7 @@ export async function renderSites(container, ctx) {
       state.upstreams = mergeByID(upstreamsResponse, unwrapList(secondaryUpstreams, ["upstreams"]));
       state.tlsConfigs = mergeByID(tlsConfigsResponse, unwrapList(secondaryTLSConfigs, ["tls_configs", "tlsConfigs"]));
       state.certificates = mergeByID(certificatesResponse, unwrapList(secondaryCertificates, ["certificates"]));
+      notifyExpiringCertificates(ctx, state.certificates);
       state.accessPolicies = normalizeArray(accessPoliciesResponse);
       state.selectedSiteIDs = new Set(Array.from(state.selectedSiteIDs).filter((id) => state.sites.some((site) => site.id === id)));
       state.geoCatalog = normalizeGeoCatalogPayload(geoCatalogResponse);
@@ -3150,29 +3243,23 @@ export async function renderSites(container, ctx) {
       }
       try {
         setLoading(feedback, ctx.t("sites.import.loading"));
-        const results = await importServicesFiles(files, ctx);
-        const warnings = [];
-        const diffs = [];
-        for (const item of results) {
-          if (item.kind === "env" && item.missingFields?.length) {
-            warnings.push(`${item.file}: ${ctx.t("sites.import.missingFields")}: ${item.missingFields.map((field) => toEnvKey(field)).join(", ")}`);
-          }
-          if (item.updatedExisting && item.diffLines?.length) {
-            diffs.push(`${item.file} (${item.siteID}):\n${item.diffLines.slice(0, 40).join("\n")}`);
-          }
-        }
-        if (warnings.length || diffs.length) {
+        const imported = await importServicesFiles(files, ctx);
+        pendingImportedDraft = {
+          draft: imported.draft,
+          missingFields: imported.missingFields,
+          rawEnvText: imported.rawEnvText,
+        };
+        if (Array.isArray(imported.missingFields) && imported.missingFields.length) {
           feedback.innerHTML = `
             <div class="waf-empty">
-              ${warnings.length ? `<div><strong>${escapeHtml(ctx.t("sites.import.warnings"))}</strong><pre class="waf-code">${escapeHtml(warnings.join("\n"))}</pre></div>` : ""}
-              ${diffs.length ? `<div><strong>${escapeHtml(ctx.t("sites.import.diff"))}</strong><pre class="waf-code">${escapeHtml(diffs.join("\n\n"))}</pre></div>` : ""}
+              <div><strong>${escapeHtml(ctx.t("sites.import.warnings"))}</strong><pre class="waf-code">${escapeHtml(`${imported.file}: ${ctx.t("sites.import.missingFields")}: ${imported.missingFields.map((field) => toEnvKey(field)).join(", ")}`)}</pre></div>
             </div>
           `;
         } else {
           feedback.innerHTML = "";
         }
         ctx.notify(ctx.t("sites.toast.imported"));
-        await load();
+        go(`${routeBase()}/new`);
       } catch (error) {
         setError(feedback, `${ctx.t("sites.error.import")}: ${String(error?.message || error)}`);
       } finally {
@@ -3223,6 +3310,44 @@ export async function renderSites(container, ctx) {
       button.addEventListener("click", (event) => {
         event.stopPropagation();
         go(`${routeBase()}/${encodeURIComponent(button.dataset.openSite)}`);
+      });
+    });
+    container.querySelectorAll("[data-toggle-site]").forEach((button) => {
+      button.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        const siteID = String(button.dataset.toggleSite || "").trim();
+        if (!siteID) {
+          return;
+        }
+        const site = state.sites.find((item) => normalizeSiteID(item?.id) === normalizeSiteID(siteID));
+        if (!site) {
+          return;
+        }
+        const nextEnabled = !(String(button.dataset.toggleEnabled || "") === "1");
+        try {
+          setLoading(feedback, ctx.t("sites.editor.saving"));
+          await ctx.api.put(`/api/sites/${encodeURIComponent(siteID)}`, {
+            ...site,
+            enabled: nextEnabled,
+          });
+          const easyProfilePath = `/api/easy-site-profiles/${encodeURIComponent(siteID)}`;
+          const profile = await ctx.api.get(easyProfilePath).catch((error) => (error?.status === 404 ? null : Promise.reject(error)));
+          if (profile && typeof profile === "object") {
+            const nextProfile = {
+              ...profile,
+              front_service: {
+                ...(profile.front_service || {}),
+                enabled: nextEnabled,
+              },
+            };
+            await putWithPostFallback(ctx, easyProfilePath, nextProfile, { tolerateAutoApplyError: true });
+          }
+          feedback.innerHTML = "";
+          ctx.notify(ctx.t(nextEnabled ? "toast.siteEnabled" : "toast.siteDisabled"));
+          await load();
+        } catch (error) {
+          setError(feedback, `${ctx.t("sites.error.saveSite")}: ${String(error?.message || error)}`);
+        }
       });
     });
     container.querySelectorAll("[data-open-service]").forEach((button) => {

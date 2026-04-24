@@ -82,6 +82,12 @@ export async function renderProfile(container, ctx) {
             </div>
             <div class="waf-list-item profile-overview-item">
               <div class="profile-overview-inline-row">
+                <span class="profile-overview-label">${escapeHtml(ctx.t("profile.field.email"))}:</span>
+                <strong id="profile-email">-</strong>
+              </div>
+            </div>
+            <div class="waf-list-item profile-overview-item">
+              <div class="profile-overview-inline-row">
                 <span class="profile-overview-label">${escapeHtml(ctx.t("profile.fullName"))}:</span>
                 <strong id="profile-fullname">-</strong>
               </div>
@@ -378,10 +384,11 @@ export async function renderProfile(container, ctx) {
   }
 
   setText("profile-username", me?.username || "-");
+  setText("profile-email", me?.email || "-");
   setText("profile-fullname", me?.full_name || me?.username || "-");
   setText("profile-department", me?.department || "-");
   setText("profile-position", me?.position || "-");
-  setText("profile-session-start", formatDateTime(me?.session_created_at || new Date().toISOString(), prefs));
+  setText("profile-session-start", formatDateTime(me?.session_created_at || "-", prefs));
   setText("profile-session-expire", formatDateTime(me?.session_expires_at || "-", prefs));
   setText("profile-last-login-ip", me?.last_login_ip || "-");
   setText("profile-trusted-ip", me?.frequent_login_ip || "-");
