@@ -47,6 +47,19 @@ func TestGenerateReleaseArtifacts(t *testing.T) {
 	if got := manifest["version"]; got != "2.0.12" {
 		t.Fatalf("manifest version = %v", got)
 	}
+	sourceInputs, ok := manifest["source_inputs"].([]any)
+	if !ok {
+		t.Fatalf("manifest source_inputs missing or invalid: %#v", manifest["source_inputs"])
+	}
+	for _, item := range sourceInputs {
+		row, ok := item.(map[string]any)
+		if !ok {
+			t.Fatalf("manifest source_inputs entry invalid: %#v", item)
+		}
+		if row["path"] == "scripts/local-ci-preflight.ps1" {
+			t.Fatalf("manifest should not publish local preflight script in source_inputs")
+		}
+	}
 	generatedFiles, ok := manifest["generated_files"].([]any)
 	if !ok || len(generatedFiles) < 4 {
 		t.Fatalf("manifest generated_files missing or too short: %#v", manifest["generated_files"])

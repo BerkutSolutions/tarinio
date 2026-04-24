@@ -98,7 +98,6 @@ func Generate(opts Options) (Result, error) {
 		"control-plane/Dockerfile",
 		"deploy/compose/default/docker-compose.yml",
 		"deploy/compose/enterprise/docker-compose.yml",
-		"scripts/local-ci-preflight.ps1",
 		"scripts/generate-release-artifacts.ps1",
 		"scripts/install-aio.sh",
 		"scripts/install-aio-enterprise.sh",
