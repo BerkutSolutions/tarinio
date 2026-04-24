@@ -9,15 +9,15 @@ import (
 
 func TestGenerateReleaseArtifacts(t *testing.T) {
 	repoRoot := filepath.Clean(filepath.Join("..", ".."))
-	outputDir := filepath.Join(t.TempDir(), "release-1.0.12")
+	outputDir := filepath.Join(t.TempDir(), "release-2.0.12")
 
 	result, err := Generate(Options{
 		RepoRoot:   repoRoot,
-		Version:    "1.0.12",
+		Version:    "2.0.12",
 		CommitSHA:  "deadbeef",
-		Tag:        "v1.0.12",
+		Tag:        "v2.0.12",
 		OutputDir:  outputDir,
-		DockerTags: []string{"tarinio:1.0.12", "ghcr.io/berkutsolutions/tarinio:1.0.12"},
+		DockerTags: []string{"tarinio:2.0.12", "ghcr.io/berkutsolutions/tarinio:2.0.12"},
 	})
 	if err != nil {
 		t.Fatalf("Generate() error = %v", err)
@@ -44,7 +44,7 @@ func TestGenerateReleaseArtifacts(t *testing.T) {
 	if got := manifest["format"]; got != "tarinio-release-artifacts/v1" {
 		t.Fatalf("manifest format = %v", got)
 	}
-	if got := manifest["version"]; got != "1.0.12" {
+	if got := manifest["version"]; got != "2.0.12" {
 		t.Fatalf("manifest version = %v", got)
 	}
 	generatedFiles, ok := manifest["generated_files"].([]any)
@@ -68,3 +68,4 @@ func decodeJSONFile(path string, target any) error {
 	}
 	return json.Unmarshal(raw, target)
 }
+
