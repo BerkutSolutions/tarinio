@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Authentication Required</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #08101c;
+      --panel: rgba(17, 28, 43, 0.95);
+      --line: rgba(132, 170, 255, 0.2);
+      --text: #eef4ff;
+      --muted: rgba(238, 244, 255, 0.74);
+      --accent: #89b3ff;
+      --danger: #ff8d8d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", Inter, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 15% 15%, rgba(95, 149, 255, 0.18), transparent 30%),
+        radial-gradient(circle at 85% 0%, rgba(84, 211, 162, 0.12), transparent 28%),
+        var(--bg);
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+    .shell {
+      width: min(920px, 100%);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: var(--panel);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
+      overflow: hidden;
+    }
+    .hero {
+      padding: 24px 28px 18px;
+      border-bottom: 1px solid var(--line);
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 999px;
+      padding: 6px 11px;
+      font-size: 12px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.04);
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 0 rgba(137, 179, 255, 0.5);
+      animation: pulse 1.8s ease-out infinite;
+    }
+    h1 {
+      margin: 14px 0 0;
+      font-size: clamp(28px, 4vw, 40px);
+      line-height: 1.08;
+    }
+    .sub {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.55;
+      max-width: 700px;
+    }
+    .body {
+      padding: 22px 28px 28px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+      gap: 16px;
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(8, 14, 24, 0.56);
+      padding: 16px;
+    }
+    .card h2 {
+      margin: 0 0 12px;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--muted);
+    }
+    form {
+      display: grid;
+      gap: 10px;
+    }
+    label {
+      font-size: 13px;
+      color: rgba(226, 234, 255, 0.86);
+    }
+    input {
+      width: 100%;
+      border: 1px solid rgba(96, 121, 187, 0.42);
+      border-radius: 10px;
+      background: rgba(6, 10, 19, 0.95);
+      color: #f0f4ff;
+      padding: 11px 12px;
+      font-size: 14px;
+      outline: none;
+    }
+    input:focus {
+      border-color: rgba(125, 155, 255, 0.85);
+      box-shadow: 0 0 0 3px rgba(125, 155, 255, 0.24);
+    }
+    .btn {
+      border: none;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #5d86ff, #7d9bff);
+      color: #05060a;
+      font-weight: 700;
+      font-size: 14px;
+      padding: 11px 12px;
+      cursor: pointer;
+    }
+    .btn:disabled {
+      opacity: 0.75;
+      cursor: default;
+    }
+    .error {
+      margin-top: 10px;
+      border: 1px solid rgba(255, 121, 121, 0.45);
+      border-radius: 10px;
+      background: rgba(255, 121, 121, 0.12);
+      color: #ffc2c2;
+      font-size: 13px;
+      padding: 10px 12px;
+      display: none;
+    }
+    .error.show {
+      display: block;
+    }
+    .meta {
+      display: grid;
+      gap: 10px;
+    }
+    .meta-line {
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 11px;
+      background: rgba(255, 255, 255, 0.03);
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--muted);
+    }
+    .meta-line strong {
+      display: block;
+      margin-bottom: 5px;
+      color: var(--text);
+      font-size: 14px;
+    }
+    .secured-by {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 20px !important;
+      z-index: 20;
+      margin: 0;
+      padding-bottom: 0;
+      font-size: 13px;
+      color: var(--muted);
+      text-align: center;
+    }
+    .secured-by a {
+      color: #cfe1ff;
+      text-decoration: none;
+      border-bottom: 1px solid rgba(207, 225, 255, 0.35);
+    }
+    .secured-by a:hover {
+      border-bottom-color: rgba(207, 225, 255, 0.85);
+    }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(137, 179, 255, 0.5); }
+      70% { box-shadow: 0 0 0 10px rgba(137, 179, 255, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(137, 179, 255, 0); }
+    }
+    @media (max-width: 860px) {
+      .body {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <div class="badge"><span class="dot" aria-hidden="true"></span><span id="eyebrow">Protected resource</span></div>
+      <h1 id="title">Authentication Required</h1>
+      <p class="sub" id="subtitle">Sign in to continue to the protected service.</p>
+    </section>
+    <section class="body">
+      <article class="card">
+        <h2 id="signin-title">Sign in</h2>
+        <form id="auth-form" novalidate>
+          <label for="username" id="label-username">Username</label>
+          <input id="username" name="username" autocomplete="username" required>
+          <label for="password" id="label-password">Password</label>
+          <input id="password" name="password" type="password" autocomplete="current-password" required>
+          <button class="btn" id="submit" type="submit">Sign in</button>
+        </form>
+        <div id="error" class="error" role="alert"></div>
+      </article>
+      <article class="card">
+        <h2 id="info-title">What happened</h2>
+        <div class="meta">
+          <div class="meta-line">
+            <strong id="meta-line-1-title">Authentication layer is active</strong>
+            <span id="meta-line-1-text">This service requires valid credentials before the request can continue.</span>
+          </div>
+          <div class="meta-line">
+            <strong id="meta-line-2-title">Session cookie is issued after sign-in</strong>
+            <span id="meta-line-2-text">After successful login, the WAF sets a session cookie and redirects you to the requested page.</span>
+          </div>
+          <div class="meta-line">
+            <strong id="meta-line-3-title">If sign-in repeats</strong>
+            <span id="meta-line-3-text">Check cookie settings and browser privacy extensions, then retry.</span>
+          </div>
+        </div>
+      </article>
+    </section>
+  </main>
+  <div class="secured-by">
+    <a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener noreferrer">Secured by Tarinio</a>
+  </div>
+  <script>
+    (function () {
+      var translations = {
+        en: {
+          pageTitle: "Authentication Required",
+          eyebrow: "Protected resource",
+          title: "Authentication Required",
+          subtitle: "Sign in to continue to the protected service.",
+          signinTitle: "Sign in",
+          infoTitle: "What happened",
+          username: "Username",
+          password: "Password",
+          submit: "Sign in",
+          invalid: "Invalid username or password.",
+          failed: "Authentication failed.",
+          line1Title: "Authentication layer is active",
+          line1Text: "This service requires valid credentials before the request can continue.",
+          line2Title: "Session cookie is issued after sign-in",
+          line2Text: "After successful login, the WAF sets a session cookie and redirects you to the requested page.",
+          line3Title: "If sign-in repeats",
+          line3Text: "Check cookie settings and browser privacy extensions, then retry."
+        },
+        ru: {
+          pageTitle: "Требуется аутентификация",
+          eyebrow: "Защищённый ресурс",
+          title: "Требуется аутентификация",
+          subtitle: "Выполните вход, чтобы получить доступ к защищённому сервису.",
+          signinTitle: "Вход",
+          infoTitle: "Что произошло",
+          username: "Имя пользователя",
+          password: "Пароль",
+          submit: "Войти",
+          invalid: "Неверное имя пользователя или пароль.",
+          failed: "Ошибка аутентификации.",
+          line1Title: "Слой аутентификации активен",
+          line1Text: "Для продолжения запроса сервис требует валидные учётные данные.",
+          line2Title: "После входа выдаётся сессионная cookie",
+          line2Text: "После успешной аутентификации WAF выдаёт cookie сессии и возвращает вас на запрошенную страницу.",
+          line3Title: "Если вход запрашивается повторно",
+          line3Text: "Проверьте настройки cookie и расширения приватности браузера, затем повторите попытку."
+        }
+      };
+
+      function uiLang() {
+        var candidates = [];
+        try {
+          if (Array.isArray(navigator.languages)) candidates = candidates.concat(navigator.languages);
+          if (navigator.language) candidates.push(navigator.language);
+        } catch (_error) {}
+        for (var i = 0; i < candidates.length; i += 1) {
+          var token = String(candidates[i] || "").toLowerCase().split(/[-_]/)[0];
+          if (translations[token]) {
+            return token;
+          }
+        }
+        return "en";
+      }
+
+      function parseReturnTarget() {
+        var params = new URLSearchParams(window.location.search || "");
+        var returnURI = String(params.get("return_uri") || "/").trim();
+        var returnArgs = String(params.get("return_args") || "").trim();
+        if (!returnURI || returnURI.charAt(0) !== "/" || returnURI.indexOf("%") !== -1) {
+          return "/";
+        }
+        if (!returnArgs) {
+          return returnURI;
+        }
+        return returnURI + "?" + returnArgs;
+      }
+
+      function showError(text) {
+        var box = document.getElementById("error");
+        box.textContent = text;
+        box.classList.add("show");
+      }
+
+      var lang = uiLang();
+      var dict = translations[lang] || translations.en;
+      document.documentElement.lang = lang;
+      document.title = dict.pageTitle;
+      document.getElementById("eyebrow").textContent = dict.eyebrow;
+      document.getElementById("title").textContent = dict.title;
+      document.getElementById("subtitle").textContent = dict.subtitle;
+      document.getElementById("signin-title").textContent = dict.signinTitle;
+      document.getElementById("info-title").textContent = dict.infoTitle;
+      document.getElementById("label-username").textContent = dict.username;
+      document.getElementById("label-password").textContent = dict.password;
+      document.getElementById("submit").textContent = dict.submit;
+      document.getElementById("meta-line-1-title").textContent = dict.line1Title;
+      document.getElementById("meta-line-1-text").textContent = dict.line1Text;
+      document.getElementById("meta-line-2-title").textContent = dict.line2Title;
+      document.getElementById("meta-line-2-text").textContent = dict.line2Text;
+      document.getElementById("meta-line-3-title").textContent = dict.line3Title;
+      document.getElementById("meta-line-3-text").textContent = dict.line3Text;
+
+      var form = document.getElementById("auth-form");
+      var submit = document.getElementById("submit");
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        var username = String(document.getElementById("username").value || "").trim();
+        var password = String(document.getElementById("password").value || "");
+        if (!username || !password) {
+          showError(dict.invalid);
+          return;
+        }
+        var token = btoa(username + ":" + password);
+        submit.disabled = true;
+        fetch("{{ .VerifyURI }}", {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Authorization": "Basic " + token,
+            "Cache-Control": "no-store"
+          }
+        }).then(function (response) {
+          if (response.ok) {
+            window.location.assign(parseReturnTarget());
+            return;
+          }
+          if (response.status === 401 || response.status === 403) {
+            showError(dict.invalid);
+            return;
+          }
+          showError(dict.failed);
+        }).catch(function () {
+          showError(dict.failed);
+        }).finally(function () {
+          submit.disabled = false;
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

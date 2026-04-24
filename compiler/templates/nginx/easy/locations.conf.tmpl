@@ -1,4 +1,31 @@
 {{- if .AntibotEnabled }}
+{{- if .AntibotTwoLayerEnabled }}
+location = {{ .AntibotStage1URI }} {
+    proxy_intercept_errors off;
+    modsecurity off;
+    add_header Set-Cookie "{{ .AntibotStage1CookieName }}={{ .AntibotStage1CookieValue }}; Max-Age=120; Path=/; SameSite=Lax; Secure; HttpOnly" always;
+    return 204;
+}
+location = {{ .AntibotStage1VerifyURI }} {
+    proxy_intercept_errors off;
+    modsecurity off;
+    set $waf_antibot_return_path /;
+    set $waf_antibot_return_query "";
+    if ($arg_return_uri != "") {
+        set $waf_antibot_return_path $arg_return_uri;
+    }
+    if ($arg_return_uri ~* "%") {
+        set $waf_antibot_return_path /;
+        set $waf_antibot_return_query "";
+    }
+    if ($arg_return_args != "") {
+        set $waf_antibot_return_query ?$arg_return_args;
+    }
+    add_header Cache-Control "no-store" always;
+    add_header Set-Cookie "{{ .AntibotStage1CookieName }}={{ .AntibotStage1CookieValue }}; Max-Age=120; Path=/; SameSite=Lax; Secure; HttpOnly" always;
+    return 302 $scheme://$host$waf_antibot_return_path$waf_antibot_return_query;
+}
+{{- end }}
 location = {{ .AntibotURI }} {
     proxy_intercept_errors off;
     modsecurity off;
@@ -18,12 +45,41 @@ location = {{ .AntibotVerifyURI }} {
     if ($arg_return_uri != "") {
         set $waf_antibot_return_path $arg_return_uri;
     }
+    if ($arg_return_uri ~* "%") {
+        set $waf_antibot_return_path /;
+        set $waf_antibot_return_query "";
+    }
     if ($arg_return_args != "") {
         set $waf_antibot_return_query ?$arg_return_args;
+    }
+    if ($waf_antibot_return_path !~ "^/") {
+        set $waf_antibot_return_path /;
+        set $waf_antibot_return_query "";
     }
     add_header Cache-Control "no-store" always;
     add_header Set-Cookie "{{ .AntibotCookieName }}={{ .AntibotCookieValue }}; Max-Age=600; Path=/; SameSite=Lax; Secure; HttpOnly" always;
     return 302 $scheme://$host$waf_antibot_return_path$waf_antibot_return_query;
+}
+{{- end }}
+{{- if .UseAuthBasic }}
+location = {{ .AuthGateLoginURI }} {
+    proxy_intercept_errors off;
+    modsecurity off;
+    default_type text/html;
+    alias /etc/waf/errors/{{ .SiteID }}/auth.html;
+}
+location = {{ .AuthGateVerifyURI }} {
+    proxy_intercept_errors off;
+    modsecurity off;
+    auth_basic "{{ .AuthBasicRealm }}";
+    auth_basic_user_file {{ .AuthBasicUserFile }};
+    add_header Cache-Control "no-store" always;
+{{- if ge .AuthGateCookieTTL 0 }}
+    add_header Set-Cookie "{{ .AuthGateCookieKey }}={{ .AuthGateCookieVal }}; Max-Age={{ .AuthGateCookieTTL }}; Path=/; SameSite=Lax; Secure; HttpOnly" always;
+{{- else }}
+    add_header Set-Cookie "{{ .AuthGateCookieKey }}={{ .AuthGateCookieVal }}; Path=/; SameSite=Lax; Secure; HttpOnly" always;
+{{- end }}
+    return 204;
 }
 {{- end }}
 {{- range .Rules }}

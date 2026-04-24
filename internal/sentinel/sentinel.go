@@ -79,18 +79,20 @@ type Config struct {
 
 // Record is per (site,ip) adaptive state.
 type Record struct {
-	Score        float64            `json:"score"`
-	RiskScore    float64            `json:"risk_score,omitempty"`
-	TrustScore   float64            `json:"trust_score,omitempty"`
-	FirstSeen    string             `json:"first_seen,omitempty"`
-	LastSeen     string             `json:"last_seen"`
-	LastUpdated  string             `json:"last_updated"`
-	Stage        string             `json:"stage"`
-	ExpiresAt    string             `json:"expires_at"`
-	ReasonCodes  []string           `json:"reason_codes,omitempty"`
-	TopSignals   map[string]float64 `json:"top_signals,omitempty"`
-	LastAction   string             `json:"last_action,omitempty"`
-	LastActionAt string             `json:"last_action_at,omitempty"`
+	Score           float64            `json:"score"`
+	RiskScore       float64            `json:"risk_score,omitempty"`
+	TrustScore      float64            `json:"trust_score,omitempty"`
+	FirstSeen       string             `json:"first_seen,omitempty"`
+	LastSeen        string             `json:"last_seen"`
+	LastUpdated     string             `json:"last_updated"`
+	Stage           string             `json:"stage"`
+	ExpiresAt       string             `json:"expires_at"`
+	ReasonCodes     []string           `json:"reason_codes,omitempty"`
+	TopSignals      map[string]float64 `json:"top_signals,omitempty"`
+	ExplainSummary  string             `json:"explain_summary,omitempty"`
+	Recommendations []string           `json:"recommendations,omitempty"`
+	LastAction      string             `json:"last_action,omitempty"`
+	LastActionAt    string             `json:"last_action_at,omitempty"`
 }
 
 // State stores persistent sentinel offset and adaptive records.
@@ -104,16 +106,25 @@ type State struct {
 
 // AdaptiveEntry is a single adaptive action entry for L4 guard.
 type AdaptiveEntry struct {
-	IP          string             `json:"ip"`
-	Action      string             `json:"action"`
-	ExpiresAt   string             `json:"expires_at,omitempty"`
-	Score       float64            `json:"score,omitempty"`
-	TrustScore  float64            `json:"trust_score,omitempty"`
-	Source      string             `json:"source,omitempty"`
-	FirstSeen   string             `json:"first_seen,omitempty"`
-	LastSeen    string             `json:"last_seen,omitempty"`
-	ReasonCodes []string           `json:"reason_codes,omitempty"`
-	TopSignals  map[string]float64 `json:"top_signals,omitempty"`
+	IP              string               `json:"ip"`
+	Action          string               `json:"action"`
+	ExpiresAt       string               `json:"expires_at,omitempty"`
+	Score           float64              `json:"score,omitempty"`
+	TrustScore      float64              `json:"trust_score,omitempty"`
+	Source          string               `json:"source,omitempty"`
+	FirstSeen       string               `json:"first_seen,omitempty"`
+	LastSeen        string               `json:"last_seen,omitempty"`
+	ReasonCodes     []string             `json:"reason_codes,omitempty"`
+	TopSignals      map[string]float64   `json:"top_signals,omitempty"`
+	ExplainSummary  string               `json:"explain_summary,omitempty"`
+	ReasonDetails   []SignalReasonDetail `json:"reason_details,omitempty"`
+	Recommendations []string             `json:"recommendations,omitempty"`
+}
+
+type SignalReasonDetail struct {
+	Code        string  `json:"code"`
+	Weight      float64 `json:"weight"`
+	Explanation string  `json:"explanation"`
 }
 
 // AdaptiveOutput is backward compatible with existing l4guard consumer.
@@ -689,7 +700,8 @@ func processTick(cfg Config, current State, now time.Time) (State, bool, error) 
 		rec.Stage = desiredAction
 		rec.RiskScore = clamp(rec.Score, 0, 100)
 		rec.TrustScore = clamp(100-rec.RiskScore, 0, 100)
-		rec.ReasonCodes = topSignalKeys(rec.TopSignals, 3)
+		rec.ReasonCodes = topSignalKeys(rec.TopSignals, 5)
+		rec.ExplainSummary, _, rec.Recommendations = buildExplainability(rec.TopSignals, rec.Stage)
 		rec.ExpiresAt = actionExpiry(now, cfg, rec.Stage).Format(time.RFC3339)
 
 		exp, _ := parseTime(rec.ExpiresAt)
@@ -973,7 +985,8 @@ func applyImmediateDrop(st *State, cfg Config, ip string, when time.Time) bool {
 	rec.LastAction = "drop"
 	rec.LastActionAt = when.UTC().Format(time.RFC3339)
 	rec.ExpiresAt = expires.Format(time.RFC3339)
-	rec.ReasonCodes = topSignalKeys(rec.TopSignals, 3)
+	rec.ReasonCodes = topSignalKeys(rec.TopSignals, 5)
+	rec.ExplainSummary, _, rec.Recommendations = buildExplainability(rec.TopSignals, rec.Stage)
 	st.IPs[key] = rec
 	return true
 }
@@ -1095,9 +1108,10 @@ func renderAdaptivePayload(cfg Config, st State, now time.Time) ([]byte, error) 
 			Score:       agg.Score,
 			TrustScore:  agg.TrustScore,
 			Source:      "tarinio-sentinel",
-			ReasonCodes: topSignalKeys(agg.TopSignals, 3),
-			TopSignals:  topSignalMap(agg.TopSignals, 5),
+			ReasonCodes: topSignalKeys(agg.TopSignals, 5),
+			TopSignals:  topSignalMap(agg.TopSignals, 8),
 		}
+		entry.ExplainSummary, entry.ReasonDetails, entry.Recommendations = buildExplainability(agg.TopSignals, entry.Action)
 		if !agg.ExpiresAt.IsZero() {
 			entry.ExpiresAt = agg.ExpiresAt.Format(time.RFC3339)
 		}
@@ -1267,7 +1281,8 @@ func applyScore(st *State, cfg Config, ip string, site string, when time.Time, w
 	}
 	rec.LastUpdated = when.UTC().Format(time.RFC3339)
 	rec.ExpiresAt = expires.Format(time.RFC3339)
-	rec.ReasonCodes = topSignalKeys(rec.TopSignals, 3)
+	rec.ReasonCodes = topSignalKeys(rec.TopSignals, 5)
+	rec.ExplainSummary, _, rec.Recommendations = buildExplainability(rec.TopSignals, rec.Stage)
 	st.IPs[key] = rec
 	return true
 }
@@ -1487,6 +1502,105 @@ func topSignalMap(items map[string]float64, limit int) map[string]float64 {
 		out[key] = items[key]
 	}
 	return out
+}
+
+func buildExplainability(items map[string]float64, action string) (string, []SignalReasonDetail, []string) {
+	keys := topSignalKeys(items, 5)
+	if len(keys) == 0 {
+		return "", nil, nil
+	}
+	details := make([]SignalReasonDetail, 0, len(keys))
+	recommendations := make([]string, 0, len(keys)+1)
+	seenRecommendations := map[string]struct{}{}
+	for _, key := range keys {
+		explanation := signalExplanation(key)
+		details = append(details, SignalReasonDetail{
+			Code:        key,
+			Weight:      items[key],
+			Explanation: explanation,
+		})
+		for _, item := range signalRecommendations(key) {
+			trimmed := strings.TrimSpace(item)
+			if trimmed == "" {
+				continue
+			}
+			if _, ok := seenRecommendations[trimmed]; ok {
+				continue
+			}
+			seenRecommendations[trimmed] = struct{}{}
+			recommendations = append(recommendations, trimmed)
+		}
+	}
+	if actionHint := actionRecommendation(action); actionHint != "" {
+		if _, ok := seenRecommendations[actionHint]; !ok {
+			recommendations = append([]string{actionHint}, recommendations...)
+		}
+	}
+	summary := "Primary drivers: " + strings.Join(keys, ", ")
+	return summary, details, recommendations
+}
+
+func signalExplanation(code string) string {
+	switch strings.TrimSpace(code) {
+	case "signal_rps":
+		return "Request rate exceeded baseline for this source."
+	case "signal_404_ratio":
+		return "High share of 404 responses suggests probing of unknown paths."
+	case "signal_unique_paths":
+		return "Large number of unique paths suggests scan-like behavior."
+	case "signal_scanner_paths":
+		return "Scanner signatures were detected in requested paths."
+	case "signal_ua_risk":
+		return "Suspicious or automation-like user-agent was observed."
+	case "signal_blocked_ratio":
+		return "High ratio of blocked responses indicates persistent abusive traffic."
+	case "signal_emergency_botnet":
+		return "Distributed emergency pattern detected (many unique sources per second)."
+	case "signal_emergency_single":
+		return "Single-source emergency flood pattern detected."
+	case "signal_emergency_drop":
+		return "Immediate drop was applied due to emergency flood threshold."
+	default:
+		return "Contributed to risk score by anomaly model."
+	}
+}
+
+func signalRecommendations(code string) []string {
+	switch strings.TrimSpace(code) {
+	case "signal_rps", "signal_emergency_single", "signal_emergency_botnet":
+		return []string{
+			"Review upstream capacity and edge rate limits for the affected site.",
+			"Verify this source against allowlists before escalating to permanent blocking.",
+		}
+	case "signal_404_ratio", "signal_unique_paths", "signal_scanner_paths":
+		return []string{
+			"Add or tighten path-based rules for high-noise scanner endpoints.",
+			"Enable stricter challenge policy for authentication and admin paths.",
+		}
+	case "signal_ua_risk":
+		return []string{
+			"Enable stronger anti-bot challenge for suspicious user-agents.",
+		}
+	case "signal_blocked_ratio":
+		return []string{
+			"Audit false positives and tune thresholds if legitimate clients are impacted.",
+		}
+	default:
+		return nil
+	}
+}
+
+func actionRecommendation(action string) string {
+	switch strings.TrimSpace(action) {
+	case "watch":
+		return "Keep traffic in watch mode and continue monitoring signal drift."
+	case "throttle":
+		return "Throttle is active: monitor latency/error budget for legitimate users."
+	case "drop", "temp_ban":
+		return "Hard mitigation is active: validate business impact and prepare incident notes."
+	default:
+		return ""
+	}
 }
 
 func clamp(value, minValue, maxValue float64) float64 {

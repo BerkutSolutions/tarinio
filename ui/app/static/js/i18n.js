@@ -42,6 +42,10 @@ function detectBrowserLanguage() {
   return defaultLanguage;
 }
 
+export function getBrowserLanguage() {
+  return detectBrowserLanguage();
+}
+
 function loadStoredLanguage() {
   try {
     return normalizeLanguage(window.localStorage.getItem(languageStorageKey) || "");
@@ -163,3 +167,4 @@ export async function setLanguage(language) {
     window.dispatchEvent(new CustomEvent(languageChangedEvent, { detail: { language: normalized } }));
   }
 }
+

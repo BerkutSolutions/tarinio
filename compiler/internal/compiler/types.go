@@ -95,6 +95,26 @@ type CustomRateLimitRuleInput struct {
 	Rate string
 }
 
+type APIPositiveEndpointPolicyInput struct {
+	Path         string
+	Methods      []string
+	TokenIDs     []string
+	ContentTypes []string
+	Mode         string
+}
+
+type ServiceAuthUserInput struct {
+	Username    string
+	Password    string
+	Enabled     bool
+	LastLoginAt string
+}
+
+type AntibotChallengeRuleInput struct {
+	Path      string
+	Challenge string
+}
+
 // ArtifactOutput is a rendered compiler artifact ready to be placed into a bundle.
 type ArtifactOutput struct {
 	Path     string
@@ -131,15 +151,20 @@ type EasyProfileInput struct {
 	AuthBasicUser     string
 	AuthBasicPassword string
 	AuthBasicText     string
+	AuthUsers         []ServiceAuthUserInput
+	AuthSessionTTLMin int
 
-	AntibotChallenge      string
-	AntibotURI            string
-	AntibotRecaptchaScore float64
-	AntibotRecaptchaKey   string
-	AntibotHcaptchaKey    string
-	AntibotTurnstileKey   string
-	AntibotCookieName     string
-	AntibotCookieValue    string
+	AntibotChallenge           string
+	AntibotURI                 string
+	AntibotRecaptchaScore      float64
+	AntibotRecaptchaKey        string
+	AntibotHcaptchaKey         string
+	AntibotTurnstileKey        string
+	AntibotCookieName          string
+	AntibotCookieValue         string
+	ChallengeEscalationEnabled bool
+	ChallengeEscalationMode    string
+	AntibotChallengeRules      []AntibotChallengeRuleInput
 
 	UseLimitConn              bool
 	LimitConnMaxHTTP1         int
@@ -166,4 +191,10 @@ type EasyProfileInput struct {
 	ModSecurityCRSPlugins             []string
 	ModSecurityCustomPath             string
 	ModSecurityCustomContent          string
+
+	UseAPIPositiveSecurity bool
+	OpenAPISchemaRef       string
+	APIEnforcementMode     string
+	APIDefaultAction       string
+	APIEndpointPolicies    []APIPositiveEndpointPolicyInput
 }

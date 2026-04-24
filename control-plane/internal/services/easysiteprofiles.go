@@ -17,6 +17,7 @@ import (
 
 type EasySiteProfileStore interface {
 	Get(siteID string) (easysiteprofiles.EasySiteProfile, bool, error)
+	List() ([]easysiteprofiles.EasySiteProfile, error)
 	Create(profile easysiteprofiles.EasySiteProfile) (easysiteprofiles.EasySiteProfile, error)
 	Update(profile easysiteprofiles.EasySiteProfile) (easysiteprofiles.EasySiteProfile, error)
 }
@@ -102,6 +103,18 @@ func (s *EasySiteProfileService) Get(siteID string) (easysiteprofiles.EasySitePr
 		return easysiteprofiles.EasySiteProfile{}, err
 	}
 	return maskEasySiteProfileSecrets(out), nil
+}
+
+func (s *EasySiteProfileService) List() ([]easysiteprofiles.EasySiteProfile, error) {
+	items, err := s.store.List()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]easysiteprofiles.EasySiteProfile, 0, len(items))
+	for _, item := range items {
+		out = append(out, maskEasySiteProfileSecrets(item))
+	}
+	return out, nil
 }
 
 func (s *EasySiteProfileService) Upsert(ctx context.Context, profile easysiteprofiles.EasySiteProfile) (updated easysiteprofiles.EasySiteProfile, err error) {
@@ -407,6 +420,9 @@ func maskEasySiteProfileSecrets(profile easysiteprofiles.EasySiteProfile) easysi
 	profile.SecurityAntibot.AntibotHcaptchaSecret = maskSecret(profile.SecurityAntibot.AntibotHcaptchaSecret)
 	profile.SecurityAntibot.AntibotTurnstileSecret = maskSecret(profile.SecurityAntibot.AntibotTurnstileSecret)
 	profile.SecurityAuthBasic.AuthBasicPassword = maskSecret(profile.SecurityAuthBasic.AuthBasicPassword)
+	for i := range profile.SecurityAuthBasic.Users {
+		profile.SecurityAuthBasic.Users[i].Password = maskSecret(profile.SecurityAuthBasic.Users[i].Password)
+	}
 	return profile
 }
 
@@ -422,6 +438,21 @@ func mergeMaskedSecrets(incoming, existing easysiteprofiles.EasySiteProfile) eas
 	}
 	if strings.TrimSpace(incoming.SecurityAuthBasic.AuthBasicPassword) == maskedSecretValue {
 		incoming.SecurityAuthBasic.AuthBasicPassword = existing.SecurityAuthBasic.AuthBasicPassword
+	}
+	if len(incoming.SecurityAuthBasic.Users) > 0 && len(existing.SecurityAuthBasic.Users) > 0 {
+		existingByUser := make(map[string]easysiteprofiles.SecurityAuthUser, len(existing.SecurityAuthBasic.Users))
+		for _, item := range existing.SecurityAuthBasic.Users {
+			existingByUser[strings.ToLower(strings.TrimSpace(item.Username))] = item
+		}
+		for i := range incoming.SecurityAuthBasic.Users {
+			user := incoming.SecurityAuthBasic.Users[i]
+			if strings.TrimSpace(user.Password) != maskedSecretValue {
+				continue
+			}
+			if existingUser, ok := existingByUser[strings.ToLower(strings.TrimSpace(user.Username))]; ok {
+				incoming.SecurityAuthBasic.Users[i].Password = existingUser.Password
+			}
+		}
 	}
 	return incoming
 }

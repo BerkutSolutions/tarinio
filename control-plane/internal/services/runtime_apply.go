@@ -773,6 +773,31 @@ func mapCustomLimitRules(items []easysiteprofiles.CustomLimitRule) []pipeline.Cu
 	return out
 }
 
+func mapAPIPositiveEndpointPolicies(items []easysiteprofiles.APIPositiveEndpointPolicy) []pipeline.APIPositiveEndpointPolicyInput {
+	out := make([]pipeline.APIPositiveEndpointPolicyInput, 0, len(items))
+	for _, item := range items {
+		out = append(out, pipeline.APIPositiveEndpointPolicyInput{
+			Path:         item.Path,
+			Methods:      append([]string(nil), item.Methods...),
+			TokenIDs:     append([]string(nil), item.TokenIDs...),
+			ContentTypes: append([]string(nil), item.ContentTypes...),
+			Mode:         item.Mode,
+		})
+	}
+	return out
+}
+
+func mapAntibotChallengeRules(items []easysiteprofiles.AntibotChallengeRule) []pipeline.AntibotChallengeRuleInput {
+	out := make([]pipeline.AntibotChallengeRuleInput, 0, len(items))
+	for _, item := range items {
+		out = append(out, pipeline.AntibotChallengeRuleInput{
+			Path:      item.Path,
+			Challenge: item.Challenge,
+		})
+	}
+	return out
+}
+
 func mapEasyInputs(items []easysiteprofiles.EasySiteProfile) []pipeline.EasyProfileInput {
 	sorted := append([]easysiteprofiles.EasySiteProfile(nil), items...)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].SiteID < sorted[j].SiteID })
@@ -806,12 +831,15 @@ func mapEasyInputs(items []easysiteprofiles.EasySiteProfile) []pipeline.EasyProf
 			AuthBasicPassword: item.SecurityAuthBasic.AuthBasicPassword,
 			AuthBasicText:     item.SecurityAuthBasic.AuthBasicText,
 
-			AntibotChallenge:      item.SecurityAntibot.AntibotChallenge,
-			AntibotURI:            item.SecurityAntibot.AntibotURI,
-			AntibotRecaptchaScore: item.SecurityAntibot.AntibotRecaptchaScore,
-			AntibotRecaptchaKey:   item.SecurityAntibot.AntibotRecaptchaSitekey,
-			AntibotHcaptchaKey:    item.SecurityAntibot.AntibotHcaptchaSitekey,
-			AntibotTurnstileKey:   item.SecurityAntibot.AntibotTurnstileSitekey,
+			AntibotChallenge:           item.SecurityAntibot.AntibotChallenge,
+			AntibotURI:                 item.SecurityAntibot.AntibotURI,
+			AntibotRecaptchaScore:      item.SecurityAntibot.AntibotRecaptchaScore,
+			AntibotRecaptchaKey:        item.SecurityAntibot.AntibotRecaptchaSitekey,
+			AntibotHcaptchaKey:         item.SecurityAntibot.AntibotHcaptchaSitekey,
+			AntibotTurnstileKey:        item.SecurityAntibot.AntibotTurnstileSitekey,
+			ChallengeEscalationEnabled: item.SecurityAntibot.ChallengeEscalationEnabled,
+			ChallengeEscalationMode:    item.SecurityAntibot.ChallengeEscalationMode,
+			AntibotChallengeRules:      mapAntibotChallengeRules(item.SecurityAntibot.ChallengeRules),
 
 			UseLimitConn:              item.SecurityBehaviorAndLimits.UseLimitConn,
 			LimitConnMaxHTTP1:         item.SecurityBehaviorAndLimits.LimitConnMaxHTTP1,
@@ -838,6 +866,12 @@ func mapEasyInputs(items []easysiteprofiles.EasySiteProfile) []pipeline.EasyProf
 			ModSecurityCRSPlugins:             item.SecurityModSecurity.ModSecurityCRSPlugins,
 			ModSecurityCustomPath:             item.SecurityModSecurity.CustomConfiguration.Path,
 			ModSecurityCustomContent:          item.SecurityModSecurity.CustomConfiguration.Content,
+
+			UseAPIPositiveSecurity: item.SecurityAPIPositive.UseAPIPositiveSecurity,
+			OpenAPISchemaRef:       item.SecurityAPIPositive.OpenAPISchemaRef,
+			APIEnforcementMode:     item.SecurityAPIPositive.EnforcementMode,
+			APIDefaultAction:       item.SecurityAPIPositive.DefaultAction,
+			APIEndpointPolicies:    mapAPIPositiveEndpointPolicies(item.SecurityAPIPositive.EndpointPolicies),
 		})
 	}
 	return out
@@ -868,24 +902,36 @@ type HTTPHealthChecker struct {
 }
 
 func (h HTTPHealthChecker) Check(active *pipeline.ActivePointer) error {
-	url := strings.TrimSpace(h.URL)
-	if url == "" {
-		url = "http://127.0.0.1:8081/readyz"
-	}
-
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return err
-	}
-	setRuntimeAuthHeader(req, strings.TrimSpace(h.Token))
+	candidates := runtimeEndpointCandidates(strings.TrimSpace(h.URL), "http://127.0.0.1:8081/readyz")
 	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
+	var lastErr error
+	for _, candidate := range candidates {
+		req, err := http.NewRequest(http.MethodGet, candidate, nil)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		setRuntimeAuthHeader(req, strings.TrimSpace(h.Token))
+		resp, err := client.Do(req)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		func() {
+			defer resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				lastErr = nil
+				return
+			}
+			lastErr = fmt.Errorf("health endpoint returned %d", resp.StatusCode)
+		}()
+		if lastErr == nil {
+			return nil
+		}
+		return lastErr
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("health endpoint returned %d", resp.StatusCode)
+	if lastErr != nil {
+		return lastErr
 	}
-	return nil
+	return fmt.Errorf("runtime health endpoint is not reachable")
 }

@@ -101,3 +101,7 @@ jobs:
           test -f build/release/2.0.10-ci/checksums.txt
           test -f build/release/2.0.10-ci/sbom.cdx.json
           test -f build/release/2.0.10-ci/provenance.json
+
+      - name: Verify release artifact checksums and signature
+        run: |
+          go run ./cmd/release-artifacts-verify -output build/release/2.0.10-ci

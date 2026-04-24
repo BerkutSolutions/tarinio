@@ -67,20 +67,20 @@ func TestRenderEasyArtifacts_GeneratesSiteAndAuthBasicFiles(t *testing.T) {
 	if !strings.Contains(siteConf, "client_max_body_size 50m;") {
 		t.Fatalf("expected max_client_size directive, got: %s", siteConf)
 	}
-	if !strings.Contains(siteConf, "auth_basic \"Restricted area\";") {
-		t.Fatalf("expected auth_basic realm, got: %s", siteConf)
+	if !strings.Contains(siteConf, "set $waf_auth_gate_skip 0;") || !strings.Contains(siteConf, "if ($waf_auth_gate_redirect = 1) { return 302 /auth?return_uri=$uri&return_args=$args; }") {
+		t.Fatalf("expected auth gate redirect guard, got: %s", siteConf)
 	}
 	if !strings.Contains(siteConf, "if ($cookie_waf_antibot_") {
 		t.Fatalf("expected site-scoped antibot cookie rule, got: %s", siteConf)
 	}
-	if !strings.Contains(siteConf, "if ($waf_antibot_guard = \"0:0:1\") { return 302 /challenge?return_uri=$uri&return_args=$args; }") {
-		t.Fatalf("expected antibot redirect challenge in easy template, got: %s", siteConf)
+	if !strings.Contains(siteConf, "if ($waf_antibot_guard = \"0:0:1\") { return 302 $waf_antibot_effective_redirect?return_uri=$uri&return_args=$args; }") {
+		t.Fatalf("expected antibot redirect challenge variable in easy template, got: %s", siteConf)
 	}
 	if !strings.Contains(siteConf, `set $waf_antibot_guard "$waf_antibot_exception_guard:$waf_antibot_verified:$waf_antibot_safe_method";`) {
 		t.Fatalf("expected antibot guard to use antibot-specific exception variable, got: %s", siteConf)
 	}
-	if !strings.Contains(siteConf, `if ($uri ~* "^/(`) || !strings.Contains(siteConf, `api/.*`) || !strings.Contains(siteConf, `static/.*`) || !strings.Contains(siteConf, `dashboard(?:/.*)?`) || !strings.Contains(siteConf, `login/2fa`) {
-		t.Fatalf("expected admin path bypass guard in easy template, got: %s", siteConf)
+	if strings.Contains(siteConf, `dashboard(?:/.*)?`) {
+		t.Fatalf("did not expect admin path bypass guard for non-management site, got: %s", siteConf)
 	}
 	if !strings.Contains(siteConf, `if ($cookie_waf_session != "")`) || !strings.Contains(siteConf, `if ($cookie_waf_session_boot != "")`) {
 		t.Fatalf("expected admin session cookie bypass guard in easy template, got: %s", siteConf)
@@ -88,7 +88,7 @@ func TestRenderEasyArtifacts_GeneratesSiteAndAuthBasicFiles(t *testing.T) {
 	if !strings.Contains(siteConf, "if ($waf_allow_bypass_site_a = 1)") {
 		t.Fatalf("expected allowlist bypass guard in easy template, got: %s", siteConf)
 	}
-	if !strings.Contains(siteConf, "add_header X-WAF-Antibot-Mode \"recaptcha\" always;") {
+	if !strings.Contains(siteConf, "add_header X-WAF-Antibot-Mode \"$waf_antibot_effective_challenge\" always;") {
 		t.Fatalf("expected antibot mode header, got: %s", siteConf)
 	}
 	if !strings.Contains(siteConf, "add_header X-WAF-Antibot-Provider \"recaptcha\" always;") {
@@ -117,14 +117,52 @@ func TestRenderEasyArtifacts_GeneratesSiteAndAuthBasicFiles(t *testing.T) {
 	}
 
 	var challengePage string
+	var authPage string
 	for _, item := range artifacts {
 		if item.Path == "errors/site-a/antibot.html" {
 			challengePage = string(item.Content)
-			break
+		}
+		if item.Path == "errors/site-a/auth.html" {
+			authPage = string(item.Content)
 		}
 	}
 	if !strings.Contains(challengePage, `var verifyURI = "/challenge/verify";`) {
 		t.Fatalf("expected antibot interstitial artifact with verify uri, got: %s", challengePage)
+	}
+	if !strings.Contains(authPage, `fetch("/auth/verify"`) {
+		t.Fatalf("expected auth gate page with verify endpoint, got: %s", authPage)
+	}
+}
+
+func TestRenderEasyArtifacts_AdminBypassOnlyForManagementSites(t *testing.T) {
+	artifacts, err := RenderEasyArtifacts(
+		[]SiteInput{
+			{ID: "control-plane-access", Enabled: true, PrimaryHost: "localhost", ListenHTTP: true},
+		},
+		[]EasyProfileInput{
+			{
+				SiteID:           "control-plane-access",
+				AllowedMethods:   []string{"GET", "POST"},
+				AntibotChallenge: "javascript",
+				AntibotURI:       "/challenge",
+			},
+		},
+	)
+	if err != nil {
+		t.Fatalf("render easy artifacts: %v", err)
+	}
+	var siteConf string
+	for _, item := range artifacts {
+		if item.Path == "nginx/easy/control-plane-access.conf" {
+			siteConf = string(item.Content)
+			break
+		}
+	}
+	if siteConf == "" {
+		t.Fatal("expected easy site conf for management site")
+	}
+	if !strings.Contains(siteConf, `if ($uri ~* "^/(`) || !strings.Contains(siteConf, `dashboard(?:/.*)?`) || !strings.Contains(siteConf, `login/2fa`) {
+		t.Fatalf("expected admin bypass guard for management site, got: %s", siteConf)
 	}
 }
 

@@ -1,6 +1,6 @@
 import { api } from "./api.js";
 import { checkEntryAccess, secureAppUrl } from "./guard.js";
-import { applyTranslations, getLanguage, t } from "./i18n.js";
+import { getBrowserLanguage, setLanguage, t } from "./i18n.js";
 
 const MIN_STEP_MS = 150;
 const CHECKS_CONCURRENCY = 4;
@@ -534,7 +534,7 @@ async function loadErrorIssues() {
 }
 
 async function bootstrap() {
-  await applyTranslations(getLanguage());
+  await setLanguage(getBrowserLanguage());
   document.title = t("healthcheck.pageTitle");
 
   const access = await checkEntryAccess("app");

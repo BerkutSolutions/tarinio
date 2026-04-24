@@ -492,6 +492,10 @@ func deleteJumpRule(exec executor, table string, parentChain string, rule []stri
 			return nil
 		}
 		if err := exec.Run(table, deleteArgs...); err != nil {
+			// Allow races: another actor may remove the same stale jump between -C and -D.
+			if checkErr := exec.Run(table, checkArgs...); checkErr != nil {
+				return nil
+			}
 			return fmt.Errorf("delete stale jump rule from %s: %w", parentChain, err)
 		}
 	}

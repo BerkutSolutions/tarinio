@@ -72,6 +72,32 @@ func TestGenerateReleaseArtifacts(t *testing.T) {
 	if got := sbom["bomFormat"]; got != "CycloneDX" {
 		t.Fatalf("sbom bomFormat = %v", got)
 	}
+	if err := Verify(outputDir); err != nil {
+		t.Fatalf("Verify() error = %v", err)
+	}
+}
+
+func TestVerifyReleaseArtifactsFailsOnTamper(t *testing.T) {
+	repoRoot := filepath.Clean(filepath.Join("..", ".."))
+	outputDir := filepath.Join(t.TempDir(), "release-3.0.0")
+
+	if _, err := Generate(Options{
+		RepoRoot:   repoRoot,
+		Version:    "3.0.0",
+		CommitSHA:  "deadbeef",
+		Tag:        "v3.0.0",
+		OutputDir:  outputDir,
+		DockerTags: []string{"tarinio:3.0.0"},
+	}); err != nil {
+		t.Fatalf("Generate() error = %v", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(outputDir, "provenance.json"), []byte(`{"tampered":true}`), 0o644); err != nil {
+		t.Fatalf("tamper provenance: %v", err)
+	}
+	if err := Verify(outputDir); err == nil {
+		t.Fatal("expected Verify() to fail after artifact tampering")
+	}
 }
 
 func decodeJSONFile(path string, target any) error {

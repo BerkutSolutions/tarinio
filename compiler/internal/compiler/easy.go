@@ -41,18 +41,31 @@ type easySiteData struct {
 	UseAuthBasic      bool
 	AuthBasicRealm    string
 	AuthBasicUserFile string
+	AuthGateLoginURI  string
+	AuthGateVerifyURI string
+	AuthGateCookieKey string
+	AuthGateCookieVal string
+	AuthGateCookieTTL int
 
-	AntibotEnabled          bool
-	AntibotUsesInterstitial bool
-	AntibotChallenge        string
-	AntibotURI              string
-	AntibotVerifyURI        string
-	AntibotRedirectURI      string
-	AntibotCookieName       string
-	AntibotCookieValue      string
-	AntibotRecaptchaHint    string
-	AntibotHcaptchaHint     string
-	AntibotTurnstileHint    string
+	AntibotEnabled           bool
+	AntibotTwoLayerEnabled   bool
+	AntibotUsesInterstitial  bool
+	AntibotChallenge         string
+	AntibotEscalationMode    string
+	AntibotURI               string
+	AntibotVerifyURI         string
+	AntibotStage1URI         string
+	AntibotStage1VerifyURI   string
+	AntibotRedirectURI       string
+	AntibotStage1RedirectURI string
+	AntibotStage1CookieName  string
+	AntibotStage1CookieValue string
+	AntibotCookieName        string
+	AntibotCookieValue       string
+	AntibotRecaptchaHint     string
+	AntibotHcaptchaHint      string
+	AntibotTurnstileHint     string
+	AntibotRuleOverrides     []easyAntibotRuleData
 
 	BlacklistIP        []string
 	BlacklistUserAgent []string
@@ -80,6 +93,16 @@ type l4GuardConfigData struct {
 
 type antibotChallengePageData struct {
 	VerifyURI string
+}
+
+type authGatePageData struct {
+	VerifyURI string
+}
+
+type easyAntibotRuleData struct {
+	GuardPattern string
+	Challenge    string
+	RedirectURI  string
 }
 
 // RenderEasyArtifacts compiles Easy-mode site directives into per-site nginx snippets.
@@ -119,6 +142,29 @@ func RenderEasyArtifacts(sites []SiteInput, profiles []EasyProfileInput) ([]Arti
 		if profile.AuthBasicText == "" {
 			profile.AuthBasicText = "Restricted area"
 		}
+		profile.AuthUsers = normalizeAuthUsers(profile.AuthUsers)
+		if len(profile.AuthUsers) == 0 && profile.AuthBasicUser != "" {
+			profile.AuthUsers = []ServiceAuthUserInput{
+				{
+					Username: profile.AuthBasicUser,
+					Password: profile.AuthBasicPassword,
+					Enabled:  true,
+				},
+			}
+		}
+		if profile.AuthBasicUser == "" && len(profile.AuthUsers) > 0 {
+			profile.AuthBasicUser = profile.AuthUsers[0].Username
+			profile.AuthBasicPassword = profile.AuthUsers[0].Password
+		}
+		if profile.AuthSessionTTLMin < -1 {
+			profile.AuthSessionTTLMin = -1
+		}
+		if profile.AuthSessionTTLMin == 0 {
+			profile.AuthSessionTTLMin = 60
+		}
+		if profile.AuthSessionTTLMin > 1440 {
+			profile.AuthSessionTTLMin = 1440
+		}
 		profile.AntibotChallenge = strings.ToLower(strings.TrimSpace(profile.AntibotChallenge))
 		profile.SecurityMode = strings.ToLower(strings.TrimSpace(profile.SecurityMode))
 		switch profile.SecurityMode {
@@ -127,6 +173,11 @@ func RenderEasyArtifacts(sites []SiteInput, profiles []EasyProfileInput) ([]Arti
 			profile.SecurityMode = "block"
 		}
 		profile.AntibotURI = strings.TrimSpace(profile.AntibotURI)
+		profile.ChallengeEscalationMode = strings.ToLower(strings.TrimSpace(profile.ChallengeEscalationMode))
+		if profile.ChallengeEscalationMode == "" {
+			profile.ChallengeEscalationMode = "javascript"
+		}
+		profile.AntibotChallengeRules = normalizeCompilerAntibotRules(profile.AntibotChallengeRules)
 		if profile.AntibotChallenge == "" {
 			profile.AntibotChallenge = "no"
 		}
@@ -146,6 +197,27 @@ func RenderEasyArtifacts(sites []SiteInput, profiles []EasyProfileInput) ([]Arti
 			profile.ModSecurityCustomPath = "modsec/anomaly_score.conf"
 		}
 		profile.ModSecurityCustomContent = strings.TrimSpace(profile.ModSecurityCustomContent)
+		profile.OpenAPISchemaRef = strings.TrimSpace(profile.OpenAPISchemaRef)
+		profile.APIEnforcementMode = strings.ToLower(strings.TrimSpace(profile.APIEnforcementMode))
+		if profile.APIEnforcementMode == "" {
+			profile.APIEnforcementMode = "monitor"
+		}
+		profile.APIDefaultAction = strings.ToLower(strings.TrimSpace(profile.APIDefaultAction))
+		if profile.APIDefaultAction == "" {
+			profile.APIDefaultAction = "allow"
+		}
+		for idx := range profile.APIEndpointPolicies {
+			policy := &profile.APIEndpointPolicies[idx]
+			policy.Path = strings.TrimSpace(policy.Path)
+			policy.Mode = strings.ToLower(strings.TrimSpace(policy.Mode))
+			policy.Methods = sortedUniqueUpper(policy.Methods)
+			policy.TokenIDs = sortedUnique(policy.TokenIDs)
+			contentTypes := sortedUnique(policy.ContentTypes)
+			for i := range contentTypes {
+				contentTypes[i] = strings.ToLower(strings.TrimSpace(contentTypes[i]))
+			}
+			policy.ContentTypes = contentTypes
+		}
 		if profile.BadBehaviorBanTimeSeconds < 0 {
 			profile.BadBehaviorBanTimeSeconds = 0
 		}
@@ -201,6 +273,13 @@ func RenderEasyArtifacts(sites []SiteInput, profiles []EasyProfileInput) ([]Arti
 		if corsAllowedOrigins == "" {
 			corsAllowedOrigins = "*"
 		}
+		antibotEnabled := profile.AntibotChallenge != "" && profile.AntibotChallenge != "no"
+		antibotTwoLayer := profile.ChallengeEscalationEnabled && antibotEnabled
+		defaultChallenge := profile.AntibotChallenge
+		if antibotTwoLayer && profile.ChallengeEscalationMode != "" && profile.ChallengeEscalationMode != "no" {
+			defaultChallenge = profile.ChallengeEscalationMode
+		}
+		authUsers := enabledAuthUsers(profile.AuthUsers)
 		data := easySiteData{
 			SiteID:                       site.ID,
 			RateLimitCookieVar:           rateLimitCookieVar(site.ID),
@@ -223,21 +302,34 @@ func RenderEasyArtifacts(sites []SiteInput, profiles []EasyProfileInput) ([]Arti
 			SendXForwardedProto:          profile.SendXForwardedProto,
 			SendXRealIP:                  profile.SendXRealIP,
 			RateLimitBanSeconds:          rateLimitBanSeconds(profile),
-			AdminBypassPathPattern:       easyAdminBypassPathPattern(),
-			UseAuthBasic:                 profile.UseAuthBasic && profile.AuthBasicUser != "" && profile.AuthBasicPassword != "",
+			AdminBypassPathPattern:       easyAdminBypassPathPatternForSite(site.ID),
+			UseAuthBasic:                 profile.UseAuthBasic && len(authUsers) > 0,
 			AuthBasicRealm:               profile.AuthBasicText,
 			AuthBasicUserFile:            fmt.Sprintf("/etc/waf/nginx/auth-basic/%s.htpasswd", site.ID),
-			AntibotEnabled:               profile.AntibotChallenge != "" && profile.AntibotChallenge != "no",
-			AntibotUsesInterstitial:      antibotUsesInterstitial(profile.AntibotChallenge),
-			AntibotChallenge:             profile.AntibotChallenge,
+			AuthGateLoginURI:             authGateLoginURI(),
+			AuthGateVerifyURI:            authGateVerifyURI(),
+			AuthGateCookieKey:            authGateCookieName(site.ID),
+			AuthGateCookieVal:            authGateCookieValue(site.ID, profile),
+			AuthGateCookieTTL:            authGateCookieTTLSeconds(profile),
+			AntibotEnabled:               antibotEnabled,
+			AntibotTwoLayerEnabled:       antibotTwoLayer,
+			AntibotUsesInterstitial:      antibotUsesInterstitial(defaultChallenge),
+			AntibotChallenge:             defaultChallenge,
+			AntibotEscalationMode:        profile.ChallengeEscalationMode,
 			AntibotURI:                   profile.AntibotURI,
 			AntibotVerifyURI:             antibotVerifyURI(profile.AntibotURI),
-			AntibotRedirectURI:           antibotRedirectURI(profile.AntibotChallenge, profile.AntibotURI),
+			AntibotStage1URI:             antibotStage1URI(profile.AntibotURI),
+			AntibotStage1VerifyURI:       antibotStage1VerifyURI(profile.AntibotURI),
+			AntibotRedirectURI:           antibotRedirectURI(defaultChallenge, profile.AntibotURI),
+			AntibotStage1RedirectURI:     antibotVerifyURI(antibotStage1URI(profile.AntibotURI)),
+			AntibotStage1CookieName:      antibotStage1CookieName(site.ID),
+			AntibotStage1CookieValue:     antibotStage1CookieValue(site.ID, profile),
 			AntibotCookieName:            antibotCookieName(site.ID),
 			AntibotCookieValue:           antibotCookieValue(site.ID, profile),
 			AntibotRecaptchaHint:         strings.TrimSpace(profile.AntibotRecaptchaKey),
 			AntibotHcaptchaHint:          strings.TrimSpace(profile.AntibotHcaptchaKey),
 			AntibotTurnstileHint:         strings.TrimSpace(profile.AntibotTurnstileKey),
+			AntibotRuleOverrides:         buildEasyAntibotRuleData(profile.AntibotChallengeRules, profile.AntibotURI),
 			BlacklistIP:                  profile.BlacklistIP,
 			BlacklistUserAgent:           profile.BlacklistUserAgent,
 			BlacklistURI:                 profile.BlacklistURI,
@@ -255,6 +347,11 @@ func RenderEasyArtifacts(sites []SiteInput, profiles []EasyProfileInput) ([]Arti
 				profile.UseModSecurityCustomConfiguration,
 				profile.ModSecurityCustomPath,
 				profile.ModSecurityCustomContent,
+				profile.UseAPIPositiveSecurity,
+				profile.OpenAPISchemaRef,
+				profile.APIEnforcementMode,
+				profile.APIDefaultAction,
+				profile.APIEndpointPolicies,
 			),
 		}
 
@@ -269,11 +366,26 @@ func RenderEasyArtifacts(sites []SiteInput, profiles []EasyProfileInput) ([]Arti
 		))
 
 		if data.UseAuthBasic {
-			htpasswd := []byte(buildSHA1HTPasswdLine(profile.AuthBasicUser, profile.AuthBasicPassword))
+			lines := make([]string, 0, len(authUsers))
+			for _, user := range authUsers {
+				lines = append(lines, buildSHA1HTPasswdLine(user.Username, user.Password))
+			}
+			htpasswd := []byte(strings.Join(lines, "\n"))
 			artifacts = append(artifacts, newArtifact(
 				fmt.Sprintf("nginx/auth-basic/%s.htpasswd", site.ID),
 				ArtifactKindNginxConfig,
 				htpasswd,
+			))
+			authPage, err := renderTemplate(filepath.Join(templatesRoot(), "..", "errors", "auth.html.tmpl"), authGatePageData{
+				VerifyURI: data.AuthGateVerifyURI,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("render auth gate page for %s: %w", site.ID, err)
+			}
+			artifacts = append(artifacts, newArtifact(
+				fmt.Sprintf("errors/%s/auth.html", site.ID),
+				ArtifactKindNginxConfig,
+				authPage,
 			))
 		}
 		if data.ModSecurityEasyRulesOn {
@@ -346,6 +458,38 @@ func antibotCookieName(siteID string) string {
 	return "waf_antibot_" + shortStableHash(siteID)
 }
 
+func authGateLoginURI() string {
+	return "/auth"
+}
+
+func authGateVerifyURI() string {
+	return "/auth/verify"
+}
+
+func authGateCookieName(siteID string) string {
+	return "waf_auth_" + shortStableHash(siteID)
+}
+
+func authGateCookieValue(siteID string, profile EasyProfileInput) string {
+	enabled := enabledAuthUsers(profile.AuthUsers)
+	parts := make([]string, 0, len(enabled)+4)
+	parts = append(parts, siteID, profile.AuthBasicText, strconv.Itoa(profile.AuthSessionTTLMin))
+	for _, user := range enabled {
+		parts = append(parts, strings.TrimSpace(user.Username)+":"+strings.TrimSpace(user.Password))
+	}
+	return shortStableHash(strings.Join(parts, "|"))
+}
+
+func authGateCookieTTLSeconds(profile EasyProfileInput) int {
+	if profile.AuthSessionTTLMin < 0 {
+		return -1
+	}
+	if profile.AuthSessionTTLMin == 0 {
+		return 3600
+	}
+	return profile.AuthSessionTTLMin * 60
+}
+
 func antibotUsesInterstitial(mode string) bool {
 	switch strings.ToLower(strings.TrimSpace(mode)) {
 	case "javascript", "captcha", "recaptcha", "hcaptcha", "turnstile", "mcaptcha":
@@ -362,6 +506,19 @@ func antibotVerifyURI(challengeURI string) string {
 	}
 	trimmed = strings.TrimRight(trimmed, "/")
 	return trimmed + "/verify"
+}
+
+func antibotStage1URI(challengeURI string) string {
+	trimmed := strings.TrimSpace(challengeURI)
+	if trimmed == "" || trimmed == "/" {
+		return "/challenge/stage1"
+	}
+	trimmed = strings.TrimRight(trimmed, "/")
+	return trimmed + "/stage1"
+}
+
+func antibotStage1VerifyURI(challengeURI string) string {
+	return antibotVerifyURI(antibotStage1URI(challengeURI))
 }
 
 func antibotRedirectURI(mode string, challengeURI string) string {
@@ -382,9 +539,62 @@ func antibotCookieValue(siteID string, profile EasyProfileInput) string {
 	}, "|"))
 }
 
+func antibotStage1CookieName(siteID string) string {
+	return "waf_antibot_s1_" + shortStableHash(siteID)
+}
+
+func antibotStage1CookieValue(siteID string, profile EasyProfileInput) string {
+	return shortStableHash(strings.Join([]string{
+		siteID,
+		profile.AntibotChallenge,
+		profile.AntibotURI,
+		profile.ChallengeEscalationMode,
+	}, "|"))
+}
+
 func shortStableHash(value string) string {
 	sum := sha1.Sum([]byte(strings.TrimSpace(value)))
 	return fmt.Sprintf("%x", sum[:6])
+}
+
+func normalizeAuthUsers(values []ServiceAuthUserInput) []ServiceAuthUserInput {
+	if len(values) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(values))
+	out := make([]ServiceAuthUserInput, 0, len(values))
+	for _, item := range values {
+		username := strings.TrimSpace(item.Username)
+		if username == "" {
+			continue
+		}
+		key := strings.ToLower(username)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, ServiceAuthUserInput{
+			Username:    username,
+			Password:    strings.TrimSpace(item.Password),
+			Enabled:     item.Enabled,
+			LastLoginAt: strings.TrimSpace(item.LastLoginAt),
+		})
+	}
+	return out
+}
+
+func enabledAuthUsers(values []ServiceAuthUserInput) []ServiceAuthUserInput {
+	out := make([]ServiceAuthUserInput, 0, len(values))
+	for _, item := range normalizeAuthUsers(values) {
+		if !item.Enabled {
+			continue
+		}
+		if strings.TrimSpace(item.Password) == "" {
+			continue
+		}
+		out = append(out, item)
+	}
+	return out
 }
 
 func rateLimitCookieVar(siteID string) string {
@@ -490,7 +700,21 @@ func buildSHA1HTPasswdLine(user, password string) string {
 	return user + ":{SHA}" + hash + "\n"
 }
 
-func buildEasyModSecurityRules(siteID, securityMode string, useCRSPlugins bool, crsVersion string, plugins []string, useCustomConfiguration bool, customPath, customContent string) string {
+func buildEasyModSecurityRules(
+	siteID,
+	securityMode string,
+	useCRSPlugins bool,
+	crsVersion string,
+	plugins []string,
+	useCustomConfiguration bool,
+	customPath,
+	customContent string,
+	useAPIPositiveSecurity bool,
+	openAPISchemaRef,
+	apiEnforcementMode,
+	apiDefaultAction string,
+	apiEndpointPolicies []APIPositiveEndpointPolicyInput,
+) string {
 	engineDirective := "SecRuleEngine On"
 	switch strings.ToLower(strings.TrimSpace(securityMode)) {
 	case "monitor":
@@ -525,7 +749,94 @@ func buildEasyModSecurityRules(siteID, securityMode string, useCRSPlugins bool, 
 	if useCustomConfiguration && strings.TrimSpace(customContent) != "" {
 		lines = append(lines, customContent)
 	}
+	if useAPIPositiveSecurity {
+		lines = append(lines, buildAPIPositiveModSecurityRules(siteID, openAPISchemaRef, apiEnforcementMode, apiDefaultAction, apiEndpointPolicies)...)
+	}
 	return strings.Join(lines, "\n") + "\n"
+}
+
+func buildAPIPositiveModSecurityRules(siteID, schemaRef, enforcementMode, defaultAction string, policies []APIPositiveEndpointPolicyInput) []string {
+	lines := []string{
+		"# API Positive Security directives",
+		"# api_positive_site: " + siteID,
+		"# api_positive_schema_ref: " + strings.TrimSpace(schemaRef),
+		"# api_positive_enforcement_mode: " + strings.TrimSpace(enforcementMode),
+		"# api_positive_default_action: " + strings.TrimSpace(defaultAction),
+	}
+
+	blocking := strings.ToLower(strings.TrimSpace(enforcementMode)) == "block"
+	defaultDeny := strings.ToLower(strings.TrimSpace(defaultAction)) == "deny"
+	ruleID := 190000
+	knownPaths := make([]string, 0, len(policies))
+
+	for _, policy := range policies {
+		path := strings.TrimSpace(policy.Path)
+		if path == "" {
+			continue
+		}
+		knownPaths = append(knownPaths, regexp.QuoteMeta(path))
+
+		mode := strings.ToLower(strings.TrimSpace(policy.Mode))
+		policyBlocking := blocking
+		if mode == "block" {
+			policyBlocking = true
+		}
+		if mode == "monitor" {
+			policyBlocking = false
+		}
+		action := "pass,log"
+		if policyBlocking {
+			action = "deny,status:403,log"
+		}
+
+		if len(policy.Methods) > 0 {
+			lines = append(lines,
+				fmt.Sprintf(`SecRule REQUEST_URI "@rx ^%s(?:$|/)" "id:%d,phase:1,t:none,chain,pass,nolog"`, regexp.QuoteMeta(path), ruleID),
+				fmt.Sprintf(`SecRule REQUEST_METHOD "!@within %s" "t:none,%s,msg:'API positive security: method mismatch for %s'"`, strings.Join(policy.Methods, " "), action, path),
+			)
+			ruleID += 2
+		}
+		if len(policy.TokenIDs) > 0 {
+			tokenPattern := "(?:" + strings.Join(quoteMetaList(policy.TokenIDs), "|") + ")"
+			lines = append(lines,
+				fmt.Sprintf(`SecRule REQUEST_URI "@rx ^%s(?:$|/)" "id:%d,phase:1,t:none,chain,pass,nolog"`, regexp.QuoteMeta(path), ruleID),
+				fmt.Sprintf(`SecRule REQUEST_HEADERS:X-WAF-API-TOKEN-ID "!@rx ^%s$" "t:none,%s,msg:'API positive security: token mismatch for %s'"`, tokenPattern, action, path),
+			)
+			ruleID += 2
+		}
+		if len(policy.ContentTypes) > 0 {
+			contentTypePattern := "(?:" + strings.Join(quoteMetaList(policy.ContentTypes), "|") + ")"
+			lines = append(lines,
+				fmt.Sprintf(`SecRule REQUEST_URI "@rx ^%s(?:$|/)" "id:%d,phase:1,t:none,chain,pass,nolog"`, regexp.QuoteMeta(path), ruleID),
+				fmt.Sprintf(`SecRule REQUEST_HEADERS:Content-Type "!@rx ^%s(?:;|$)" "t:none,%s,msg:'API positive security: content-type mismatch for %s'"`, contentTypePattern, action, path),
+			)
+			ruleID += 2
+		}
+	}
+
+	if defaultDeny && len(knownPaths) > 0 {
+		action := "pass,log"
+		if blocking {
+			action = "deny,status:403,log"
+		}
+		lines = append(lines,
+			fmt.Sprintf(`SecRule REQUEST_URI "!@rx ^(?:%s)(?:$|/)" "id:%d,phase:1,t:none,%s,msg:'API positive security: unknown endpoint'"`, strings.Join(knownPaths, "|"), ruleID, action),
+		)
+	}
+
+	return lines
+}
+
+func quoteMetaList(values []string) []string {
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		v := strings.TrimSpace(value)
+		if v == "" {
+			continue
+		}
+		out = append(out, regexp.QuoteMeta(v))
+	}
+	return out
 }
 
 func parseRatePerSecond(value string) int {
@@ -537,6 +848,85 @@ func parseRatePerSecond(value string) int {
 		return 0
 	}
 	return v
+}
+
+func normalizeCompilerAntibotRules(values []AntibotChallengeRuleInput) []AntibotChallengeRuleInput {
+	if len(values) == 0 {
+		return nil
+	}
+	items := make([]AntibotChallengeRuleInput, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		path := strings.TrimSpace(value.Path)
+		challenge := strings.ToLower(strings.TrimSpace(value.Challenge))
+		if path == "" || challenge == "" || challenge == "no" {
+			continue
+		}
+		key := strings.ToLower(path) + "\x00" + challenge
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		items = append(items, AntibotChallengeRuleInput{
+			Path:      path,
+			Challenge: challenge,
+		})
+	}
+	sort.Slice(items, func(i, j int) bool {
+		leftPriority := customLimitPriority(items[i].Path)
+		rightPriority := customLimitPriority(items[j].Path)
+		if leftPriority != rightPriority {
+			return leftPriority > rightPriority
+		}
+		if len(items[i].Path) != len(items[j].Path) {
+			return len(items[i].Path) > len(items[j].Path)
+		}
+		if items[i].Path == items[j].Path {
+			return items[i].Challenge < items[j].Challenge
+		}
+		return items[i].Path < items[j].Path
+	})
+	return items
+}
+
+func buildEasyAntibotRuleData(rules []AntibotChallengeRuleInput, challengeURI string) []easyAntibotRuleData {
+	if len(rules) == 0 {
+		return nil
+	}
+	out := make([]easyAntibotRuleData, 0, len(rules))
+	for _, rule := range rules {
+		pattern := antibotRuleGuardPattern(rule.Path)
+		if pattern == "" {
+			continue
+		}
+		out = append(out, easyAntibotRuleData{
+			GuardPattern: pattern,
+			Challenge:    rule.Challenge,
+			RedirectURI:  antibotRedirectURI(rule.Challenge, challengeURI),
+		})
+	}
+	return out
+}
+
+func antibotRuleGuardPattern(path string) string {
+	trimmed := strings.TrimSpace(path)
+	if trimmed == "" {
+		return ""
+	}
+	if hasComplexWildcard(trimmed) {
+		return wildcardPathToRegex(trimmed)
+	}
+	if strings.HasSuffix(trimmed, "*") {
+		base := strings.TrimSuffix(trimmed, "*")
+		if base == "" {
+			return "^/"
+		}
+		return "^" + regexp.QuoteMeta(base)
+	}
+	if strings.HasSuffix(trimmed, "/") {
+		return "^" + regexp.QuoteMeta(trimmed)
+	}
+	return "^" + regexp.QuoteMeta(trimmed) + "$"
 }
 
 func normalizeBlacklistURIPatterns(values []string) []string {

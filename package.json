@@ -1,7 +1,7 @@
 {
     "name": "tarinio-docs-site",
     "private": true,
-    "version": "3.0.1",
+    "version": "3.0.2",
     "scripts": {
         "start": "npm run clear && docusaurus start --host 127.0.0.1 --port 3000",
         "docs:start": "npm run clear && docusaurus start --host 127.0.0.1 --port 3000",
@@ -24,3 +24,4 @@
         "uuid": "^14.0.0"
     }
 }
+

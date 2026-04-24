@@ -49,7 +49,37 @@ map $waf_country_header $waf_country_code {
     default $waf_country_header;
 }
 
-log_format waf_security_json escape=json '{"timestamp":"$time_iso8601","request_id":"$request_id","client_ip":"$remote_addr","country":"$waf_country_code","host":"$host","method":"$request_method","uri":"$request_uri","status":$status,"bytes_sent":$body_bytes_sent,"referer":"$http_referer","user_agent":"$http_user_agent","site":"$waf_site_id","upstream_addr":"$upstream_addr","request_time":$request_time}';
+map $http_x_city $waf_city_from_x_city {
+    default "";
+    ~(?i)^[A-Za-z0-9._-]+$ $http_x_city;
+}
+
+map $http_x_geo_city $waf_city_from_x_geo_city {
+    default "";
+    ~(?i)^[A-Za-z0-9._-]+$ $http_x_geo_city;
+}
+
+map $http_cf_ipcity $waf_city_from_cf {
+    default "";
+    ~(?i)^[A-Za-z0-9._-]+$ $http_cf_ipcity;
+}
+
+map $waf_city_from_cf $waf_city_header_step_1 {
+    "" $waf_city_from_x_city;
+    default $waf_city_from_cf;
+}
+
+map $waf_city_header_step_1 $waf_city_header {
+    "" $waf_city_from_x_geo_city;
+    default $waf_city_header_step_1;
+}
+
+map $waf_city_header $waf_city_name {
+    "" $geoip_city;
+    default $waf_city_header;
+}
+
+log_format waf_security_json escape=json '{"timestamp":"$time_iso8601","request_id":"$request_id","client_ip":"$remote_addr","country":"$waf_country_code","city":"$waf_city_name","host":"$host","method":"$request_method","uri":"$request_uri","status":$status,"bytes_sent":$body_bytes_sent,"referer":"$http_referer","user_agent":"$http_user_agent","site":"$waf_site_id","upstream_addr":"$upstream_addr","request_time":$request_time}';
 access_log /var/log/nginx/access.log waf_security_json;
 
 server {

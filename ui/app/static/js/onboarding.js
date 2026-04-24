@@ -1,5 +1,5 @@
 import { api } from "./api.js";
-import { applyTranslations, getLanguage, t } from "./i18n.js";
+import { getBrowserLanguage, setLanguage, t } from "./i18n.js";
 import { checkEntryAccess, markOnboardingRedirecting } from "./guard.js";
 import { escapeHtml, notify, setError, setLoading } from "./ui.js";
 
@@ -688,7 +688,7 @@ async function runApply() {
 }
 
 async function bootstrap() {
-  await applyTranslations(getLanguage());
+  await setLanguage(getBrowserLanguage());
 
   const access = await checkEntryAccess("onboarding");
   if (!access.allowed) {

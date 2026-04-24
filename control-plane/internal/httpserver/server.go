@@ -223,6 +223,9 @@ func New(
 		http.MethodPut:    rbac.PermissionRateLimitsWrite,
 		http.MethodDelete: rbac.PermissionRateLimitsWrite,
 	}, handlers.NewRateLimitPoliciesHandler(rateLimitPolicyService)))
+	mux.Handle("/api/easy-site-profiles", withMethodPermissions(authService, map[string]rbac.Permission{
+		http.MethodGet: rbac.PermissionSitesRead,
+	}, handlers.NewEasySiteProfilesHandler(easySiteProfileService)))
 	mux.Handle("/api/easy-site-profiles/", withMethodPermissions(authService, map[string]rbac.Permission{
 		http.MethodGet:  rbac.PermissionSitesRead,
 		http.MethodPut:  rbac.PermissionSitesWrite,

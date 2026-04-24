@@ -131,6 +131,60 @@ func TestSecurityEventSourceSkipsAdminAppTrafficOnPublicHost(t *testing.T) {
 	}
 }
 
+func TestSecurityEventSourceThreatIntelEmitsReputationEvent(t *testing.T) {
+	root := t.TempDir()
+	feedPath := filepath.Join(root, "threat-intel-feed.txt")
+	if err := os.WriteFile(feedPath, []byte("203.0.113.10,77,scanner\n"), 0o644); err != nil {
+		t.Fatalf("write threat intel feed: %v", err)
+	}
+	t.Setenv("WAF_THREAT_INTEL_FEEDS", feedPath)
+	t.Setenv("WAF_THREAT_INTEL_REFRESH_SECONDS", "3600")
+
+	lines := []string{
+		mustMarshalAccessLogLine(t, map[string]any{
+			"timestamp":  "2026-04-24T12:00:00Z",
+			"client_ip":  "203.0.113.10",
+			"method":     "GET",
+			"uri":        "/catalog",
+			"status":     200,
+			"site":       "shop_example_com",
+			"host":       "shop.example.com",
+			"country":    "DE",
+			"city":       "Berlin",
+			"user_agent": "Mozilla/5.0",
+		}),
+		mustMarshalAccessLogLine(t, map[string]any{
+			"timestamp":  "2026-04-24T12:00:00Z",
+			"client_ip":  "203.0.113.10",
+			"method":     "GET",
+			"uri":        "/cart",
+			"status":     200,
+			"site":       "shop_example_com",
+			"host":       "shop.example.com",
+			"country":    "DE",
+			"city":       "Berlin",
+			"user_agent": "Mozilla/5.0",
+		}),
+	}
+
+	events := readSecurityEventsFromLines(t, lines)
+	intelEvents := make([]securityEvent, 0, 1)
+	for _, event := range events {
+		if event.Type == "security_threat_intel" {
+			intelEvents = append(intelEvents, event)
+		}
+	}
+	if len(intelEvents) != 1 {
+		t.Fatalf("expected exactly one threat intel event per ip/feed per tick, got %+v", intelEvents)
+	}
+	if got := asString(intelEvents[0].Details["city"]); got != "Berlin" {
+		t.Fatalf("expected city in threat intel event, got %q", got)
+	}
+	if got := parseIntValue(intelEvents[0].Details["intel_score"]); got != 77 {
+		t.Fatalf("expected intel score 77, got %d", got)
+	}
+}
+
 func readSecurityEventsFromLines(t *testing.T, lines []string) []securityEvent {
 	t.Helper()
 	root := t.TempDir()

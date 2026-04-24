@@ -18,6 +18,7 @@ func TestSiteSettings_FieldContract(t *testing.T) {
 		"front_service.adaptive_model_enabled",
 		"front_service.auto_lets_encrypt",
 		"front_service.certificate_authority_server",
+		"front_service.profile",
 		"front_service.security_mode",
 		"front_service.server_name",
 		"front_service.use_lets_encrypt_staging",
@@ -43,11 +44,20 @@ func TestSiteSettings_FieldContract(t *testing.T) {
 		"security_antibot.antibot_turnstile_secret",
 		"security_antibot.antibot_turnstile_sitekey",
 		"security_antibot.antibot_uri",
+		"security_antibot.challenge_escalation_enabled",
+		"security_antibot.challenge_escalation_mode",
+		"security_antibot.challenge_rules.challenge",
+		"security_antibot.challenge_rules.path",
 		"security_auth_basic.auth_basic_location",
 		"security_auth_basic.auth_basic_password",
 		"security_auth_basic.auth_basic_text",
 		"security_auth_basic.auth_basic_user",
+		"security_auth_basic.session_inactivity_minutes",
 		"security_auth_basic.use_auth_basic",
+		"security_auth_basic.users.enabled",
+		"security_auth_basic.users.last_login_at",
+		"security_auth_basic.users.password",
+		"security_auth_basic.users.username",
 		"security_behavior_and_limits.bad_behavior_ban_time_seconds",
 		"security_behavior_and_limits.bad_behavior_count_time_seconds",
 		"security_behavior_and_limits.bad_behavior_status_codes",
@@ -81,6 +91,15 @@ func TestSiteSettings_FieldContract(t *testing.T) {
 		"security_behavior_and_limits.use_limit_req",
 		"security_country_policy.blacklist_country",
 		"security_country_policy.whitelist_country",
+		"security_api_positive.default_action",
+		"security_api_positive.enforcement_mode",
+		"security_api_positive.endpoint_policies.content_types",
+		"security_api_positive.endpoint_policies.methods",
+		"security_api_positive.endpoint_policies.mode",
+		"security_api_positive.endpoint_policies.path",
+		"security_api_positive.endpoint_policies.token_ids",
+		"security_api_positive.openapi_schema_ref",
+		"security_api_positive.use_api_positive_security",
 		"security_modsecurity.custom_configuration.content",
 		"security_modsecurity.custom_configuration.path",
 		"security_modsecurity.modsecurity_crs_plugins",
@@ -148,6 +167,7 @@ func TestSiteSettings_CreateAndSave_AllFieldsRoundTrip(t *testing.T) {
 	updatedProfile := allFieldsProfile("site-contract")
 	updatedProfile.FrontService.ServerName = "api.changed.example.com"
 	updatedProfile.FrontService.SecurityMode = SecurityModeMonitor
+	updatedProfile.FrontService.Profile = ServiceProfileAPI
 	updatedProfile.UpstreamRouting.ReverseProxyHost = "https://backend.changed.internal:8443"
 	updatedProfile.HTTPBehavior.AllowedMethods = []string{"DELETE", "PATCH", "GET"}
 	updatedProfile.SecurityBehaviorAndLimits.LimitReqRate = "21r/s"
@@ -193,6 +213,7 @@ func allFieldsProfile(siteID string) EasySiteProfile {
 	profile := DefaultProfile(siteID)
 	profile.FrontService.ServerName = "api.example.com"
 	profile.FrontService.SecurityMode = SecurityModeBlock
+	profile.FrontService.Profile = ServiceProfileStrict
 	profile.FrontService.AutoLetsEncrypt = false
 	profile.FrontService.UseLetsEncryptStaging = true
 	profile.FrontService.UseLetsEncryptWildcard = true
@@ -263,6 +284,12 @@ func allFieldsProfile(siteID string) EasySiteProfile {
 	profile.SecurityAntibot.AntibotHcaptchaSecret = "hcaptcha-secret"
 	profile.SecurityAntibot.AntibotTurnstileSitekey = "turnstile-site"
 	profile.SecurityAntibot.AntibotTurnstileSecret = "turnstile-secret"
+	profile.SecurityAntibot.ChallengeEscalationEnabled = true
+	profile.SecurityAntibot.ChallengeEscalationMode = AntibotChallengeTurnstile
+	profile.SecurityAntibot.ChallengeRules = []AntibotChallengeRule{
+		{Path: "/login", Challenge: AntibotChallengeRecaptcha},
+		{Path: "/api/auth/", Challenge: AntibotChallengeCookie},
+	}
 
 	profile.SecurityAuthBasic.UseAuthBasic = true
 	profile.SecurityAuthBasic.AuthBasicLocation = AuthBasicLocationSitewide
@@ -272,6 +299,27 @@ func allFieldsProfile(siteID string) EasySiteProfile {
 
 	profile.SecurityCountryPolicy.BlacklistCountry = []string{"RU", "APAC"}
 	profile.SecurityCountryPolicy.WhitelistCountry = []string{"US", "EMEA"}
+
+	profile.SecurityAPIPositive.UseAPIPositiveSecurity = true
+	profile.SecurityAPIPositive.OpenAPISchemaRef = "openapi/petstore.yaml"
+	profile.SecurityAPIPositive.EnforcementMode = APIPositiveEnforcementBlock
+	profile.SecurityAPIPositive.DefaultAction = APIPositiveDefaultActionDeny
+	profile.SecurityAPIPositive.EndpointPolicies = []APIPositiveEndpointPolicy{
+		{
+			Path:         "/api/v1/orders",
+			Methods:      []string{"GET", "POST"},
+			TokenIDs:     []string{"svc-orders", "svc-admin"},
+			ContentTypes: []string{"application/json"},
+			Mode:         APIPositiveEnforcementBlock,
+		},
+		{
+			Path:         "/api/v1/public",
+			Methods:      []string{"GET"},
+			TokenIDs:     []string{},
+			ContentTypes: []string{},
+			Mode:         APIPositiveEnforcementMonitor,
+		},
+	}
 
 	profile.SecurityModSecurity.UseModSecurity = true
 	profile.SecurityModSecurity.UseModSecurityCRSPlugins = true

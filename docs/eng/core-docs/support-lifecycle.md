@@ -2,7 +2,7 @@
 
 This page belongs to the current documentation branch.
 
-TARINIO `3.0.1` uses explicit support channels so enterprise operations are not based on implicit assumptions.
+TARINIO `3.0.2` uses explicit support channels so enterprise operations are not based on implicit assumptions.
 
 ## Release Channels
 
@@ -12,7 +12,7 @@ TARINIO `3.0.1` uses explicit support channels so enterprise operations are not 
 
 ## Support Windows
 
-For `3.0.1`, the support windows are:
+For `3.0.2`, the support windows are:
 
 - `Current`: from April 23, 2026 until the next minor release.
 - `Stable` (`latest-1`): 180 days after the next minor release is published.
@@ -57,4 +57,5 @@ Operators must:
 - keep change records with product version and active revision;
 - archive `release-manifest.json`, `signature.json`, `sbom.cdx.json`, and `provenance.json` for each promoted build;
 - run restore validation at least once per month.
+
 

@@ -12,6 +12,12 @@ const (
 	SecurityModeMonitor     = "monitor"
 	SecurityModeTransparent = "transparent"
 
+	ServiceProfileStrict     = "strict"
+	ServiceProfileBalanced   = "balanced"
+	ServiceProfileCompat     = "compat"
+	ServiceProfileAPI        = "api"
+	ServiceProfilePublicEdge = "public-edge"
+
 	AntibotChallengeNo         = "no"
 	AntibotChallengeCookie     = "cookie"
 	AntibotChallengeJavascript = "javascript"
@@ -22,11 +28,18 @@ const (
 	AntibotChallengeMcaptcha   = "mcaptcha"
 
 	AuthBasicLocationSitewide = "sitewide"
+
+	APIPositiveEnforcementMonitor = "monitor"
+	APIPositiveEnforcementBlock   = "block"
+
+	APIPositiveDefaultActionAllow = "allow"
+	APIPositiveDefaultActionDeny  = "deny"
 )
 
 type FrontServiceSettings struct {
 	ServerName                 string `json:"server_name"`
 	SecurityMode               string `json:"security_mode"`
+	Profile                    string `json:"profile"`
 	AdaptiveModelEnabled       bool   `json:"adaptive_model_enabled"`
 	AutoLetsEncrypt            bool   `json:"auto_lets_encrypt"`
 	UseLetsEncryptStaging      bool   `json:"use_lets_encrypt_staging"`
@@ -109,15 +122,23 @@ type SecurityBehaviorAndLimitsSettings struct {
 }
 
 type SecurityAntibotSettings struct {
-	AntibotChallenge        string  `json:"antibot_challenge"`
-	AntibotURI              string  `json:"antibot_uri"`
-	AntibotRecaptchaScore   float64 `json:"antibot_recaptcha_score"`
-	AntibotRecaptchaSitekey string  `json:"antibot_recaptcha_sitekey"`
-	AntibotRecaptchaSecret  string  `json:"antibot_recaptcha_secret"`
-	AntibotHcaptchaSitekey  string  `json:"antibot_hcaptcha_sitekey"`
-	AntibotHcaptchaSecret   string  `json:"antibot_hcaptcha_secret"`
-	AntibotTurnstileSitekey string  `json:"antibot_turnstile_sitekey"`
-	AntibotTurnstileSecret  string  `json:"antibot_turnstile_secret"`
+	AntibotChallenge           string                 `json:"antibot_challenge"`
+	AntibotURI                 string                 `json:"antibot_uri"`
+	AntibotRecaptchaScore      float64                `json:"antibot_recaptcha_score"`
+	AntibotRecaptchaSitekey    string                 `json:"antibot_recaptcha_sitekey"`
+	AntibotRecaptchaSecret     string                 `json:"antibot_recaptcha_secret"`
+	AntibotHcaptchaSitekey     string                 `json:"antibot_hcaptcha_sitekey"`
+	AntibotHcaptchaSecret      string                 `json:"antibot_hcaptcha_secret"`
+	AntibotTurnstileSitekey    string                 `json:"antibot_turnstile_sitekey"`
+	AntibotTurnstileSecret     string                 `json:"antibot_turnstile_secret"`
+	ChallengeEscalationEnabled bool                   `json:"challenge_escalation_enabled"`
+	ChallengeEscalationMode    string                 `json:"challenge_escalation_mode"`
+	ChallengeRules             []AntibotChallengeRule `json:"challenge_rules"`
+}
+
+type AntibotChallengeRule struct {
+	Path      string `json:"path"`
+	Challenge string `json:"challenge"`
 }
 
 type SecurityAuthBasicSettings struct {
@@ -126,11 +147,38 @@ type SecurityAuthBasicSettings struct {
 	AuthBasicUser     string `json:"auth_basic_user"`
 	AuthBasicPassword string `json:"auth_basic_password"`
 	AuthBasicText     string `json:"auth_basic_text"`
+	Users             []SecurityAuthUser `json:"users"`
+	// SessionInactivityMinutes controls auth session expiration for service-auth cookies.
+	// -1 means unlimited.
+	SessionInactivityMinutes int `json:"session_inactivity_minutes"`
+}
+
+type SecurityAuthUser struct {
+	Username    string `json:"username"`
+	Password    string `json:"password"`
+	Enabled     bool   `json:"enabled"`
+	LastLoginAt string `json:"last_login_at,omitempty"`
 }
 
 type SecurityCountryPolicySettings struct {
 	BlacklistCountry []string `json:"blacklist_country"`
 	WhitelistCountry []string `json:"whitelist_country"`
+}
+
+type APIPositiveEndpointPolicy struct {
+	Path         string   `json:"path"`
+	Methods      []string `json:"methods"`
+	TokenIDs     []string `json:"token_ids"`
+	ContentTypes []string `json:"content_types"`
+	Mode         string   `json:"mode"`
+}
+
+type SecurityAPIPositiveSettings struct {
+	UseAPIPositiveSecurity bool                        `json:"use_api_positive_security"`
+	OpenAPISchemaRef       string                      `json:"openapi_schema_ref"`
+	EnforcementMode        string                      `json:"enforcement_mode"`
+	DefaultAction          string                      `json:"default_action"`
+	EndpointPolicies       []APIPositiveEndpointPolicy `json:"endpoint_policies"`
 }
 
 type ModSecurityCustomConfiguration struct {
@@ -158,6 +206,7 @@ type EasySiteProfile struct {
 	SecurityAntibot           SecurityAntibotSettings           `json:"security_antibot"`
 	SecurityAuthBasic         SecurityAuthBasicSettings         `json:"security_auth_basic"`
 	SecurityCountryPolicy     SecurityCountryPolicySettings     `json:"security_country_policy"`
+	SecurityAPIPositive       SecurityAPIPositiveSettings       `json:"security_api_positive"`
 	SecurityModSecurity       SecurityModSecuritySettings       `json:"security_modsecurity"`
 	CreatedAt                 string                            `json:"created_at"`
 	UpdatedAt                 string                            `json:"updated_at"`
@@ -220,6 +269,7 @@ func DefaultProfile(siteID string) EasySiteProfile {
 		FrontService: FrontServiceSettings{
 			ServerName:                 siteID,
 			SecurityMode:               SecurityModeBlock,
+			Profile:                    ServiceProfileBalanced,
 			AdaptiveModelEnabled:       isManagementSite,
 			AutoLetsEncrypt:            true,
 			UseLetsEncryptStaging:      false,
@@ -290,15 +340,18 @@ func DefaultProfile(siteID string) EasySiteProfile {
 			CustomLimitRules:            append([]CustomLimitRule(nil), customLimitRules...),
 		},
 		SecurityAntibot: SecurityAntibotSettings{
-			AntibotChallenge:        AntibotChallengeNo,
-			AntibotURI:              "/challenge",
-			AntibotRecaptchaScore:   0.7,
-			AntibotRecaptchaSitekey: "",
-			AntibotRecaptchaSecret:  "",
-			AntibotHcaptchaSitekey:  "",
-			AntibotHcaptchaSecret:   "",
-			AntibotTurnstileSitekey: "",
-			AntibotTurnstileSecret:  "",
+			AntibotChallenge:           AntibotChallengeNo,
+			AntibotURI:                 "/challenge",
+			AntibotRecaptchaScore:      0.7,
+			AntibotRecaptchaSitekey:    "",
+			AntibotRecaptchaSecret:     "",
+			AntibotHcaptchaSitekey:     "",
+			AntibotHcaptchaSecret:      "",
+			AntibotTurnstileSitekey:    "",
+			AntibotTurnstileSecret:     "",
+			ChallengeEscalationEnabled: false,
+			ChallengeEscalationMode:    AntibotChallengeJavascript,
+			ChallengeRules:             []AntibotChallengeRule{},
 		},
 		SecurityAuthBasic: SecurityAuthBasicSettings{
 			UseAuthBasic:      false,
@@ -306,10 +359,25 @@ func DefaultProfile(siteID string) EasySiteProfile {
 			AuthBasicUser:     "changeme",
 			AuthBasicPassword: "",
 			AuthBasicText:     "Restricted area",
+			Users: []SecurityAuthUser{
+				{
+					Username: "changeme",
+					Password: "",
+					Enabled:  true,
+				},
+			},
+			SessionInactivityMinutes: 60,
 		},
 		SecurityCountryPolicy: SecurityCountryPolicySettings{
 			BlacklistCountry: []string{},
 			WhitelistCountry: []string{},
+		},
+		SecurityAPIPositive: SecurityAPIPositiveSettings{
+			UseAPIPositiveSecurity: false,
+			OpenAPISchemaRef:       "",
+			EnforcementMode:        APIPositiveEnforcementMonitor,
+			DefaultAction:          APIPositiveDefaultActionAllow,
+			EndpointPolicies:       []APIPositiveEndpointPolicy{},
 		},
 		SecurityModSecurity: SecurityModSecuritySettings{
 			UseModSecurity:           true,

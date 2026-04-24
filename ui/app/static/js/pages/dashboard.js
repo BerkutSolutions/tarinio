@@ -15,7 +15,7 @@ const WIDGETS = [
   { id: "requests-day", titleKey: "dashboard.widget.requestsDay", width: 340, height: 220, x: 620, y: 20 },
   { id: "attacks-day", titleKey: "dashboard.widget.attacksDay", width: 280, height: 220, x: 980, y: 20 },
   { id: "blocked-attacks", titleKey: "dashboard.widget.blockedAttacks", width: 280, height: 220, x: 1280, y: 20 },
-  { id: "unique-attackers", titleKey: "dashboard.widget.uniqueAttackers", width: 300, height: 240, x: 1380, y: 20 },
+  { id: "unique-attackers", titleKey: "dashboard.widget.uniqueAttackers", width: 300, height: 240, x: 1280, y: 260 },
   { id: "requests-series", titleKey: "dashboard.widget.requestsSeries", width: 1240, height: 340, x: 20, y: 280 },
   { id: "popular-errors", titleKey: "dashboard.widget.popularErrors", width: 360, height: 300, x: 20, y: 640 },
   { id: "top-ips", titleKey: "dashboard.widget.topIPs", width: 360, height: 300, x: 400, y: 640 },
@@ -1655,6 +1655,14 @@ export async function renderDashboard(container, ctx) {
   const widgetsScopeID = String(ctx?.currentUser?.username || ctx?.currentUser?.id || "").trim().toLowerCase();
   const visibleWidgetIDs = new Set(loadVisibleWidgetIDs(widgetsScopeID));
 
+  const persistLayoutNow = () => {
+    if (!layoutDirty) {
+      return;
+    }
+    saveLayout(layout);
+    layoutDirty = false;
+  };
+
   const ensureDetailModel = async () => {
     if (!latestStats) {
       return null;
@@ -1777,6 +1785,7 @@ export async function renderDashboard(container, ctx) {
     boardNode.appendChild(frameNode);
     wireFrameInteractions(pageNode, boardNode, layout, frameNode, () => {
       layoutDirty = true;
+      persistLayoutNow();
     });
   };
 
@@ -2051,9 +2060,8 @@ export async function renderDashboard(container, ctx) {
     pageNode.dataset.editMode = wasEdit ? "0" : "1";
     container.querySelector("#dashboard-edit-toggle").textContent = pageNode.dataset.editMode === "1" ? ctx.t("dashboard.action.doneEdit") : ctx.t("dashboard.action.editLayout");
     pageNode.classList.toggle("dashboard-edit-mode", pageNode.dataset.editMode === "1");
-    if (wasEdit && layoutDirty) {
-      saveLayout(layout);
-      layoutDirty = false;
+    if (wasEdit) {
+      persistLayoutNow();
     }
   });
 
@@ -2078,6 +2086,14 @@ export async function renderDashboard(container, ctx) {
     }
   };
   window.addEventListener("resize", container.__dashboardResizeHandler);
+
+  if (container.__dashboardPageHideHandler) {
+    window.removeEventListener("pagehide", container.__dashboardPageHideHandler);
+  }
+  container.__dashboardPageHideHandler = () => {
+    persistLayoutNow();
+  };
+  window.addEventListener("pagehide", container.__dashboardPageHideHandler);
 
   if (container.__dashboardRequestsResizeObserver) {
     container.__dashboardRequestsResizeObserver.disconnect();

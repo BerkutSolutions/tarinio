@@ -1,5 +1,5 @@
 import { api } from "./api.js";
-import { applyTranslations, getLanguage, setLanguage, t } from "./i18n.js";
+import { getBrowserLanguage, setLanguage, t } from "./i18n.js";
 import { checkEntryAccess, onboardingUrl, secureAppUrl } from "./guard.js";
 import { BerkutWebAuthn } from "./webauthn.js";
 
@@ -79,7 +79,7 @@ async function tryPasskeyLogin(usernameRaw) {
 }
 
 async function bootstrap() {
-  await applyTranslations(getLanguage());
+  await setLanguage(getBrowserLanguage());
   document.title = t("login.pageTitle");
 
   try {

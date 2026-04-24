@@ -90,16 +90,16 @@ func TestRenderEasyArtifacts_AntiBotModesMatrix(t *testing.T) {
 				if !strings.Contains(siteConf, "if ($cookie_waf_antibot_") {
 					t.Fatalf("expected antibot cookie guard for mode %s, got: %s", tc.mode, siteConf)
 				}
-				if !strings.Contains(siteConf, `add_header X-WAF-Antibot-Mode "`+tc.mode+`" always;`) {
+				if !strings.Contains(siteConf, `add_header X-WAF-Antibot-Mode "$waf_antibot_effective_challenge" always;`) {
 					t.Fatalf("expected antibot mode header for mode %s, got: %s", tc.mode, siteConf)
 				}
 				if tc.usesInterstitial {
-					if !strings.Contains(siteConf, `return 302 /challenge?return_uri=$uri&return_args=$args;`) {
-						t.Fatalf("expected interstitial redirect for mode %s, got: %s", tc.mode, siteConf)
+					if !strings.Contains(siteConf, `set $waf_antibot_effective_redirect "/challenge";`) {
+						t.Fatalf("expected interstitial redirect target for mode %s, got: %s", tc.mode, siteConf)
 					}
 				} else {
-					if !strings.Contains(siteConf, `return 302 /challenge/verify?return_uri=$uri&return_args=$args;`) {
-						t.Fatalf("expected direct verify redirect for mode %s, got: %s", tc.mode, siteConf)
+					if !strings.Contains(siteConf, `set $waf_antibot_effective_redirect "/challenge/verify";`) {
+						t.Fatalf("expected direct verify redirect target for mode %s, got: %s", tc.mode, siteConf)
 					}
 				}
 			} else {

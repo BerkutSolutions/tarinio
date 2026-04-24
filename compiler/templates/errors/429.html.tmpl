@@ -6,11 +6,62 @@
   <title>429 Too Many Requests</title>
   <style>
     :root { color-scheme: dark; }
-    body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at top, #142744 0%, #050b18 60%, #030711 100%); color: #e8eefc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-    .card { width: min(560px, calc(100vw - 40px)); border: 1px solid #294d7f; border-radius: 14px; background: linear-gradient(180deg, #12233d, #0a1529); box-shadow: 0 16px 40px rgba(0,0,0,.38); padding: 22px; box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 12px;
+      background: radial-gradient(circle at top, #142744 0%, #050b18 60%, #030711 100%);
+      color: #e8eefc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      padding: 16px;
+    }
+    .card {
+      width: min(560px, calc(100vw - 40px));
+      border: 1px solid #294d7f;
+      border-radius: 14px;
+      background: linear-gradient(180deg, #12233d, #0a1529);
+      box-shadow: 0 16px 40px rgba(0,0,0,.38);
+      padding: 22px;
+      box-sizing: border-box;
+    }
     .title { margin: 0; font-size: 24px; line-height: 1.25; }
     .sub { margin: 10px 0 0; color: #afc3e7; font-size: 14px; line-height: 1.5; }
-    .badge { display: inline-block; margin-top: 14px; padding: 4px 10px; border-radius: 999px; border: 1px solid #365f95; background: #0d1c34; color: #b4cbef; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
+    .badge {
+      display: inline-block;
+      margin-top: 14px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid #365f95;
+      background: #0d1c34;
+      color: #b4cbef;
+      font-size: 12px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .powered {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 20px !important;
+      z-index: 20;
+      margin: 0;
+      padding-bottom: 0;
+      color: rgba(180, 203, 239, 0.9);
+      font-size: 13px;
+      text-align: center;
+    }
+    .powered a {
+      color: #d3e4ff;
+      text-decoration: none;
+      border-bottom: 1px solid rgba(211, 228, 255, 0.45);
+    }
+    .powered a:hover {
+      border-bottom-color: rgba(211, 228, 255, 0.9);
+    }
   </style>
 </head>
 <body>
@@ -19,17 +70,46 @@
     <p class="sub" id="status-sub">Flood protection is active. Wait for the cooldown window to end and try again.</p>
     <span class="badge" id="status-badge">Protection active</span>
   </article>
+  <div class="powered">
+    <a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener noreferrer">Secured by Tarinio</a>
+  </div>
   <script>
     (function () {
-      var messages = {"en":{"title":"429 Too Many Requests","sub":"Flood protection is active. Wait for the cooldown window to end and try again.","badge":"Protection active"},"ru":{"title":"429 \u0421\u043b\u0438\u0448\u043a\u043e\u043c \u043c\u043d\u043e\u0433\u043e \u0437\u0430\u043f\u0440\u043e\u0441\u043e\u0432","sub":"\u0421\u0440\u0430\u0431\u043e\u0442\u0430\u043b\u0430 \u0437\u0430\u0449\u0438\u0442\u0430 \u043e\u0442 \u0444\u043b\u0443\u0434\u0430. \u041f\u043e\u0434\u043e\u0436\u0434\u0438\u0442\u0435, \u043f\u043e\u043a\u0430 \u0437\u0430\u0432\u0435\u0440\u0448\u0438\u0442\u0441\u044f \u043e\u043a\u043d\u043e \u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u043a\u0438, \u0438 \u043f\u043e\u0432\u0442\u043e\u0440\u0438\u0442\u0435 \u043f\u043e\u043f\u044b\u0442\u043a\u0443.","badge":"\u0417\u0430\u0449\u0438\u0442\u0430 \u0430\u043a\u0442\u0438\u0432\u043d\u0430"},"de":{"title":"429 Zu viele Anfragen","sub":"Der Flutschutz ist aktiv. Warten Sie, bis das Sperrfenster endet, und versuchen Sie es erneut.","badge":"Schutz aktiv"},"sr":{"title":"429 \u041f\u0440\u0435\u0432\u0438\u0448\u0435 \u0437\u0430\u0445\u0442\u0435\u0432\u0430","sub":"\u0417\u0430\u0448\u0442\u0438\u0442\u0430 \u043e\u0434 \u0444\u043b\u0443\u0434\u0430 \u0458\u0435 \u0430\u043a\u0442\u0438\u0432\u043d\u0430. \u0421\u0430\u0447\u0435\u043a\u0430\u0458\u0442\u0435 \u0434\u0430 \u0441\u0435 \u043f\u0440\u043e\u0437\u043e\u0440 \u0431\u043b\u043e\u043a\u0430\u0434\u0435 \u0437\u0430\u0432\u0440\u0448\u0438 \u0438 \u043f\u043e\u043a\u0443\u0448\u0430\u0458\u0442\u0435 \u043f\u043e\u043d\u043e\u0432\u043e.","badge":"\u0417\u0430\u0448\u0442\u0438\u0442\u0430 \u0430\u043a\u0442\u0438\u0432\u043d\u0430"},"zh":{"title":"429 \u8bf7\u6c42\u8fc7\u591a","sub":"\u9632\u6d2a\u4fdd\u62a4\u5df2\u542f\u7528\u3002\u8bf7\u7b49\u5f85\u5c01\u9501\u7a97\u53e3\u7ed3\u675f\u540e\u518d\u8bd5\u3002","badge":"\u4fdd\u62a4\u5df2\u542f\u7528"}}
+      var messages = {
+        en: {
+          title: "429 Too Many Requests",
+          sub: "Flood protection is active. Wait for the cooldown window to end and try again.",
+          badge: "Protection active"
+        },
+        ru: {
+          title: "429 Слишком много запросов",
+          sub: "Сработала защита от флуда. Подождите, пока завершится окно блокировки, и повторите попытку.",
+          badge: "Защита активна"
+        },
+        de: {
+          title: "429 Zu viele Anfragen",
+          sub: "Der Flutschutz ist aktiv. Warten Sie, bis das Sperrfenster endet, und versuchen Sie es erneut.",
+          badge: "Schutz aktiv"
+        },
+        sr: {
+          title: "429 Превише захтева",
+          sub: "Заштита од флуда је активна. Сачекајте да се прозор блокаде заврши и покушајте поново.",
+          badge: "Заштита активна"
+        },
+        zh: {
+          title: "429 请求过多",
+          sub: "防洪保护已启用。请等待封锁窗口结束后再试。",
+          badge: "保护已启用"
+        }
+      };
       var candidates = [];
       try {
         if (Array.isArray(navigator.languages)) candidates = candidates.concat(navigator.languages);
         if (navigator.language) candidates.push(navigator.language);
       } catch (_error) {}
-      var lang = 'en';
+      var lang = "en";
       for (var i = 0; i < candidates.length; i += 1) {
-        var value = String(candidates[i] || '').toLowerCase().split(/[-_]/)[0];
+        var value = String(candidates[i] || "").toLowerCase().split(/[-_]/)[0];
         if (messages[value]) {
           lang = value;
           break;
@@ -38,9 +118,9 @@
       var copy = messages[lang] || messages.en;
       document.documentElement.lang = lang;
       document.title = copy.title;
-      document.getElementById('status-title').textContent = copy.title;
-      document.getElementById('status-sub').textContent = copy.sub;
-      document.getElementById('status-badge').textContent = copy.badge;
+      document.getElementById("status-title").textContent = copy.title;
+      document.getElementById("status-sub").textContent = copy.sub;
+      document.getElementById("status-badge").textContent = copy.badge;
     })();
   </script>
 </body>

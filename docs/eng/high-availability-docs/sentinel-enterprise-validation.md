@@ -2,7 +2,7 @@
 
 Last full smoke run: 2026-04-24 17:31:33 +03:00
 
-This page records the reproducible enterprise validation pack for `tarinio-sentinel` in TARINIO `3.0.1`.
+This page records the reproducible enterprise validation pack for `tarinio-sentinel` in TARINIO `3.0.2`.
 
 ## What Is Validated
 
@@ -81,4 +81,5 @@ Single-profile examples:
 `./scripts/smoke-sentinel.ps1 -ComposeFile deploy/compose/default/docker-compose.yml -ProfileName default -OutputDir .work/sentinel-smoke/manual/default`
 
 `./scripts/smoke-sentinel.ps1 -ComposeFile deploy/compose/ha-lab/docker-compose.yml -ProfileName ha-lab -OutputDir .work/sentinel-smoke/manual/ha-lab`
+
 

@@ -12,6 +12,7 @@ server {
     error_page 497 =307 https://$http_host$request_uri;
 {{- end }}
     set $waf_site_id "{{ .SiteIDSlug }}";
+    set $waf_antibot_effective_challenge "no";
     set $waf_host_allowed 0;
 {{- range .ServerNames }}
     if ($host = "{{ . }}") { set $waf_host_allowed 1; }

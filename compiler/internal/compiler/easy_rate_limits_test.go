@@ -25,9 +25,13 @@ func TestRenderEasyRateLimitArtifacts_GeneratesRouteSpecificArtifacts(t *testing
 			PassHostHeader: true,
 		}},
 		[]EasyProfileInput{{
-			SiteID:           "control-plane-access",
-			AntibotChallenge: "turnstile",
-			AntibotURI:       "/challenge",
+			SiteID:            "control-plane-access",
+			AntibotChallenge:  "turnstile",
+			AntibotURI:        "/challenge",
+			UseAuthBasic:      true,
+			AuthBasicUser:     "admin",
+			AuthBasicPassword: "secret",
+			AuthBasicText:     "Restricted area",
 			CustomLimitRules: []CustomRateLimitRuleInput{
 				{Path: "/login", Rate: "6r/s"},
 				{Path: "/api/auth/", Rate: "12r/s"},
@@ -54,6 +58,12 @@ func TestRenderEasyRateLimitArtifacts_GeneratesRouteSpecificArtifacts(t *testing
 	locationsConf := byPath["nginx/easy-locations/control-plane-access.conf"]
 	if !strings.Contains(locationsConf, "location = /challenge") || !strings.Contains(locationsConf, "location = /challenge/verify") || !strings.Contains(locationsConf, "Set-Cookie \"waf_antibot_") {
 		t.Fatalf("expected antibot challenge location in easy locations conf, got: %s", locationsConf)
+	}
+	if !strings.Contains(locationsConf, "location = /auth {") || !strings.Contains(locationsConf, "location = /auth/verify {") {
+		t.Fatalf("expected auth gate locations in easy locations conf, got: %s", locationsConf)
+	}
+	if !strings.Contains(locationsConf, `auth_basic "Restricted area";`) {
+		t.Fatalf("expected auth basic on verify endpoint only, got: %s", locationsConf)
 	}
 	if !strings.Contains(locationsConf, "alias /etc/waf/errors/control-plane-access/antibot.html;") {
 		t.Fatalf("expected antibot interstitial alias in easy locations conf, got: %s", locationsConf)

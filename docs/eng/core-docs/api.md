@@ -2,7 +2,7 @@
 
 This page belongs to the current documentation branch.
 
-This document describes the current control-plane HTTP API for version `3.0.1`. The catalog is aligned with the routes registered in `control-plane/internal/httpserver/server.go`.
+This document describes the current control-plane HTTP API for version `3.0.2`. The catalog is aligned with the routes registered in `control-plane/internal/httpserver/server.go`.
 
 ## General Rules
 
@@ -263,7 +263,7 @@ Also accepts the hourly auto-update toggle path used by the UI.
 
 ### `GET /core-docs/api/revisions`
 
-The new aggregated revision catalog in `3.0.1`.
+The new aggregated revision catalog in `3.0.2`.
 
 It powers the `Revisions` UI and returns:
 
@@ -395,4 +395,5 @@ Downloads the archived execution result.
 - `Activity`: `audit`
 - `Settings`: `settings/runtime`, `app/meta`
 - `Profile`: `auth/me`, `auth/change-password`, `auth/2fa/*`, `auth/passkeys/*`
+
 

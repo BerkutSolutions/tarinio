@@ -14,6 +14,7 @@ type fakeExecutor struct {
 	runCommands  [][]string
 	outputErrors map[string]error
 	rules        map[string]bool
+	failDelete   map[string]int
 }
 
 func (f *fakeExecutor) Run(name string, args ...string) error {
@@ -38,6 +39,13 @@ func (f *fakeExecutor) Run(name string, args ...string) error {
 		return nil
 	}
 	if len(args) >= 2 && args[1] == "-D" {
+		key := strings.Join(command, " ")
+		if f.failDelete != nil {
+			if remain, ok := f.failDelete[key]; ok && remain > 0 {
+				f.failDelete[key] = remain - 1
+				return errors.New("simulated delete race")
+			}
+		}
 		inserted := append([]string{name, args[0], "-I", args[2]}, args[3:]...)
 		delete(f.rules, strings.Join(inserted, " "))
 		return nil
@@ -110,6 +118,24 @@ func TestBootstrap_DockerUserUsesDestinationIP(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("expected DOCKER-USER jump rule with destination IP, got %+v", exec.runCommands)
+	}
+}
+
+func TestDeleteJumpRule_ToleratesConcurrentRemovalRace(t *testing.T) {
+	exec := &fakeExecutor{
+		chains:       map[string]bool{"INPUT": true, customChainName: true},
+		outputErrors: map[string]error{},
+		rules:        map[string]bool{},
+		failDelete:   map[string]int{},
+	}
+	rule := []string{"-p", "tcp", "-m", "multiport", "--dports", "80,443", "-j", customChainName}
+	inserted := append([]string{iptablesIPv4, "-w", "-I", "INPUT", "1"}, rule...)
+	exec.rules[strings.Join(inserted, " ")] = true
+	deleteCmd := append([]string{iptablesIPv4, "-w", "-D", "INPUT"}, rule...)
+	exec.failDelete[strings.Join(deleteCmd, " ")] = 1
+
+	if err := deleteJumpRule(exec, iptablesIPv4, "INPUT", rule); err != nil {
+		t.Fatalf("deleteJumpRule should tolerate race: %v", err)
 	}
 }
 

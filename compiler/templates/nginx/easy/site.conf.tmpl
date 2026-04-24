@@ -6,6 +6,8 @@ set $waf_rate_limited_active 0;
 set $waf_rate_limited_escalated 0;
 set $waf_easy_exception_guard 0;
 set $waf_easy_admin_guard 0;
+set $waf_antibot_effective_challenge "no";
+set $waf_antibot_effective_redirect "";
 if ($uri ~* "{{ .AdminBypassPathPattern }}") {
     set $waf_easy_admin_guard 1;
 }
@@ -97,8 +99,25 @@ proxy_set_header Connection "";
 {{- end }}
 
 {{- if .UseAuthBasic }}
-auth_basic "{{ .AuthBasicRealm }}";
-auth_basic_user_file {{ .AuthBasicUserFile }};
+set $waf_auth_gate_skip 0;
+if ($uri = "/login") { set $waf_auth_gate_skip 1; }
+if ($uri = "/login/2fa") { set $waf_auth_gate_skip 1; }
+if ($uri = "{{ .AuthGateLoginURI }}") { set $waf_auth_gate_skip 1; }
+if ($uri = "{{ .AuthGateVerifyURI }}") { set $waf_auth_gate_skip 1; }
+{{- if .AntibotEnabled }}
+if ($uri = "{{ .AntibotURI }}") { set $waf_auth_gate_skip 1; }
+if ($uri = "{{ .AntibotVerifyURI }}") { set $waf_auth_gate_skip 1; }
+{{- if .AntibotTwoLayerEnabled }}
+if ($uri = "{{ .AntibotStage1URI }}") { set $waf_auth_gate_skip 1; }
+if ($uri = "{{ .AntibotStage1VerifyURI }}") { set $waf_auth_gate_skip 1; }
+{{- end }}
+{{- end }}
+set $waf_auth_gate_verified 0;
+if ($cookie_{{ .AuthGateCookieKey }} = "{{ .AuthGateCookieVal }}") { set $waf_auth_gate_verified 1; }
+set $waf_auth_gate_redirect 0;
+if ($waf_auth_gate_skip = 0) { set $waf_auth_gate_redirect 1; }
+if ($waf_auth_gate_verified = 1) { set $waf_auth_gate_redirect 0; }
+if ($waf_auth_gate_redirect = 1) { return 302 {{ .AuthGateLoginURI }}?return_uri=$uri&return_args=$args; }
 {{- end }}
 
 {{- if .UseModSecurityEasyFile }}
@@ -110,16 +129,37 @@ modsecurity_rules_file /etc/waf/modsecurity/easy/{{ .SiteID }}.conf;
 set $waf_antibot_exception_guard 0;
 if ($cookie_waf_session != "") { set $waf_antibot_exception_guard 1; }
 if ($cookie_waf_session_boot != "") { set $waf_antibot_exception_guard 1; }
+{{- if .UseAuthBasic }}
+if ($uri = "{{ .AuthGateLoginURI }}") { set $waf_antibot_exception_guard 1; }
+if ($uri = "{{ .AuthGateVerifyURI }}") { set $waf_antibot_exception_guard 1; }
+{{- end }}
 if (${{ .ExceptionVar }} = 1) { set $waf_antibot_exception_guard 1; }
+set $waf_antibot_effective_challenge "{{ .AntibotChallenge }}";
+set $waf_antibot_effective_redirect "{{ .AntibotRedirectURI }}";
+{{- range .AntibotRuleOverrides }}
+if ($uri ~* "{{ .GuardPattern }}") {
+    set $waf_antibot_effective_challenge "{{ .Challenge }}";
+    set $waf_antibot_effective_redirect "{{ .RedirectURI }}";
+}
+{{- end }}
 set $waf_antibot_verified 0;
 if ($cookie_{{ .AntibotCookieName }} = "{{ .AntibotCookieValue }}") { set $waf_antibot_verified 1; }
+set $waf_antibot_stage1_verified 0;
+if ($cookie_{{ .AntibotStage1CookieName }} = "{{ .AntibotStage1CookieValue }}") { set $waf_antibot_stage1_verified 1; }
 set $waf_antibot_safe_method 0;
 if ($request_method = GET) { set $waf_antibot_safe_method 1; }
 if ($request_method = HEAD) { set $waf_antibot_safe_method 1; }
 set $waf_antibot_guard "$waf_antibot_exception_guard:$waf_antibot_verified:$waf_antibot_safe_method";
-if ($waf_antibot_guard = "0:0:1") { return 302 {{ .AntibotRedirectURI }}?return_uri=$uri&return_args=$args; }
+{{- if .AntibotTwoLayerEnabled }}
+if ($waf_antibot_guard = "0:0:1") {
+    if ($waf_antibot_stage1_verified = 0) { return 302 {{ .AntibotStage1RedirectURI }}?return_uri=$uri&return_args=$args; }
+    return 302 $waf_antibot_effective_redirect?return_uri=$uri&return_args=$args;
+}
+{{- else }}
+if ($waf_antibot_guard = "0:0:1") { return 302 $waf_antibot_effective_redirect?return_uri=$uri&return_args=$args; }
+{{- end }}
 if ($waf_antibot_guard ~ "^0:0:") { return 403; }
-add_header X-WAF-Antibot-Mode "{{ .AntibotChallenge }}" always;
+add_header X-WAF-Antibot-Mode "$waf_antibot_effective_challenge" always;
 {{- if .AntibotRecaptchaHint }}
 add_header X-WAF-Antibot-Provider "recaptcha" always;
 {{- end }}

@@ -15,6 +15,16 @@ type fakeEasySiteProfileService struct {
 	err  error
 }
 
+func (f *fakeEasySiteProfileService) List() ([]easysiteprofiles.EasySiteProfile, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	if f.item.SiteID == "" {
+		f.item = easysiteprofiles.DefaultProfile("site-a")
+	}
+	return []easysiteprofiles.EasySiteProfile{f.item}, nil
+}
+
 func (f *fakeEasySiteProfileService) Get(siteID string) (easysiteprofiles.EasySiteProfile, error) {
 	if f.err != nil {
 		return easysiteprofiles.EasySiteProfile{}, f.err
@@ -23,6 +33,16 @@ func (f *fakeEasySiteProfileService) Get(siteID string) (easysiteprofiles.EasySi
 		f.item = easysiteprofiles.DefaultProfile(siteID)
 	}
 	return f.item, nil
+}
+
+func TestEasySiteProfilesHandler_List(t *testing.T) {
+	handler := NewEasySiteProfilesHandler(&fakeEasySiteProfileService{})
+	req := httptest.NewRequest(http.MethodGet, "/api/easy-site-profiles", nil)
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
 }
 
 func (f *fakeEasySiteProfileService) Upsert(ctx context.Context, profile easysiteprofiles.EasySiteProfile) (easysiteprofiles.EasySiteProfile, error) {

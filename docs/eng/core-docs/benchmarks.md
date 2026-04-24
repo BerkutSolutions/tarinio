@@ -68,7 +68,7 @@ The High Availability lab keeps the full benchmark environment below the worksta
 
 ## Sentinel Enterprise Test Matrix
 
-TARINIO 3.0.1 adds a focused Smart WAF validation pack for `tarinio-sentinel`. The pack is intentionally CPU-only and can be replayed with generated access-log lines before running destructive network tests.
+TARINIO 3.0.2 adds a focused Smart WAF validation pack for `tarinio-sentinel`. The pack is intentionally CPU-only and can be replayed with generated access-log lines before running destructive network tests.
 
 Scenarios to cover:
 
@@ -95,5 +95,6 @@ Acceptance criteria:
 - `drop` and `temp_ban` require multi-signal evidence unless emergency detection is active;
 - adaptive output remains backward compatible for `l4guard`;
 - `tarinio-sentinel` remains within the documented container limits.
+
 
 

@@ -1,6 +1,6 @@
 # Logging Architecture
 
-This document describes the real request-log behavior in TARINIO `3.0.1`.
+This document describes the real request-log behavior in TARINIO `3.0.2`.
 
 ## Overview
 
@@ -51,7 +51,7 @@ When a node upgrades from an older build that already has local request archives
 4. removes only the verified legacy file;
 5. records the migration state to avoid unsafe partial cleanup.
 
-This keeps the `2.0.5 -> 3.0.1` transition safe:
+This keeps the `2.0.5 -> 3.0.2` transition safe:
 
 - old request history is not dropped before verification;
 - standalone installs move toward `OpenSearch` as the primary store;
@@ -91,12 +91,13 @@ In this mode:
 
 ## What Operators Should Expect
 
-Healthy `3.0.1` behavior looks like this:
+Healthy `3.0.2` behavior looks like this:
 
 1. fresh requests appear in `Requests` through the API without direct file reads;
 2. `OpenSearch` receives recent traffic;
 3. old legacy archive days are migrated and removed only after validation;
 4. if `ClickHouse` is enabled, older hot data can be moved there without losing validated records;
 5. the local archive remains available as a fallback spool rather than the main database.
+
 
 

@@ -13,6 +13,9 @@ func TestDefaultProfile_HasExpectedDefaults(t *testing.T) {
 	if profile.FrontService.SecurityMode != SecurityModeBlock {
 		t.Fatalf("unexpected security mode: %s", profile.FrontService.SecurityMode)
 	}
+	if profile.FrontService.Profile != ServiceProfileBalanced {
+		t.Fatalf("unexpected service profile default: %s", profile.FrontService.Profile)
+	}
 	if profile.FrontService.AdaptiveModelEnabled {
 		t.Fatal("expected adaptive model disabled for regular site default profile")
 	}
@@ -24,6 +27,9 @@ func TestDefaultProfile_HasExpectedDefaults(t *testing.T) {
 	}
 	if got := len(profile.SecurityBehaviorAndLimits.BadBehaviorStatusCodes); got != 4 {
 		t.Fatalf("expected 4 default bad behavior codes, got %d", got)
+	}
+	if profile.SecurityAPIPositive.UseAPIPositiveSecurity {
+		t.Fatal("expected API positive security disabled by default")
 	}
 }
 

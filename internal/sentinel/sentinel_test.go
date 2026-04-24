@@ -229,3 +229,55 @@ func TestBuildRuleSuggestionsPreservesPreviousOnQuietTick(t *testing.T) {
 		t.Fatal("expected preserved suggestions to be copied")
 	}
 }
+
+func TestRenderAdaptivePayload_ExplainabilityFields(t *testing.T) {
+	now := time.Now().UTC()
+	st := State{
+		IPs: map[string]Record{
+			MakeScoreKey("*", "203.0.113.10"): {
+				Stage:      "drop",
+				Score:      11,
+				TrustScore: 20,
+				ExpiresAt:  now.Add(time.Minute).Format(time.RFC3339),
+				TopSignals: map[string]float64{
+					"signal_rps":           2.1,
+					"signal_scanner_paths": 1.4,
+					"signal_ua_risk":       0.8,
+				},
+			},
+			MakeScoreKey("site-a", "203.0.113.10"): {
+				Stage:      "drop",
+				Score:      10,
+				TrustScore: 22,
+				ExpiresAt:  now.Add(time.Minute).Format(time.RFC3339),
+				TopSignals: map[string]float64{"signal_blocked_ratio": 0.9},
+			},
+		},
+	}
+	cfg := Config{
+		ThrottleRatePerSecond: 3,
+		ThrottleBurst:         6,
+		ThrottleTarget:        "REJECT",
+	}
+	raw, err := renderAdaptivePayload(cfg, st, now)
+	if err != nil {
+		t.Fatalf("render adaptive payload: %v", err)
+	}
+	var out AdaptiveOutput
+	if err := json.Unmarshal(raw, &out); err != nil {
+		t.Fatalf("decode adaptive payload: %v", err)
+	}
+	if len(out.Entries) != 1 {
+		t.Fatalf("expected one published entry, got %d", len(out.Entries))
+	}
+	entry := out.Entries[0]
+	if entry.ExplainSummary == "" {
+		t.Fatal("expected explain_summary to be populated")
+	}
+	if len(entry.ReasonCodes) == 0 || len(entry.ReasonDetails) == 0 {
+		t.Fatalf("expected reason codes/details, got %+v", entry)
+	}
+	if len(entry.Recommendations) == 0 {
+		t.Fatal("expected recommendations in adaptive entry")
+	}
+}

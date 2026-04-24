@@ -6,30 +6,30 @@
 
 [English version](README.en.md)
 
-Berkut Solutions - TARINIO - self-hosted платформа защиты и управления веб-трафиком (WAF/CRS + L4/L7 Anti-DDoS) с централизованным управлением изменениями через ревизии.
+Berkut Solutions - TARINIO — self-hosted платформа защиты и управления веб-трафиком (WAF/CRS + L4/L7 Anti-DDoS) с централизованным управлением изменениями через ревизии.
 
-Актуальная версия: `3.0.1`
+Актуальная версия: `3.0.2`
 
-## Что это
+## О продукте
 
-TARINIO принимает входящий трафик перед бизнес-приложениями, проверяет запросы правилами безопасности, применяет rate-limit и Anti-DDoS политики и выкатывает изменения через контролируемый цикл ревизий:
+TARINIO принимает входящий трафик перед бизнес-приложениями, проверяет запросы по политикам безопасности, применяет rate-limit и Anti-DDoS политики и выкатывает изменения через контролируемый цикл ревизий:
 
 - `compile` -> `validate` -> `apply`
 - rollback на последнюю стабильную ревизию при рисках
 
-Это дает воспроизводимые изменения, аудируемые операции и единый контур управления для runtime и control-plane.
+Это дает воспроизводимые изменения, аудит операций и единый контур управления для runtime и control-plane.
 
 ## Для кого
 
-- Команды, которым нужен self-hosted WAF-периметр без внешнего SaaS.
-- Инфраструктурные и security-команды, которым нужен контролируемый rollout политик.
+- Команды, которым нужен self-hosted WAF-контур без внешнего SaaS.
+- Infra и security-команды, которым нужен контролируемый rollout политик.
 - Организации, где важны трассируемость изменений и предсказуемое восстановление после инцидентов.
 
 ## Ценность
 
 - Снижение риска инцидентов за счет фильтрации нежелательного трафика до приложений.
-- Контролируемый выпуск конфигурации через ревизии и единый audit trail.
-- Единый контур управления WAF, TLS, доступом, rate-limit и Anti-DDoS.
+- Централизованный контроль релизов через ревизии и audit trail.
+- Единый контур для WAF, TLS, доступа, rate-limit и Anti-DDoS.
 
 ## Возможности
 
@@ -44,7 +44,7 @@ TARINIO принимает входящий трафик перед бизнес
 - Server-side zero-trust проверки на каждом endpoint.
 - Session auth с поддержкой 2FA (TOTP) и passkeys (WebAuthn).
 - Self-hosted контур данных для runtime и control-plane.
-- Production baseline: недефолтные секреты, HTTPS, ограниченные trusted proxies.
+- Production baseline: не дефолтные секреты, HTTPS и ограниченные trusted proxies.
 
 ## Технический стек
 
@@ -56,10 +56,10 @@ TARINIO принимает входящий трафик перед бизнес
 ## Документация
 
 - Индекс: [`docs/README.md`](docs/README.md)
-- Русская wiki: [`docs/ru/README.md`](docs/ru/README.md)
-- Интерфейс и все вкладки UI: [`docs/ru/ui.md`](docs/ru/ui.md)
+- Русская документация: [`docs/ru/README.md`](docs/ru/README.md)
 - English documentation: [`docs/eng/README.md`](docs/eng/README.md)
-- Команды CLI: [`docs/CLI_COMMANDS.md`](docs/CLI_COMMANDS.md)
+- UI Wiki (RU): [`docs/ru/ui.md`](docs/ru/ui.md)
+- CLI команды: [`docs/CLI_COMMANDS.md`](docs/CLI_COMMANDS.md)
 
 ## Быстрый старт
 
@@ -69,7 +69,7 @@ TARINIO принимает входящий трафик перед бизнес
   - `docker pull ghcr.io/berkutsolutions/tarinio:latest`
 - Deploy: [`docs/ru/deploy.md`](docs/ru/deploy.md)
 - Runbook: [`docs/ru/runbook.md`](docs/ru/runbook.md)
-- Обновление/откат: [`docs/ru/upgrade.md`](docs/ru/upgrade.md)
+- Upgrade/rollback: [`docs/ru/upgrade.md`](docs/ru/upgrade.md)
 - Compose профили: [`deploy/compose/README.md`](deploy/compose/README.md)
 
 ## Интерфейс

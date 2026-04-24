@@ -32,14 +32,27 @@ type easyLocationRuleData struct {
 }
 
 type easyLocationData struct {
-	SiteID                  string
-	AntibotEnabled          bool
-	AntibotUsesInterstitial bool
-	AntibotURI              string
-	AntibotVerifyURI        string
-	AntibotCookieName       string
-	AntibotCookieValue      string
-	Rules                   []easyLocationRuleData
+	SiteID                   string
+	AntibotEnabled           bool
+	AntibotTwoLayerEnabled   bool
+	AntibotUsesInterstitial  bool
+	AntibotURI               string
+	AntibotVerifyURI         string
+	AntibotStage1URI         string
+	AntibotStage1VerifyURI   string
+	AntibotStage1CookieName  string
+	AntibotStage1CookieValue string
+	AntibotCookieName        string
+	AntibotCookieValue       string
+	UseAuthBasic             bool
+	AuthBasicRealm           string
+	AuthBasicUserFile        string
+	AuthGateLoginURI         string
+	AuthGateVerifyURI        string
+	AuthGateCookieKey        string
+	AuthGateCookieVal        string
+	AuthGateCookieTTL        int
+	Rules                    []easyLocationRuleData
 }
 
 func RenderEasyRateLimitArtifacts(sites []SiteInput, upstreams []UpstreamInput, profiles []EasyProfileInput) ([]ArtifactOutput, error) {
@@ -63,6 +76,37 @@ func RenderEasyRateLimitArtifacts(sites []SiteInput, upstreams []UpstreamInput, 
 		if !ok {
 			profile = EasyProfileInput{SiteID: site.ID}
 		}
+		if profile.AuthSessionTTLMin < -1 {
+			profile.AuthSessionTTLMin = -1
+		}
+		if profile.AuthSessionTTLMin == 0 {
+			profile.AuthSessionTTLMin = 60
+		}
+		if profile.AuthSessionTTLMin > 1440 {
+			profile.AuthSessionTTLMin = 1440
+		}
+		profile.AuthBasicText = strings.TrimSpace(profile.AuthBasicText)
+		if profile.AuthBasicText == "" {
+			profile.AuthBasicText = "Restricted area"
+		}
+		profile.AuthBasicUser = strings.TrimSpace(profile.AuthBasicUser)
+		profile.AuthBasicPassword = strings.TrimSpace(profile.AuthBasicPassword)
+		profile.AuthUsers = normalizeAuthUsers(profile.AuthUsers)
+		if len(profile.AuthUsers) == 0 && profile.AuthBasicUser != "" {
+			profile.AuthUsers = []ServiceAuthUserInput{
+				{
+					Username: profile.AuthBasicUser,
+					Password: profile.AuthBasicPassword,
+					Enabled:  true,
+				},
+			}
+		}
+		antibotEnabled := profile.AntibotChallenge != "" && profile.AntibotChallenge != "no"
+		antibotTwoLayer := profile.ChallengeEscalationEnabled && antibotEnabled
+		defaultChallenge := profile.AntibotChallenge
+		if antibotTwoLayer && strings.TrimSpace(profile.ChallengeEscalationMode) != "" && strings.ToLower(strings.TrimSpace(profile.ChallengeEscalationMode)) != "no" {
+			defaultChallenge = strings.ToLower(strings.TrimSpace(profile.ChallengeEscalationMode))
+		}
 		statusCode := easyCustomLimitStatusCode(profile.BadBehaviorStatusCodes)
 		rules := normalizeCompilerCustomLimitRules(profile.CustomLimitRules)
 		for index, rule := range rules {
@@ -74,15 +118,29 @@ func RenderEasyRateLimitArtifacts(sites []SiteInput, upstreams []UpstreamInput, 
 		}
 
 		upstream := upstreamByID[site.DefaultUpstreamID]
+		authUsers := enabledAuthUsers(profile.AuthUsers)
 		locationData := easyLocationData{
-			SiteID:                  site.ID,
-			AntibotEnabled:          profile.AntibotChallenge != "" && profile.AntibotChallenge != "no",
-			AntibotUsesInterstitial: antibotUsesInterstitial(profile.AntibotChallenge),
-			AntibotURI:              profile.AntibotURI,
-			AntibotVerifyURI:        antibotVerifyURI(profile.AntibotURI),
-			AntibotCookieName:       antibotCookieName(site.ID),
-			AntibotCookieValue:      antibotCookieValue(site.ID, profile),
-			Rules:                   make([]easyLocationRuleData, 0, len(rules)),
+			SiteID:                   site.ID,
+			AntibotEnabled:           antibotEnabled,
+			AntibotTwoLayerEnabled:   antibotTwoLayer,
+			AntibotUsesInterstitial:  antibotUsesInterstitial(defaultChallenge),
+			AntibotURI:               profile.AntibotURI,
+			AntibotVerifyURI:         antibotVerifyURI(profile.AntibotURI),
+			AntibotStage1URI:         antibotStage1URI(profile.AntibotURI),
+			AntibotStage1VerifyURI:   antibotStage1VerifyURI(profile.AntibotURI),
+			AntibotStage1CookieName:  antibotStage1CookieName(site.ID),
+			AntibotStage1CookieValue: antibotStage1CookieValue(site.ID, profile),
+			AntibotCookieName:        antibotCookieName(site.ID),
+			AntibotCookieValue:       antibotCookieValue(site.ID, profile),
+			UseAuthBasic:             profile.UseAuthBasic && len(authUsers) > 0,
+			AuthBasicRealm:           profile.AuthBasicText,
+			AuthBasicUserFile:        fmt.Sprintf("/etc/waf/nginx/auth-basic/%s.htpasswd", site.ID),
+			AuthGateLoginURI:         authGateLoginURI(),
+			AuthGateVerifyURI:        authGateVerifyURI(),
+			AuthGateCookieKey:        authGateCookieName(site.ID),
+			AuthGateCookieVal:        authGateCookieValue(site.ID, profile),
+			AuthGateCookieTTL:        authGateCookieTTLSeconds(profile),
+			Rules:                    make([]easyLocationRuleData, 0, len(rules)),
 		}
 		for index, rule := range rules {
 			canonicalPath := customLimitCanonicalPath(rule.Path)

@@ -22,6 +22,14 @@ func (f *fakeEasySiteProfileStore) Get(siteID string) (easysiteprofiles.EasySite
 	return item, ok, nil
 }
 
+func (f *fakeEasySiteProfileStore) List() ([]easysiteprofiles.EasySiteProfile, error) {
+	out := make([]easysiteprofiles.EasySiteProfile, 0, len(f.items))
+	for _, item := range f.items {
+		out = append(out, item)
+	}
+	return out, nil
+}
+
 func (f *fakeEasySiteProfileStore) Create(profile easysiteprofiles.EasySiteProfile) (easysiteprofiles.EasySiteProfile, error) {
 	f.items[profile.SiteID] = profile
 	return profile, nil

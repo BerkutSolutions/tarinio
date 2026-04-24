@@ -10,6 +10,7 @@ import (
 )
 
 type easySiteProfileService interface {
+	List() ([]easysiteprofiles.EasySiteProfile, error)
 	Get(siteID string) (easysiteprofiles.EasySiteProfile, error)
 	Upsert(ctx context.Context, profile easysiteprofiles.EasySiteProfile) (easysiteprofiles.EasySiteProfile, error)
 }
@@ -24,6 +25,8 @@ func NewEasySiteProfilesHandler(profiles easySiteProfileService) *EasySiteProfil
 
 func (h *EasySiteProfilesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
+	case r.URL.Path == "/api/easy-site-profiles" && r.Method == http.MethodGet:
+		h.list(w, r)
 	case strings.HasPrefix(r.URL.Path, "/api/easy-site-profiles/") && r.Method == http.MethodGet:
 		h.get(w, r)
 	case strings.HasPrefix(r.URL.Path, "/api/easy-site-profiles/") && r.Method == http.MethodPut:
@@ -33,6 +36,15 @@ func (h *EasySiteProfilesHandler) ServeHTTP(w http.ResponseWriter, r *http.Reque
 	default:
 		w.WriteHeader(http.StatusNotFound)
 	}
+}
+
+func (h *EasySiteProfilesHandler) list(w http.ResponseWriter, _ *http.Request) {
+	items, err := h.profiles.List()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, items)
 }
 
 func (h *EasySiteProfilesHandler) get(w http.ResponseWriter, r *http.Request) {

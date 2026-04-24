@@ -2,11 +2,11 @@
 
 This page belongs to the current documentation branch.
 
-This document describes the evidence-grade controls implemented in TARINIO `3.0.1`: audit chaining, revision signatures, support bundles, and release artifacts.
+This document describes the evidence-grade controls implemented in TARINIO `3.0.2`: audit chaining, revision signatures, support bundles, and release artifacts.
 
 ## What Is Implemented
 
-TARINIO `3.0.1` provides:
+TARINIO `3.0.2` provides:
 
 - tamper-evident audit chaining
 - revision manifest signatures
@@ -185,7 +185,7 @@ For preprod and prod promotions:
 
 ## CI/CD Quality Gates
 
-In the `3.0.1` release line, the minimum release pipeline includes:
+In the `3.0.2` release line, the minimum release pipeline includes:
 
 - `go test ./...` and `go vet ./...`;
 - wiki/i18n quality tests in `ui/tests`;
@@ -199,4 +199,5 @@ In the `3.0.1` release line, the minimum release pipeline includes:
 - [Security](core-docs/security.md)
 - [Enterprise Identity](core-docs/enterprise-identity.md)
 - [API](core-docs/api.md)
+
 

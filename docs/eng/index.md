@@ -2,7 +2,7 @@
 
 This page belongs to the current documentation branch.
 
-This is the main English index for TARINIO documentation. It is structured as an operator wiki for the real `3.0.1` product and is meant to complement the Russian branch, not lag behind it.
+This is the main English index for TARINIO documentation. It is structured as an operator wiki for the real `3.0.2` product and is meant to complement the Russian branch, not lag behind it.
 
 ## Start Here
 
@@ -19,20 +19,22 @@ This is the main English index for TARINIO documentation. It is structured as an
 3. [API](core-docs/api.md)
 4. [Security](core-docs/security.md)
 5. [Deployment](core-docs/deploy.md)
-6. [High Availability / multi-node](high-availability-docs/high-availability.md)
-7. [Observability](core-docs/observability.md)
-8. [Benchmarks](core-docs/benchmarks.md)
-9. [Runbook](core-docs/runbook.md)
-10. [Troubleshooting](core-docs/troubleshooting.md)
-11. [Upgrade and rollback](core-docs/upgrade.md)
-12. [Backups and restore](core-docs/backups.md)
-13. [CLI commands](core-docs/cli-commands.md)
-14. [WAF env parameter reference](core-docs/waf-env-reference.md)
-15. [Logging architecture](architecture-docs/logging-architecture.md)
-16. [Secret management](core-docs/secret-management.md)
-17. [Migration and compatibility](core-docs/migration-compatibility.md)
-18. [Enterprise identity](core-docs/enterprise-identity.md)
-19. [Evidence and releases](core-docs/evidence-and-releases.md)
+6. [Security Profiles](core-docs/security-profiles.md)
+7. [API Positive Security](core-docs/api-positive-security.md)
+8. [High Availability / multi-node](high-availability-docs/high-availability.md)
+9. [Observability](core-docs/observability.md)
+10. [Benchmarks](core-docs/benchmarks.md)
+11. [Runbook](core-docs/runbook.md)
+12. [Troubleshooting](core-docs/troubleshooting.md)
+13. [Upgrade and rollback](core-docs/upgrade.md)
+14. [Backups and restore](core-docs/backups.md)
+15. [CLI commands](core-docs/cli-commands.md)
+16. [WAF env parameter reference](core-docs/waf-env-reference.md)
+17. [Logging architecture](architecture-docs/logging-architecture.md)
+18. [Secret management](core-docs/secret-management.md)
+19. [Migration and compatibility](core-docs/migration-compatibility.md)
+20. [Enterprise identity](core-docs/enterprise-identity.md)
+21. [Evidence and releases](core-docs/evidence-and-releases.md)
 
 ## Enterprise Trust Documents
 
@@ -54,6 +56,7 @@ This is the main English index for TARINIO documentation. It is structured as an
 
 - [Anti-DDoS runbook](model-docs/anti-ddos-runbook.md)
 - [Anti-DDoS model](model-docs/anti-ddos-model.md)
+- [Security Benchmark Pack](security-benchmark-pack/README.md)
 - [TARINIO Sentinel](model-docs/tarinio-sentinel.md)
 - [Runtime L4 guard](model-docs/runtime-l4-guard.md)
 - [Runtime filesystem contract](model-docs/runtime-filesystem-contract.md)
@@ -62,7 +65,7 @@ This is the main English index for TARINIO documentation. It is structured as an
 - [OWASP CRS operations](operators/owasp-crs.md)
 - [Let's Encrypt DNS-01 operations](operators/letsencrypt-dns.md)
 
-## What Matters In 3.0.1
+## What Matters In 3.0.2
 
 - Documentation is aligned with the application version from `control-plane/internal/appmeta/meta.go`.
 - The wiki covers the real UI sections: `Dashboard`, `Sites`, `Anti-DDoS`, `OWASP CRS`, `TLS`, `Requests`, `Revisions`, `Events`, `Bans`, `Administration`, `Activity`, `Settings`, and `Profile`.
@@ -99,6 +102,7 @@ Stage 0 architecture decisions remain the binding foundation:
 - `docs/architecture/`
 
 Those documents define product boundaries, revision semantics, compilation, and deployment assumptions.
+
 
 
 

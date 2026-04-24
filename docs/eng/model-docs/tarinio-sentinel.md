@@ -1,6 +1,6 @@
 # TARINIO Sentinel
 
-`tarinio-sentinel` is the adaptive security engine for TARINIO 3.0.1. It replaces the old `ddos-model` runtime process while keeping the legacy `ddos-model/config.json` artifact and `MODEL_*` environment contract compatible for existing deployments.
+`tarinio-sentinel` is the adaptive security engine for TARINIO 3.0.2. It replaces the old `ddos-model` runtime process while keeping the legacy `ddos-model/config.json` artifact and `MODEL_*` environment contract compatible for existing deployments.
 
 ## Runtime Role
 
@@ -88,7 +88,7 @@ The MVP statuses are:
 - `suggested`: visible candidate, no runtime blocking;
 - `shadow`: would-block counters are collected, still no runtime blocking.
 
-There is no automatic permanent apply in 3.0.1.
+There is no automatic permanent apply in 3.0.2.
 
 ## False Positive Safety
 
@@ -110,6 +110,7 @@ Recommended container limits:
 - minimum practical range: `0.25-0.75 CPU`, `128-512MB`.
 
 Main bottlenecks are log volume, active IP cardinality, and path diversity. Keep `MODEL_MAX_ACTIVE_IPS`, `MODEL_MAX_PUBLISHED_ENTRIES`, and `MODEL_MAX_UNIQUE_PATHS_PER_IP` set in production.
+
 
 
 

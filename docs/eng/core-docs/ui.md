@@ -2,7 +2,7 @@
 
 This page belongs to the current documentation branch.
 
-This document describes the real TARINIO administrative interface for version `3.0.1`: login, onboarding, healthcheck, the sidebar sections, and the practical workflows behind each screen.
+This document describes the real TARINIO administrative interface for version `3.0.2`: login, onboarding, healthcheck, the sidebar sections, and the practical workflows behind each screen.
 
 ## Interface Map
 
@@ -346,7 +346,7 @@ Typical use cases:
 
 ## Revisions
 
-This is the core change-management screen in `3.0.1`.
+This is the core change-management screen in `3.0.2`.
 
 It includes:
 
@@ -554,4 +554,5 @@ Across the application, TARINIO uses:
 4. Use `Bans` for block decisions and manual intervention.
 5. Use `Activity` to understand whether the incident overlaps with a recent administrative change.
 6. Export a signed support bundle from `Administration -> Enterprise` when evidence needs to leave the system.
+
 

@@ -27,6 +27,10 @@ func normalizeProfile(profile EasySiteProfile) EasySiteProfile {
 
 	profile.FrontService.ServerName = strings.ToLower(strings.TrimSpace(profile.FrontService.ServerName))
 	profile.FrontService.SecurityMode = strings.ToLower(strings.TrimSpace(profile.FrontService.SecurityMode))
+	profile.FrontService.Profile = strings.ToLower(strings.TrimSpace(profile.FrontService.Profile))
+	if profile.FrontService.Profile == "" {
+		profile.FrontService.Profile = ServiceProfileBalanced
+	}
 	profile.FrontService.CertificateAuthorityServer = strings.ToLower(strings.TrimSpace(profile.FrontService.CertificateAuthorityServer))
 	profile.FrontService.ACMEAccountEmail = strings.ToLower(strings.TrimSpace(profile.FrontService.ACMEAccountEmail))
 
@@ -79,14 +83,61 @@ func normalizeProfile(profile EasySiteProfile) EasySiteProfile {
 	profile.SecurityAntibot.AntibotHcaptchaSecret = strings.TrimSpace(profile.SecurityAntibot.AntibotHcaptchaSecret)
 	profile.SecurityAntibot.AntibotTurnstileSitekey = strings.TrimSpace(profile.SecurityAntibot.AntibotTurnstileSitekey)
 	profile.SecurityAntibot.AntibotTurnstileSecret = strings.TrimSpace(profile.SecurityAntibot.AntibotTurnstileSecret)
+	profile.SecurityAntibot.ChallengeEscalationMode = strings.ToLower(strings.TrimSpace(profile.SecurityAntibot.ChallengeEscalationMode))
+	if profile.SecurityAntibot.ChallengeEscalationMode == "" {
+		profile.SecurityAntibot.ChallengeEscalationMode = AntibotChallengeJavascript
+	}
+	profile.SecurityAntibot.ChallengeRules = normalizeAntibotChallengeRules(profile.SecurityAntibot.ChallengeRules)
 
 	profile.SecurityAuthBasic.AuthBasicLocation = strings.ToLower(strings.TrimSpace(profile.SecurityAuthBasic.AuthBasicLocation))
 	profile.SecurityAuthBasic.AuthBasicUser = strings.TrimSpace(profile.SecurityAuthBasic.AuthBasicUser)
 	profile.SecurityAuthBasic.AuthBasicPassword = strings.TrimSpace(profile.SecurityAuthBasic.AuthBasicPassword)
 	profile.SecurityAuthBasic.AuthBasicText = strings.TrimSpace(profile.SecurityAuthBasic.AuthBasicText)
+	profile.SecurityAuthBasic.Users = normalizeAuthUsers(profile.SecurityAuthBasic.Users)
+	if len(profile.SecurityAuthBasic.Users) == 0 && profile.SecurityAuthBasic.AuthBasicUser != "" {
+		profile.SecurityAuthBasic.Users = []SecurityAuthUser{
+			{
+				Username: profile.SecurityAuthBasic.AuthBasicUser,
+				Password: profile.SecurityAuthBasic.AuthBasicPassword,
+				Enabled:  true,
+			},
+		}
+	}
+	if profile.SecurityAuthBasic.UseAuthBasic &&
+		profile.SecurityAuthBasic.AuthBasicUser != "" &&
+		profile.SecurityAuthBasic.AuthBasicPassword != "" &&
+		!hasEnabledUserWithPassword(profile.SecurityAuthBasic.Users) {
+		profile.SecurityAuthBasic.Users = []SecurityAuthUser{
+			{
+				Username: profile.SecurityAuthBasic.AuthBasicUser,
+				Password: profile.SecurityAuthBasic.AuthBasicPassword,
+				Enabled:  true,
+			},
+		}
+	}
+	if profile.SecurityAuthBasic.AuthBasicUser == "" && len(profile.SecurityAuthBasic.Users) > 0 {
+		profile.SecurityAuthBasic.AuthBasicUser = profile.SecurityAuthBasic.Users[0].Username
+	}
+	if profile.SecurityAuthBasic.AuthBasicPassword == "" && len(profile.SecurityAuthBasic.Users) > 0 {
+		profile.SecurityAuthBasic.AuthBasicPassword = profile.SecurityAuthBasic.Users[0].Password
+	}
+	if profile.SecurityAuthBasic.SessionInactivityMinutes == 0 {
+		profile.SecurityAuthBasic.SessionInactivityMinutes = 60
+	}
 
 	profile.SecurityCountryPolicy.BlacklistCountry = normalizeCountryList(profile.SecurityCountryPolicy.BlacklistCountry)
 	profile.SecurityCountryPolicy.WhitelistCountry = normalizeCountryList(profile.SecurityCountryPolicy.WhitelistCountry)
+
+	profile.SecurityAPIPositive.OpenAPISchemaRef = strings.TrimSpace(profile.SecurityAPIPositive.OpenAPISchemaRef)
+	profile.SecurityAPIPositive.EnforcementMode = strings.ToLower(strings.TrimSpace(profile.SecurityAPIPositive.EnforcementMode))
+	if profile.SecurityAPIPositive.EnforcementMode == "" {
+		profile.SecurityAPIPositive.EnforcementMode = APIPositiveEnforcementMonitor
+	}
+	profile.SecurityAPIPositive.DefaultAction = strings.ToLower(strings.TrimSpace(profile.SecurityAPIPositive.DefaultAction))
+	if profile.SecurityAPIPositive.DefaultAction == "" {
+		profile.SecurityAPIPositive.DefaultAction = APIPositiveDefaultActionAllow
+	}
+	profile.SecurityAPIPositive.EndpointPolicies = normalizeAPIPositiveEndpointPolicies(profile.SecurityAPIPositive.EndpointPolicies)
 
 	profile.SecurityModSecurity.ModSecurityCRSVersion = strings.TrimSpace(profile.SecurityModSecurity.ModSecurityCRSVersion)
 	profile.SecurityModSecurity.ModSecurityCRSPlugins = normalizeTrimmedList(profile.SecurityModSecurity.ModSecurityCRSPlugins)
@@ -120,6 +171,16 @@ func validateProfile(profile EasySiteProfile) error {
 	}
 	if !slices.Contains([]string{SecurityModeBlock, SecurityModeMonitor, SecurityModeTransparent}, profile.FrontService.SecurityMode) {
 		return errors.New("easy site profile front_service.security_mode must be block, monitor, or transparent")
+	}
+	allowedProfiles := []string{
+		ServiceProfileStrict,
+		ServiceProfileBalanced,
+		ServiceProfileCompat,
+		ServiceProfileAPI,
+		ServiceProfilePublicEdge,
+	}
+	if !slices.Contains(allowedProfiles, profile.FrontService.Profile) {
+		return errors.New("easy site profile front_service.profile has unsupported value")
 	}
 	if profile.FrontService.CertificateAuthorityServer == "" {
 		return errors.New("easy site profile front_service.certificate_authority_server is required")
@@ -236,6 +297,8 @@ func validateProfile(profile EasySiteProfile) error {
 		if profile.SecurityAntibot.AntibotURI == "" || !strings.HasPrefix(profile.SecurityAntibot.AntibotURI, "/") {
 			return errors.New("easy site profile security_antibot.antibot_uri must start with / when antibot is enabled")
 		}
+	} else if len(profile.SecurityAntibot.ChallengeRules) > 0 {
+		return errors.New("easy site profile security_antibot.challenge_rules requires antibot enabled")
 	}
 	if profile.SecurityAntibot.AntibotRecaptchaScore < 0 || profile.SecurityAntibot.AntibotRecaptchaScore > 1 {
 		return errors.New("easy site profile security_antibot.antibot_recaptcha_score must be between 0 and 1")
@@ -255,6 +318,25 @@ func validateProfile(profile EasySiteProfile) error {
 			return errors.New("easy site profile security_antibot turnstile mode requires sitekey and secret")
 		}
 	}
+	if profile.SecurityAntibot.ChallengeEscalationEnabled {
+		if profile.SecurityAntibot.AntibotChallenge == AntibotChallengeNo {
+			return errors.New("easy site profile security_antibot.challenge_escalation_enabled requires antibot enabled")
+		}
+		if profile.SecurityAntibot.ChallengeEscalationMode == AntibotChallengeNo || !slices.Contains(antibotModes, profile.SecurityAntibot.ChallengeEscalationMode) {
+			return errors.New("easy site profile security_antibot.challenge_escalation_mode has unsupported mode")
+		}
+	}
+	if len(profile.SecurityAntibot.ChallengeRules) > 32 {
+		return errors.New("easy site profile security_antibot.challenge_rules must not exceed 32 entries")
+	}
+	for _, rule := range profile.SecurityAntibot.ChallengeRules {
+		if rule.Path == "" || !strings.HasPrefix(rule.Path, "/") {
+			return errors.New("easy site profile security_antibot.challenge_rules.path must start with /")
+		}
+		if rule.Challenge == AntibotChallengeNo || !slices.Contains(antibotModes, rule.Challenge) {
+			return errors.New("easy site profile security_antibot.challenge_rules.challenge has unsupported mode")
+		}
+	}
 
 	if profile.SecurityAuthBasic.AuthBasicLocation != AuthBasicLocationSitewide {
 		return errors.New("easy site profile security_auth_basic.auth_basic_location must be sitewide")
@@ -267,6 +349,26 @@ func validateProfile(profile EasySiteProfile) error {
 	}
 	if profile.SecurityAuthBasic.AuthBasicText == "" {
 		return errors.New("easy site profile security_auth_basic.auth_basic_text is required")
+	}
+	if profile.SecurityAuthBasic.SessionInactivityMinutes < -1 || profile.SecurityAuthBasic.SessionInactivityMinutes > 24*60 {
+		return errors.New("easy site profile security_auth_basic.session_inactivity_minutes must be between -1 and 1440")
+	}
+	if len(profile.SecurityAuthBasic.Users) > 128 {
+		return errors.New("easy site profile security_auth_basic.users must not exceed 128 entries")
+	}
+	if profile.SecurityAuthBasic.UseAuthBasic {
+		enabledUsers := 0
+		for _, user := range profile.SecurityAuthBasic.Users {
+			if user.Enabled {
+				enabledUsers++
+				if strings.TrimSpace(user.Password) == "" {
+					return errors.New("easy site profile security_auth_basic.users.password is required for enabled users")
+				}
+			}
+		}
+		if enabledUsers == 0 {
+			return errors.New("easy site profile security_auth_basic.users must include at least one enabled user")
+		}
 	}
 	if !isSafeHeaderValue(profile.SecurityAuthBasic.AuthBasicText) {
 		return errors.New("easy site profile security_auth_basic.auth_basic_text contains unsupported characters")
@@ -317,6 +419,30 @@ func validateProfile(profile EasySiteProfile) error {
 	for _, value := range profile.SecurityCountryPolicy.WhitelistCountry {
 		if _, ok := blacklist[value]; ok {
 			return fmt.Errorf("easy site profile security_country_policy contains conflicting value %s in blacklist and whitelist", value)
+		}
+	}
+
+	if profile.SecurityAPIPositive.EnforcementMode != APIPositiveEnforcementMonitor &&
+		profile.SecurityAPIPositive.EnforcementMode != APIPositiveEnforcementBlock {
+		return errors.New("easy site profile security_api_positive.enforcement_mode must be monitor or block")
+	}
+	if profile.SecurityAPIPositive.DefaultAction != APIPositiveDefaultActionAllow &&
+		profile.SecurityAPIPositive.DefaultAction != APIPositiveDefaultActionDeny {
+		return errors.New("easy site profile security_api_positive.default_action must be allow or deny")
+	}
+	if profile.SecurityAPIPositive.UseAPIPositiveSecurity {
+		if profile.SecurityAPIPositive.OpenAPISchemaRef == "" && len(profile.SecurityAPIPositive.EndpointPolicies) == 0 {
+			return errors.New("easy site profile security_api_positive requires openapi_schema_ref or endpoint_policies when enabled")
+		}
+		for _, policy := range profile.SecurityAPIPositive.EndpointPolicies {
+			if policy.Path == "" || !strings.HasPrefix(policy.Path, "/") {
+				return errors.New("easy site profile security_api_positive.endpoint_policies.path must start with /")
+			}
+			if policy.Mode != "" &&
+				policy.Mode != APIPositiveEnforcementMonitor &&
+				policy.Mode != APIPositiveEnforcementBlock {
+				return errors.New("easy site profile security_api_positive.endpoint_policies.mode must be monitor or block")
+			}
 		}
 	}
 
@@ -395,6 +521,46 @@ func normalizeCountryList(values []string) []string {
 	return slices.Compact(items)
 }
 
+func normalizeAPIPositiveEndpointPolicies(values []APIPositiveEndpointPolicy) []APIPositiveEndpointPolicy {
+	if len(values) == 0 {
+		return nil
+	}
+	out := make([]APIPositiveEndpointPolicy, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		path := strings.TrimSpace(value.Path)
+		if path == "" {
+			continue
+		}
+		methods := normalizeUpperList(value.Methods)
+		tokenIDs := normalizeTrimmedList(value.TokenIDs)
+		contentTypes := normalizeTrimmedList(value.ContentTypes)
+		for i := range contentTypes {
+			contentTypes[i] = strings.ToLower(strings.TrimSpace(contentTypes[i]))
+		}
+		mode := strings.ToLower(strings.TrimSpace(value.Mode))
+		key := strings.ToLower(path) + "\x00" + strings.Join(methods, ",") + "\x00" + strings.Join(tokenIDs, ",") + "\x00" + strings.Join(contentTypes, ",") + "\x00" + mode
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, APIPositiveEndpointPolicy{
+			Path:         path,
+			Methods:      methods,
+			TokenIDs:     tokenIDs,
+			ContentTypes: contentTypes,
+			Mode:         mode,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Path == out[j].Path {
+			return strings.Join(out[i].Methods, ",") < strings.Join(out[j].Methods, ",")
+		}
+		return out[i].Path < out[j].Path
+	})
+	return out
+}
+
 func normalizeStatusCodes(values []int) []int {
 	items := append([]int(nil), values...)
 	sort.Ints(items)
@@ -427,6 +593,79 @@ func normalizeCustomLimitRules(values []CustomLimitRule) []CustomLimitRule {
 		return items[i].Path < items[j].Path
 	})
 	return items
+}
+
+func normalizeAntibotChallengeRules(values []AntibotChallengeRule) []AntibotChallengeRule {
+	if len(values) == 0 {
+		return nil
+	}
+	items := make([]AntibotChallengeRule, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		path := strings.TrimSpace(value.Path)
+		challenge := strings.ToLower(strings.TrimSpace(value.Challenge))
+		if path == "" || challenge == "" {
+			continue
+		}
+		key := strings.ToLower(path) + "\x00" + challenge
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		items = append(items, AntibotChallengeRule{
+			Path:      path,
+			Challenge: challenge,
+		})
+	}
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].Path == items[j].Path {
+			return items[i].Challenge < items[j].Challenge
+		}
+		return items[i].Path < items[j].Path
+	})
+	return items
+}
+
+func normalizeAuthUsers(values []SecurityAuthUser) []SecurityAuthUser {
+	if len(values) == 0 {
+		return nil
+	}
+	out := make([]SecurityAuthUser, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		username := strings.TrimSpace(value.Username)
+		if username == "" {
+			continue
+		}
+		key := strings.ToLower(username)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, SecurityAuthUser{
+			Username:    username,
+			Password:    strings.TrimSpace(value.Password),
+			Enabled:     value.Enabled,
+			LastLoginAt: strings.TrimSpace(value.LastLoginAt),
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return strings.ToLower(out[i].Username) < strings.ToLower(out[j].Username)
+	})
+	return out
+}
+
+func hasEnabledUserWithPassword(values []SecurityAuthUser) bool {
+	for _, value := range values {
+		if !value.Enabled {
+			continue
+		}
+		if strings.TrimSpace(value.Password) == "" {
+			continue
+		}
+		return true
+	}
+	return false
 }
 
 func normalizeLimitReqRate(value string) string {

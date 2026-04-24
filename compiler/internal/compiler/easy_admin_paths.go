@@ -29,6 +29,8 @@ var easyAdminExactPaths = []string{
 	"/",
 	"/login",
 	"/login/2fa",
+	"/auth",
+	"/auth/verify",
 }
 
 var easyAdminPrefixPaths = []string{
@@ -64,6 +66,8 @@ func easyAdminBypassPathPattern() string {
 		"",
 		"login",
 		"login/2fa",
+		"auth",
+		"auth/verify",
 	}
 	for _, prefix := range easyAdminSegmentPrefixes {
 		trimmed := strings.TrimPrefix(prefix, "/")
@@ -76,9 +80,27 @@ func easyAdminBypassPathPattern() string {
 	return "^/(?:" + strings.Join(parts, "|") + ")$"
 }
 
+func isManagementSiteID(siteID string) bool {
+	switch strings.ToLower(strings.TrimSpace(siteID)) {
+	case "control-plane-access", "control-plane", "ui", "localhost":
+		return true
+	default:
+		return false
+	}
+}
+
+func easyAdminBypassPathPatternForSite(siteID string) string {
+	if !isManagementSiteID(siteID) {
+		return "^$"
+	}
+	return easyAdminBypassPathPattern()
+}
+
 var easyReservedLimitExactPaths = []string{
 	"/",
 	"/api/",
+	"/auth",
+	"/auth/verify",
 }
 
 var easyReservedLimitPrefixPaths = []string{

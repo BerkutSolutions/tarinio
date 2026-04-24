@@ -377,7 +377,7 @@ func TestApplyService_CompilesEasyProfileArtifacts(t *testing.T) {
 	if !strings.Contains(easyConf, "if ($waf_country_guard ~ \"^(?:0:(?:RU))$\") { return 403; }") {
 		t.Fatalf("expected blacklist country in easy conf, got: %s", easyConf)
 	}
-	if !strings.Contains(easyConf, "add_header X-WAF-Antibot-Mode \"recaptcha\" always;") {
+	if !strings.Contains(easyConf, "add_header X-WAF-Antibot-Mode \"$waf_antibot_effective_challenge\" always;") {
 		t.Fatalf("expected antibot directive in easy conf, got: %s", easyConf)
 	}
 	if !strings.Contains(easyConf, "modsecurity_rules_file /etc/waf/modsecurity/easy/site-a.conf;") {

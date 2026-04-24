@@ -2,11 +2,11 @@
 
 This page belongs to the current documentation branch.
 
-This document describes the real enterprise identity model in TARINIO `3.0.1`.
+This document describes the real enterprise identity model in TARINIO `3.0.2`.
 
 ## What Is Implemented
 
-TARINIO `3.0.1` provides:
+TARINIO `3.0.2` provides:
 
 - OpenID Connect (`OIDC`) login for interactive operator access
 - `SCIM 2.0` user provisioning with bearer-token authentication
@@ -17,7 +17,7 @@ The identity surface is implemented by the real control-plane routes and UI, not
 
 ## Important Boundary: LDAP / AD
 
-TARINIO `3.0.1` does **not** expose a standalone direct `LDAP` password-login endpoint.
+TARINIO `3.0.2` does **not** expose a standalone direct `LDAP` password-login endpoint.
 
 Instead, the product supports `LDAP` / `Active Directory` backed identity in the practical enterprise way:
 
@@ -187,4 +187,5 @@ For enterprise directory integration:
 - [Security](core-docs/security.md)
 - [Evidence And Releases](core-docs/evidence-and-releases.md)
 - [UI](core-docs/ui.md)
+
 

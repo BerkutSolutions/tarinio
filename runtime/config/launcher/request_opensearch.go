@@ -123,6 +123,7 @@ func (s *requestOpenSearchStore) ensureIndex(cfg requestOpenSearchConfig) error 
 				"request_id":    map[string]any{"type": "keyword"},
 				"client_ip":     map[string]any{"type": "ip", "ignore_malformed": true},
 				"country":       map[string]any{"type": "keyword"},
+				"city":          map[string]any{"type": "keyword"},
 				"method":        map[string]any{"type": "keyword"},
 				"uri":           map[string]any{"type": "wildcard"},
 				"status":        map[string]any{"type": "integer"},
@@ -135,6 +136,13 @@ func (s *requestOpenSearchStore) ensureIndex(cfg requestOpenSearchConfig) error 
 		},
 	}
 	if err := s.doRequest(cfg, http.MethodPut, "/"+cfg.RequestsIndex, body, nil); err != nil && !strings.Contains(err.Error(), "resource_already_exists_exception") {
+		return err
+	}
+	if err := s.doRequest(cfg, http.MethodPut, "/"+cfg.RequestsIndex+"/_mapping", map[string]any{
+		"properties": map[string]any{
+			"city": map[string]any{"type": "keyword"},
+		},
+	}, nil); err != nil && !strings.Contains(strings.ToLower(err.Error()), "mapper_parsing_exception") {
 		return err
 	}
 	s.mu.Lock()

@@ -170,6 +170,26 @@
       color: var(--muted);
       font-size: 13px;
     }
+    .powered {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 20px !important;
+      z-index: 20;
+      margin: 0;
+      padding-bottom: 0;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center;
+    }
+    .powered a {
+      color: #cfe1ff;
+      text-decoration: none;
+      border-bottom: 1px solid rgba(207, 225, 255, 0.35);
+    }
+    .powered a:hover {
+      border-bottom-color: rgba(207, 225, 255, 0.85);
+    }
     @media (max-width: 860px) {
       .body {
         grid-template-columns: 1fr;
@@ -181,56 +201,153 @@
   <main class="shell">
     <section class="hero">
       <div>
-        <div class="code"><strong>{{ .StatusCode }}</strong><span>{{ .Category }}</span></div>
-        <h1 class="title">{{ .Title }}</h1>
-        <p class="subtitle">{{ .Summary }}</p>
+        <div class="code"><strong>{{ .StatusCode }}</strong><span id="status-category">{{ .Category }}</span></div>
+        <h1 class="title" id="status-main-title">{{ .Title }}</h1>
+        <p class="subtitle" id="status-summary">{{ .Summary }}</p>
         <div class="meta">
-          <div class="meta-item"><span>Request ID</span><strong id="req-id">n/a</strong></div>
-          <div class="meta-item"><span>Client IP</span><strong id="client-ip">n/a</strong></div>
-          <div class="meta-item"><span>Timestamp</span><strong id="req-time">n/a</strong></div>
+          <div class="meta-item"><span id="meta-request-label">Request ID</span><strong id="req-id">n/a</strong></div>
+          <div class="meta-item"><span id="meta-client-label">Client IP</span><strong id="client-ip">n/a</strong></div>
+          <div class="meta-item"><span id="meta-time-label">Timestamp</span><strong id="req-time">n/a</strong></div>
         </div>
       </div>
     </section>
     <section class="body">
       <article class="card accent">
-        <h2>What happened</h2>
+        <h2 id="what-happened-title">What happened</h2>
         <div class="state-grid">
           <div class="state">
             <div>
-              <strong>Client request</strong>
-              <span>{{ .ClientStateText }}</span>
+              <strong id="client-title">Client request</strong>
+              <span id="client-text">{{ .ClientStateText }}</span>
             </div>
-            <span class="pill {{ .ClientStateTone }}">{{ .ClientStateLabel }}</span>
+            <span class="pill {{ .ClientStateTone }}" id="client-label">{{ .ClientStateLabel }}</span>
           </div>
           <div class="state">
             <div>
-              <strong>WAF layer</strong>
-              <span>{{ .WAFStateText }}</span>
+              <strong id="waf-title">WAF layer</strong>
+              <span id="waf-text">{{ .WAFStateText }}</span>
             </div>
-            <span class="pill {{ .WAFStateTone }}">{{ .WAFStateLabel }}</span>
+            <span class="pill {{ .WAFStateTone }}" id="waf-label">{{ .WAFStateLabel }}</span>
           </div>
           <div class="state">
             <div>
-              <strong>Upstream service</strong>
-              <span>{{ .UpstreamStateText }}</span>
+              <strong id="upstream-title">Upstream service</strong>
+              <span id="upstream-text">{{ .UpstreamStateText }}</span>
             </div>
-            <span class="pill {{ .UpstreamStateTone }}">{{ .UpstreamStateLabel }}</span>
+            <span class="pill {{ .UpstreamStateTone }}" id="upstream-label">{{ .UpstreamStateLabel }}</span>
           </div>
         </div>
       </article>
       <article class="card">
-        <h2>What to do next</h2>
+        <h2 id="what-next-title">What to do next</h2>
         <ol class="list">
           {{- range .Suggestions }}
           <li>{{ . }}</li>
           {{- end }}
         </ol>
-        <div class="footer">TARINIO handled this response with an internal fallback page so the failure mode stays readable.</div>
+        <div class="footer" id="status-footer">TARINIO handled this response with an internal fallback page so the failure mode stays readable.</div>
       </article>
     </section>
   </main>
+  <div class="powered">
+    <a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener noreferrer">Secured by Tarinio</a>
+  </div>
   <script>
     (function () {
+      var copy = {
+        en: {
+          requestID: "Request ID",
+          clientIP: "Client IP",
+          timestamp: "Timestamp",
+          whatHappened: "What happened",
+          whatNext: "What to do next",
+          footer: "TARINIO handled this response with an internal fallback page so the failure mode stays readable."
+        },
+        ru: {
+          requestID: "ID запроса",
+          clientIP: "IP клиента",
+          timestamp: "Время",
+          whatHappened: "Что произошло",
+          whatNext: "Что делать дальше",
+          footer: "TARINIO обработал ответ через внутреннюю fallback-страницу, чтобы сценарий ошибки оставался читаемым."
+        }
+      };
+      var ruPhrases = {
+        "Protected resource": "Защищённый ресурс",
+        "Authentication Required": "Требуется аутентификация",
+        "The destination is reachable, but authentication is required before the request can continue.": "Ресурс доступен, но перед продолжением запроса требуется аутентификация.",
+        "Client request": "Запрос клиента",
+        "The client must provide a valid session or credentials.": "Клиент должен предоставить валидную сессию или учётные данные.",
+        "Sign in": "Войти",
+        "WAF layer": "Слой WAF",
+        "The WAF is healthy and forwarding the protected flow correctly.": "WAF работает штатно и корректно передаёт защищённый трафик.",
+        "Online": "Онлайн",
+        "Upstream service": "Целевой сервис",
+        "The application is reachable but requires authentication.": "Приложение доступно, но требует аутентификации.",
+        "Sign in again and retry the request.": "Войдите снова и повторите запрос.",
+        "Check whether your session expired.": "Проверьте, не истекла ли сессия.",
+        "Confirm that the protected path is expected to require login.": "Убедитесь, что защищённый путь действительно должен требовать вход."
+      };
+      var lang = "en";
+      try {
+        var candidates = [];
+        if (Array.isArray(navigator.languages)) candidates = candidates.concat(navigator.languages);
+        if (navigator.language) candidates.push(navigator.language);
+        for (var i = 0; i < candidates.length; i += 1) {
+          var token = String(candidates[i] || "").toLowerCase().split(/[-_]/)[0];
+          if (copy[token]) {
+            lang = token;
+            break;
+          }
+        }
+      } catch (_error) {}
+      var t = copy[lang] || copy.en;
+      document.documentElement.lang = lang;
+      var requestLabel = document.getElementById("meta-request-label");
+      var clientLabel = document.getElementById("meta-client-label");
+      var timeLabel = document.getElementById("meta-time-label");
+      var happenedTitle = document.getElementById("what-happened-title");
+      var nextTitle = document.getElementById("what-next-title");
+      var footer = document.getElementById("status-footer");
+      if (requestLabel) requestLabel.textContent = t.requestID;
+      if (clientLabel) clientLabel.textContent = t.clientIP;
+      if (timeLabel) timeLabel.textContent = t.timestamp;
+      if (happenedTitle) happenedTitle.textContent = t.whatHappened;
+      if (nextTitle) nextTitle.textContent = t.whatNext;
+      if (footer) footer.textContent = t.footer;
+      function translateIfRu(id) {
+        if (lang !== "ru") return;
+        var node = document.getElementById(id);
+        if (!node) return;
+        var source = String(node.textContent || "").trim();
+        if (!source) return;
+        if (Object.prototype.hasOwnProperty.call(ruPhrases, source)) {
+          node.textContent = ruPhrases[source];
+        }
+      }
+      [
+        "status-category",
+        "status-main-title",
+        "status-summary",
+        "client-title",
+        "client-text",
+        "client-label",
+        "waf-title",
+        "waf-text",
+        "waf-label",
+        "upstream-title",
+        "upstream-text",
+        "upstream-label"
+      ].forEach(translateIfRu);
+      if (lang === "ru") {
+        document.querySelectorAll(".list li").forEach(function (item) {
+          var source = String(item.textContent || "").trim();
+          if (Object.prototype.hasOwnProperty.call(ruPhrases, source)) {
+            item.textContent = ruPhrases[source];
+          }
+        });
+      }
+
       function readFromServerTiming(metricName) {
         try {
           var entries = performance.getEntriesByType("navigation");
@@ -247,7 +364,7 @@
               return String(metric.description);
             }
           }
-        } catch (error) {
+        } catch (_e) {
           return "";
         }
         return "";

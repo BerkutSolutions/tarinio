@@ -4,7 +4,7 @@ This page belongs to the current documentation branch.
 
 ## Scope
 
-This matrix defines the deployment combinations TARINIO `3.0.1` is designed, tested, and supported for.
+This matrix defines the deployment combinations TARINIO `3.0.2` is designed, tested, and supported for.
 
 ## Runtime Platform
 
@@ -62,6 +62,7 @@ The operator UI targets evergreen browsers:
 - [Support and Lifecycle Policy](core-docs/support-lifecycle.md)
 - [Sizing Guide](core-docs/sizing.md)
 - [Reference Architectures](architecture-docs/reference-architectures.md)
+
 
 
 

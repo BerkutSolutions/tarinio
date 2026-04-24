@@ -1,8 +1,8 @@
-# API
+﻿# API
 
 Эта страница относится к текущей ветке документации.
 
-Документ описывает актуальный HTTP API control-plane для версии `3.0.0`. Каталог собран по реально зарегистрированным маршрутам из `control-plane/internal/httpserver/server.go`.
+Документ описывает актуальный HTTP API control-plane для версии `3.0.2`. Каталог собран по реально зарегистрированным маршрутам из `control-plane/internal/httpserver/server.go`.
 
 ## Общие правила
 
@@ -335,4 +335,6 @@
 - `Активность`: `audit`
 - `Настройки`: `settings/runtime`, `app/meta`
 - `Профиль`: `auth/me`, `auth/change-password`, `auth/2fa/*`, `auth/passkeys/*`
+
+
 

@@ -881,38 +881,36 @@
   .section-wrapper {
     height: 100%;
   }
-  
-  /* Анимации, имитирующие Windows */
   .window {
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   }
   
   .minimize-animation {
-    transform: translateY(100vh); /* Сворачивание вниз */
+    transform: translateY(100vh);
   }
   
   .maximize-animation {
-    transform: scale(1.01); /* Легкое увеличение для разворачивания через кнопку */
+    transform: scale(1.01);
   }
   
   .unmaximize-animation {
-    transform: scale(0.98); /* Легкое уменьшение перед возвратом */
+    transform: scale(0.98);
   }
   
   .close-animation {
-    opacity: 0; /* Затухание */
+    opacity: 0;
   }
   
   .restore-animation {
-    animation: restoreSlideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1); /* Обратное движение вверх */
+    animation: restoreSlideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   }
   
   @keyframes restoreSlideUp {
     from {
-      transform: translateY(100vh); /* Начинается снизу */
+      transform: translateY(100vh);
     }
     to {
-      transform: translateY(0); /* Возвращается в исходное положение */
+      transform: translateY(0);
     }
   }
   .page {
@@ -1965,7 +1963,7 @@
   }
 
   .healthcheck-step-icon[data-status='failed']::after {
-    content: '×';
+    content: '';
     position: absolute;
     inset: 0;
     display: flex;
@@ -1978,7 +1976,7 @@
   }
 
   /* Healthcheck: "skipped/no access" state + safe cross glyph override. */
-  .healthcheck-step-icon[data-status='failed']::after { content: '×'; }
+  .healthcheck-step-icon[data-status='failed']::after { content: ''; }
 
   .healthcheck-step-icon[data-status='skipped'] {
     border-color: rgba(180, 190, 210, 0.9);
@@ -1986,7 +1984,7 @@
   }
 
   .healthcheck-step-icon[data-status='skipped']::after {
-    content: '–';
+    content: '';
     position: absolute;
     inset: 0;
     display: flex;
@@ -2002,8 +2000,8 @@
   /* Healthcheck: force stable glyphs and tweak vertical alignment. */
   .healthcheck-step-icon[data-status='failed']::after { content: '\00D7' !important; line-height: 1; transform: translateY(-1px) !important; }
   .healthcheck-step-icon[data-status='skipped']::after { content: '\2013' !important; line-height: 1; transform: translateY(-1px) !important; }
-  .healthcheck-step-icon[data-status='failed']::after { content: '×' !important; }
-  .healthcheck-step-icon[data-status='skipped']::after { content: '–' !important; }
+  .healthcheck-step-icon[data-status='failed']::after { content: '' !important; }
+  .healthcheck-step-icon[data-status='skipped']::after { content: '' !important; }
 
   @keyframes healthcheck-spin {
     from { transform: rotate(0deg); }
@@ -4773,6 +4771,104 @@
 .waf-services-tls-badge-expire {
   font-size: 12px;
   opacity: 0.92;
+}
+
+.waf-auth-editor-frame .waf-card-head {
+  padding: 14px 16px 12px;
+}
+
+.waf-antibot-auth-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.waf-antibot-editor-frame .waf-card-head {
+  padding: 14px 16px 12px;
+}
+
+.waf-antibot-editor-frame,
+.waf-auth-editor-frame {
+  border: 1px solid rgba(109, 153, 245, 0.22);
+  background:
+    radial-gradient(circle at 85% 10%, rgba(121, 171, 255, 0.1), transparent 34%),
+    radial-gradient(circle at left bottom, rgba(58, 103, 194, 0.07), transparent 26%),
+    linear-gradient(145deg, rgba(16, 24, 39, 0.95), rgba(10, 16, 28, 0.98));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02), 0 14px 28px rgba(0, 0, 0, 0.22);
+}
+
+.waf-antibot-editor-frame .waf-card-head h3 {
+  font-size: 16px;
+}
+
+.waf-antibot-editor-frame .waf-card-body {
+  padding: 16px;
+}
+
+.waf-auth-editor-frame .waf-card-head h3 {
+  font-size: 16px;
+}
+
+.waf-auth-editor-frame .waf-card-body {
+  padding: 16px;
+}
+
+.waf-auth-users-table input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.waf-auth-password-cell {
+  position: relative;
+  display: block;
+}
+
+.waf-auth-password-cell input {
+  width: 100%;
+  padding-right: 42px;
+}
+
+.waf-auth-users-enabled-cell {
+  min-width: 90px;
+}
+
+.waf-auth-users-enabled-cell .waf-checkbox {
+  justify-content: center;
+}
+
+.waf-password-toggle {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border: 1px solid rgba(96, 121, 187, 0.35);
+  border-radius: 10px;
+  background: rgba(8, 11, 18, 0.88);
+  color: #eef3ff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.waf-password-toggle:hover {
+  background: rgba(25, 35, 56, 0.95);
+  border-color: rgba(125, 155, 255, 0.62);
+}
+
+.waf-password-toggle svg {
+  width: 18px;
+  height: 18px;
+}
+
+@media (max-width: 1200px) {
+  .waf-antibot-auth-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 #dashboard-page .dashboard-board {
@@ -12377,7 +12473,7 @@ body.auth-locked #main-screen {
   background: rgba(11, 18, 30, 0.22);
 }
 
-/* Revisions 3.0.1 */
+/* Revisions 3.0.2 */
 #revisions-page.revisions-page {
   overflow: hidden;
 }
@@ -12981,3 +13077,4 @@ body.auth-locked #main-screen {
     grid-template-columns: 1fr;
   }
 }
+

@@ -31,6 +31,7 @@ type requestLogRecord struct {
 	RequestID    string `json:"request_id"`
 	ClientIP     string `json:"client_ip"`
 	Country      string `json:"country"`
+	City         string `json:"city"`
 	Method       string `json:"method"`
 	URI          string `json:"uri"`
 	Status       int    `json:"status"`
@@ -170,7 +171,7 @@ func (s *requestClickHouseStore) latest(options requestQueryOptions) ([]map[stri
 		limit = 500
 	}
 	query := strings.Builder{}
-	query.WriteString("SELECT event_hash, stream, ingested_at, timestamp, request_id, client_ip, country, method, uri, status, site, host, upstream_addr, referer, user_agent ")
+	query.WriteString("SELECT event_hash, stream, ingested_at, timestamp, request_id, client_ip, country, city, method, uri, status, site, host, upstream_addr, referer, user_agent ")
 	query.WriteString(fmt.Sprintf("FROM %s.%s FINAL WHERE 1=1", cfg.Database, cfg.Table))
 	if options.RetentionDays > 0 && options.Day == "" && options.Since.IsZero() {
 		query.WriteString(fmt.Sprintf(" AND timestamp >= now64(9) - INTERVAL %d DAY", options.RetentionDays))
@@ -312,7 +313,7 @@ func (s *requestClickHouseStore) exportDay(day string) ([]requestLogRecord, erro
 		return nil, err
 	}
 	query := strings.Builder{}
-	query.WriteString("SELECT event_hash, stream, ingested_at, timestamp, request_id, client_ip, country, method, uri, status, site, host, upstream_addr, referer, user_agent ")
+	query.WriteString("SELECT event_hash, stream, ingested_at, timestamp, request_id, client_ip, country, city, method, uri, status, site, host, upstream_addr, referer, user_agent ")
 	query.WriteString(fmt.Sprintf("FROM %s.%s FINAL WHERE toDate(timestamp) = toDate('%s') ORDER BY timestamp ASC FORMAT JSONEachRow", cfg.Database, cfg.Table, escapeSQLString(day)))
 	resp, err := s.query(cfg, query.String())
 	if err != nil {
@@ -355,6 +356,7 @@ timestamp DateTime64(9, 'UTC'),
 request_id String,
 client_ip String,
 country LowCardinality(String),
+city String,
 method LowCardinality(String),
 uri String,
 status UInt16,
@@ -367,6 +369,9 @@ user_agent String
 PARTITION BY toYYYYMMDD(timestamp)
 ORDER BY (timestamp, event_hash)`, cfg.Database, cfg.Table)
 	if err := s.doQuery(cfg, createTable, nil); err != nil {
+		return err
+	}
+	if err := s.doQuery(cfg, fmt.Sprintf("ALTER TABLE %s.%s ADD COLUMN IF NOT EXISTS city String AFTER country", cfg.Database, cfg.Table), nil); err != nil {
 		return err
 	}
 	s.mu.Lock()
@@ -444,6 +449,7 @@ func newRequestLogRecord(item parsedAccess) requestLogRecord {
 		RequestID:    item.requestID,
 		ClientIP:     item.ip,
 		Country:      item.country,
+		City:         item.city,
 		Method:       item.method,
 		URI:          item.path,
 		Status:       item.status,
@@ -464,6 +470,7 @@ func requestRecordHash(record requestLogRecord) string {
 		record.RequestID,
 		record.ClientIP,
 		record.Country,
+		record.City,
 		record.Method,
 		record.URI,
 		strconv.Itoa(record.Status),
@@ -486,6 +493,7 @@ func requestRecordToMap(record requestLogRecord) map[string]any {
 			"request_id":    record.RequestID,
 			"client_ip":     record.ClientIP,
 			"country":       record.Country,
+			"city":          record.City,
 			"method":        record.Method,
 			"uri":           record.URI,
 			"status":        record.Status,
@@ -518,6 +526,7 @@ func loadRequestLogRecordFromArchiveLine(line string) (requestLogRecord, bool) {
 		RequestID:    strings.TrimSpace(asString(row.Entry["request_id"])),
 		ClientIP:     strings.TrimSpace(asString(row.Entry["client_ip"])),
 		Country:      strings.TrimSpace(asString(row.Entry["country"])),
+		City:         strings.TrimSpace(asString(row.Entry["city"])),
 		Method:       strings.TrimSpace(asString(row.Entry["method"])),
 		URI:          strings.TrimSpace(asString(row.Entry["uri"])),
 		Status:       parseIntValue(row.Entry["status"]),

@@ -80,9 +80,10 @@ type securityEvent struct {
 }
 
 type securityEventSource struct {
-	mu     sync.Mutex
-	path   string
-	offset int64
+	mu          sync.Mutex
+	path        string
+	offset      int64
+	threatIntel *threatIntelMatcher
 }
 
 const (
@@ -91,7 +92,10 @@ const (
 )
 
 func newSecurityEventSource(path string) *securityEventSource {
-	return &securityEventSource{path: path}
+	return &securityEventSource{
+		path:        path,
+		threatIntel: newThreatIntelMatcherFromEnv(),
+	}
 }
 
 func normalizeSiteID(value string) string {
@@ -1174,6 +1178,7 @@ func (s *securityEventSource) next() ([]securityEvent, error) {
 	burstBySecond := make(map[string]int)
 	burstBySecondAndPath := make(map[string]int)
 	burstMeta := make(map[string]map[string]string)
+	threatSeenByTick := make(map[string]struct{})
 	burstThreshold := burstThresholdFromEnv("WAF_SECURITY_EVENT_BURST_RPS_THRESHOLD", defaultBurstRequestsPerSecondThreshold)
 	burstPathThreshold := burstThresholdFromEnv("WAF_SECURITY_EVENT_BURST_PATH_RPS_THRESHOLD", defaultBurstPathRequestsPerSecondThreshold)
 	for scanner.Scan() {
@@ -1187,6 +1192,32 @@ func (s *securityEventSource) next() ([]securityEvent, error) {
 		}
 		if shouldSkipInternalManagementRequest(item) {
 			continue
+		}
+		if s.threatIntel != nil {
+			if hit, ok := s.threatIntel.Match(item.ip); ok {
+				seenKey := item.ip + "\x00" + hit.Feed
+				if _, exists := threatSeenByTick[seenKey]; !exists {
+					threatSeenByTick[seenKey] = struct{}{}
+					out = append(out, securityEvent{
+						Type:            "security_threat_intel",
+						Severity:        "warning",
+						SiteID:          item.siteID,
+						SourceComponent: "runtime-threat-intel",
+						OccurredAt:      item.when.UTC().Format(time.RFC3339Nano),
+						Summary:         "threat intel reputation match",
+						Details: map[string]any{
+							"client_ip":   item.ip,
+							"country":     item.country,
+							"city":        item.city,
+							"host":        item.host,
+							"path":        item.path,
+							"feed":        hit.Feed,
+							"intel_score": hit.Score,
+							"intel_label": hit.Label,
+						},
+					})
+				}
+			}
 		}
 		if shouldTrackRequestBurst(item) {
 			second := item.when.UTC().Format("2006-01-02T15:04:05Z")
@@ -1203,6 +1234,7 @@ func (s *securityEventSource) next() ([]securityEvent, error) {
 					"site_id": item.siteID,
 					"host":    item.host,
 					"country": item.country,
+					"city":    item.city,
 				}
 			}
 			if _, exists := burstMeta[burstPathKey]; !exists {
@@ -1213,6 +1245,7 @@ func (s *securityEventSource) next() ([]securityEvent, error) {
 					"site_id": item.siteID,
 					"host":    item.host,
 					"country": item.country,
+					"city":    item.city,
 				}
 			}
 		}
@@ -1232,6 +1265,7 @@ func (s *securityEventSource) next() ([]securityEvent, error) {
 					"path":       item.path,
 					"client_ip":  item.ip,
 					"country":    item.country,
+					"city":       item.city,
 					"host":       item.host,
 					"referer":    item.referer,
 					"user_agent": item.userAgent,
@@ -1251,6 +1285,7 @@ func (s *securityEventSource) next() ([]securityEvent, error) {
 					"path":       item.path,
 					"client_ip":  item.ip,
 					"country":    item.country,
+					"city":       item.city,
 					"host":       item.host,
 					"referer":    item.referer,
 					"user_agent": item.userAgent,
@@ -1282,6 +1317,7 @@ func (s *securityEventSource) next() ([]securityEvent, error) {
 				"requests_second": count,
 				"host":            meta["host"],
 				"country":         meta["country"],
+				"city":            meta["city"],
 				"blocked":         false,
 			},
 		})
@@ -1304,6 +1340,7 @@ func (s *securityEventSource) next() ([]securityEvent, error) {
 				"path_requests_sec": count,
 				"host":              meta["host"],
 				"country":           meta["country"],
+				"city":              meta["city"],
 				"blocked":           false,
 			},
 		})
@@ -1335,6 +1372,7 @@ type parsedAccess struct {
 	siteID       string
 	host         string
 	country      string
+	city         string
 	method       string
 	path         string
 	status       int
@@ -1351,6 +1389,7 @@ func parseAccessLine(line string) (parsedAccess, bool) {
 			RequestID    string `json:"request_id"`
 			ClientIP     string `json:"client_ip"`
 			Country      string `json:"country"`
+			City         string `json:"city"`
 			Method       string `json:"method"`
 			URI          string `json:"uri"`
 			Status       int    `json:"status"`
@@ -1378,6 +1417,7 @@ func parseAccessLine(line string) (parsedAccess, bool) {
 				siteID:       sanitizeSiteID(item.Site),
 				host:         strings.ToLower(strings.TrimSpace(item.Host)),
 				country:      strings.ToUpper(strings.TrimSpace(item.Country)),
+				city:         strings.TrimSpace(item.City),
 				method:       strings.TrimSpace(item.Method),
 				path:         strings.TrimSpace(item.URI),
 				status:       item.Status,
@@ -1406,6 +1446,7 @@ func parseAccessLine(line string) (parsedAccess, bool) {
 		siteID:       sanitizeSiteID(matches[9]),
 		host:         "",
 		country:      "",
+		city:         "",
 		method:       matches[3],
 		path:         matches[4],
 		status:       status,

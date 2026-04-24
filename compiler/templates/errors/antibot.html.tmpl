@@ -161,6 +161,26 @@
     .hint-ok { color: var(--ok); }
     .hint-warn { color: var(--warn); }
     .hint-bad { color: var(--bad); }
+    .powered {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 20px !important;
+      z-index: 20;
+      margin: 0;
+      padding-bottom: 0;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center;
+    }
+    .powered a {
+      color: #cfe1ff;
+      text-decoration: none;
+      border-bottom: 1px solid rgba(207, 225, 255, 0.35);
+    }
+    .powered a:hover {
+      border-bottom-color: rgba(207, 225, 255, 0.85);
+    }
     @keyframes spin { to { transform: rotate(360deg); } }
     @keyframes pulse {
       0% { box-shadow: 0 0 0 0 rgba(138, 180, 255, 0.5); }
@@ -175,9 +195,9 @@
 <body>
   <main class="shell">
     <section class="hero">
-      <div class="eyebrow"><span class="dot"></span><span>Security Check In Progress</span></div>
-      <h1>Performing browser verification</h1>
-      <p class="sub">This site is protected by TARINIO anti-bot challenge mode. The check runs automatically, issues a site-scoped verification cookie, and returns you to the page you originally requested.</p>
+      <div class="eyebrow"><span class="dot"></span><span id="eyebrow-label">Security Check In Progress</span></div>
+      <h1 id="hero-title">Performing browser verification</h1>
+      <p class="sub" id="hero-sub">This site is protected by TARINIO anti-bot challenge mode. The check runs automatically, issues a site-scoped verification cookie, and returns you to the page you originally requested.</p>
     </section>
     <section class="body">
       <article class="status">
@@ -186,24 +206,27 @@
       </article>
       <section class="grid">
         <article class="tile">
-          <h2>Browser</h2>
+          <h2 id="tile-browser-title">Browser</h2>
           <p id="browser-state">Waiting for client checks.</p>
         </article>
         <article class="tile">
-          <h2>Cookie</h2>
+          <h2 id="tile-cookie-title">Cookie</h2>
           <p id="cookie-state">Cookie not issued yet.</p>
         </article>
         <article class="tile">
-          <h2>Return</h2>
+          <h2 id="tile-return-title">Return</h2>
           <p id="return-state">The original path will open automatically after verification.</p>
         </article>
       </section>
       <div class="actions">
         <button id="retry-btn" class="btn" type="button" hidden>Retry check</button>
       </div>
-      <div class="footer">If the page does not advance, review your browser privacy extensions and cookie settings, then retry the verification.</div>
+      <div class="footer" id="footer-text">If the page does not advance, review your browser privacy extensions and cookie settings, then retry the verification.</div>
     </section>
   </main>
+  <div class="powered">
+    <a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener noreferrer">Secured by Tarinio</a>
+  </div>
   <script>
     (function () {
       var verifyURI = "{{ .VerifyURI }}";
@@ -213,6 +236,95 @@
       var browserState = document.getElementById("browser-state");
       var cookieState = document.getElementById("cookie-state");
       var returnState = document.getElementById("return-state");
+      var messages = {
+        en: {
+          pageTitle: "Security Check In Progress",
+          eyebrow: "Security Check In Progress",
+          heroTitle: "Performing browser verification",
+          heroSub: "This site is protected by TARINIO anti-bot challenge mode. The check runs automatically, issues a site-scoped verification cookie, and returns you to the page you originally requested.",
+          statusPreparingTitle: "Preparing challenge",
+          statusPreparingText: "Checking browser capabilities and preparing a short redirect through the verification endpoint.",
+          tileBrowser: "Browser",
+          tileCookie: "Cookie",
+          tileReturn: "Return",
+          browserWaiting: "Waiting for client checks.",
+          cookieWaiting: "Cookie not issued yet.",
+          returnWaiting: "The original path will open automatically after verification.",
+          retry: "Retry check",
+          footer: "If the page does not advance, review your browser privacy extensions and cookie settings, then retry the verification.",
+          failTitle: "Verification did not complete",
+          failCookie: "Challenge cookie was not issued.",
+          noApi: "Required browser APIs are unavailable.",
+          noApiDetail: "The browser does not expose the APIs required for the JavaScript challenge.",
+          noCookie: "Cookies are disabled.",
+          noCookieDetail: "Cookies are disabled, so the site cannot persist the anti-bot verification result.",
+          checksPassed: "Browser checks passed.",
+          issueCookieTitle: "Issuing challenge cookie",
+          issueCookieText: "The browser check passed. Redirecting through the verification endpoint and back to the requested page.",
+          cookieRedirecting: "Challenge cookie will be issued during the redirect."
+        },
+        ru: {
+          pageTitle: "Проверка безопасности",
+          eyebrow: "Проверка безопасности",
+          heroTitle: "Выполняется проверка браузера",
+          heroSub: "Сайт защищён anti-bot режимом TARINIO. Проверка выполняется автоматически, выдаёт cookie верификации для сайта и возвращает вас на исходную страницу.",
+          statusPreparingTitle: "Подготовка challenge",
+          statusPreparingText: "Проверяем возможности браузера и готовим короткий редирект через endpoint верификации.",
+          tileBrowser: "Браузер",
+          tileCookie: "Cookie",
+          tileReturn: "Возврат",
+          browserWaiting: "Ожидание клиентской проверки.",
+          cookieWaiting: "Cookie пока не выдана.",
+          returnWaiting: "Исходный путь откроется автоматически после верификации.",
+          retry: "Повторить проверку",
+          footer: "Если страница не продолжает работу, проверьте расширения приватности и настройки cookie, затем повторите проверку.",
+          failTitle: "Верификация не завершилась",
+          failCookie: "Challenge cookie не была выдана.",
+          noApi: "Отсутствуют необходимые API браузера.",
+          noApiDetail: "Браузер не предоставляет API, необходимые для JavaScript challenge.",
+          noCookie: "Cookie отключены.",
+          noCookieDetail: "Cookie отключены, поэтому сайт не может сохранить результат anti-bot верификации.",
+          checksPassed: "Проверки браузера пройдены.",
+          issueCookieTitle: "Выдача challenge cookie",
+          issueCookieText: "Проверка браузера пройдена. Выполняем редирект через endpoint верификации и возвращаем вас на запрошенную страницу.",
+          cookieRedirecting: "Challenge cookie будет выдана во время редиректа."
+        }
+      };
+      var lang = "en";
+      try {
+        var candidates = [];
+        if (Array.isArray(navigator.languages)) candidates = candidates.concat(navigator.languages);
+        if (navigator.language) candidates.push(navigator.language);
+        for (var i = 0; i < candidates.length; i += 1) {
+          var token = String(candidates[i] || "").toLowerCase().split(/[-_]/)[0];
+          if (messages[token]) {
+            lang = token;
+            break;
+          }
+        }
+      } catch (_langError) {}
+      function m(key) {
+        var set = messages[lang] || messages.en;
+        if (set && Object.prototype.hasOwnProperty.call(set, key)) {
+          return set[key];
+        }
+        return messages.en[key] || key;
+      }
+      document.documentElement.lang = lang;
+      document.title = m("pageTitle");
+      document.getElementById("eyebrow-label").textContent = m("eyebrow");
+      document.getElementById("hero-title").textContent = m("heroTitle");
+      document.getElementById("hero-sub").textContent = m("heroSub");
+      statusTitle.textContent = m("statusPreparingTitle");
+      statusText.textContent = m("statusPreparingText");
+      document.getElementById("tile-browser-title").textContent = m("tileBrowser");
+      document.getElementById("tile-cookie-title").textContent = m("tileCookie");
+      document.getElementById("tile-return-title").textContent = m("tileReturn");
+      browserState.textContent = m("browserWaiting");
+      cookieState.textContent = m("cookieWaiting");
+      returnState.textContent = m("returnWaiting");
+      retryBtn.textContent = m("retry");
+      document.getElementById("footer-text").textContent = m("footer");
 
       function readReturnTarget() {
         var params = new URLSearchParams(window.location.search || "");
@@ -225,48 +337,48 @@
       }
 
       function buildVerifyURL(target) {
-        var url = new URL(verifyURI, window.location.origin);
-        url.searchParams.set("return_uri", target.uri);
+        var base = new URL(verifyURI, window.location.origin).toString();
+        var query = "return_uri=" + encodeURI(target.uri || "/");
         if (target.args) {
-          url.searchParams.set("return_args", target.args);
+          query += "&return_args=" + encodeURIComponent(target.args);
         }
-        return url.toString();
+        return base + (base.indexOf("?") >= 0 ? "&" : "?") + query;
       }
 
       function reportFailure(message) {
-        statusTitle.textContent = "Verification did not complete";
+        statusTitle.textContent = m("failTitle");
         statusText.textContent = message;
-        cookieState.textContent = "Challenge cookie was not issued.";
+        cookieState.textContent = m("failCookie");
         cookieState.className = "hint-bad";
         retryBtn.hidden = false;
       }
 
       function performChecks() {
         if (!window.fetch || !window.URL || !window.URLSearchParams || !window.crypto) {
-          browserState.textContent = "Required browser APIs are unavailable.";
+          browserState.textContent = m("noApi");
           browserState.className = "hint-bad";
-          reportFailure("The browser does not expose the APIs required for the JavaScript challenge.");
+          reportFailure(m("noApiDetail"));
           return;
         }
         if (!navigator.cookieEnabled) {
-          browserState.textContent = "Cookies are disabled.";
+          browserState.textContent = m("noCookie");
           browserState.className = "hint-bad";
-          reportFailure("Cookies are disabled, so the site cannot persist the anti-bot verification result.");
+          reportFailure(m("noCookieDetail"));
           return;
         }
 
-        browserState.textContent = "Browser checks passed.";
+        browserState.textContent = m("checksPassed");
         browserState.className = "hint-ok";
 
         var target = readReturnTarget();
         returnState.textContent = target.uri + (target.args ? "?" + target.args : "");
         returnState.className = "hint-ok";
 
-        statusTitle.textContent = "Issuing challenge cookie";
-        statusText.textContent = "The browser check passed. Redirecting through the verification endpoint and back to the requested page.";
+        statusTitle.textContent = m("issueCookieTitle");
+        statusText.textContent = m("issueCookieText");
 
         window.setTimeout(function () {
-          cookieState.textContent = "Challenge cookie will be issued during the redirect.";
+          cookieState.textContent = m("cookieRedirecting");
           cookieState.className = "hint-ok";
           window.location.replace(buildVerifyURL(target));
         }, 1200);

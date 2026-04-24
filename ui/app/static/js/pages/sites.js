@@ -149,6 +149,25 @@ function mergeByID(primary, secondary) {
   return Array.from(map.values());
 }
 
+function mergeProfilesBySite(primary, secondaryPayload) {
+  const map = new Map();
+  for (const item of normalizeArray(primary)) {
+    const siteID = normalizeSiteID(item?.site_id);
+    if (!siteID) {
+      continue;
+    }
+    map.set(siteID, item);
+  }
+  for (const item of unwrapList(secondaryPayload, ["easy_site_profiles"])) {
+    const siteID = normalizeSiteID(item?.site_id);
+    if (!siteID || map.has(siteID)) {
+      continue;
+    }
+    map.set(siteID, item);
+  }
+  return Array.from(map.values());
+}
+
 function unwrapList(payload, keys = []) {
   if (Array.isArray(payload)) {
     return payload;
@@ -204,6 +223,184 @@ function normalizeCustomLimitRules(value) {
     });
 }
 
+function normalizeAntibotChallengeRules(value) {
+  const seen = new Set();
+  return normalizeArray(value)
+    .map((item) => ({
+      path: String(item?.path || "").trim(),
+      challenge: String(item?.challenge || "").trim().toLowerCase()
+    }))
+    .filter((item) => item.path && item.challenge && item.challenge !== "no")
+    .filter((item) => {
+      const key = item.path.toLowerCase() + "\u0000" + item.challenge;
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+}
+
+function normalizeAuthBasicUsers(value) {
+  const seen = new Set();
+  const out = normalizeArray(value)
+    .map((item) => ({
+      username: String(item?.username || "").trim(),
+      password: String(item?.password || "").trim(),
+      enabled: Boolean(item?.enabled ?? true),
+      last_login_at: String(item?.last_login_at || "").trim()
+    }))
+    .filter((item) => item.username)
+    .filter((item) => {
+      const key = item.username.toLowerCase();
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+  if (!out.length) {
+    return [{ username: "changeme", password: "", enabled: true, last_login_at: "" }];
+  }
+  return out;
+}
+
+function normalizeAuthSessionTTLMinutes(value) {
+  const parsed = Number.parseInt(String(value ?? "").trim(), 10);
+  if (!Number.isInteger(parsed)) {
+    return 60;
+  }
+  if (parsed === -1) {
+    return -1;
+  }
+  if (parsed < 5) {
+    return 5;
+  }
+  if (parsed > 1440) {
+    return 1440;
+  }
+  return parsed;
+}
+
+function formatAuthLastLogin(value, ctx) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return ctx.t("sites.easy.antibot.authUsersNever");
+  }
+  const ts = Date.parse(raw);
+  if (Number.isNaN(ts)) {
+    return raw;
+  }
+  try {
+    return new Date(ts).toLocaleString();
+  } catch {
+    return raw;
+  }
+}
+
+function renderAuthPasswordToggleButton(index, ctx) {
+  return `
+    <button
+      class="waf-password-toggle"
+      type="button"
+      data-auth-user-toggle="${index}"
+      data-visible="false"
+      aria-pressed="false"
+      title="${escapeHtml(ctx.t("common.show"))}"
+    >
+      <svg class="waf-password-icon-eye" viewBox="0 0 24 24" aria-hidden="true">
+        <path fill="currentColor" d="M12 5c5.2 0 9.4 4.7 10.9 6.8a1 1 0 0 1 0 1.2C21.4 15.1 17.2 19.8 12 19.8S2.6 15.1 1.1 13a1 1 0 0 1 0-1.2C2.6 9.7 6.8 5 12 5Zm0 2c-3.9 0-7.2 3.2-8.8 5.4 1.6 2.2 4.9 5.4 8.8 5.4s7.2-3.2 8.8-5.4C19.2 10.2 15.9 7 12 7Zm0 1.8a3.6 3.6 0 1 1 0 7.2 3.6 3.6 0 0 1 0-7.2Zm0 2a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2Z"/>
+      </svg>
+      <svg class="waf-password-icon-off waf-hidden" viewBox="0 0 24 24" aria-hidden="true">
+        <path fill="currentColor" d="m3.3 2 18.7 18.7-1.4 1.4-3.2-3.2c-1.6.7-3.4 1.1-5.4 1.1-5.2 0-9.4-4.7-10.9-6.8a1 1 0 0 1 0-1.2c1.1-1.6 3.7-4.6 7.1-6l-3.3-3.3L3.3 2Zm6.2 6.2a3.6 3.6 0 0 1 4.3 4.3l-4.3-4.3Zm5.9 5.9A3.6 3.6 0 0 1 10 8.7l-1.5-1.5A9.5 9.5 0 0 0 3.2 12c1.6 2.2 4.9 5.4 8.8 5.4 1.4 0 2.7-.4 3.8-.9l-1.4-1.4Zm-3.4-9.1c5.2 0 9.4 4.7 10.9 6.8a1 1 0 0 1 0 1.2 18 18 0 0 1-3.6 3.8l-1.4-1.4c1.2-.9 2.2-2 2.9-3-1.6-2.2-4.9-5.4-8.8-5.4-.8 0-1.5.1-2.2.3L8.2 5.8c1.2-.5 2.5-.8 3.8-.8Z"/>
+      </svg>
+    </button>
+  `;
+}
+
+function syncAuthPasswordToggle(button, visible, ctx) {
+  button.dataset.visible = visible ? "true" : "false";
+  button.setAttribute("aria-pressed", visible ? "true" : "false");
+  button.title = ctx.t(visible ? "common.hide" : "common.show");
+  button.querySelector(".waf-password-icon-eye")?.classList.toggle("waf-hidden", visible);
+  button.querySelector(".waf-password-icon-off")?.classList.toggle("waf-hidden", !visible);
+}
+
+function renderAuthUsersEditor(users, ctx) {
+  const safeUsers = normalizeAuthBasicUsers(users);
+  return `
+    <div class="waf-field full">
+      <label>${escapeHtml(ctx.t("sites.easy.antibot.authUsers"))}</label>
+      <div class="waf-table-wrap">
+        <table class="waf-table waf-services-table waf-auth-users-table">
+          <thead>
+            <tr>
+              <th>${escapeHtml(ctx.t("sites.easy.antibot.authUsersUsername"))}</th>
+              <th>${escapeHtml(ctx.t("sites.easy.antibot.authUsersPassword"))}</th>
+              <th>${escapeHtml(ctx.t("sites.easy.antibot.authUsersEnabled"))}</th>
+              <th>${escapeHtml(ctx.t("sites.easy.antibot.authUsersLastLogin"))}</th>
+              <th>${escapeHtml(ctx.t("sites.easy.antibot.authUsersActions"))}</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${safeUsers.length ? safeUsers.map((user, index) => `
+              <tr>
+                <td>
+                  <input data-auth-user-username="${index}" value="${escapeHtml(user.username)}" placeholder="user${index + 1}">
+                </td>
+                <td>
+                  <div class="waf-auth-password-cell">
+                    <input data-auth-user-password="${index}" type="password" value="${escapeHtml(user.password)}">
+                    ${renderAuthPasswordToggleButton(index, ctx)}
+                  </div>
+                </td>
+                <td class="waf-auth-users-enabled-cell">
+                  <label class="waf-checkbox">
+                    <input data-auth-user-enabled="${index}" type="checkbox"${user.enabled ? " checked" : ""}>
+                  </label>
+                </td>
+                <td>
+                  ${escapeHtml(formatAuthLastLogin(user.last_login_at, ctx))}
+                </td>
+                <td>
+                  <button class="btn ghost btn-sm" type="button" data-auth-user-remove="${index}">x</button>
+                </td>
+              </tr>
+            `).join("") : `
+              <tr>
+                <td colspan="5">
+                  <div class="waf-empty">${escapeHtml(ctx.t("sites.easy.noValues"))}</div>
+                </td>
+              </tr>
+            `}
+          </tbody>
+        </table>
+      </div>
+      <div class="waf-actions">
+        <button class="btn ghost btn-sm" type="button" data-auth-user-add>${escapeHtml(ctx.t("sites.easy.antibot.authUsersAdd"))}</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderAuthSessionTtlOptions(ttlMinutes, ctx) {
+  const safeTTL = normalizeAuthSessionTTLMinutes(ttlMinutes);
+  const ttlOptions = [
+    { value: 5, label: "5m" },
+    { value: 10, label: "10m" },
+    { value: 15, label: "15m" },
+    { value: 30, label: "30m" },
+    ...Array.from({ length: 24 }, (_unused, idx) => {
+      const hours = idx + 1;
+      return { value: hours * 60, label: `${hours}h` };
+    }),
+    { value: -1, label: ctx.t("sites.easy.antibot.authSessionUnlimited") }
+  ];
+  return ttlOptions
+    .map((option) => `<option value="${option.value}"${option.value === safeTTL ? " selected" : ""}>${escapeHtml(option.label)}</option>`)
+    .join("");
+}
+
 function renderCustomLimitRulesEditor(rules, ctx) {
   const safeRules = normalizeCustomLimitRules(rules);
   return `
@@ -223,12 +420,139 @@ function renderCustomLimitRulesEditor(rules, ctx) {
     </div>`;
 }
 
+function renderAntibotChallengeRulesEditor(rules, ctx) {
+  const safeRules = normalizeAntibotChallengeRules(rules);
+  const modes = ["cookie", "javascript", "captcha", "recaptcha", "hcaptcha", "turnstile", "mcaptcha"];
+  return `
+    <div class="waf-field full">
+      <label>${escapeHtml(ctx.t("sites.easy.antibot.challengeRulesByUrl"))}</label>
+      <div class="waf-stack">
+        ${safeRules.map((rule, index) => `
+          <div class="waf-inline waf-custom-limit-row">
+            <input data-antibot-rule-path="${index}" placeholder="/login" value="${escapeHtml(rule.path)}">
+            <select data-antibot-rule-challenge="${index}">
+              ${modes.map((mode) => `<option value="${mode}"${rule.challenge === mode ? " selected" : ""}>${mode}</option>`).join("")}
+            </select>
+            <button class="btn ghost btn-sm" type="button" data-antibot-rule-remove="${index}">x</button>
+          </div>
+        `).join("")}
+        ${safeRules.length ? "" : `<span class="waf-note">${escapeHtml(ctx.t("sites.easy.noValues"))}</span>`}
+        <button class="btn ghost btn-sm" type="button" data-antibot-rule-add>${escapeHtml(ctx.t("sites.easy.antibot.addChallengeRule"))}</button>
+      </div>
+    </div>`;
+}
+
 function normalizeHost(value) {
   return String(value || "").trim().toLowerCase();
 }
 
 function normalizeSiteID(value) {
   return String(value || "").trim().toLowerCase();
+}
+
+const SERVICE_PROFILE_VALUES = ["strict", "balanced", "compat", "api", "public-edge"];
+
+function normalizeServiceProfile(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return SERVICE_PROFILE_VALUES.includes(normalized) ? normalized : "balanced";
+}
+
+function formatServiceProfile(value, ctx) {
+  const normalized = normalizeServiceProfile(value);
+  const key = `sites.profile.${normalized}`;
+  const translated = String(ctx.t(key) || "").trim();
+  return translated && translated !== key ? translated : normalized;
+}
+
+function normalizeAPIPositiveEndpointPolicies(value) {
+  const items = Array.isArray(value) ? value : [];
+  const out = [];
+  for (const item of items) {
+    const path = String(item?.path || "").trim();
+    if (!path) {
+      continue;
+    }
+    out.push({
+      path,
+      methods: normalizeStringArray(item?.methods).map((entry) => entry.toUpperCase()),
+      token_ids: normalizeStringArray(item?.token_ids),
+      content_types: normalizeStringArray(item?.content_types).map((entry) => entry.toLowerCase()),
+      mode: String(item?.mode || "").trim().toLowerCase()
+    });
+  }
+  return out;
+}
+
+function applyServiceProfilePresetToDraft(draft, profile) {
+  const next = { ...draft, service_profile: normalizeServiceProfile(profile) };
+  if (next.service_profile === "strict") {
+    next.security_mode = "block";
+    next.use_bad_behavior = true;
+    next.bad_behavior_status_codes = [400, 401, 403, 404, 405, 429, 444];
+    next.bad_behavior_threshold = 60;
+    next.bad_behavior_count_time_seconds = 60;
+    next.bad_behavior_ban_time_seconds = 900;
+    next.use_limit_req = true;
+    next.limit_req_url = "/";
+    next.limit_req_rate = "80r/s";
+    next.use_limit_conn = true;
+    next.limit_conn_max_http1 = 120;
+    next.limit_conn_max_http2 = 220;
+    next.limit_conn_max_http3 = 220;
+    next.antibot_challenge = "javascript";
+  } else if (next.service_profile === "compat") {
+    next.security_mode = "monitor";
+    next.use_bad_behavior = false;
+    next.use_limit_req = false;
+    next.use_limit_conn = true;
+    next.limit_conn_max_http1 = 300;
+    next.limit_conn_max_http2 = 500;
+    next.limit_conn_max_http3 = 500;
+    next.antibot_challenge = "no";
+  } else if (next.service_profile === "api") {
+    next.security_mode = "block";
+    next.allowed_methods = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"];
+    next.use_cors = true;
+    next.cors_allowed_origins = ["*"];
+    next.use_limit_req = true;
+    next.limit_req_url = "/api/";
+    next.limit_req_rate = "200r/s";
+    next.antibot_challenge = "no";
+    next.api_positive_security_enabled = true;
+    next.api_positive_enforcement_mode = "monitor";
+    next.api_positive_default_action = "allow";
+  } else if (next.service_profile === "public-edge") {
+    next.security_mode = "block";
+    next.use_bad_behavior = true;
+    next.bad_behavior_status_codes = [400, 401, 403, 404, 405, 429, 444];
+    next.bad_behavior_threshold = 80;
+    next.bad_behavior_count_time_seconds = 60;
+    next.bad_behavior_ban_time_seconds = 600;
+    next.use_blacklist = true;
+    next.use_dnsbl = true;
+    next.use_limit_req = true;
+    next.limit_req_url = "/";
+    next.limit_req_rate = "100r/s";
+    next.antibot_challenge = "javascript";
+  } else {
+    next.security_mode = "block";
+  }
+  return next;
+}
+
+function applyServiceProfilePresetForMissingFields(draft, missingFields) {
+  const missing = new Set(normalizeArray(missingFields).map((item) => String(item || "").trim()));
+  if (!missing.size) {
+    return draft;
+  }
+  const preset = applyServiceProfilePresetToDraft({ ...draft }, draft?.service_profile);
+  const merged = { ...preset };
+  for (const key of Object.keys(draft || {})) {
+    if (!missing.has(key)) {
+      merged[key] = draft[key];
+    }
+  }
+  return merged;
 }
 
 function normalizeEmail(value) {
@@ -623,6 +947,7 @@ const SETTINGS_SEARCH_INDEX = [
   { id: "primary_host", tab: "front", selector: "#service-host", labelKey: "sites.easy.front.serverName" },
   { id: "service_id", tab: "front", selector: "#service-id", labelKey: "sites.easy.front.serviceId" },
   { id: "security_mode", tab: "front", selector: "#service-security-mode", labelKey: "sites.editor.securityMode" },
+  { id: "service_profile", tab: "front", selector: "#service-profile", labelKey: "sites.table.profile" },
   { id: "certificate_authority_server", tab: "front", selector: "#service-ca-server", labelKey: "sites.easy.front.caServer" },
   { id: "enabled", tab: "front", selector: "#service-enabled", labelKey: "sites.easy.front.serviceEnabled" },
   { id: "tls_enabled", tab: "front", selector: "#service-tls-enabled", labelKey: "sites.easy.front.tlsEnabled" },
@@ -826,6 +1151,7 @@ function defaultSiteDraft() {
     tls_self_signed: false,
     certificate_id: "",
     security_mode: "block",
+    service_profile: "balanced",
     adaptive_model_enabled: false,
     upstream_id: "",
     upstream_host: "ui",
@@ -902,13 +1228,23 @@ function defaultSiteDraft() {
     antibot_hcaptcha_secret: "",
     antibot_turnstile_sitekey: "",
     antibot_turnstile_secret: "",
+    challenge_escalation_enabled: false,
+    challenge_escalation_mode: "javascript",
+    antibot_challenge_rules: [],
     use_auth_basic: false,
     auth_basic_location: "sitewide",
     auth_basic_user: "changeme",
     auth_basic_password: "",
     auth_basic_text: "Restricted area",
+    auth_basic_users: [{ username: "changeme", password: "", enabled: true, last_login_at: "" }],
+    auth_basic_session_inactivity_minutes: 60,
     blacklist_country: [],
     whitelist_country: [],
+    api_positive_security_enabled: false,
+    api_positive_openapi_schema_ref: "",
+    api_positive_enforcement_mode: "monitor",
+    api_positive_default_action: "allow",
+    api_positive_endpoint_policies: [],
     use_modsecurity: true,
     use_modsecurity_crs_plugins: true,
     use_modsecurity_custom_configuration: false,
@@ -948,11 +1284,13 @@ function applyEasyProfileToDraft(draft, profile) {
   const antibot = profile.security_antibot || {};
   const authBasic = profile.security_auth_basic || {};
   const country = profile.security_country_policy || {};
+  const apiPositive = profile.security_api_positive || {};
   const modsecurity = profile.security_modsecurity || {};
   return {
     ...draft,
     primary_host: front.server_name || draft.primary_host,
     security_mode: front.security_mode || draft.security_mode,
+    service_profile: normalizeServiceProfile(front.profile || draft.service_profile),
     adaptive_model_enabled: Boolean(front.adaptive_model_enabled ?? draft.adaptive_model_enabled),
     auto_lets_encrypt: Boolean(front.auto_lets_encrypt ?? draft.auto_lets_encrypt),
     use_lets_encrypt_staging: Boolean(front.use_lets_encrypt_staging ?? draft.use_lets_encrypt_staging),
@@ -1027,13 +1365,25 @@ function applyEasyProfileToDraft(draft, profile) {
     antibot_hcaptcha_secret: antibot.antibot_hcaptcha_secret || draft.antibot_hcaptcha_secret,
     antibot_turnstile_sitekey: antibot.antibot_turnstile_sitekey || draft.antibot_turnstile_sitekey,
     antibot_turnstile_secret: antibot.antibot_turnstile_secret || draft.antibot_turnstile_secret,
+    challenge_escalation_enabled: Boolean(antibot.challenge_escalation_enabled ?? draft.challenge_escalation_enabled),
+    challenge_escalation_mode: String(antibot.challenge_escalation_mode || draft.challenge_escalation_mode).trim().toLowerCase() || "javascript",
+    antibot_challenge_rules: normalizeAntibotChallengeRules(antibot.challenge_rules || draft.antibot_challenge_rules),
     use_auth_basic: Boolean(authBasic.use_auth_basic ?? draft.use_auth_basic),
     auth_basic_location: authBasic.auth_basic_location || draft.auth_basic_location,
     auth_basic_user: authBasic.auth_basic_user || draft.auth_basic_user,
     auth_basic_password: authBasic.auth_basic_password || draft.auth_basic_password,
     auth_basic_text: authBasic.auth_basic_text || draft.auth_basic_text,
+    auth_basic_users: normalizeAuthBasicUsers(authBasic.users),
+    auth_basic_session_inactivity_minutes: normalizeAuthSessionTTLMinutes(
+      authBasic.session_inactivity_minutes ?? draft.auth_basic_session_inactivity_minutes
+    ),
     blacklist_country: normalizeStringArray(country.blacklist_country),
     whitelist_country: normalizeStringArray(country.whitelist_country),
+    api_positive_security_enabled: Boolean(apiPositive.use_api_positive_security ?? draft.api_positive_security_enabled),
+    api_positive_openapi_schema_ref: String(apiPositive.openapi_schema_ref || draft.api_positive_openapi_schema_ref),
+    api_positive_enforcement_mode: String(apiPositive.enforcement_mode || draft.api_positive_enforcement_mode).trim().toLowerCase() || "monitor",
+    api_positive_default_action: String(apiPositive.default_action || draft.api_positive_default_action).trim().toLowerCase() || "allow",
+    api_positive_endpoint_policies: normalizeAPIPositiveEndpointPolicies(apiPositive.endpoint_policies || draft.api_positive_endpoint_policies),
     use_modsecurity: Boolean(modsecurity.use_modsecurity ?? draft.use_modsecurity),
     use_modsecurity_crs_plugins: Boolean(modsecurity.use_modsecurity_crs_plugins ?? draft.use_modsecurity_crs_plugins),
     use_modsecurity_custom_configuration: Boolean(modsecurity.use_modsecurity_custom_configuration ?? draft.use_modsecurity_custom_configuration),
@@ -1082,6 +1432,9 @@ function draftToEasyProfile(draft) {
   const limitReqRate = /^\d+r\/s$/.test(limitReqRateRaw) ? limitReqRateRaw : "100r/s";
   const authBasicLocation = "sitewide";
   const authBasicText = String(draft.auth_basic_text || "").trim() || "Restricted area";
+  const authUsers = normalizeAuthBasicUsers(draft.auth_basic_users);
+  const firstUser = authUsers[0] || { username: "", password: "" };
+  const authSessionTTLMinutes = normalizeAuthSessionTTLMinutes(draft.auth_basic_session_inactivity_minutes);
   const customPath = String(draft.modsecurity_custom_path || "").trim() || "modsec/anomaly_score.conf";
   const securityMode = ["transparent", "monitor", "block"].includes(String(draft.security_mode || "").trim().toLowerCase())
     ? String(draft.security_mode || "").trim().toLowerCase()
@@ -1099,6 +1452,7 @@ function draftToEasyProfile(draft) {
     front_service: {
       server_name: primaryHost,
       security_mode: securityMode,
+      profile: normalizeServiceProfile(draft.service_profile),
       adaptive_model_enabled: Boolean(draft.adaptive_model_enabled),
       auto_lets_encrypt: draft.auto_lets_encrypt,
       use_lets_encrypt_staging: draft.use_lets_encrypt_staging,
@@ -1177,18 +1531,30 @@ function draftToEasyProfile(draft) {
       antibot_hcaptcha_sitekey: draft.antibot_hcaptcha_sitekey,
       antibot_hcaptcha_secret: draft.antibot_hcaptcha_secret,
       antibot_turnstile_sitekey: draft.antibot_turnstile_sitekey,
-      antibot_turnstile_secret: draft.antibot_turnstile_secret
+      antibot_turnstile_secret: draft.antibot_turnstile_secret,
+      challenge_escalation_enabled: Boolean(draft.challenge_escalation_enabled),
+      challenge_escalation_mode: String(draft.challenge_escalation_mode || "javascript").trim().toLowerCase() || "javascript",
+      challenge_rules: normalizeAntibotChallengeRules(draft.antibot_challenge_rules)
     },
     security_auth_basic: {
       use_auth_basic: draft.use_auth_basic,
       auth_basic_location: authBasicLocation,
-      auth_basic_user: draft.auth_basic_user,
-      auth_basic_password: draft.auth_basic_password,
-      auth_basic_text: authBasicText
+      auth_basic_user: firstUser.username,
+      auth_basic_password: firstUser.password,
+      auth_basic_text: authBasicText,
+      users: authUsers,
+      session_inactivity_minutes: authSessionTTLMinutes
     },
     security_country_policy: {
       blacklist_country: draft.blacklist_country,
       whitelist_country: draft.whitelist_country
+    },
+    security_api_positive: {
+      use_api_positive_security: Boolean(draft.api_positive_security_enabled),
+      openapi_schema_ref: String(draft.api_positive_openapi_schema_ref || "").trim(),
+      enforcement_mode: String(draft.api_positive_enforcement_mode || "monitor").trim().toLowerCase() || "monitor",
+      default_action: String(draft.api_positive_default_action || "allow").trim().toLowerCase() || "allow",
+      endpoint_policies: normalizeAPIPositiveEndpointPolicies(draft.api_positive_endpoint_policies)
     },
     security_modsecurity: {
       use_modsecurity: draft.use_modsecurity,
@@ -1267,8 +1633,28 @@ function validateDraft(draft, ctx) {
       return ctx.t("sites.validation.customLimitRateFormat");
     }
   }
-  if (draft.use_auth_basic && !String(draft.auth_basic_user || "").trim()) {
-    return ctx.t("sites.validation.authBasicUserRequired");
+  if (normalizeAntibotChallengeRules(draft.antibot_challenge_rules).length > 32) {
+    return "Too many antibot challenge rules (max 32).";
+  }
+  for (const rule of normalizeAntibotChallengeRules(draft.antibot_challenge_rules)) {
+    if (!rule.path.startsWith("/")) {
+      return "Antibot challenge rule path must start with /.";
+    }
+    if (!["cookie", "javascript", "captcha", "recaptcha", "hcaptcha", "turnstile", "mcaptcha"].includes(rule.challenge)) {
+      return "Antibot challenge rule mode is invalid.";
+    }
+  }
+  if (draft.use_auth_basic) {
+    const users = normalizeAuthBasicUsers(draft.auth_basic_users);
+    const enabledUsers = users.filter((item) => item.enabled);
+    if (!enabledUsers.length) {
+      return ctx.t("sites.validation.authBasicUserRequired");
+    }
+    for (const user of enabledUsers) {
+      if (!String(user.password || "").trim()) {
+        return ctx.t("sites.validation.authBasicPasswordRequired");
+      }
+    }
   }
   if (draft.use_modsecurity_custom_configuration && !String(draft.modsecurity_custom_path || "").trim()) {
     return ctx.t("sites.validation.modsecCustomPathRequired");
@@ -1648,6 +2034,7 @@ function renderListView(state, ctx) {
                     <input type="checkbox" id="services-select-all"${state.filteredSites.length && state.filteredSites.every((site) => state.selectedSiteIDs.has(site.id)) ? " checked" : ""}>
                   </th>
                   <th>${escapeHtml(ctx.t("sites.table.name"))}</th>
+                  <th>${escapeHtml(ctx.t("sites.table.profile"))}</th>
                   <th>${escapeHtml(ctx.t("sites.table.upstream"))}</th>
                   <th>${escapeHtml(ctx.t("sites.table.tls"))}</th>
                   <th>${escapeHtml(ctx.t("sites.table.updated"))}</th>
@@ -1657,6 +2044,8 @@ function renderListView(state, ctx) {
               </thead>
               <tbody>
                 ${state.filteredSites.length ? state.filteredSites.map((site) => {
+                  const easyProfile = state.easyProfilesBySite.get(normalizeSiteID(site.id)) || null;
+                  const serviceProfile = normalizeServiceProfile(easyProfile?.front_service?.profile);
                   const upstream = state.upstreamsBySite.get(site.id)?.[0] || null;
                   const tls = state.tlsBySite.get(site.id);
                   const language = String(ctx.getLanguage?.() || "en").trim().toLowerCase();
@@ -1685,6 +2074,7 @@ function renderListView(state, ctx) {
                       <td>
                         <button class="waf-link-button" type="button" data-open-service="${escapeHtml(serviceURL)}" title="${escapeHtml(ctx.t("sites.action.openService"))}">${escapeHtml(site.primary_host || site.id)}</button>
                       </td>
+                      <td>${escapeHtml(formatServiceProfile(serviceProfile, ctx))}</td>
                       <td>${upstream ? `${escapeHtml(upstream.host)}:${escapeHtml(String(upstream.port))}` : escapeHtml(ctx.t("common.notSet"))}</td>
                       <td>
                         <div class="waf-services-tls-cell">
@@ -1708,7 +2098,7 @@ function renderListView(state, ctx) {
                   `;
                 }).join("") : `
                   <tr>
-                    <td colspan="7">
+                    <td colspan="8">
                       <div class="waf-empty">${escapeHtml(ctx.t("sites.empty.sites"))}</div>
                     </td>
                   </tr>
@@ -1866,6 +2256,16 @@ function renderDetailView(state, ctx) {
                       <option value="transparent"${draft.security_mode === "transparent" ? " selected" : ""}>${escapeHtml(ctx.t("sites.easy.security.transparent"))}</option>
                       <option value="monitor"${draft.security_mode === "monitor" ? " selected" : ""}>${escapeHtml(ctx.t("sites.easy.security.monitor"))}</option>
                       <option value="block"${draft.security_mode === "block" ? " selected" : ""}>${escapeHtml(ctx.t("sites.easy.security.block"))}</option>
+                    </select>
+                  </div>
+                  <div class="waf-field">
+                    <label for="service-profile">${escapeHtml(ctx.t("sites.table.profile"))}</label>
+                    <select id="service-profile">
+                      <option value="strict"${normalizeServiceProfile(draft.service_profile) === "strict" ? " selected" : ""}>${escapeHtml(ctx.t("sites.profile.strict"))}</option>
+                      <option value="balanced"${normalizeServiceProfile(draft.service_profile) === "balanced" ? " selected" : ""}>${escapeHtml(ctx.t("sites.profile.balanced"))}</option>
+                      <option value="compat"${normalizeServiceProfile(draft.service_profile) === "compat" ? " selected" : ""}>${escapeHtml(ctx.t("sites.profile.compat"))}</option>
+                      <option value="api"${normalizeServiceProfile(draft.service_profile) === "api" ? " selected" : ""}>${escapeHtml(ctx.t("sites.profile.api"))}</option>
+                      <option value="public-edge"${normalizeServiceProfile(draft.service_profile) === "public-edge" ? " selected" : ""}>${escapeHtml(ctx.t("sites.profile.public-edge"))}</option>
                     </select>
                   </div>
                   <div class="waf-field">
@@ -2203,65 +2603,96 @@ function renderDetailView(state, ctx) {
 
               <section class="waf-stack waf-service-compact-section${state.activeTab === "antibot" ? "" : " waf-hidden"}" data-tab-panel="antibot">
                 <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.antibot.title"))}</div>
-                <div class="waf-form-grid">
-                  <div class="waf-field">
-                    <label for="service-antibot-challenge">${escapeHtml(ctx.t("sites.easy.antibot.challenge"))}</label>
-                    <select id="service-antibot-challenge">
-                      ${["no", "cookie", "javascript", "captcha", "recaptcha", "hcaptcha", "turnstile", "mcaptcha"].map((mode) => `<option value="${mode}"${draft.antibot_challenge === mode ? " selected" : ""}>${mode}</option>`).join("")}
-                    </select>
-                  </div>
-                  <div class="waf-field">
-                    <label for="service-antibot-uri">${escapeHtml(ctx.t("sites.easy.antibot.url"))}</label>
-                    <input id="service-antibot-uri" value="${escapeHtml(draft.antibot_uri)}">
-                  </div>
-                  <div class="waf-field">
-                    <label for="service-antibot-recaptcha-score">${escapeHtml(ctx.t("sites.easy.antibot.recaptchaScore"))}</label>
-                    <input id="service-antibot-recaptcha-score" type="number" step="0.1" min="0" max="1" value="${escapeHtml(String(draft.antibot_recaptcha_score))}">
-                  </div>
-                  <div class="waf-field">
-                    <label for="service-antibot-recaptcha-sitekey">${escapeHtml(ctx.t("sites.easy.antibot.recaptchaSitekey"))}</label>
-                    <input id="service-antibot-recaptcha-sitekey" value="${escapeHtml(draft.antibot_recaptcha_sitekey)}">
-                  </div>
-                  <div class="waf-field">
-                    <label for="service-antibot-recaptcha-secret">${escapeHtml(ctx.t("sites.easy.antibot.recaptchaSecret"))}</label>
-                    <input id="service-antibot-recaptcha-secret" type="password" value="${escapeHtml(draft.antibot_recaptcha_secret)}">
-                  </div>
-                  <div class="waf-field">
-                    <label for="service-antibot-hcaptcha-sitekey">${escapeHtml(ctx.t("sites.easy.antibot.hcaptchaSitekey"))}</label>
-                    <input id="service-antibot-hcaptcha-sitekey" value="${escapeHtml(draft.antibot_hcaptcha_sitekey)}">
-                  </div>
-                  <div class="waf-field">
-                    <label for="service-antibot-hcaptcha-secret">${escapeHtml(ctx.t("sites.easy.antibot.hcaptchaSecret"))}</label>
-                    <input id="service-antibot-hcaptcha-secret" type="password" value="${escapeHtml(draft.antibot_hcaptcha_secret)}">
-                  </div>
-                  <div class="waf-field">
-                    <label for="service-antibot-turnstile-sitekey">${escapeHtml(ctx.t("sites.easy.antibot.turnstileSitekey"))}</label>
-                    <input id="service-antibot-turnstile-sitekey" value="${escapeHtml(draft.antibot_turnstile_sitekey)}">
-                  </div>
-                  <div class="waf-field">
-                    <label for="service-antibot-turnstile-secret">${escapeHtml(ctx.t("sites.easy.antibot.turnstileSecret"))}</label>
-                    <input id="service-antibot-turnstile-secret" type="password" value="${escapeHtml(draft.antibot_turnstile_secret)}">
-                  </div>
-                  <label class="waf-checkbox">
-                    <input id="service-use-auth-basic" type="checkbox"${draft.use_auth_basic ? " checked" : ""}>
-                    <span>${escapeHtml(ctx.t("sites.easy.antibot.useAuthBasic"))}</span>
-                  </label>
-                  <div class="waf-field">
-                    <label for="service-auth-basic-location">${escapeHtml(ctx.t("sites.easy.antibot.authBasicLocation"))}</label>
-                    <input id="service-auth-basic-location" value="${escapeHtml("sitewide")}" readonly>
-                  </div>
-                  <div class="waf-field">
-                    <label for="service-auth-basic-user">${escapeHtml(ctx.t("sites.easy.antibot.authBasicUsername"))}</label>
-                    <input id="service-auth-basic-user" value="${escapeHtml(draft.auth_basic_user)}">
-                  </div>
-                  <div class="waf-field">
-                    <label for="service-auth-basic-password">${escapeHtml(ctx.t("sites.easy.antibot.authBasicPassword"))}</label>
-                    <input id="service-auth-basic-password" type="password" value="${escapeHtml(draft.auth_basic_password)}">
-                  </div>
-                  <div class="waf-field">
-                    <label for="service-auth-basic-text">${escapeHtml(ctx.t("sites.easy.antibot.authText"))}</label>
-                    <input id="service-auth-basic-text" value="${escapeHtml(draft.auth_basic_text)}">
-                  </div>
+                <div class="waf-antibot-auth-grid">
+                  <section class="waf-subcard waf-antibot-editor-frame">
+                    <div class="waf-card-head">
+                      <h3>${escapeHtml(ctx.t("sites.easy.antibot.frameTitle"))}</h3>
+                    </div>
+                    <div class="waf-card-body">
+                      <div class="waf-form-grid">
+                        <div class="waf-field">
+                          <label for="service-antibot-challenge">${escapeHtml(ctx.t("sites.easy.antibot.challenge"))}</label>
+                          <select id="service-antibot-challenge">
+                            ${["no", "cookie", "javascript", "captcha", "recaptcha", "hcaptcha", "turnstile", "mcaptcha"].map((mode) => `<option value="${mode}"${draft.antibot_challenge === mode ? " selected" : ""}>${mode}</option>`).join("")}
+                          </select>
+                        </div>
+                        <div class="waf-field">
+                          <label for="service-antibot-uri">${escapeHtml(ctx.t("sites.easy.antibot.url"))}</label>
+                          <input id="service-antibot-uri" value="${escapeHtml(draft.antibot_uri)}">
+                        </div>
+                        <div class="waf-field">
+                          <label for="service-antibot-recaptcha-score">${escapeHtml(ctx.t("sites.easy.antibot.recaptchaScore"))}</label>
+                          <input id="service-antibot-recaptcha-score" type="number" step="0.1" min="0" max="1" value="${escapeHtml(String(draft.antibot_recaptcha_score))}">
+                        </div>
+                        <div class="waf-field">
+                          <label for="service-antibot-recaptcha-sitekey">${escapeHtml(ctx.t("sites.easy.antibot.recaptchaSitekey"))}</label>
+                          <input id="service-antibot-recaptcha-sitekey" value="${escapeHtml(draft.antibot_recaptcha_sitekey)}">
+                        </div>
+                        <div class="waf-field">
+                          <label for="service-antibot-recaptcha-secret">${escapeHtml(ctx.t("sites.easy.antibot.recaptchaSecret"))}</label>
+                          <input id="service-antibot-recaptcha-secret" type="password" value="${escapeHtml(draft.antibot_recaptcha_secret)}">
+                        </div>
+                        <div class="waf-field">
+                          <label for="service-antibot-hcaptcha-sitekey">${escapeHtml(ctx.t("sites.easy.antibot.hcaptchaSitekey"))}</label>
+                          <input id="service-antibot-hcaptcha-sitekey" value="${escapeHtml(draft.antibot_hcaptcha_sitekey)}">
+                        </div>
+                        <div class="waf-field">
+                          <label for="service-antibot-hcaptcha-secret">${escapeHtml(ctx.t("sites.easy.antibot.hcaptchaSecret"))}</label>
+                          <input id="service-antibot-hcaptcha-secret" type="password" value="${escapeHtml(draft.antibot_hcaptcha_secret)}">
+                        </div>
+                        <div class="waf-field">
+                          <label for="service-antibot-turnstile-sitekey">${escapeHtml(ctx.t("sites.easy.antibot.turnstileSitekey"))}</label>
+                          <input id="service-antibot-turnstile-sitekey" value="${escapeHtml(draft.antibot_turnstile_sitekey)}">
+                        </div>
+                        <div class="waf-field">
+                          <label for="service-antibot-turnstile-secret">${escapeHtml(ctx.t("sites.easy.antibot.turnstileSecret"))}</label>
+                          <input id="service-antibot-turnstile-secret" type="password" value="${escapeHtml(draft.antibot_turnstile_secret)}">
+                        </div>
+                        <label class="waf-checkbox waf-field full">
+                          <input id="service-antibot-escalation-enabled" type="checkbox"${draft.challenge_escalation_enabled ? " checked" : ""}>
+                          <span>${escapeHtml(ctx.t("sites.easy.antibot.twoLayerEscalation"))}</span>
+                        </label>
+                        <div class="waf-field">
+                          <label for="service-antibot-escalation-mode">${escapeHtml(ctx.t("sites.easy.antibot.escalationMode"))}</label>
+                          <select id="service-antibot-escalation-mode">
+                            ${["cookie", "javascript", "captcha", "recaptcha", "hcaptcha", "turnstile", "mcaptcha"].map((mode) => `<option value="${mode}"${draft.challenge_escalation_mode === mode ? " selected" : ""}>${mode}</option>`).join("")}
+                          </select>
+                        </div>
+                        ${renderAntibotChallengeRulesEditor(draft.antibot_challenge_rules, ctx)}
+                      </div>
+                    </div>
+                  </section>
+                  <section class="waf-subcard waf-auth-editor-frame">
+                    <div class="waf-card-head">
+                      <h3>${escapeHtml(ctx.t("sites.easy.antibot.authSectionTitle"))}</h3>
+                    </div>
+                    <div class="waf-card-body">
+                      <div class="waf-form-grid">
+                        <label class="waf-checkbox">
+                          <input id="service-use-auth-basic" type="checkbox"${draft.use_auth_basic ? " checked" : ""}>
+                          <span>${escapeHtml(ctx.t("sites.easy.antibot.useAuthBasic"))}</span>
+                        </label>
+                        <div class="waf-field">
+                          <label for="service-auth-basic-location">${escapeHtml(ctx.t("sites.easy.antibot.authBasicLocation"))}</label>
+                          <input id="service-auth-basic-location" value="${escapeHtml("sitewide")}" readonly>
+                        </div>
+                        <div class="waf-field">
+                          <label for="service-auth-basic-text">${escapeHtml(ctx.t("sites.easy.antibot.authText"))}</label>
+                          <input id="service-auth-basic-text" value="${escapeHtml(draft.auth_basic_text)}">
+                        </div>
+                        <div class="waf-field">
+                          <label for="service-auth-basic-session-ttl">${escapeHtml(ctx.t("sites.easy.antibot.authSessionTtl"))}</label>
+                          <select id="service-auth-basic-session-ttl">
+                            ${renderAuthSessionTtlOptions(draft.auth_basic_session_inactivity_minutes, ctx)}
+                          </select>
+                        </div>
+                        <div class="waf-field full">
+                          <div class="waf-note">${escapeHtml(ctx.t("sites.easy.antibot.authSessionTtlHint"))}</div>
+                        </div>
+                        ${renderAuthUsersEditor(draft.auth_basic_users, ctx)}
+                      </div>
+                    </div>
+                  </section>
                 </div>
               </section>
 
@@ -3032,13 +3463,14 @@ async function importServicesFiles(files, ctx) {
   requirePermissions(ctx, ["sites.write", "upstreams.write", "tls.write", "certificates.write"], "sites.error.importEnvPermissions");
   const text = await file.text();
   const { draft, missingFields } = envToDraft(text);
-  const validationError = validateDraft(draft, ctx);
+  const draftWithPreset = applyServiceProfilePresetForMissingFields(draft, missingFields);
+  const validationError = validateDraft(draftWithPreset, ctx);
   if (validationError) {
     throw new Error(`${file.name}: ${validationError}`);
   }
   return {
     file: file.name,
-    draft,
+    draft: draftWithPreset,
     missingFields,
     rawEnvText: text,
   };
@@ -3053,6 +3485,7 @@ export async function renderSites(container, ctx) {
     tlsConfigs: [],
     certificates: [],
     accessPolicies: [],
+    easyProfiles: [],
     geoCatalog: buildGeoCatalogFallback(),
     search: "",
     sort: "updated-desc",
@@ -3070,6 +3503,7 @@ export async function renderSites(container, ctx) {
     certificateBySiteID: new Map(),
     certificateByHost: new Map(),
     accessBySite: new Map(),
+    easyProfilesBySite: new Map(),
     countryFilters: {
       blacklist_country: "",
       whitelist_country: ""
@@ -3087,6 +3521,7 @@ export async function renderSites(container, ctx) {
     state.certificateBySiteID = new Map();
     state.certificateByHost = new Map();
     state.accessBySite = new Map();
+    state.easyProfilesBySite = new Map();
     for (const upstream of state.upstreams) {
       const items = state.upstreamsBySite.get(upstream.site_id) || [];
       items.push(upstream);
@@ -3115,6 +3550,13 @@ export async function renderSites(container, ctx) {
       }
       state.accessBySite.set(siteID, accessPolicy);
     }
+    for (const easyProfile of state.easyProfiles) {
+      const siteID = normalizeSiteID(easyProfile?.site_id);
+      if (!siteID || state.easyProfilesBySite.has(siteID)) {
+        continue;
+      }
+      state.easyProfilesBySite.set(siteID, easyProfile);
+    }
   };
 
   const applyFilters = () => {
@@ -3123,7 +3565,9 @@ export async function renderSites(container, ctx) {
       if (!search) {
         return true;
       }
-      return `${site.id} ${site.primary_host}`.toLowerCase().includes(search);
+      const profile = state.easyProfilesBySite.get(normalizeSiteID(site.id));
+      const profileValue = normalizeServiceProfile(profile?.front_service?.profile);
+      return `${site.id} ${site.primary_host} ${profileValue}`.toLowerCase().includes(search);
     });
     sites.sort((left, right) => {
       if (state.sort === "name-asc") {
@@ -3192,19 +3636,21 @@ export async function renderSites(container, ctx) {
   const load = async () => {
     try {
       setLoading(container, ctx.t("sites.loading"));
-      const [sitesResponse, upstreamsResponse, tlsConfigsResponse, certificatesResponse, accessPoliciesResponse, geoCatalogResponse] = await Promise.all([
+      const [sitesResponse, upstreamsResponse, tlsConfigsResponse, certificatesResponse, accessPoliciesResponse, easyProfilesResponse, geoCatalogResponse] = await Promise.all([
         ctx.api.get("/api/sites"),
         ctx.api.get("/api/upstreams"),
         ctx.api.get("/api/tls-configs"),
         ctx.api.get("/api/certificates").catch(() => []),
         ctx.api.get("/api/access-policies").catch(() => []),
+        ctx.api.get("/api/easy-site-profiles").catch(() => []),
         ctx.api.get("/api/easy-site-profiles/catalog/countries").catch(() => null)
       ]);
-      const [secondarySites, secondaryUpstreams, secondaryTLSConfigs, secondaryCertificates] = await Promise.all([
+      const [secondarySites, secondaryUpstreams, secondaryTLSConfigs, secondaryCertificates, secondaryEasyProfiles] = await Promise.all([
         tryGetJSON("/api-app/sites"),
         tryGetJSON("/api-app/upstreams"),
         tryGetJSON("/api-app/tls-configs"),
-        tryGetJSON("/api-app/certificates")
+        tryGetJSON("/api-app/certificates"),
+        tryGetJSON("/api-app/easy-site-profiles")
       ]);
       state.sites = mergeByID(sitesResponse, unwrapList(secondarySites, ["sites"]));
       state.upstreams = mergeByID(upstreamsResponse, unwrapList(secondaryUpstreams, ["upstreams"]));
@@ -3212,6 +3658,7 @@ export async function renderSites(container, ctx) {
       state.certificates = mergeByID(certificatesResponse, unwrapList(secondaryCertificates, ["certificates"]));
       notifyExpiringCertificates(ctx, state.certificates);
       state.accessPolicies = normalizeArray(accessPoliciesResponse);
+      state.easyProfiles = mergeProfilesBySite(easyProfilesResponse, secondaryEasyProfiles);
       state.selectedSiteIDs = new Set(Array.from(state.selectedSiteIDs).filter((id) => state.sites.some((site) => site.id === id)));
       state.geoCatalog = normalizeGeoCatalogPayload(geoCatalogResponse);
       rebuildIndexes();
@@ -3388,8 +3835,8 @@ export async function renderSites(container, ctx) {
       const parsed = envToDraft(rawEnvText);
       state.rawEnvText = rawEnvText ? `${rawEnvText}\n` : "";
       state.rawMissingFields = normalizeArray(parsed.missingFields);
-      state.draft = parsed.draft;
-      return parsed.draft;
+      state.draft = applyServiceProfilePresetForMissingFields(parsed.draft, parsed.missingFields);
+      return state.draft;
     };
     container.querySelectorAll("[data-wizard-tab]").forEach((button) => {
       button.addEventListener("click", () => {
@@ -3433,6 +3880,7 @@ export async function renderSites(container, ctx) {
       tls_self_signed: container.querySelector("#service-tls-self-signed").checked,
       certificate_id: container.querySelector("#service-certificate-id").value.trim().toLowerCase(),
       security_mode: container.querySelector("#service-security-mode").value,
+      service_profile: normalizeServiceProfile(container.querySelector("#service-profile")?.value || state.draft.service_profile),
       upstream_id: computeUpstreamID(container.querySelector("#service-id").value),
       upstream_host: container.querySelector("#service-upstream-host").value.trim(),
       upstream_port: Number(container.querySelector("#service-upstream-port").value || "80"),
@@ -3516,13 +3964,45 @@ export async function renderSites(container, ctx) {
       antibot_hcaptcha_secret: container.querySelector("#service-antibot-hcaptcha-secret").value.trim(),
       antibot_turnstile_sitekey: container.querySelector("#service-antibot-turnstile-sitekey").value.trim(),
       antibot_turnstile_secret: container.querySelector("#service-antibot-turnstile-secret").value.trim(),
+      challenge_escalation_enabled: container.querySelector("#service-antibot-escalation-enabled")?.checked || false,
+      challenge_escalation_mode: container.querySelector("#service-antibot-escalation-mode")?.value || "javascript",
+      antibot_challenge_rules: Array.from(container.querySelectorAll("[data-antibot-rule-path]"))
+        .map((input) => {
+          const index = String(input.dataset.antibotRulePath || "");
+          const modeInput = container.querySelector(`[data-antibot-rule-challenge="${index}"]`);
+          return {
+            path: String(input.value || "").trim(),
+            challenge: String(modeInput?.value || "").trim().toLowerCase()
+          };
+        }),
       use_auth_basic: container.querySelector("#service-use-auth-basic").checked,
       auth_basic_location: container.querySelector("#service-auth-basic-location").value.trim(),
-      auth_basic_user: container.querySelector("#service-auth-basic-user").value.trim(),
-      auth_basic_password: container.querySelector("#service-auth-basic-password").value.trim(),
+      auth_basic_user: "",
+      auth_basic_password: "",
       auth_basic_text: container.querySelector("#service-auth-basic-text").value.trim(),
+      auth_basic_users: Array.from(container.querySelectorAll("[data-auth-user-username]"))
+        .map((input) => {
+          const index = String(input.dataset.authUserUsername || "");
+          const passwordInput = container.querySelector(`[data-auth-user-password="${index}"]`);
+          const enabledInput = container.querySelector(`[data-auth-user-enabled="${index}"]`);
+          const lastLogin = normalizeAuthBasicUsers(state.draft.auth_basic_users)[Number.parseInt(index, 10)]?.last_login_at || "";
+          return {
+            username: String(input.value || "").trim(),
+            password: String(passwordInput?.value || "").trim(),
+            enabled: Boolean(enabledInput?.checked),
+            last_login_at: String(lastLogin || "")
+          };
+        }),
+      auth_basic_session_inactivity_minutes: normalizeAuthSessionTTLMinutes(
+        container.querySelector("#service-auth-basic-session-ttl")?.value
+      ),
       blacklist_country: normalizeStringArray(state.draft.blacklist_country),
       whitelist_country: normalizeStringArray(state.draft.whitelist_country),
+      api_positive_security_enabled: Boolean(state.draft.api_positive_security_enabled),
+      api_positive_openapi_schema_ref: String(state.draft.api_positive_openapi_schema_ref || "").trim(),
+      api_positive_enforcement_mode: String(state.draft.api_positive_enforcement_mode || "monitor").trim().toLowerCase() || "monitor",
+      api_positive_default_action: String(state.draft.api_positive_default_action || "allow").trim().toLowerCase() || "allow",
+      api_positive_endpoint_policies: normalizeAPIPositiveEndpointPolicies(state.draft.api_positive_endpoint_policies),
       use_modsecurity: container.querySelector("#service-use-modsecurity").checked,
       use_modsecurity_crs_plugins: container.querySelector("#service-use-modsecurity-crs-plugins").checked,
       use_modsecurity_custom_configuration: container.querySelector("#service-use-modsecurity-custom-configuration").checked,
@@ -3545,6 +4025,13 @@ export async function renderSites(container, ctx) {
         state.draft.ban_escalation_stages_seconds,
         state.draft.bad_behavior_ban_time_seconds
       );
+      state.draft.auth_basic_users = normalizeAuthBasicUsers(state.draft.auth_basic_users);
+      state.draft.auth_basic_session_inactivity_minutes = normalizeAuthSessionTTLMinutes(
+        state.draft.auth_basic_session_inactivity_minutes
+      );
+      const firstAuthUser = state.draft.auth_basic_users[0] || { username: "", password: "" };
+      state.draft.auth_basic_user = String(firstAuthUser.username || "").trim();
+      state.draft.auth_basic_password = String(firstAuthUser.password || "").trim();
     };
 
     const back = () => go(routeBase());
@@ -3628,6 +4115,16 @@ export async function renderSites(container, ctx) {
       const autoID = normalizeAutoSiteID(hostInput?.value || "");
       event.target.dataset.dirty = id && id !== autoID ? "true" : "";
       syncDerivedFieldsFromID();
+    });
+    container.querySelector("#service-profile")?.addEventListener("change", (event) => {
+      syncStateDraftFromForm();
+      const selectedProfile = normalizeServiceProfile(event?.target?.value || state.draft.service_profile);
+      const currentProfile = normalizeServiceProfile(state.draft.service_profile);
+      if (selectedProfile === currentProfile) {
+        return;
+      }
+      state.draft = applyServiceProfilePresetToDraft(state.draft, selectedProfile);
+      render();
     });
     container.querySelector("#service-certificate-id")?.addEventListener("input", (event) => {
       event.target.dataset.dirty = event.target.value.trim() ? "true" : "";
@@ -3942,6 +4439,73 @@ export async function renderSites(container, ctx) {
         current.splice(index, 1);
         state.draft.custom_limit_rules = current;
         render();
+      });
+    });
+
+    container.querySelector("[data-antibot-rule-add]")?.addEventListener("click", () => {
+      syncStateDraftFromForm();
+      state.draft.antibot_challenge_rules = [...normalizeAntibotChallengeRules(state.draft.antibot_challenge_rules), { path: "/", challenge: "javascript" }];
+      render();
+    });
+
+    container.querySelectorAll("[data-antibot-rule-remove]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const index = Number.parseInt(String(button.dataset.antibotRuleRemove || "-1"), 10);
+        if (!Number.isInteger(index) || index < 0) {
+          return;
+        }
+        syncStateDraftFromForm();
+        const current = normalizeAntibotChallengeRules(state.draft.antibot_challenge_rules);
+        if (index >= current.length) {
+          return;
+        }
+        current.splice(index, 1);
+        state.draft.antibot_challenge_rules = current;
+        render();
+      });
+    });
+
+    container.querySelector("[data-auth-user-add]")?.addEventListener("click", () => {
+      syncStateDraftFromForm();
+      const current = normalizeAuthBasicUsers(state.draft.auth_basic_users);
+      current.push({
+        username: `user${current.length + 1}`,
+        password: "",
+        enabled: true,
+        last_login_at: ""
+      });
+      state.draft.auth_basic_users = current;
+      render();
+    });
+
+    container.querySelectorAll("[data-auth-user-remove]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const index = Number.parseInt(String(button.dataset.authUserRemove || "-1"), 10);
+        if (!Number.isInteger(index) || index < 0) {
+          return;
+        }
+        syncStateDraftFromForm();
+        const current = normalizeAuthBasicUsers(state.draft.auth_basic_users);
+        if (index >= current.length) {
+          return;
+        }
+        current.splice(index, 1);
+        state.draft.auth_basic_users = current.length ? current : [{ username: "changeme", password: "", enabled: true, last_login_at: "" }];
+        render();
+      });
+    });
+
+    container.querySelectorAll("[data-auth-user-toggle]").forEach((button) => {
+      syncAuthPasswordToggle(button, false, ctx);
+      button.addEventListener("click", () => {
+        const index = String(button.dataset.authUserToggle || "");
+        const input = container.querySelector(`[data-auth-user-password="${index}"]`);
+        if (!input) {
+          return;
+        }
+        const nextVisible = input.type !== "text";
+        input.type = nextVisible ? "text" : "password";
+        syncAuthPasswordToggle(button, nextVisible, ctx);
       });
     });
 
