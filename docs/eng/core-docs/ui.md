@@ -2,7 +2,7 @@
 
 This page belongs to the current documentation branch.
 
-This document describes the real TARINIO administrative interface for version `3.0.0`: login, onboarding, healthcheck, the sidebar sections, and the practical workflows behind each screen.
+This document describes the real TARINIO administrative interface for version `3.0.1`: login, onboarding, healthcheck, the sidebar sections, and the practical workflows behind each screen.
 
 ## Interface Map
 
@@ -346,7 +346,7 @@ Typical use cases:
 
 ## Revisions
 
-This is the core change-management screen in `3.0.0`.
+This is the core change-management screen in `3.0.1`.
 
 It includes:
 

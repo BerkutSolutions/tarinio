@@ -1,6 +1,6 @@
-﻿# TARINIO Sentinel
+# TARINIO Sentinel
 
-`tarinio-sentinel` is the adaptive security engine for TARINIO 3.0.0. It replaces the old `ddos-model` runtime process while keeping the legacy `ddos-model/config.json` artifact and `MODEL_*` environment contract compatible for existing deployments.
+`tarinio-sentinel` is the adaptive security engine for TARINIO 3.0.1. It replaces the old `ddos-model` runtime process while keeping the legacy `ddos-model/config.json` artifact and `MODEL_*` environment contract compatible for existing deployments.
 
 ## Runtime Role
 
@@ -88,7 +88,7 @@ The MVP statuses are:
 - `suggested`: visible candidate, no runtime blocking;
 - `shadow`: would-block counters are collected, still no runtime blocking.
 
-There is no automatic permanent apply in 3.0.0.
+There is no automatic permanent apply in 3.0.1.
 
 ## False Positive Safety
 

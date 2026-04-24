@@ -1,0 +1,10 @@
+title = "TARINIO gitleaks config"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Allow secret-like placeholders in environment template examples"
+paths = [
+  '''^deploy/compose/[^/]+/\.env\.example$'''
+]

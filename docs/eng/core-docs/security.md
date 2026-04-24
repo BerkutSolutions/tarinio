@@ -1,4 +1,4 @@
-﻿# Security
+# Security
 
 This page belongs to the current documentation branch.
 
@@ -15,7 +15,7 @@ This document defines the minimum production baseline and the main secure-operat
 
 ## Authentication And Access
 
-In version `3.0.0`, the platform supports:
+In version `3.0.1`, the platform supports:
 
 - session-based login;
 - enterprise login through `OIDC`;
@@ -27,7 +27,7 @@ In version `3.0.0`, the platform supports:
 Important boundary:
 
 - directory-backed `LDAP/AD` group mapping is supported when groups are projected into `OIDC` or `SCIM`;
-- standalone direct `LDAP` password login is not part of `3.0.0`.
+- standalone direct `LDAP` password login is not part of `3.0.1`.
 
 Recommendations:
 

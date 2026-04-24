@@ -9,3 +9,5 @@
 - [Развёртывание](../core-docs/deploy.md)
 - [Обновление](../core-docs/upgrade.md)
 - [Восстановление](../core-docs/disaster-recovery.md)
+- [Enterprise-проверка Sentinel](./sentinel-enterprise-validation.md)
+- [Enterprise-проверка Anti-Bot](./antibot-enterprise-validation.md)

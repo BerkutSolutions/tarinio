@@ -1,10 +1,10 @@
-﻿# Compatibility Matrix
+# Compatibility Matrix
 
 This page belongs to the current documentation branch.
 
 ## Scope
 
-This matrix defines the deployment combinations TARINIO `3.0.0` is designed, tested, and supported for.
+This matrix defines the deployment combinations TARINIO `3.0.1` is designed, tested, and supported for.
 
 ## Runtime Platform
 

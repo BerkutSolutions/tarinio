@@ -1,10 +1,10 @@
-﻿# Observability
+# Observability
 
 This page belongs to the current documentation branch.
 
 ## Scope
 
-TARINIO `3.0.0` includes a production-oriented observability stack for High Availability deployments:
+TARINIO `3.0.1` includes a production-oriented observability stack for High Availability deployments:
 
 - Prometheus-compatible metrics from the control-plane;
 - Prometheus-compatible metrics from the runtime launcher;

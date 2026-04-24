@@ -1,8 +1,8 @@
-﻿# English Wiki
+# English Wiki
 
 This page belongs to the current documentation branch.
 
-This is the main English index for TARINIO documentation. It is structured as an operator wiki for the real `3.0.0` product and is meant to complement the Russian branch, not lag behind it.
+This is the main English index for TARINIO documentation. It is structured as an operator wiki for the real `3.0.1` product and is meant to complement the Russian branch, not lag behind it.
 
 ## Start Here
 
@@ -37,7 +37,7 @@ This is the main English index for TARINIO documentation. It is structured as an
 - OWASP CRS operations: `docs/eng/operators/owasp-crs.md`
 - Let's Encrypt DNS-01 operations: `docs/eng/operators/letsencrypt-dns.md`
 
-## What Matters In 3.0.0
+## What Matters In 3.0.1
 
 - Documentation is aligned with the application version from `control-plane/internal/appmeta/meta.go`.
 - The wiki covers the real UI sections: `Dashboard`, `Sites`, `Anti-DDoS`, `OWASP CRS`, `TLS`, `Requests`, `Revisions`, `Events`, `Bans`, `Administration`, `Activity`, `Settings`, and `Profile`.

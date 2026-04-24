@@ -76,6 +76,9 @@ func TestRenderEasyArtifacts_GeneratesSiteAndAuthBasicFiles(t *testing.T) {
 	if !strings.Contains(siteConf, "if ($waf_antibot_guard = \"0:0:1\") { return 302 /challenge?return_uri=$uri&return_args=$args; }") {
 		t.Fatalf("expected antibot redirect challenge in easy template, got: %s", siteConf)
 	}
+	if !strings.Contains(siteConf, `set $waf_antibot_guard "$waf_antibot_exception_guard:$waf_antibot_verified:$waf_antibot_safe_method";`) {
+		t.Fatalf("expected antibot guard to use antibot-specific exception variable, got: %s", siteConf)
+	}
 	if !strings.Contains(siteConf, `if ($uri ~* "^/(`) || !strings.Contains(siteConf, `api/.*`) || !strings.Contains(siteConf, `static/.*`) || !strings.Contains(siteConf, `dashboard(?:/.*)?`) || !strings.Contains(siteConf, `login/2fa`) {
 		t.Fatalf("expected admin path bypass guard in easy template, got: %s", siteConf)
 	}

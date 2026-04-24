@@ -1,10 +1,10 @@
-﻿# High Availability and Multi-Node
+# High Availability and Multi-Node
 
 This page belongs to the current documentation branch.
 
 ## Scope
 
-TARINIO `3.0.0` now supports a practical multi-node control-plane topology on one Docker host:
+TARINIO `3.0.1` now supports a practical multi-node control-plane topology on one Docker host:
 
 - shared PostgreSQL state;
 - shared Redis coordination;
@@ -16,7 +16,7 @@ This closes the earlier gap where the product was documented as PostgreSQL-backe
 
 ## What Is High Availability Today
 
-The supported High Availability shape in `3.0.0` is:
+The supported High Availability shape in `3.0.1` is:
 
 ```text
 ui -> api-lb -> control-plane-a / control-plane-b
@@ -29,6 +29,11 @@ ui -> api-lb -> control-plane-a / control-plane-b
                               |
                          protected sites
 ```
+
+Related validation docs:
+
+- [Sentinel Enterprise Validation](./sentinel-enterprise-validation.md)
+- [Anti-Bot Enterprise Validation](./antibot-enterprise-validation.md)
 
 In this model:
 

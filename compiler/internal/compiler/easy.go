@@ -42,17 +42,17 @@ type easySiteData struct {
 	AuthBasicRealm    string
 	AuthBasicUserFile string
 
-	AntibotEnabled       bool
+	AntibotEnabled          bool
 	AntibotUsesInterstitial bool
-	AntibotChallenge     string
-	AntibotURI           string
-	AntibotVerifyURI     string
-	AntibotRedirectURI   string
-	AntibotCookieName    string
-	AntibotCookieValue   string
-	AntibotRecaptchaHint string
-	AntibotHcaptchaHint  string
-	AntibotTurnstileHint string
+	AntibotChallenge        string
+	AntibotURI              string
+	AntibotVerifyURI        string
+	AntibotRedirectURI      string
+	AntibotCookieName       string
+	AntibotCookieValue      string
+	AntibotRecaptchaHint    string
+	AntibotHcaptchaHint     string
+	AntibotTurnstileHint    string
 
 	BlacklistIP        []string
 	BlacklistUserAgent []string
