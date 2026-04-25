@@ -2,6 +2,8 @@
 
 This document describes the real request-log behavior in TARINIO `current release`.
 
+Release baseline for this revision: `3.0.4`.
+
 ## Overview
 
 The request path is now split into three roles:
@@ -98,6 +100,12 @@ Healthy `current release` behavior looks like this:
 3. old legacy archive days are migrated and removed only after validation;
 4. if `ClickHouse` is enabled, older hot data can be moved there without losing validated records;
 5. the local archive remains available as a fallback spool rather than the main database.
+
+For lab profile rollout checks, use:
+
+- `deploy/lab-k8s-terraform/k8s/scripts/smoke-k8s-lab.ps1`
+- `deploy/lab-k8s-terraform/k8s/scripts/apply-profile-opensearch-clickhouse.ps1`
+
 
 
 

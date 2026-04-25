@@ -9,11 +9,12 @@ export default function Home() {
       description="Enterprise-grade self-hosted WAF platform documentation">
       <main className="hero-page">
         <section className="hero-panel">
-          <p className="eyebrow">TARINIO 3.0.0</p>
+          <p className="eyebrow">TARINIO 3.0.4</p>
           <h1>Документация TARINIO</h1>
           <p className="hero-copy">
-            Единый портал по развёртыванию, ежедневной эксплуатации, обновлениям, высокой доступности, PostgreSQL,
-            наблюдаемости и benchmark-сценариям для production WAF-контуров.
+            Единый портал по развёртыванию, ежедневной эксплуатации, обновлениям,
+            высокой доступности, PostgreSQL, наблюдаемости и benchmark-сценариям
+            для production WAF-контуров.
           </p>
           <div className="hero-actions">
             <Link className="button button--primary button--lg" to="/ru/">

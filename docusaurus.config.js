@@ -97,10 +97,10 @@ const config = {
           ],
         },
         {
-          label: 'Version 3.0.3',
+          label: 'Version 3.0.4',
           position: 'right',
           items: [
-            {label: 'Current Release 3.0.3', to: '/ru/core-docs/release-policy/'},
+            {label: 'Current Release 3.0.4', to: '/ru/core-docs/release-policy/'},
             {label: 'CHANGELOG', href: 'https://github.com/BerkutSolutions/tarinio/blob/main/CHANGELOG.md'},
           ],
         },
@@ -151,4 +151,5 @@ const config = {
 };
 
 module.exports = config;
+
 

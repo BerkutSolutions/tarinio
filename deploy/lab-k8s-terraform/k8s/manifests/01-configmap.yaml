@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tarinio-lab-config
+data:
+  POSTGRES_USER: "waf"
+  POSTGRES_DB: "waf"
+  CONTROL_PLANE_AUTH_ISSUER: "TARINIO"
+  CONTROL_PLANE_STARTUP_SELF_TEST_ENABLED: "false"
+  CONTROL_PLANE_HTTP_ADDR: "0.0.0.0:8080"
+  CONTROL_PLANE_BOOTSTRAP_ADMIN_ENABLED: "true"
+  CONTROL_PLANE_BOOTSTRAP_ADMIN_ID: "admin"
+  CONTROL_PLANE_BOOTSTRAP_ADMIN_USERNAME: "admin"
+  CONTROL_PLANE_BOOTSTRAP_ADMIN_EMAIL: "admin@lab.local"
+  WAF_RUNTIME_ROOT: "/var/lib/waf"
+  WAF_RUNTIME_HEALTH_URL: "http://runtime:8081/readyz"
+  WAF_RUNTIME_RELOAD_URL: "http://runtime:8081/reload"
+  CONTROL_PLANE_ACME_ENABLED: "false"
+  CONTROL_PLANE_ACME_USE_DEVELOPMENT_CLIENT: "true"
+  CONTROL_PLANE_ACME_EMAIL: "admin@example.com"
+  CONTROL_PLANE_ACME_DIRECTORY_URL: "https://acme-staging-v02.api.letsencrypt.org/directory"
+  OPENSEARCH_ENDPOINT: "http://opensearch:9200"
+  OPENSEARCH_USERNAME: "admin"
+  OPENSEARCH_INDEX_PREFIX: "waf-hot"
+  VAULT_ENABLED: "false"
+  WAF_RUNTIME_HEALTH_ADDR: "0.0.0.0:8081"
+  WAF_REQUEST_ARCHIVE_ROOT: "/var/lib/waf-request-archive"

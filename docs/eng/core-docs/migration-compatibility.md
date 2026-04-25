@@ -2,6 +2,8 @@
 
 This document defines the `current release` compatibility contract for logging, secret handling, and standalone-to-enterprise cutover.
 
+Release baseline for this revision: `3.0.4`.
+
 ## Backward Compatibility
 
 Existing standalone installs remain supported:
@@ -94,5 +96,14 @@ The following are regressions:
 - making the UI depend on local request files instead of the API/backend path;
 - clearing local secrets before Vault storage is confirmed;
 - making standalone require enterprise-only dependencies just to stay functional.
+
+## Kubernetes/Terraform Lab Note
+
+For the `deploy/lab-k8s-terraform` experimental profile, migration validation is considered complete only when:
+
+1. `terraform apply` and `terraform destroy` pass without manual fixes;
+2. smoke checks pass on single-node and HA overlays;
+3. no-trace test leaves no local Terraform artifacts after execution.
+
 
 

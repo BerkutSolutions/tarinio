@@ -1,0 +1,132 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: waf-request-archive-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: runtime
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: runtime
+  template:
+    metadata:
+      labels:
+        app: runtime
+    spec:
+      containers:
+        - name: runtime
+          image: tarinio-runtime:lab
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            capabilities:
+              add:
+                - NET_ADMIN
+                - NET_RAW
+          ports:
+            - containerPort: 80
+            - containerPort: 443
+            - containerPort: 8081
+          env:
+            - name: WAF_RUNTIME_ROOT
+              valueFrom:
+                configMapKeyRef:
+                  name: tarinio-lab-config
+                  key: WAF_RUNTIME_ROOT
+            - name: WAF_REQUEST_ARCHIVE_ROOT
+              valueFrom:
+                configMapKeyRef:
+                  name: tarinio-lab-config
+                  key: WAF_REQUEST_ARCHIVE_ROOT
+            - name: WAF_RUNTIME_HEALTH_ADDR
+              valueFrom:
+                configMapKeyRef:
+                  name: tarinio-lab-config
+                  key: WAF_RUNTIME_HEALTH_ADDR
+            - name: WAF_RUNTIME_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: tarinio-lab-secrets
+                  key: WAF_RUNTIME_API_TOKEN
+            - name: CONTROL_PLANE_SECURITY_PEPPER
+              valueFrom:
+                secretKeyRef:
+                  name: tarinio-lab-secrets
+                  key: CONTROL_PLANE_SECURITY_PEPPER
+            - name: OPENSEARCH_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: tarinio-lab-config
+                  key: OPENSEARCH_ENDPOINT
+            - name: OPENSEARCH_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: tarinio-lab-config
+                  key: OPENSEARCH_USERNAME
+            - name: OPENSEARCH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tarinio-lab-secrets
+                  key: OPENSEARCH_PASSWORD
+            - name: OPENSEARCH_INDEX_PREFIX
+              valueFrom:
+                configMapKeyRef:
+                  name: tarinio-lab-config
+                  key: OPENSEARCH_INDEX_PREFIX
+            - name: VAULT_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: tarinio-lab-config
+                  key: VAULT_ENABLED
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          volumeMounts:
+            - name: waf-runtime-data
+              mountPath: /var/lib/waf
+              readOnly: true
+            - name: waf-request-archive-data
+              mountPath: /var/lib/waf-request-archive
+      volumes:
+        - name: waf-runtime-data
+          persistentVolumeClaim:
+            claimName: waf-runtime-data
+        - name: waf-request-archive-data
+          persistentVolumeClaim:
+            claimName: waf-request-archive-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: runtime
+spec:
+  selector:
+    app: runtime
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+    - name: https
+      port: 443
+      targetPort: 443
+    - name: health
+      port: 8081
+      targetPort: 8081

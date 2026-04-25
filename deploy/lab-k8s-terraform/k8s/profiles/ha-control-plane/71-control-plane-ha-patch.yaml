@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: control-plane
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+        - name: control-plane
+          env:
+            - name: CONTROL_PLANE_HA_ENABLED
+              value: "true"
+            - name: CONTROL_PLANE_REDIS_ADDR
+              value: "redis:6379"
+            - name: CONTROL_PLANE_HA_OPERATION_LOCK_TTL_SECONDS
+              value: "120"
+            - name: CONTROL_PLANE_HA_LEADER_LOCK_TTL_SECONDS
+              value: "30"
+            - name: CONTROL_PLANE_HA_NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name

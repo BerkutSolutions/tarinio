@@ -53,7 +53,7 @@ function Write-EnglishWiki {
 
 Last full smoke run: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss zzz")
 
-This page records the reproducible validation pack for tarinio-sentinel in TARINIO 3.0.0. The run starts the Docker Compose stacks for both the standalone default profile and the HA-ready ha-lab profile, injects controlled access-log evidence, and verifies that the model publishes bounded adaptive decisions without blocking benign traffic.
+This page records the reproducible validation pack for tarinio-sentinel in TARINIO 3.0.4. The run starts the Docker Compose stacks for both the standalone default profile and the HA-ready ha-lab profile, injects controlled access-log evidence, and verifies that the model publishes bounded adaptive decisions without blocking benign traffic.
 
 ## Executive Summary
 
@@ -112,47 +112,47 @@ function Write-RussianWiki {
   }
 
   $md = @"
-# Enterprise-проверка Sentinel
+# Enterprise-РїСЂРѕРІРµСЂРєР° Sentinel
 
-Последний полный smoke-прогон: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss zzz")
+РџРѕСЃР»РµРґРЅРёР№ РїРѕР»РЅС‹Р№ smoke-РїСЂРѕРіРѕРЅ: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss zzz")
 
-Эта страница фиксирует воспроизводимую проверку tarinio-sentinel в TARINIO 3.0.0. Прогон запускает Docker Compose стеки default и ha-lab, добавляет контролируемые строки access-log и проверяет, что модель выдает ограниченные adaptive-решения без блокировки нормального трафика.
+Р­С‚Р° СЃС‚СЂР°РЅРёС†Р° С„РёРєСЃРёСЂСѓРµС‚ РІРѕСЃРїСЂРѕРёР·РІРѕРґРёРјСѓСЋ РїСЂРѕРІРµСЂРєСѓ tarinio-sentinel РІ TARINIO 3.0.4. РџСЂРѕРіРѕРЅ Р·Р°РїСѓСЃРєР°РµС‚ Docker Compose СЃС‚РµРєРё default Рё ha-lab, РґРѕР±Р°РІР»СЏРµС‚ РєРѕРЅС‚СЂРѕР»РёСЂСѓРµРјС‹Рµ СЃС‚СЂРѕРєРё access-log Рё РїСЂРѕРІРµСЂСЏРµС‚, С‡С‚Рѕ РјРѕРґРµР»СЊ РІС‹РґР°РµС‚ РѕРіСЂР°РЅРёС‡РµРЅРЅС‹Рµ adaptive-СЂРµС€РµРЅРёСЏ Р±РµР· Р±Р»РѕРєРёСЂРѕРІРєРё РЅРѕСЂРјР°Р»СЊРЅРѕРіРѕ С‚СЂР°С„РёРєР°.
 
-## Итог
+## РС‚РѕРі
 
-Покрыты нормальный трафик, scanner paths, brute-force, XSS, SQL injection, command injection, single-source DDoS, distributed DDoS и high-cardinality noise. Профиль считается успешным только если нормальный источник не попал в adaptive output, вредоносные сценарии дали evidence, а scanner paths попали в L7 suggestions до постоянного enforcement.
+РџРѕРєСЂС‹С‚С‹ РЅРѕСЂРјР°Р»СЊРЅС‹Р№ С‚СЂР°С„РёРє, scanner paths, brute-force, XSS, SQL injection, command injection, single-source DDoS, distributed DDoS Рё high-cardinality noise. РџСЂРѕС„РёР»СЊ СЃС‡РёС‚Р°РµС‚СЃСЏ СѓСЃРїРµС€РЅС‹Рј С‚РѕР»СЊРєРѕ РµСЃР»Рё РЅРѕСЂРјР°Р»СЊРЅС‹Р№ РёСЃС‚РѕС‡РЅРёРє РЅРµ РїРѕРїР°Р» РІ adaptive output, РІСЂРµРґРѕРЅРѕСЃРЅС‹Рµ СЃС†РµРЅР°СЂРёРё РґР°Р»Рё evidence, Р° scanner paths РїРѕРїР°Р»Рё РІ L7 suggestions РґРѕ РїРѕСЃС‚РѕСЏРЅРЅРѕРіРѕ enforcement.
 
-| Профиль | Passed | Events | Adaptive entries | Actions | L7 suggestions | Normal false positives |
+| РџСЂРѕС„РёР»СЊ | Passed | Events | Adaptive entries | Actions | L7 suggestions | Normal false positives |
 | --- | --- | ---: | ---: | --- | ---: | ---: |
 $($rows -join "`n")
 
-## Матрица сценариев
+## РњР°С‚СЂРёС†Р° СЃС†РµРЅР°СЂРёРµРІ
 
-| Сценарий | Паттерн | Ожидаемый сигнал |
+| РЎС†РµРЅР°СЂРёР№ | РџР°С‚С‚РµСЂРЅ | РћР¶РёРґР°РµРјС‹Р№ СЃРёРіРЅР°Р» |
 | --- | --- | --- |
-| Normal baseline | 20 безопасных запросов dashboard от одного источника | Нет adaptive entries и false positive block |
-| Scanner discovery | /.env, /wp-admin, /phpmyadmin, /vendor/phpunit | Снижается trust и появляются L7 suggestions |
-| Brute force | Повторные /login с 401, 403, 429 | Источник получает adaptive scrutiny и может эскалироваться |
-| XSS / SQLi / RCE probes | Encoded script tag, UNION SELECT, shell metacharacters | Payload-источник повышает adaptive risk |
-| Single-source DDoS | 140 запросов за секунду от одного IP | Срабатывает emergency single-source detection |
-| Distributed DDoS | 240 запросов за секунду от многих IP | Срабатывает emergency botnet-like detection |
-| High cardinality | Много уникальных path и источников | State остается ограниченным, publish output capped |
+| Normal baseline | 20 Р±РµР·РѕРїР°СЃРЅС‹С… Р·Р°РїСЂРѕСЃРѕРІ dashboard РѕС‚ РѕРґРЅРѕРіРѕ РёСЃС‚РѕС‡РЅРёРєР° | РќРµС‚ adaptive entries Рё false positive block |
+| Scanner discovery | /.env, /wp-admin, /phpmyadmin, /vendor/phpunit | РЎРЅРёР¶Р°РµС‚СЃСЏ trust Рё РїРѕСЏРІР»СЏСЋС‚СЃСЏ L7 suggestions |
+| Brute force | РџРѕРІС‚РѕСЂРЅС‹Рµ /login СЃ 401, 403, 429 | РСЃС‚РѕС‡РЅРёРє РїРѕР»СѓС‡Р°РµС‚ adaptive scrutiny Рё РјРѕР¶РµС‚ СЌСЃРєР°Р»РёСЂРѕРІР°С‚СЊСЃСЏ |
+| XSS / SQLi / RCE probes | Encoded script tag, UNION SELECT, shell metacharacters | Payload-РёСЃС‚РѕС‡РЅРёРє РїРѕРІС‹С€Р°РµС‚ adaptive risk |
+| Single-source DDoS | 140 Р·Р°РїСЂРѕСЃРѕРІ Р·Р° СЃРµРєСѓРЅРґСѓ РѕС‚ РѕРґРЅРѕРіРѕ IP | РЎСЂР°Р±Р°С‚С‹РІР°РµС‚ emergency single-source detection |
+| Distributed DDoS | 240 Р·Р°РїСЂРѕСЃРѕРІ Р·Р° СЃРµРєСѓРЅРґСѓ РѕС‚ РјРЅРѕРіРёС… IP | РЎСЂР°Р±Р°С‚С‹РІР°РµС‚ emergency botnet-like detection |
+| High cardinality | РњРЅРѕРіРѕ СѓРЅРёРєР°Р»СЊРЅС‹С… path Рё РёСЃС‚РѕС‡РЅРёРєРѕРІ | State РѕСЃС‚Р°РµС‚СЃСЏ РѕРіСЂР°РЅРёС‡РµРЅРЅС‹Рј, publish output capped |
 
 ## False Positive
 
-Нормальный источник проверяется отдельно от атакующих источников. Критерий приемки жесткий: normal_false_positive_entries должен быть 0 в каждом профиле.
+РќРѕСЂРјР°Р»СЊРЅС‹Р№ РёСЃС‚РѕС‡РЅРёРє РїСЂРѕРІРµСЂСЏРµС‚СЃСЏ РѕС‚РґРµР»СЊРЅРѕ РѕС‚ Р°С‚Р°РєСѓСЋС‰РёС… РёСЃС‚РѕС‡РЅРёРєРѕРІ. РљСЂРёС‚РµСЂРёР№ РїСЂРёРµРјРєРё Р¶РµСЃС‚РєРёР№: normal_false_positive_entries РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ 0 РІ РєР°Р¶РґРѕРј РїСЂРѕС„РёР»Рµ.
 
-## Артефакты
+## РђСЂС‚РµС„Р°РєС‚С‹
 
 $RunDir
 
-В каждом каталоге профиля лежат result.json, adaptive.json, l7-suggestions.json, model-state.json и report.md.
+Р’ РєР°Р¶РґРѕРј РєР°С‚Р°Р»РѕРіРµ РїСЂРѕС„РёР»СЏ Р»РµР¶Р°С‚ result.json, adaptive.json, l7-suggestions.json, model-state.json Рё report.md.
 
-## Повторить прогон
+## РџРѕРІС‚РѕСЂРёС‚СЊ РїСЂРѕРіРѕРЅ
 
 ./scripts/smoke-sentinel-enterprise.ps1
 
-Это smoke и evidence test, а не замена внешнему нагрузочному тестированию. Он проверяет контур продукта: ingestion логов runtime, score calculation, explainable reasons, adaptive output compatibility, L7 suggestions, FP safety и запуск HA-профиля.
+Р­С‚Рѕ smoke Рё evidence test, Р° РЅРµ Р·Р°РјРµРЅР° РІРЅРµС€РЅРµРјСѓ РЅР°РіСЂСѓР·РѕС‡РЅРѕРјСѓ С‚РµСЃС‚РёСЂРѕРІР°РЅРёСЋ. РћРЅ РїСЂРѕРІРµСЂСЏРµС‚ РєРѕРЅС‚СѓСЂ РїСЂРѕРґСѓРєС‚Р°: ingestion Р»РѕРіРѕРІ runtime, score calculation, explainable reasons, adaptive output compatibility, L7 suggestions, FP safety Рё Р·Р°РїСѓСЃРє HA-РїСЂРѕС„РёР»СЏ.
 "@
   Set-Content -LiteralPath $Path -Value $md -Encoding UTF8
 }
@@ -196,3 +196,4 @@ $summary | ConvertTo-Json -Depth 6
 if (-not $summary.passed) {
   throw "sentinel enterprise smoke failed"
 }
+

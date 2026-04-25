@@ -1,0 +1,5 @@
+bootstrap_kind        = true
+kubeconfig_path       = ""
+kube_context          = "kind-tarinio-lab"
+manifest_dir          = "../k8s/manifests"
+run_smoke_after_apply = true

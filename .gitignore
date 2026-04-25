@@ -58,6 +58,9 @@ Thumbs.db
 *~
 .tmp_cookie*.txt
 
+# Local Terraform binaries
+deploy/lab-k8s-terraform/terraform/terraform.exe
+
 # Logs and local runtime files
 *.log
 *.pid

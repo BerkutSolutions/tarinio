@@ -1,0 +1,39 @@
+name: lab-k8s-terraform-cycle
+
+on:
+  workflow_dispatch:
+
+jobs:
+  lab-cycle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Setup kind
+        uses: helm/kind-action@v1.10.0
+        with:
+          cluster_name: tarinio-lab
+
+      - name: Run lab cycle (PowerShell)
+        shell: pwsh
+        run: |
+          powershell -ExecutionPolicy Bypass -File deploy/lab-k8s-terraform/ci/run-lab-cycle.ps1
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lab-k8s-terraform-artifacts
+          path: deploy/lab-k8s-terraform/ci/artifacts
+
+

@@ -2,7 +2,7 @@
 
 Last full smoke run: 2026-04-25 13:22:32 +03:00
 
-This document records a reproducible service-protection validation pack for TARINIO 3.0.3.
+This document records a reproducible service-protection validation pack for TARINIO 3.0.4.
 
 ## Scope
 
@@ -68,3 +68,4 @@ Single profile:
 
 ./scripts/smoke-service-protection.ps1 -ComposeFile deploy/compose/default/docker-compose.yml -ProfileName default -OutputDir .work/service-protection-smoke/manual/default
 ./scripts/smoke-service-protection.ps1 -ComposeFile deploy/compose/ha-lab/docker-compose.yml -ProfileName ha-lab -OutputDir .work/service-protection-smoke/manual/ha-lab
+

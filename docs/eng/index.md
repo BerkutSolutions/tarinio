@@ -4,6 +4,8 @@ This page belongs to the current documentation branch.
 
 This is the main English index for TARINIO documentation. It is structured as an operator wiki for the real `current release` product and is meant to complement the Russian branch, not lag behind it.
 
+Documentation cycle baseline: `3.0.4`.
+
 ## Start Here
 
 - Product overview: `README.en.md`
@@ -63,6 +65,7 @@ This is the main English index for TARINIO documentation. It is structured as an
 - [Service protection enterprise validation](high-availability-docs/service-protection-enterprise-validation.md)
 - [OWASP CRS operations](operators/owasp-crs.md)
 - [Let's Encrypt DNS-01 operations](operators/letsencrypt-dns.md)
+- Kubernetes/Terraform lab runbook: `deploy/lab-k8s-terraform/docs/RUNBOOK.en.md`
 
 ## What Matters In current release
 
@@ -101,6 +104,7 @@ Stage 0 architecture decisions remain the binding foundation:
 - `docs/architecture/`
 
 Those documents define product boundaries, revision semantics, compilation, and deployment assumptions.
+
 
 
 

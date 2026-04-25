@@ -4,6 +4,13 @@
 
 Это руководство описывает ежедневные операторские действия, поток изменений, разбор инцидентов и откат для TARINIO.
 
+Релизный baseline для этой ревизии документа: `3.0.4`.
+
+Для Kubernetes/Terraform lab-контура используйте:
+
+- `deploy/lab-k8s-terraform/docs/RUNBOOK.ru.md`
+- `.work/SUPPORTED_PROFILE_CRITERIA.md`
+
 ## Быстрые проверки здоровья
 
 - `GET /healthz`

@@ -338,7 +338,7 @@
     "app.sites":  "服务",
     "app.tls":  "TLS / 证书",
     "app.user.noRoles":  "没有角色",
-    "app.version":  "v3.0.3",
+    "app.version":  "v3.0.4",
     "auth.2fa.challengeMissing":  "2FA 挑战缺失。请重新登录。",
     "auth.2fa.code":  "2FA 代码",
     "auth.2fa.codeRequired":  "需要 2FA 代码",

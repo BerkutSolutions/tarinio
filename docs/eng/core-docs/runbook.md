@@ -4,6 +4,15 @@ This page belongs to the current documentation branch.
 
 This runbook describes daily operator checks, standard change flow, triage, and rollback patterns for TARINIO.
 
+## Release Context
+
+Current validated documentation cycle: `3.0.4`.
+
+For Kubernetes/Terraform lab operations and promotion criteria:
+
+- `deploy/lab-k8s-terraform/docs/RUNBOOK.en.md`
+- `.work/SUPPORTED_PROFILE_CRITERIA.md`
+
 ## Fast Health Checks
 
 - `GET /healthz`
@@ -117,5 +126,6 @@ Escalation is mandatory when:
 - `docs/eng/core-docs/upgrade.md`
 - `docs/eng/core-docs/backups.md`
 - `docs/eng/model-docs/anti-ddos-runbook.md`
+
 
 
