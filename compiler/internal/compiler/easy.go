@@ -66,6 +66,8 @@ type easySiteData struct {
 	AntibotHcaptchaHint      string
 	AntibotTurnstileHint     string
 	AntibotRuleOverrides     []easyAntibotRuleData
+	AntibotScannerAutoBan    bool
+	AntibotScannerPattern    string
 
 	BlacklistIP        []string
 	BlacklistUserAgent []string
@@ -250,6 +252,7 @@ func RenderEasyArtifacts(sites []SiteInput, profiles []EasyProfileInput) ([]Arti
 				SendXForwardedFor:         true,
 				SendXForwardedProto:       true,
 				SendXRealIP:               false,
+				AntibotScannerAutoBan:     true,
 				UseBadBehavior:            true,
 				BadBehaviorStatusCodes:    []int{400, 401, 403, 404, 405, 429, 444},
 				BadBehaviorBanTimeSeconds: 30,
@@ -330,6 +333,8 @@ func RenderEasyArtifacts(sites []SiteInput, profiles []EasyProfileInput) ([]Arti
 			AntibotHcaptchaHint:          strings.TrimSpace(profile.AntibotHcaptchaKey),
 			AntibotTurnstileHint:         strings.TrimSpace(profile.AntibotTurnstileKey),
 			AntibotRuleOverrides:         buildEasyAntibotRuleData(profile.AntibotChallengeRules, profile.AntibotURI),
+			AntibotScannerAutoBan:        profile.AntibotScannerAutoBan,
+			AntibotScannerPattern:        antibotScannerPattern(),
 			BlacklistIP:                  profile.BlacklistIP,
 			BlacklistUserAgent:           profile.BlacklistUserAgent,
 			BlacklistURI:                 profile.BlacklistURI,
@@ -964,4 +969,28 @@ func toSafeBlacklistURIRegex(pattern string) string {
 	quoted = strings.ReplaceAll(quoted, `\*`, `.*`)
 	quoted = strings.ReplaceAll(quoted, `\?`, `.`)
 	return quoted
+}
+
+func antibotScannerPattern() string {
+	patterns := []string{
+		`/(?:\.env|\.git|phpmyadmin|wp-admin|vendor/phpunit|cgi-bin|boaform)`,
+		`acunetix`,
+		`dirbuster`,
+		`dirsearch`,
+		`feroxbuster`,
+		`ffuf`,
+		`gobuster`,
+		`gospider`,
+		`hakrawler`,
+		`masscan`,
+		`nessus`,
+		`nikto`,
+		`nmap`,
+		`sqlmap`,
+		`wfuzz`,
+		`wpscan`,
+		`zgrab`,
+		`securityscanner`,
+	}
+	return strings.Join(patterns, "|")
 }

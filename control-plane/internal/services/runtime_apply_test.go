@@ -377,6 +377,14 @@ func TestApplyService_CompilesEasyProfileArtifacts(t *testing.T) {
 	if !strings.Contains(easyConf, "if ($waf_country_guard ~ \"^(?:0:(?:RU))$\") { return 403; }") {
 		t.Fatalf("expected blacklist country in easy conf, got: %s", easyConf)
 	}
+	countryPos := strings.Index(easyConf, "if ($waf_country_guard !~")
+	antibotPos := strings.Index(easyConf, "set $waf_antibot_exception_guard 0;")
+	if countryPos == -1 || antibotPos == -1 || countryPos > antibotPos {
+		t.Fatalf("expected country hard-block guard to run before antibot challenge, got: %s", easyConf)
+	}
+	if !strings.Contains(easyConf, "set $waf_antibot_scanner_guard \"$waf_easy_exception_guard:$request_uri:$http_user_agent\";") {
+		t.Fatalf("expected antibot scanner auto-ban guard in easy conf, got: %s", easyConf)
+	}
 	if !strings.Contains(easyConf, "add_header X-WAF-Antibot-Mode \"$waf_antibot_effective_challenge\" always;") {
 		t.Fatalf("expected antibot directive in easy conf, got: %s", easyConf)
 	}
@@ -453,6 +461,26 @@ func TestMapRateLimitInputs_KeepsManagementSiteEnabled(t *testing.T) {
 		if item.SiteID == "site-a" && !item.Enabled {
 			t.Fatalf("expected non-management rate limit to stay enabled, got %+v", item)
 		}
+	}
+}
+
+func TestMapAccessInputs_AllowlistDefaultsToDenyForAllSites(t *testing.T) {
+	got := mapAccessInputs([]accesspolicies.AccessPolicy{
+		{ID: "site-a-access", SiteID: "site-a", AllowList: []string{"10.0.0.0/24"}},
+		{ID: "site-b-access", SiteID: "site-b", AllowList: nil},
+	})
+	if len(got) != 2 {
+		t.Fatalf("expected 2 mapped access policies, got %d", len(got))
+	}
+	bySite := map[string]pipeline.AccessPolicyInput{}
+	for _, item := range got {
+		bySite[item.SiteID] = item
+	}
+	if bySite["site-a"].DefaultAction != "deny" {
+		t.Fatalf("expected allowlist-backed site to default deny, got %+v", bySite["site-a"])
+	}
+	if bySite["site-b"].DefaultAction != "allow" {
+		t.Fatalf("expected site without allowlist to default allow, got %+v", bySite["site-b"])
 	}
 }
 

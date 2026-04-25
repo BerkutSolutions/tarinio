@@ -1,6 +1,6 @@
 # Migration And Compatibility Contract
 
-This document defines the `3.0.2` compatibility contract for logging, secret handling, and standalone-to-enterprise cutover.
+This document defines the `current release` compatibility contract for logging, secret handling, and standalone-to-enterprise cutover.
 
 ## Backward Compatibility
 
@@ -25,12 +25,12 @@ For request data, the migration order is:
 
 This applies to:
 
-- `2.0.5 -> 3.0.2` standalone upgrades where request history lived in local `*.jsonl` archives;
+- `legacy release -> current release` standalone upgrades where request history lived in local `*.jsonl` archives;
 - enterprise setups that still need to move validated data from hot to cold tiers.
 
 ## Backend Cutover Rules
 
-The effective request-routing model in `3.0.2` is:
+The effective request-routing model in `current release` is:
 
 1. `OpenSearch` is the primary request backend when enabled;
 2. `ClickHouse` is the optional cold tier for enterprise history;
@@ -56,7 +56,7 @@ The invariant is:
 
 ### Default
 
-The normal `3.0.2` default profile is:
+The normal `current release` default profile is:
 
 - `PostgreSQL`
 - `OpenSearch`

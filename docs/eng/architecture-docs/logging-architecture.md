@@ -1,6 +1,6 @@
 # Logging Architecture
 
-This document describes the real request-log behavior in TARINIO `3.0.2`.
+This document describes the real request-log behavior in TARINIO `current release`.
 
 ## Overview
 
@@ -51,7 +51,7 @@ When a node upgrades from an older build that already has local request archives
 4. removes only the verified legacy file;
 5. records the migration state to avoid unsafe partial cleanup.
 
-This keeps the `2.0.5 -> 3.0.2` transition safe:
+This keeps the `legacy release -> current release` transition safe:
 
 - old request history is not dropped before verification;
 - standalone installs move toward `OpenSearch` as the primary store;
@@ -91,7 +91,7 @@ In this mode:
 
 ## What Operators Should Expect
 
-Healthy `3.0.2` behavior looks like this:
+Healthy `current release` behavior looks like this:
 
 1. fresh requests appear in `Requests` through the API without direct file reads;
 2. `OpenSearch` receives recent traffic;

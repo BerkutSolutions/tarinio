@@ -124,6 +124,35 @@ if ($waf_auth_gate_redirect = 1) { return 302 {{ .AuthGateLoginURI }}?return_uri
 modsecurity_rules_file /etc/waf/modsecurity/easy/{{ .SiteID }}.conf;
 {{- end }}
 
+{{- range .BlacklistIP }}
+deny {{ . }};
+{{- end }}
+
+{{- range .BlacklistUserAgent }}
+set $waf_blacklist_ua_guard "$waf_easy_exception_guard:$http_user_agent";
+if ($waf_blacklist_ua_guard ~* "^0:.*{{ . }}") { return 403; }
+{{- end }}
+
+{{- range .BlacklistURI }}
+set $waf_blacklist_uri_guard "$waf_easy_exception_guard:$request_uri";
+if ($waf_blacklist_uri_guard ~* "^0:.*{{ . }}") { return 403; }
+{{- end }}
+
+{{- if .WhitelistCountryGuardPattern }}
+set $waf_country_guard "$waf_easy_exception_guard:$waf_country_code";
+if ($waf_country_guard !~ "{{ .WhitelistCountryGuardPattern }}") { return 403; }
+{{- end }}
+
+{{- if .BlacklistCountryGuardPattern }}
+set $waf_country_guard "$waf_easy_exception_guard:$waf_country_code";
+if ($waf_country_guard ~ "{{ .BlacklistCountryGuardPattern }}") { return 403; }
+{{- end }}
+
+{{- if and .AntibotEnabled .AntibotScannerAutoBan }}
+set $waf_antibot_scanner_guard "$waf_easy_exception_guard:$request_uri:$http_user_agent";
+if ($waf_antibot_scanner_guard ~* "^0:.*(?:{{ .AntibotScannerPattern }})") { return 403; }
+{{- end }}
+
 {{- if .AntibotEnabled }}
 # Easy antibot guard: requests are challenged unless a site-scoped challenge cookie is present.
 set $waf_antibot_exception_guard 0;
@@ -169,30 +198,6 @@ add_header X-WAF-Antibot-Provider "hcaptcha" always;
 {{- if .AntibotTurnstileHint }}
 add_header X-WAF-Antibot-Provider "turnstile" always;
 {{- end }}
-{{- end }}
-
-{{- range .BlacklistIP }}
-deny {{ . }};
-{{- end }}
-
-{{- range .BlacklistUserAgent }}
-set $waf_blacklist_ua_guard "$waf_easy_exception_guard:$http_user_agent";
-if ($waf_blacklist_ua_guard ~* "^0:.*{{ . }}") { return 403; }
-{{- end }}
-
-{{- range .BlacklistURI }}
-set $waf_blacklist_uri_guard "$waf_easy_exception_guard:$request_uri";
-if ($waf_blacklist_uri_guard ~* "^0:.*{{ . }}") { return 403; }
-{{- end }}
-
-{{- if .WhitelistCountryGuardPattern }}
-set $waf_country_guard "$waf_easy_exception_guard:$waf_country_code";
-if ($waf_country_guard !~ "{{ .WhitelistCountryGuardPattern }}") { return 403; }
-{{- end }}
-
-{{- if .BlacklistCountryGuardPattern }}
-set $waf_country_guard "$waf_easy_exception_guard:$waf_country_code";
-if ($waf_country_guard ~ "{{ .BlacklistCountryGuardPattern }}") { return 403; }
 {{- end }}
 
 {{- if not .UseModSecurity }}

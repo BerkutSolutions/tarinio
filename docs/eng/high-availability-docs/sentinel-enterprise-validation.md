@@ -2,7 +2,7 @@
 
 Last full smoke run: 2026-04-24 17:31:33 +03:00
 
-This page records the reproducible enterprise validation pack for `tarinio-sentinel` in TARINIO `3.0.2`.
+This page records the reproducible enterprise validation pack for `tarinio-sentinel` in TARINIO `current release`.
 
 ## What Is Validated
 

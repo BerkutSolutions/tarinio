@@ -1221,6 +1221,7 @@ function defaultSiteDraft() {
     custom_limit_rules: [],
     antibot_challenge: "no",
     antibot_uri: "/challenge",
+    antibot_scanner_auto_ban_enabled: true,
     antibot_recaptcha_score: 0.7,
     antibot_recaptcha_sitekey: "",
     antibot_recaptcha_secret: "",
@@ -1358,6 +1359,7 @@ function applyEasyProfileToDraft(draft, profile) {
     custom_limit_rules: normalizeCustomLimitRules(security.custom_limit_rules),
     antibot_challenge: antibot.antibot_challenge || draft.antibot_challenge,
     antibot_uri: antibot.antibot_uri || draft.antibot_uri,
+    antibot_scanner_auto_ban_enabled: Boolean(antibot.scanner_auto_ban_enabled ?? draft.antibot_scanner_auto_ban_enabled),
     antibot_recaptcha_score: Number(antibot.antibot_recaptcha_score ?? draft.antibot_recaptcha_score),
     antibot_recaptcha_sitekey: antibot.antibot_recaptcha_sitekey || draft.antibot_recaptcha_sitekey,
     antibot_recaptcha_secret: antibot.antibot_recaptcha_secret || draft.antibot_recaptcha_secret,
@@ -1525,6 +1527,7 @@ function draftToEasyProfile(draft) {
     security_antibot: {
       antibot_challenge: draft.antibot_challenge,
       antibot_uri: draft.antibot_uri,
+      scanner_auto_ban_enabled: Boolean(draft.antibot_scanner_auto_ban_enabled),
       antibot_recaptcha_score: draft.antibot_recaptcha_score,
       antibot_recaptcha_sitekey: draft.antibot_recaptcha_sitekey,
       antibot_recaptcha_secret: draft.antibot_recaptcha_secret,
@@ -2620,6 +2623,10 @@ function renderDetailView(state, ctx) {
                           <label for="service-antibot-uri">${escapeHtml(ctx.t("sites.easy.antibot.url"))}</label>
                           <input id="service-antibot-uri" value="${escapeHtml(draft.antibot_uri)}">
                         </div>
+                        <label class="waf-checkbox waf-field full">
+                          <input id="service-antibot-scanner-auto-ban-enabled" type="checkbox"${draft.antibot_scanner_auto_ban_enabled ? " checked" : ""}>
+                          <span>${escapeHtml(ctx.t("sites.easy.antibot.scannerAutoBanEnabled"))}</span>
+                        </label>
                         <div class="waf-field">
                           <label for="service-antibot-recaptcha-score">${escapeHtml(ctx.t("sites.easy.antibot.recaptchaScore"))}</label>
                           <input id="service-antibot-recaptcha-score" type="number" step="0.1" min="0" max="1" value="${escapeHtml(String(draft.antibot_recaptcha_score))}">
@@ -2754,11 +2761,8 @@ async function upsertAccessPolicy(draft, ctx, existingAccessPolicy) {
     return;
   }
   const allowlistSources = [];
-  if (draft.use_allowlist) {
+  if (draft.use_allowlist || normalizeStringArray(draft.access_allowlist).length) {
     allowlistSources.push(...normalizeStringArray(draft.access_allowlist));
-  }
-  if (draft.use_exceptions) {
-    allowlistSources.push(...normalizeStringArray(draft.exceptions_ip));
   }
   const allowlist = Array.from(new Set(allowlistSources));
   const denylist = normalizeStringArray(draft.access_denylist);
@@ -3957,6 +3961,7 @@ export async function renderSites(container, ctx) {
         }),
       antibot_challenge: container.querySelector("#service-antibot-challenge").value,
       antibot_uri: container.querySelector("#service-antibot-uri").value.trim(),
+      antibot_scanner_auto_ban_enabled: container.querySelector("#service-antibot-scanner-auto-ban-enabled")?.checked ?? true,
       antibot_recaptcha_score: Number(container.querySelector("#service-antibot-recaptcha-score").value || "0.7"),
       antibot_recaptcha_sitekey: container.querySelector("#service-antibot-recaptcha-sitekey").value.trim(),
       antibot_recaptcha_secret: container.querySelector("#service-antibot-recaptcha-secret").value.trim(),

@@ -21,9 +21,9 @@ In practical terms, the product consists of four main layers:
 - Rollout and rollback are normal lifecycle operations, not emergency exceptions.
 - Permissions are checked server-side on every endpoint.
 
-## Key Domains In 3.0.2
+## Key Domains In current release
 
-The main architectural domains in version `3.0.2` are:
+The main architectural domains in version `current release` are:
 
 - sites and upstreams;
 - TLS and certificate materials;
@@ -48,7 +48,7 @@ This is why the `Revisions` section is a central product capability rather than 
 
 ## Why Revisions Matter
 
-In `3.0.2`, the revision subsystem includes:
+In `current release`, the revision subsystem includes:
 
 - an aggregated revision catalog by service;
 - active, pending, and failed classification;
@@ -78,7 +78,7 @@ Control-plane is responsible for:
 
 ## The UI As An Architectural Layer
 
-In `3.0.2`, the UI is not a thin shell over a few backend objects. It reflects multiple operational layers:
+In `current release`, the UI is not a thin shell over a few backend objects. It reflects multiple operational layers:
 
 - operational overview through `Dashboard`;
 - configuration through `Sites`, `TLS`, `Anti-DDoS`, and `OWASP CRS`;
@@ -97,5 +97,5 @@ The mandatory architecture foundation remains in:
 - `docs/architecture/mvp-deployment-topology.md`
 - `docs/architecture/mvp-ui-information-architecture.md`
 
-Those documents define the foundation, while this wiki maps that foundation to the real product surface in `3.0.2`.
+Those documents define the foundation, while this wiki maps that foundation to the real product surface in `current release`.
 

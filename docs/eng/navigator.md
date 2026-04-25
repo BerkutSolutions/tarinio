@@ -57,8 +57,8 @@ Read in this order:
 Read in this order:
 
 1. [Observability](core-docs/observability.md)
-2. [Benchmarks](core-docs/benchmarks.md)
-3. [Stage 1 E2E Validation](high-availability-docs/stage-1-e2e-validation.md)
+2. [Stage 1 E2E Validation](high-availability-docs/stage-1-e2e-validation.md)
+3. [Runbook](core-docs/runbook.md)
 
 ## Language Branches
 

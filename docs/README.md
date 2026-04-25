@@ -1,8 +1,8 @@
 # Documentation
 
-Version baseline: `3.0.2`
+Version baseline: `current release`
 
-This directory is the release-synced documentation set for TARINIO `3.0.2`.
+This directory is the release-synced documentation set for TARINIO `current release`.
 The Russian and English branches are intended to mirror the same product map and complement each other as one bilingual wiki: UI sections, workflows, API catalog, deployment, security, backups, upgrades, and operator runbooks.
 
 ## Main Entry Points
@@ -41,11 +41,6 @@ The Russian and English branches are intended to mirror the same product map and
 - Upgrade: `docs/eng/core-docs/upgrade.md`
 - Backups: `docs/eng/core-docs/backups.md`
 - Operator guides: `docs/eng/operators/`
-- Security benchmark pack: `docs/eng/security-benchmark-pack/README.md`
-
-## Russian Documentation Additions
-
-- Security benchmark pack: `docs/ru/security-benchmark-pack/README.md`
 
 ## OSS Policy Documents
 

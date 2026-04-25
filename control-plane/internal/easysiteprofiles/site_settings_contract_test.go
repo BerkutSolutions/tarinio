@@ -41,6 +41,7 @@ func TestSiteSettings_FieldContract(t *testing.T) {
 		"security_antibot.antibot_recaptcha_score",
 		"security_antibot.antibot_recaptcha_secret",
 		"security_antibot.antibot_recaptcha_sitekey",
+		"security_antibot.scanner_auto_ban_enabled",
 		"security_antibot.antibot_turnstile_secret",
 		"security_antibot.antibot_turnstile_sitekey",
 		"security_antibot.antibot_uri",
@@ -277,6 +278,7 @@ func allFieldsProfile(siteID string) EasySiteProfile {
 
 	profile.SecurityAntibot.AntibotChallenge = AntibotChallengeRecaptcha
 	profile.SecurityAntibot.AntibotURI = "/challenge"
+	profile.SecurityAntibot.ScannerAutoBanEnabled = true
 	profile.SecurityAntibot.AntibotRecaptchaScore = 0.8
 	profile.SecurityAntibot.AntibotRecaptchaSitekey = "recaptcha-site"
 	profile.SecurityAntibot.AntibotRecaptchaSecret = "recaptcha-secret"

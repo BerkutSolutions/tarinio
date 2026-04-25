@@ -2,7 +2,7 @@
 
 Last full profile run: 2026-04-24.
 
-This document captures the dedicated enterprise validation slice for anti-bot challenge behavior in TARINIO `3.0.2`.
+This document captures the dedicated enterprise validation slice for anti-bot challenge behavior in TARINIO `current release`.
 
 ## Validation Goal
 
@@ -45,5 +45,5 @@ The anti-bot layer passes enterprise-style validation for human/bot separation:
 - bot traffic without cookie persistence does not get a stable bypass;
 - challenge contract and cookie persistence remain predictable.
 
-This supports production-like use of anti-bot controls as part of TARINIO `3.0.2`.
+This supports production-like use of anti-bot controls as part of TARINIO `current release`.
 

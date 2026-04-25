@@ -2,7 +2,7 @@
 
 Последний полный smoke-прогон: `24.04.2026 17:31:33 +03:00`.
 
-Документ фиксирует воспроизводимый enterprise validation pack для `tarinio-sentinel` в TARINIO `3.0.2`.
+Документ фиксирует воспроизводимый enterprise validation pack для `tarinio-sentinel` в TARINIO `??????? ?????`.
 
 ## Что проверяется
 

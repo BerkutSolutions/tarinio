@@ -88,7 +88,7 @@ The deployment should be considered complete only when:
 
 - `/healthz` is stable;
 - login and onboarding work;
-- `GET /core-docs/api/app/meta` returns `3.0.2`;
+- `GET /core-docs/api/app/meta` returns `current release`;
 - a site can be created and turned into a working revision;
 - runtime serves the expected host after apply;
 - events, requests, and audit entries appear in the UI.

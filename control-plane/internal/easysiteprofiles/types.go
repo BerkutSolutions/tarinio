@@ -124,6 +124,7 @@ type SecurityBehaviorAndLimitsSettings struct {
 type SecurityAntibotSettings struct {
 	AntibotChallenge           string                 `json:"antibot_challenge"`
 	AntibotURI                 string                 `json:"antibot_uri"`
+	ScannerAutoBanEnabled      bool                   `json:"scanner_auto_ban_enabled"`
 	AntibotRecaptchaScore      float64                `json:"antibot_recaptcha_score"`
 	AntibotRecaptchaSitekey    string                 `json:"antibot_recaptcha_sitekey"`
 	AntibotRecaptchaSecret     string                 `json:"antibot_recaptcha_secret"`
@@ -142,11 +143,11 @@ type AntibotChallengeRule struct {
 }
 
 type SecurityAuthBasicSettings struct {
-	UseAuthBasic      bool   `json:"use_auth_basic"`
-	AuthBasicLocation string `json:"auth_basic_location"`
-	AuthBasicUser     string `json:"auth_basic_user"`
-	AuthBasicPassword string `json:"auth_basic_password"`
-	AuthBasicText     string `json:"auth_basic_text"`
+	UseAuthBasic      bool               `json:"use_auth_basic"`
+	AuthBasicLocation string             `json:"auth_basic_location"`
+	AuthBasicUser     string             `json:"auth_basic_user"`
+	AuthBasicPassword string             `json:"auth_basic_password"`
+	AuthBasicText     string             `json:"auth_basic_text"`
 	Users             []SecurityAuthUser `json:"users"`
 	// SessionInactivityMinutes controls auth session expiration for service-auth cookies.
 	// -1 means unlimited.
@@ -342,6 +343,7 @@ func DefaultProfile(siteID string) EasySiteProfile {
 		SecurityAntibot: SecurityAntibotSettings{
 			AntibotChallenge:           AntibotChallengeNo,
 			AntibotURI:                 "/challenge",
+			ScannerAutoBanEnabled:      true,
 			AntibotRecaptchaScore:      0.7,
 			AntibotRecaptchaSitekey:    "",
 			AntibotRecaptchaSecret:     "",

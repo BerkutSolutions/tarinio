@@ -156,6 +156,7 @@ type EasyProfileInput struct {
 
 	AntibotChallenge           string
 	AntibotURI                 string
+	AntibotScannerAutoBan      bool
 	AntibotRecaptchaScore      float64
 	AntibotRecaptchaKey        string
 	AntibotHcaptchaKey         string

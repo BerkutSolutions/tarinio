@@ -71,13 +71,12 @@ The main multipliers are:
 - event and request log retention;
 - CRS usage and policy complexity;
 - observability retention;
-- High Availability and benchmark workloads.
+- High Availability and load-test workloads.
 
 ## Practical Recommendation
 
 Start with conservative headroom, then validate with:
 
-- [Benchmarks](core-docs/benchmarks.md)
 - [Observability](core-docs/observability.md)
 - your own preproduction traffic profile.
 

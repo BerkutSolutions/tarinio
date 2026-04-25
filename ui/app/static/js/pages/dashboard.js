@@ -157,11 +157,60 @@ function getContainerStatusTone(item) {
   return "warning";
 }
 
-function formatContainerStatusLabel(value) {
-  return String(value || "")
+function localizeContainerDuration(raw, ctx) {
+  let text = String(raw || "").trim();
+  if (!text) {
+    return "";
+  }
+  text = text
+    .replace(/\babout an hour\b/ig, `~1${ctx.t("dashboard.containers.time.hourShort")}`)
+    .replace(/\bless than a second\b/ig, `<1${ctx.t("dashboard.containers.time.secondShort")}`)
+    .replace(/\b(\d+)\s+seconds?\b/ig, (_m, n) => `${n}${ctx.t("dashboard.containers.time.secondShort")}`)
+    .replace(/\b(\d+)\s+minutes?\b/ig, (_m, n) => `${n}${ctx.t("dashboard.containers.time.minuteShort")}`)
+    .replace(/\b(\d+)\s+hours?\b/ig, (_m, n) => `${n}${ctx.t("dashboard.containers.time.hourShort")}`)
+    .replace(/\b(\d+)\s+days?\b/ig, (_m, n) => `${n}${ctx.t("dashboard.containers.time.dayShort")}`)
+    .replace(/\b(\d+)\s+weeks?\b/ig, (_m, n) => `${n}${ctx.t("dashboard.containers.time.weekShort")}`)
+    .replace(/\b(\d+)\s+months?\b/ig, (_m, n) => `${n}${ctx.t("dashboard.containers.time.monthShort")}`)
+    .replace(/\b(\d+)\s+years?\b/ig, (_m, n) => `${n}${ctx.t("dashboard.containers.time.yearShort")}`)
+    .replace(/\s+ago\b/ig, ` ${ctx.t("dashboard.containers.status.ago")}`)
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  return text;
+}
+
+function formatContainerStatusLabel(value, ctx) {
+  const cleaned = String(value || "")
     .replace(/\s*\((healthy|unhealthy|health:\s*starting)\)\s*/ig, " ")
     .replace(/\s{2,}/g, " ")
     .trim();
+  if (!cleaned) {
+    return "-";
+  }
+  const normalized = cleaned.toLowerCase();
+  if (normalized === "created") {
+    return ctx.t("dashboard.containers.status.created");
+  }
+  if (normalized === "paused") {
+    return ctx.t("dashboard.containers.status.paused");
+  }
+  if (normalized === "dead") {
+    return ctx.t("dashboard.containers.status.dead");
+  }
+  if (normalized === "removal in progress") {
+    return ctx.t("dashboard.containers.status.removalInProgress");
+  }
+  if (normalized.startsWith("up ")) {
+    return `${ctx.t("dashboard.containers.status.up")} ${localizeContainerDuration(cleaned.slice(3), ctx)}`.trim();
+  }
+  let match = cleaned.match(/^exited\s+\(([^)]+)\)\s*(.+)$/i);
+  if (match) {
+    return `${ctx.t("dashboard.containers.status.exited")} (${match[1]}) ${localizeContainerDuration(match[2], ctx)}`.trim();
+  }
+  match = cleaned.match(/^restarting\s+\(([^)]+)\)\s*(.+)$/i);
+  if (match) {
+    return `${ctx.t("dashboard.containers.status.restarting")} (${match[1]}) ${localizeContainerDuration(match[2], ctx)}`.trim();
+  }
+  return localizeContainerDuration(cleaned, ctx);
 }
 
 function formatUptimeLocalized(seconds, ctx) {
@@ -591,7 +640,7 @@ function renderContainersHealthWidget(overview, ctx) {
             <button type="button" class="dashboard-list-row clickable container-status-${escapeHtml(getContainerStatusTone(item))}" data-widget-action="container-logs" data-container-name="${escapeHtml(String(item?.name || ""))}">
               <div class="dashboard-list-label">
                 <strong>${escapeHtml(String(item?.name || "-"))}</strong>
-                <div class="muted">${escapeHtml(formatContainerStatusLabel(item?.status || "-"))}</div>
+                <div class="muted">${escapeHtml(formatContainerStatusLabel(item?.status || "-", ctx))}</div>
               </div>
               <div class="dashboard-list-meta">
                 <span class="badge badge-neutral">CPU ${escapeHtml(formatPercent(item?.cpu_percent || 0))}</span>
@@ -1549,7 +1598,7 @@ function buildWidgetDetail(action, payload, stats, detailModel, containersOvervi
       ], ctx) + renderDetailTable(rows, ctx, ctx.t("dashboard.containers.container"), ctx.t("dashboard.containers.cpu"), {
         labelFormatter: (item) => `
           <div><strong>${escapeHtml(String(item?.name || "-"))}</strong></div>
-          <div class="muted">${escapeHtml(formatContainerStatusLabel(item?.status || "-"))}</div>
+          <div class="muted">${escapeHtml(formatContainerStatusLabel(item?.status || "-", ctx))}</div>
           <div class="muted">MEM ${escapeHtml(formatPercent(item?.memory_percent || 0))} | NET ${escapeHtml(String(item?.network_in_text || "0 B"))} / ${escapeHtml(String(item?.network_out_text || "0 B"))}</div>
         `,
         rowAttrs: (item) => {

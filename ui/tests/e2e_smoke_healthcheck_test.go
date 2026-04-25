@@ -90,9 +90,21 @@ func TestE2ESmoke_LoginHealthcheckDashboard(t *testing.T) {
 	if loginResp.StatusCode != http.StatusOK {
 		t.Fatalf("login failed: status=%d body=%s", loginResp.StatusCode, mustReadBody(t, loginResp.Body))
 	}
+	loginBodyBytes, err := io.ReadAll(loginResp.Body)
+	if err != nil {
+		t.Fatalf("read login response: %v", err)
+	}
+	loginContentType := strings.ToLower(strings.TrimSpace(loginResp.Header.Get("Content-Type")))
+	if !strings.Contains(loginContentType, "application/json") {
+		bodyPreview := strings.TrimSpace(string(loginBodyBytes))
+		if len(bodyPreview) > 300 {
+			bodyPreview = bodyPreview[:300]
+		}
+		t.Fatalf("login response is not json: content-type=%q final_url=%q body_preview=%q", loginContentType, loginResp.Request.URL.String(), bodyPreview)
+	}
 	var loginData map[string]any
-	if err := json.NewDecoder(loginResp.Body).Decode(&loginData); err != nil {
-		t.Fatalf("decode login response: %v", err)
+	if err := json.Unmarshal(loginBodyBytes, &loginData); err != nil {
+		t.Fatalf("decode login response: %v body=%q", err, strings.TrimSpace(string(loginBodyBytes)))
 	}
 	if requires2FA, _ := loginData["requires_2fa"].(bool); requires2FA {
 		t.Fatalf("smoke flow requires direct login without 2fa; got requires_2fa=true")

@@ -2,7 +2,7 @@
 
 This page belongs to the current documentation branch.
 
-This is the main English index for TARINIO documentation. It is structured as an operator wiki for the real `3.0.2` product and is meant to complement the Russian branch, not lag behind it.
+This is the main English index for TARINIO documentation. It is structured as an operator wiki for the real `current release` product and is meant to complement the Russian branch, not lag behind it.
 
 ## Start Here
 
@@ -29,7 +29,6 @@ This is the main English index for TARINIO documentation. It is structured as an
 
 - Anti-DDoS runbook: `docs/eng/model-docs/anti-ddos-runbook.md`
 - Anti-DDoS model: `docs/eng/model-docs/anti-ddos-model.md`
-- Security Benchmark Pack: `docs/eng/security-benchmark-pack/README.md`
 - High Availability architecture and operations: `docs/eng/high-availability-docs/high-availability.md`
 - Runtime L4 guard: `docs/eng/model-docs/runtime-l4-guard.md`
 - Runtime filesystem contract: `docs/eng/model-docs/runtime-filesystem-contract.md`
@@ -38,7 +37,7 @@ This is the main English index for TARINIO documentation. It is structured as an
 - OWASP CRS operations: `docs/eng/operators/owasp-crs.md`
 - Let's Encrypt DNS-01 operations: `docs/eng/operators/letsencrypt-dns.md`
 
-## What Matters In 3.0.2
+## What Matters In current release
 
 - Documentation is aligned with the application version from `control-plane/internal/appmeta/meta.go`.
 - The wiki covers the real UI sections: `Dashboard`, `Sites`, `Anti-DDoS`, `OWASP CRS`, `TLS`, `Requests`, `Revisions`, `Events`, `Bans`, `Administration`, `Activity`, `Settings`, and `Profile`.

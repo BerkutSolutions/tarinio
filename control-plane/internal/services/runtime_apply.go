@@ -726,12 +726,8 @@ func mapAccessInputs(items []accesspolicies.AccessPolicy) []pipeline.AccessPolic
 	out := make([]pipeline.AccessPolicyInput, 0, len(sorted))
 	for _, item := range sorted {
 		defaultAction := "allow"
-		if strings.EqualFold(strings.TrimSpace(item.SiteID), "control-plane-access") ||
-			strings.EqualFold(strings.TrimSpace(item.SiteID), "control-plane") ||
-			strings.EqualFold(strings.TrimSpace(item.SiteID), "ui") {
-			if len(item.AllowList) > 0 {
-				defaultAction = "deny"
-			}
+		if len(item.AllowList) > 0 {
+			defaultAction = "deny"
 		}
 		out = append(out, pipeline.AccessPolicyInput{
 			ID:            item.ID,
@@ -833,6 +829,7 @@ func mapEasyInputs(items []easysiteprofiles.EasySiteProfile) []pipeline.EasyProf
 
 			AntibotChallenge:           item.SecurityAntibot.AntibotChallenge,
 			AntibotURI:                 item.SecurityAntibot.AntibotURI,
+			AntibotScannerAutoBan:      item.SecurityAntibot.ScannerAutoBanEnabled,
 			AntibotRecaptchaScore:      item.SecurityAntibot.AntibotRecaptchaScore,
 			AntibotRecaptchaKey:        item.SecurityAntibot.AntibotRecaptchaSitekey,
 			AntibotHcaptchaKey:         item.SecurityAntibot.AntibotHcaptchaSitekey,

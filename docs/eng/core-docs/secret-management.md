@@ -1,6 +1,6 @@
 # Secret Management
 
-This document explains how TARINIO `3.0.2` handles secrets, what `Vault` is responsible for, which data is allowed to stay local, and what operators should verify after a fresh install or upgrade.
+This document explains how TARINIO `current release` handles secrets, what `Vault` is responsible for, which data is allowed to stay local, and what operators should verify after a fresh install or upgrade.
 
 ## Why This Matters
 
@@ -9,7 +9,7 @@ For production and enterprise deployments, two questions always matter:
 - where secrets physically live;
 - whether unsafe legacy copies remain after a migration.
 
-In `3.0.2`, the product should no longer look like a stack where backend passwords simply live in `.env` and spread across containers without a controlled secret flow.
+In `current release`, the product should no longer look like a stack where backend passwords simply live in `.env` and spread across containers without a controlled secret flow.
 
 ## Secret Classes
 
@@ -52,7 +52,7 @@ This is safer than plain local storage, but it is the fallback mode rather than 
 
 ### `vault`
 
-This is the default and preferred `3.0.2` mode:
+This is the default and preferred `current release` mode:
 
 - backend integration secrets are written to `HashiCorp Vault`;
 - runtime resolves them at read time;
@@ -123,7 +123,7 @@ The following should be treated as unsafe:
 - leaving old local copies after a successful Vault migration;
 - maintaining multiple conflicting sources of truth for the same credential.
 
-## What Counts As Normal In `3.0.2`
+## What Counts As Normal In `current release`
 
 The intended release posture is:
 
@@ -166,5 +166,5 @@ The simple rule for operators is:
 - the product must not expose plaintext secrets;
 - migration must follow `write -> validate -> clean local copy`.
 
-If those conditions hold, the secret-management model in `3.0.2` is current, predictable, and safe enough for real operation.
+If those conditions hold, the secret-management model in `current release` is current, predictable, and safe enough for real operation.
 

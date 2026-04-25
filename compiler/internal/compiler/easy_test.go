@@ -290,3 +290,60 @@ func TestRenderEasyArtifacts_BlacklistURIWildcardPattern(t *testing.T) {
 		t.Fatalf("expected wildcard blacklist uri to be rendered as safe regex, got: %s", siteConf)
 	}
 }
+
+func TestRenderEasyArtifacts_PrioritizesHardBlocksBeforeAntibotAndSupportsScannerAutoban(t *testing.T) {
+	artifacts, err := RenderEasyArtifacts(
+		[]SiteInput{{
+			ID:          "site-a",
+			Enabled:     true,
+			PrimaryHost: "a.example.com",
+			ListenHTTP:  true,
+		}},
+		[]EasyProfileInput{{
+			SiteID:                   "site-a",
+			SecurityMode:             "block",
+			AllowedMethods:           []string{"GET"},
+			MaxClientSize:            "50m",
+			UseLimitConn:             true,
+			LimitConnMaxHTTP1:        100,
+			UseLimitReq:              true,
+			LimitReqRate:             "10r/s",
+			AntibotChallenge:         "javascript",
+			AntibotURI:               "/challenge",
+			AntibotScannerAutoBan:    true,
+			BlacklistCountry:         []string{"RU"},
+			WhitelistCountry:         []string{"US"},
+			BlacklistURI:             []string{"/admin"},
+			BlacklistUserAgent:       []string{"sqlmap"},
+			UseModSecurity:           true,
+			UseModSecurityCRSPlugins: true,
+		}},
+	)
+	if err != nil {
+		t.Fatalf("render easy artifacts: %v", err)
+	}
+	var siteConf string
+	for _, item := range artifacts {
+		if item.Path == "nginx/easy/site-a.conf" {
+			siteConf = string(item.Content)
+			break
+		}
+	}
+	if siteConf == "" {
+		t.Fatal("expected easy site conf artifact")
+	}
+	countryPos := strings.Index(siteConf, "if ($waf_country_guard !~")
+	antibotPos := strings.Index(siteConf, "set $waf_antibot_exception_guard 0;")
+	if countryPos == -1 || antibotPos == -1 {
+		t.Fatalf("expected both country and antibot guards, got: %s", siteConf)
+	}
+	if countryPos > antibotPos {
+		t.Fatalf("expected country guard before antibot guard, got: %s", siteConf)
+	}
+	if !strings.Contains(siteConf, "set $waf_antibot_scanner_guard \"$waf_easy_exception_guard:$request_uri:$http_user_agent\";") {
+		t.Fatalf("expected scanner guard variable in easy template, got: %s", siteConf)
+	}
+	if !strings.Contains(siteConf, "if ($waf_antibot_scanner_guard ~* \"^0:.*(?:") {
+		t.Fatalf("expected scanner autoban regex guard in easy template, got: %s", siteConf)
+	}
+}

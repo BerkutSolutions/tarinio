@@ -79,6 +79,8 @@ docker compose --profile tools exec toolbox /tools/mini-ddos.sh
 - a stricter rate-limit policy on `tenant-01`
 - tuned anti-DDoS settings for repeated local tests
 
+For enterprise smoke validation, scenario strength can be increased independently from base profile limits using synthetic load scaling (for example, 3x for `ha-lab`).
+
 The provisioning flow persists anti-DDoS settings with:
 
 - `X-WAF-Auto-Apply-Disabled: true`
