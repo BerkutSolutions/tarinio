@@ -15,8 +15,8 @@ This gives resilience: DDoS adaptation is independent, not a single point of fai
 ## High-level flow
 
 1. Each model container reads runtime `access.log` from a dedicated log volume:
-   - `ddos-model-mgmt` -> management runtime (`https://localhost:8080`)
-   - `ddos-model-app` -> test runtime (`https://localhost:8081`)
+   - `tarinio-sentinel-mgmt` -> management runtime (`https://localhost:8080`)
+   - `tarinio-sentinel-app` -> test runtime (`https://localhost:8081`)
 2. For each source IP, model updates score:
    - weight added for blocking statuses (`429`, `403`, `444`)
    - exponential decay between events
@@ -141,9 +141,9 @@ Model math/behavior:
 ```powershell
 cd deploy/compose/testpage
 docker compose ps
-docker compose logs --tail=120 ddos-model-mgmt ddos-model-app runtime runtime-test
-docker compose exec ddos-model-mgmt sh -lc "cat /out/adaptive.json"
-docker compose exec ddos-model-app sh -lc "cat /out/adaptive.json"
+docker compose logs --tail=120 tarinio-sentinel-mgmt tarinio-sentinel-app runtime runtime-test
+docker compose exec tarinio-sentinel-mgmt sh -lc "cat /out/adaptive.json"
+docker compose exec tarinio-sentinel-app sh -lc "cat /out/adaptive.json"
 ```
 
 ## Failure behavior

@@ -1,62 +1,54 @@
 # Enterprise-проверка Sentinel
 
-Последний полный smoke-прогон: `24.04.2026 17:31:33 +03:00`.
+Дата последнего полного smoke-validation: 26.04.2026
 
-Документ фиксирует воспроизводимый enterprise validation pack для `tarinio-sentinel` в TARINIO `??????? ?????`.
+Документ фиксирует enterprise-пакет проверок `tarinio-sentinel` для TARINIO `3.0.5`.
 
 ## Что проверяется
 
-Проверка покрывает полный цикл Sentinel:
+Проверяются три режима Anti-DDoS:
 
-1. Прием runtime access-log событий.
-2. Multi-signal scoring и пересчет trust.
-3. Explainability-вывод (`reason_codes`, `top_signals`).
-4. Ограниченный publish (`max_published_entries`, publish interval).
-5. Генерация L7 suggestions по scanner-паттернам.
-6. Защита от ложных срабатываний на нормальном трафике.
+1. `classic-only`: только базовый L4 anti-DDoS, adaptive-модель отключена.
+2. `hybrid`: базовый anti-DDoS и adaptive-модель работают вместе.
+3. `adaptive-only`: основная эскалация идет через adaptive-модель при активном baseline L4-профиле.
 
-Профили проверки:
+Каждый режим валидируется в профилях:
 
 - `default`
-- `high-availability-lab`
+- `ha-lab`
 
 ## Итоговые результаты
 
-| Профиль | Passed | Events | Adaptive entries | Actions | L7 suggestions | Normal false positives |
-| --- | --- | ---: | ---: | --- | ---: | ---: |
-| default | true | 856 | 141 | drop: 141 | 4 | 0 |
-| high-availability-lab | true | 856 | 142 | drop: 142 | 4 | 0 |
+| Профиль | Режим | Passed | Events | Adaptive entries | Actions | L7 suggestions | Normal false positives | Baseline conn/rate/burst |
+| --- | --- | --- | ---: | ---: | --- | ---: | ---: | --- |
+| default | classic-only | True | 1116 | 0 | none | 0 | 0 | 120/180/360 |
+| default | hybrid | True | 1116 | 255 | drop: 255 | 4 | 0 | 120/180/360 |
+| default | adaptive-only | True | 1116 | 262 | drop: 262 | 4 | 0 | 50000/20000/40000 |
+| ha-lab | classic-only | True | 1116 | 0 | none | 0 | 0 | 120/240/480 |
+| ha-lab | hybrid | True | 1116 | 2 | drop: 2 | 4 | 0 | 120/240/480 |
+| ha-lab | adaptive-only | True | 1116 | 259 | drop: 259 | 4 | 0 | 120/240/480 |
 
-## Enterprise-матрица трафика
+## Матрица на 30 акторов
 
-| Сценарий | Паттерн трафика | Ожидаемый enterprise-сигнал |
-| --- | --- | --- |
-| Нормальный baseline | Benign dashboard/API трафик | Нет adaptive-блокировок для легитимного трафика |
-| Scanner discovery | `/.env`, `/wp-admin`, `/phpmyadmin`, `/vendor/phpunit` | Снижение trust и появление L7 suggestions |
-| Brute force | Повторные запросы на `/login` | Рост adaptive-risk для источника атаки |
-| XSS / SQLi / RCE probes | Script/UNION/shell payloads | Рост risk score с объяснимыми причинами |
-| Single-source flood | Burst с одного IP | Срабатывает emergency single-source путь |
-| Distributed flood | Burst с множества IP | Срабатывает emergency botnet-like путь |
-| High-cardinality noise | Большое число уникальных путей и источников | State остается bounded, publish остается capped |
+| Группа акторов | Кол-во | Значимость по режимам | Ожидаемый сигнал |
+| --- | ---: | --- | --- |
+| Нормальные пользователи (`web`, `mobile`, `trusted`) | 10 | все режимы | отсутствие adaptive false positive |
+| Scanner-источники | 8 | hybrid, adaptive-only | появление L7 suggestions и снижение trust |
+| Brute-force + payload источники | 6 | hybrid, adaptive-only | adaptive-эскалация с explainable-причинами |
+| Flood-источники (single + distributed) | 6+ synthetic botnet spread | все режимы | baseline-защита в classic, adaptive/emergency evidence в hybrid/adaptive-only |
 
-## Финальный вывод
+Для каждого profile/mode сохраняются:
 
-`tarinio-sentinel` прошел воспроизводимую enterprise-проверку для standalone и HA-ready профилей:
-
-- adaptive-детекция активна и объяснима;
-- нормальный трафик чистый (`0` normal false positives);
-- scanner-поведение выводится в L7 suggestions для дальнейшего применения.
-
-Итог enterprise-теста: продукт соответствует ожидаемому поведению для контролируемой security-автоматизации в production-like среде.
+- `result.json`
+- `adaptive.json`
+- `l7-suggestions.json`
+- `model-state.json`
+- `report.md`
 
 ## Как воспроизвести
 
 PowerShell:
 
-`./scripts/smoke-sentinel-enterprise.ps1`
-
-Запуск по отдельному профилю:
-
-`./scripts/smoke-sentinel.ps1 -ComposeFile deploy/compose/default/docker-compose.yml -ProfileName default -OutputDir .work/sentinel-smoke/manual/default`
-
-`./scripts/smoke-sentinel.ps1 -ComposeFile deploy/compose/ha-lab/docker-compose.yml -ProfileName ha-lab -OutputDir .work/sentinel-smoke/manual/ha-lab`
+- `./scripts/smoke-sentinel-enterprise.ps1` (default + ha-lab)
+- `./scripts/smoke-sentinel-enterprise.ps1 -SkipHaLab` (только default)
+- `./scripts/smoke-sentinel-enterprise.ps1 -SkipDefault` (только ha-lab)

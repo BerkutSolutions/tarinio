@@ -71,6 +71,7 @@ type App struct {
 	SiteStore                      *sites.Store
 	SiteService                    *services.SiteService
 	ManualBanService               *services.ManualBanService
+	SentinelBanSyncService         *services.SentinelBanSyncService
 	UpstreamStore                  *upstreams.Store
 	UpstreamService                *services.UpstreamService
 	CertificateStore               *certificates.Store
@@ -400,6 +401,18 @@ func New(cfg config.Config) (*App, error) {
 	revisionCompileService.SetGovernance(enterpriseService)
 	siteService := services.NewSiteService(siteStore, auditService)
 	manualBanService := services.NewManualBanService(accessPolicyStore, siteStore, auditService)
+	var sentinelBanSyncService *services.SentinelBanSyncService
+	if cfg.SentinelBanSync.Enabled {
+		sentinelBanSyncService = services.NewSentinelBanSyncService(
+			manualBanService,
+			cfg.SentinelBanSync.AdaptivePath,
+			cfg.SentinelBanSync.StatePath,
+			time.Duration(cfg.SentinelBanSync.PollIntervalSeconds)*time.Second,
+			cfg.SentinelBanSync.MinScore,
+			cfg.SentinelBanSync.MaxPromotionsPerTick,
+		)
+		sentinelBanSyncService.Start()
+	}
 	upstreamService := services.NewUpstreamService(upstreamStore, siteStore, auditService)
 	certificateService := services.NewCertificateService(certificateStore, auditService)
 	certificateUploadService := services.NewCertificateUploadService(certificateStore, certificateMaterialStore, auditService)
@@ -508,6 +521,7 @@ func New(cfg config.Config) (*App, error) {
 		SiteStore:                      siteStore,
 		SiteService:                    siteService,
 		ManualBanService:               manualBanService,
+		SentinelBanSyncService:         sentinelBanSyncService,
 		UpstreamStore:                  upstreamStore,
 		UpstreamService:                upstreamService,
 		CertificateStore:               certificateStore,

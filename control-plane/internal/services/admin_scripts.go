@@ -101,7 +101,7 @@ func NewAdminScriptService(revisionStoreDir string, scriptsRoot string) *AdminSc
 				{Name: "FILTER_URI", Label: "Request URI / Path", Type: "textarea", Placeholder: "/api/2/envelope\n/login", HelpText: "Optional URI/path filters. One per line or space-separated."},
 				{Name: "RUNTIME_CONTAINER", Label: "Runtime Container", LabelKey: "administration.scripts.field.runtimeContainer", Type: "text", DefaultValue: "tarinio-runtime", HelpText: "Docker container name for runtime logs.", HelpTextKey: "administration.scripts.field.runtimeContainerHelp"},
 				{Name: "CONTROL_PLANE_CONTAINER", Label: "Control-Plane Container", LabelKey: "administration.scripts.field.controlPlaneContainer", Type: "text", DefaultValue: "tarinio-control-plane", HelpText: "Docker container name for control-plane logs.", HelpTextKey: "administration.scripts.field.controlPlaneContainerHelp"},
-				{Name: "DDOS_MODEL_CONTAINER", Label: "DDoS Model Container", LabelKey: "administration.scripts.field.ddosModelContainer", Type: "text", DefaultValue: "tarinio-ddos-model"},
+				{Name: "DDOS_MODEL_CONTAINER", Label: "DDoS Model Container", LabelKey: "administration.scripts.field.ddosModelContainer", Type: "text", DefaultValue: "tarinio-sentinel"},
 				{Name: "UI_CONTAINER", Label: "UI Container", LabelKey: "administration.scripts.field.uiContainer", Type: "text", DefaultValue: "tarinio-ui"},
 			},
 		},

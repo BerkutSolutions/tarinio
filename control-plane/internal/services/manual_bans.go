@@ -44,6 +44,10 @@ func (s *ManualBanService) Ban(ctx context.Context, siteID string, address strin
 	if isAllServicesSelector(siteID) {
 		return s.banAllSites(ctx, address)
 	}
+	return s.banSite(ctx, siteID, address, true)
+}
+
+func (s *ManualBanService) banSite(ctx context.Context, siteID string, address string, autoApply bool) (accesspolicies.AccessPolicy, error) {
 	canonicalSiteID, err := s.resolveSiteID(siteID)
 	if err != nil {
 		return accesspolicies.AccessPolicy{}, err
@@ -65,8 +69,10 @@ func (s *ManualBanService) Ban(ctx context.Context, siteID string, address strin
 		if createErr != nil {
 			return accesspolicies.AccessPolicy{}, createErr
 		}
-		if applyErr := runAutoApply(ctx); applyErr != nil {
-			return accesspolicies.AccessPolicy{}, applyErr
+		if autoApply {
+			if applyErr := runAutoApply(ctx); applyErr != nil {
+				return accesspolicies.AccessPolicy{}, applyErr
+			}
 		}
 		return created, nil
 	}
@@ -80,8 +86,10 @@ func (s *ManualBanService) Ban(ctx context.Context, siteID string, address strin
 	if updateErr != nil {
 		return accesspolicies.AccessPolicy{}, updateErr
 	}
-	if applyErr := runAutoApply(ctx); applyErr != nil {
-		return accesspolicies.AccessPolicy{}, applyErr
+	if autoApply {
+		if applyErr := runAutoApply(ctx); applyErr != nil {
+			return accesspolicies.AccessPolicy{}, applyErr
+		}
 	}
 	return updated, nil
 }
@@ -103,6 +111,10 @@ func (s *ManualBanService) Unban(ctx context.Context, siteID string, address str
 	if isAllServicesSelector(siteID) {
 		return s.unbanAllSites(ctx, address)
 	}
+	return s.unbanSite(ctx, siteID, address, true)
+}
+
+func (s *ManualBanService) unbanSite(ctx context.Context, siteID string, address string, autoApply bool) (accesspolicies.AccessPolicy, error) {
 	canonicalSiteID, err := s.resolveSiteID(siteID)
 	if err != nil {
 		// Backward-compatible fallback: allow unban for stale policies whose site
@@ -145,8 +157,10 @@ func (s *ManualBanService) Unban(ctx context.Context, siteID string, address str
 	if updateErr != nil {
 		return accesspolicies.AccessPolicy{}, updateErr
 	}
-	if applyErr := runAutoApply(ctx); applyErr != nil {
-		return accesspolicies.AccessPolicy{}, applyErr
+	if autoApply {
+		if applyErr := runAutoApply(ctx); applyErr != nil {
+			return accesspolicies.AccessPolicy{}, applyErr
+		}
 	}
 	return updated, nil
 }
@@ -160,11 +174,15 @@ func (s *ManualBanService) banAllSites(ctx context.Context, address string) (acc
 		return accesspolicies.AccessPolicy{}, fmt.Errorf("no sites found")
 	}
 	var last accesspolicies.AccessPolicy
+	manualCtx := withAutoApplyDisabled(ctx)
 	for _, currentSiteID := range siteIDs {
-		last, err = s.Ban(ctx, currentSiteID, address)
+		last, err = s.banSite(manualCtx, currentSiteID, address, false)
 		if err != nil {
 			return accesspolicies.AccessPolicy{}, err
 		}
+	}
+	if err := runAutoApply(ctx); err != nil {
+		return accesspolicies.AccessPolicy{}, err
 	}
 	return accesspolicies.AccessPolicy{
 		ID:        allServicesSiteID + "-access",
@@ -186,11 +204,15 @@ func (s *ManualBanService) unbanAllSites(ctx context.Context, address string) (a
 		return accesspolicies.AccessPolicy{}, fmt.Errorf("no sites found")
 	}
 	var last accesspolicies.AccessPolicy
+	manualCtx := withAutoApplyDisabled(ctx)
 	for _, currentSiteID := range siteIDs {
-		last, err = s.Unban(ctx, currentSiteID, address)
+		last, err = s.unbanSite(manualCtx, currentSiteID, address, false)
 		if err != nil {
 			return accesspolicies.AccessPolicy{}, err
 		}
+	}
+	if err := runAutoApply(ctx); err != nil {
+		return accesspolicies.AccessPolicy{}, err
 	}
 	return accesspolicies.AccessPolicy{
 		ID:        allServicesSiteID + "-access",

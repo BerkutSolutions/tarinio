@@ -46,7 +46,7 @@ function Write-EnglishWiki {
 
 Last full smoke run: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss zzz")
 
-This document records a reproducible service-protection validation pack for TARINIO 3.0.4.
+This document records a reproducible service-protection validation pack for TARINIO 3.0.5.
 
 ## Scope
 
@@ -128,7 +128,7 @@ function Write-RussianWiki {
 
 Last full smoke run: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss zzz")
 
-This document records a reproducible service-protection validation pack for TARINIO 3.0.4.
+This document records a reproducible service-protection validation pack for TARINIO 3.0.5.
 
 ## Scope
 

@@ -25,6 +25,9 @@ func TestLoadFromEnv_Defaults(t *testing.T) {
 	if !cfg.StartupSelfTest {
 		t.Fatal("expected startup self-test to be enabled by default")
 	}
+	if cfg.SentinelBanSync.Enabled {
+		t.Fatal("expected sentinel ban sync to be disabled by default")
+	}
 }
 
 func TestLoadFromEnv_Overrides(t *testing.T) {
@@ -35,6 +38,12 @@ func TestLoadFromEnv_Overrides(t *testing.T) {
 	t.Setenv("CONTROL_PLANE_REDIS_DB", "2")
 	t.Setenv("CONTROL_PLANE_STARTUP_SELF_TEST_ENABLED", "false")
 	t.Setenv("CONTROL_PLANE_SECURITY_PEPPER", "test-pepper")
+	t.Setenv("CONTROL_PLANE_SENTINEL_BAN_SYNC_ENABLED", "true")
+	t.Setenv("CONTROL_PLANE_SENTINEL_BAN_SYNC_ADAPTIVE_PATH", "/tmp/adaptive.json")
+	t.Setenv("CONTROL_PLANE_SENTINEL_BAN_SYNC_STATE_PATH", "/tmp/sentinel-sync-state.json")
+	t.Setenv("CONTROL_PLANE_SENTINEL_BAN_SYNC_POLL_SECONDS", "7")
+	t.Setenv("CONTROL_PLANE_SENTINEL_BAN_SYNC_MIN_SCORE", "11.5")
+	t.Setenv("CONTROL_PLANE_SENTINEL_BAN_SYNC_MAX_PROMOTIONS_PER_TICK", "8")
 
 	cfg, err := LoadFromEnv()
 	if err != nil {
@@ -51,6 +60,18 @@ func TestLoadFromEnv_Overrides(t *testing.T) {
 	}
 	if cfg.StartupSelfTest {
 		t.Fatal("expected startup self-test to be disabled by env override")
+	}
+	if !cfg.SentinelBanSync.Enabled {
+		t.Fatal("expected sentinel ban sync to be enabled")
+	}
+	if cfg.SentinelBanSync.AdaptivePath != "/tmp/adaptive.json" {
+		t.Fatalf("unexpected sentinel adaptive path: %s", cfg.SentinelBanSync.AdaptivePath)
+	}
+	if cfg.SentinelBanSync.StatePath != "/tmp/sentinel-sync-state.json" {
+		t.Fatalf("unexpected sentinel state path: %s", cfg.SentinelBanSync.StatePath)
+	}
+	if cfg.SentinelBanSync.PollIntervalSeconds != 7 || cfg.SentinelBanSync.MinScore != 11.5 || cfg.SentinelBanSync.MaxPromotionsPerTick != 8 {
+		t.Fatalf("unexpected sentinel ban sync config: %+v", cfg.SentinelBanSync)
 	}
 }
 

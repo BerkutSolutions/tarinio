@@ -104,8 +104,8 @@ func (s *Store) SetStatus(id, status string) (Suggestion, error) {
 	if id == "" {
 		return Suggestion{}, errors.New("anti-ddos rule suggestion id is required")
 	}
-	if status != StatusSuggested && status != StatusShadow {
-		return Suggestion{}, errors.New("anti-ddos rule suggestion status must be suggested or shadow")
+	if status != StatusSuggested && status != StatusShadow && status != StatusTemporary && status != StatusPermanent {
+		return Suggestion{}, errors.New("anti-ddos rule suggestion status must be suggested, shadow, temporary, or permanent")
 	}
 
 	current, err := s.loadLocked()

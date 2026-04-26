@@ -1,6 +1,6 @@
 # Security Profiles
 
-TARINIO ??????? ????? включает 5 встроенных security-профилей сервиса:
+TARINIO `3.0.5` включает 5 встроенных security-профилей сервиса:
 
 1. `strict`
 2. `balanced`

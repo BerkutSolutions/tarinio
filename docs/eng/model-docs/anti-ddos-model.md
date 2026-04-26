@@ -82,7 +82,7 @@ This layer is static for the lifetime of the active revision. It does not learn 
 
 ## 5. Adaptive Model Data Sources
 
-The adaptive model runs as a separate `ddos-model` process.
+The adaptive model runs as a separate `tarinio-sentinel` process (legacy-compatible with `ddos-model` artifacts and `MODEL_*` env contract).
 
 It reads:
 
@@ -92,9 +92,9 @@ It reads:
 
 It writes:
 
-- `adaptive.json` containing temporary IP-based actions.
+- `adaptive.json` containing temporary IP-based actions and explainability fields.
 
-The L4 guard consumes `adaptive.json` and extends baseline firewall behavior with temporary throttle/drop rules.
+The L4 guard consumes `adaptive.json` and extends baseline firewall behavior with temporary throttle/drop/temp-ban-derived rules.
 
 ## 6. Signals Used By The Model
 
@@ -136,14 +136,16 @@ This means:
 
 ## 8. Thresholds And Stages
 
-The model uses two major stages:
+The model uses action ladder stages:
 
+- `watch`;
 - `throttle` when `score >= model_throttle_threshold`;
-- `drop` when `score >= model_drop_threshold`.
+- `drop` when `score >= model_drop_threshold`;
+- `temp_ban` for repeated or emergency-confirmed high-risk behavior.
 
 If the score is below the throttle threshold:
 
-- the IP does not appear in adaptive firewall output.
+- the IP stays in `watch` and can still recover through decay/cooldown.
 
 If the score crosses the throttle threshold:
 
@@ -152,6 +154,10 @@ If the score crosses the throttle threshold:
 If the score crosses the drop threshold:
 
 - the IP is published as `drop` in `adaptive.json`.
+
+If high-risk behavior keeps repeating across consecutive ticks:
+
+- the IP can be promoted into `temp_ban` based on anti-flapping/promotion gates.
 
 The `drop` threshold should always be higher than the `throttle` threshold.
 
@@ -204,14 +210,15 @@ Adaptive output contains:
 - `throttle_rate_per_second`;
 - `throttle_burst`;
 - `throttle_target`;
-- `entries[]`, where each IP has an `action` and `expires_at`.
+- `entries[]`, where each IP has an `action`, `expires_at`, and optional explainability metadata.
 
 Possible actions:
 
 - `throttle`
 - `drop`
+- `temp_ban` (published as adaptive decision and synced into full ban flow when enabled)
 
-The L4 guard then turns those entries into concrete `iptables` rules.
+The L4 guard then turns these entries into concrete `iptables`/runtime guard rules.
 
 ## 12. How The L4 Guard Uses Adaptive Entries
 
@@ -289,7 +296,7 @@ Operators should think of the adaptive model as a local automatic escalation lay
 - the revision defines the operating rules;
 - runtime applies temporary measures while the attack is ongoing.
 
-This is not opaque machine learning. It is a deterministic scoring system with explicit thresholds, weights, and TTL behavior.
+This is primarily a deterministic scoring system with explicit thresholds, weights, and TTL behavior. Optional CPU-only ML signals can be enabled, but they stay outside request-path enforcement.
 
 ## 17. What The Model Does Not Do
 
@@ -298,14 +305,15 @@ The model does not:
 - replace WAF policy tuning;
 - analyze payload semantics like a content-aware detector;
 - make operator decisions on behalf of humans;
-- modify control-plane state by itself;
+- rewrite control-plane revisions by itself;
 - rewrite the active revision.
 
 It only:
 
 - reads runtime telemetry;
 - recalculates IP scores;
-- writes adaptive firewall output.
+- writes adaptive firewall output;
+- optionally requests permanent-ban sync via control-plane service pipeline (when enabled by operator config).
 
 ## 18. Monitoring And Debugging
 

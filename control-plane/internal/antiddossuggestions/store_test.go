@@ -30,6 +30,20 @@ func TestStore_UpsertListSetStatus(t *testing.T) {
 	if updated.Status != StatusShadow {
 		t.Fatalf("expected shadow status, got %q", updated.Status)
 	}
+	updated, err = store.SetStatus(created.ID, StatusTemporary)
+	if err != nil {
+		t.Fatalf("set temporary status: %v", err)
+	}
+	if updated.Status != StatusTemporary {
+		t.Fatalf("expected temporary status, got %q", updated.Status)
+	}
+	updated, err = store.SetStatus(created.ID, StatusPermanent)
+	if err != nil {
+		t.Fatalf("set permanent status: %v", err)
+	}
+	if updated.Status != StatusPermanent {
+		t.Fatalf("expected permanent status, got %q", updated.Status)
+	}
 
 	items, err := store.List()
 	if err != nil {

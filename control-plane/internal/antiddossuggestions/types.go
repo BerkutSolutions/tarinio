@@ -8,6 +8,8 @@ import (
 const (
 	StatusSuggested = "suggested"
 	StatusShadow    = "shadow"
+	StatusTemporary = "temporary"
+	StatusPermanent = "permanent"
 )
 
 type Suggestion struct {
@@ -19,7 +21,9 @@ type Suggestion struct {
 	WouldBlock int    `json:"would_block_hits,omitempty"`
 	ShadowHits int    `json:"shadow_hits,omitempty"`
 	ShadowFP   int    `json:"shadow_false_positive_hits,omitempty"`
-	ShadowRate string `json:"shadow_false_positive_rate,omitempty"`
+	ShadowRate     string `json:"shadow_false_positive_rate,omitempty"`
+	TemporaryUntil string `json:"temporary_until,omitempty"`
+	PromotionReason string `json:"promotion_reason,omitempty"`
 	Source     string `json:"source,omitempty"`
 	Reason     string `json:"reason,omitempty"`
 	FirstSeen  string `json:"first_seen,omitempty"`
@@ -59,6 +63,8 @@ func NormalizeSuggestion(item Suggestion) Suggestion {
 		out.ShadowFP = 0
 	}
 	out.ShadowRate = strings.TrimSpace(out.ShadowRate)
+	out.TemporaryUntil = strings.TrimSpace(out.TemporaryUntil)
+	out.PromotionReason = strings.TrimSpace(out.PromotionReason)
 	return out
 }
 
@@ -73,9 +79,9 @@ func ValidateSuggestion(item Suggestion) error {
 		return errors.New("anti-ddos rule suggestion path_prefix must start with /")
 	}
 	switch item.Status {
-	case StatusSuggested, StatusShadow:
+	case StatusSuggested, StatusShadow, StatusTemporary, StatusPermanent:
 	default:
-		return errors.New("anti-ddos rule suggestion status must be suggested or shadow")
+		return errors.New("anti-ddos rule suggestion status must be suggested, shadow, temporary, or permanent")
 	}
 	return nil
 }

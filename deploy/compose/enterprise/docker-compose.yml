@@ -46,6 +46,11 @@ services:
       WAF_RUNTIME_HEALTH_URL: http://runtime:8081/readyz
       WAF_RUNTIME_RELOAD_URL: http://runtime:8081/reload
       WAF_RUNTIME_API_TOKEN: ${WAF_RUNTIME_API_TOKEN:?set WAF_RUNTIME_API_TOKEN in .env}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_ENABLED: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_ENABLED:-true}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_ADAPTIVE_PATH: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_ADAPTIVE_PATH:-/etc/waf/l4guard-adaptive/adaptive.json}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_POLL_SECONDS: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_POLL_SECONDS:-5}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_MIN_SCORE: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_MIN_SCORE:-10}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_MAX_PROMOTIONS_PER_TICK: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_MAX_PROMOTIONS_PER_TICK:-5}
       POSTGRES_DSN: postgres://${POSTGRES_USER:-waf}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-waf}?sslmode=disable
       CLICKHOUSE_ENDPOINT: ${CLICKHOUSE_ENDPOINT:-http://clickhouse:8123}
       CLICKHOUSE_DB: ${CLICKHOUSE_DB:-waf_logs}
@@ -65,6 +70,7 @@ services:
       - waf-ha-runtime-data:/var/lib/waf
       - waf-ha-control-plane-data:/var/lib/waf/control-plane
       - waf-ha-certificates-data:/var/lib/waf/control-plane/certificate-materials
+      - waf-ha-l4-adaptive:/etc/waf/l4guard-adaptive:ro
       - waf-ha-vault-bootstrap-data:/var/run/waf-secrets:ro
       - /var/run/docker.sock:/var/run/docker.sock
     expose:
@@ -112,6 +118,11 @@ services:
       WAF_RUNTIME_HEALTH_URL: http://runtime:8081/readyz
       WAF_RUNTIME_RELOAD_URL: http://runtime:8081/reload
       WAF_RUNTIME_API_TOKEN: ${WAF_RUNTIME_API_TOKEN:?set WAF_RUNTIME_API_TOKEN in .env}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_ENABLED: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_ENABLED:-true}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_ADAPTIVE_PATH: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_ADAPTIVE_PATH:-/etc/waf/l4guard-adaptive/adaptive.json}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_POLL_SECONDS: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_POLL_SECONDS:-5}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_MIN_SCORE: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_MIN_SCORE:-10}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_MAX_PROMOTIONS_PER_TICK: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_MAX_PROMOTIONS_PER_TICK:-5}
       POSTGRES_DSN: postgres://${POSTGRES_USER:-waf}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-waf}?sslmode=disable
       CLICKHOUSE_ENDPOINT: ${CLICKHOUSE_ENDPOINT:-http://clickhouse:8123}
       CLICKHOUSE_DB: ${CLICKHOUSE_DB:-waf_logs}
@@ -131,6 +142,7 @@ services:
       - waf-ha-runtime-data:/var/lib/waf
       - waf-ha-control-plane-data:/var/lib/waf/control-plane
       - waf-ha-certificates-data:/var/lib/waf/control-plane/certificate-materials
+      - waf-ha-l4-adaptive:/etc/waf/l4guard-adaptive:ro
       - waf-ha-vault-bootstrap-data:/var/run/waf-secrets:ro
       - /var/run/docker.sock:/var/run/docker.sock
     expose:
@@ -344,16 +356,19 @@ services:
     mem_limit: 256m
     cpus: 0.5
 
-  ddos-model:
+  tarinio-sentinel:
     build:
       context: ../../..
       dockerfile: deploy/compose/default/ddos-model/Dockerfile
-    container_name: tarinio-ha-ddos-model
+    container_name: tarinio-ha-sentinel
     restart: unless-stopped
     environment:
+      MODEL_ENABLED: ${DDOS_MODEL_ENABLED:-true}
+      MODEL_SOURCE_BACKEND: ${MODEL_SOURCE_BACKEND:-file}
       MODEL_LOG_PATH: /logs/access.log
       MODEL_STATE_PATH: /state/model-state.json
       MODEL_OUTPUT_PATH: /out/adaptive.json
+      MODEL_SUGGESTIONS_OUTPUT_PATH: /out/l7-suggestions.json
       MODEL_RUNTIME_ROOT: /var/lib/waf
       MODEL_POLL_INTERVAL_SECONDS: ${DDOS_MODEL_POLL_INTERVAL_SECONDS:-2}
       MODEL_DECAY_LAMBDA: ${DDOS_MODEL_DECAY_LAMBDA:-0.08}
@@ -386,8 +401,8 @@ services:
       retries: 8
     networks:
       - waf-ha-net
-    mem_limit: 512m
-    cpus: 0.75
+    mem_limit: ${SENTINEL_MEM_LIMIT:-512m}
+    cpus: ${SENTINEL_CPU_LIMIT:-0.75}
 
   demo-app:
     build:

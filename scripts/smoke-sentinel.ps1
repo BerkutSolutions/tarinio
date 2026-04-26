@@ -4,11 +4,14 @@ param(
 
   [string]$ProfileName = "default",
   [string]$RuntimeService = "runtime",
+  [string]$ControlPlaneService = "control-plane",
   [string]$SentinelService = "tarinio-sentinel",
   [string]$PrimarySite = "control-plane-access",
   [string]$SecondarySite = "localhost",
   [int]$WaitSeconds = 10,
   [string]$OutputDir = "",
+  [ValidateSet("hybrid", "classic-only", "adaptive-only")]
+  [string]$Mode = "hybrid",
   [switch]$NoReset
 )
 
@@ -29,6 +32,30 @@ function Invoke-ComposeText {
     throw "docker compose failed: $($ComposeArgs -join ' ')"
   }
   return ($output -join "`n")
+}
+
+function Invoke-ComposeWithRetry {
+  param(
+    [string[]]$ComposeArgs,
+    [int]$Attempts = 8,
+    [int]$DelaySeconds = 2
+  )
+  $lastError = $null
+  for ($i = 0; $i -lt $Attempts; $i++) {
+    try {
+      Invoke-Compose $ComposeArgs
+      return
+    } catch {
+      $lastError = $_
+      if ($i -lt ($Attempts - 1)) {
+        Start-Sleep -Seconds $DelaySeconds
+      }
+    }
+  }
+  if ($null -ne $lastError) {
+    throw $lastError
+  }
+  throw "docker compose retry exhausted"
 }
 
 function New-AccessLine {
@@ -67,7 +94,7 @@ function Add-ScenarioLineBatch {
   param([string[]]$Lines)
   $payload = ($Lines -join "`n") + "`n"
   $encoded = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($payload))
-  Invoke-Compose @("exec", "-T", $RuntimeService, "sh", "-lc", "printf '%s' '$encoded' | base64 -d >> /var/log/nginx/access.log")
+  Invoke-ComposeWithRetry @("exec", "-T", $RuntimeService, "sh", "-lc", "printf '%s' '$encoded' | base64 -d >> /var/log/nginx/access.log")
 }
 
 function Read-ContainerJSON {
@@ -79,10 +106,42 @@ function Read-ContainerJSON {
   return $raw | ConvertFrom-Json
 }
 
+function Read-ContainerJSONSafe {
+  param([string]$Path)
+  try {
+    return Read-ContainerJSON $Path
+  } catch {
+    return $null
+  }
+}
+
+function Read-ServiceJSONSafe {
+  param([string]$Service, [string]$Path)
+  try {
+    $raw = Invoke-ComposeText @("exec", "-T", $Service, "sh", "-lc", "cat $Path")
+    if ([string]::IsNullOrWhiteSpace($raw)) {
+      return $null
+    }
+    return ($raw | ConvertFrom-Json)
+  } catch {
+    return $null
+  }
+}
+
+function Read-ServiceTextSafe {
+  param([string]$Service, [string]$Command)
+  try {
+    $raw = Invoke-ComposeText @("exec", "-T", $Service, "sh", "-lc", $Command)
+    return [string]$raw
+  } catch {
+    return ""
+  }
+}
+
 function Reset-SmokeState {
   Write-Host "[$ProfileName] resetting runtime log and sentinel state"
-  Invoke-Compose @("exec", "-T", $RuntimeService, "sh", "-lc", ": > /var/log/nginx/access.log")
-  Invoke-Compose @("exec", "-T", $SentinelService, "sh", "-lc", "rm -f /state/model-state.json /out/adaptive.json /out/l7-suggestions.json")
+  Invoke-ComposeWithRetry @("exec", "-T", $RuntimeService, "sh", "-lc", "truncate -s 0 /var/log/nginx/access.log || : > /var/log/nginx/access.log")
+  Invoke-ComposeWithRetry @("exec", "-T", $SentinelService, "sh", "-lc", "rm -f /state/model-state.json /out/adaptive.json /out/l7-suggestions.json")
   Invoke-Compose @("restart", $SentinelService)
   Start-Sleep -Seconds 5
 }
@@ -98,6 +157,66 @@ function Count-EntriesByAction {
     $out[$action]++
   }
   return $out
+}
+
+function Get-L4BaselineSnapshot {
+  $cfg = Read-ServiceJSONSafe -Service $RuntimeService -Path "/etc/waf/l4guard/config.json"
+  if ($null -eq $cfg) {
+    $pointer = Read-ServiceJSONSafe -Service $RuntimeService -Path "/var/lib/waf/active/current.json"
+    if ($null -ne $pointer -and -not [string]::IsNullOrWhiteSpace([string]$pointer.candidate_path)) {
+      $candidate = [string]$pointer.candidate_path
+      if (-not $candidate.StartsWith("/")) {
+        $candidate = "/var/lib/waf/$candidate"
+      }
+      $cfg = Read-ServiceJSONSafe -Service $RuntimeService -Path "$candidate/l4guard/config.json"
+    }
+  }
+  if ($null -eq $cfg) {
+    $rawBaseline = Read-ServiceTextSafe -Service $ControlPlaneService -Command "printenv WAF_DEFAULT_ANTIDDOS_CONN_LIMIT; printenv WAF_DEFAULT_ANTIDDOS_RATE_PER_SECOND; printenv WAF_DEFAULT_ANTIDDOS_RATE_BURST"
+    $parts = @($rawBaseline -split "\r?\n" | ForEach-Object { $_.Trim() })
+    if ($parts.Count -ge 3 -and -not [string]::IsNullOrWhiteSpace($parts[0]) -and -not [string]::IsNullOrWhiteSpace($parts[1]) -and -not [string]::IsNullOrWhiteSpace($parts[2])) {
+      $conn = 0
+      $rate = 0
+      $burst = 0
+      [void][int]::TryParse($parts[0], [ref]$conn)
+      [void][int]::TryParse($parts[1], [ref]$rate)
+      [void][int]::TryParse($parts[2], [ref]$burst)
+      if ($conn -gt 0 -and $rate -gt 0 -and $burst -gt 0) {
+        return [ordered]@{
+          present = $true
+          conn_limit = $conn
+          rate_per_second = $rate
+          rate_burst = $burst
+          destination_ip = "control-plane-defaults"
+          ports = @()
+        }
+      }
+    }
+
+    return [ordered]@{
+      present = $false
+      conn_limit = 0
+      rate_per_second = 0
+      rate_burst = 0
+      destination_ip = ""
+      ports = @()
+    }
+  }
+
+  $ports = @()
+  if ($null -ne $cfg.ports) {
+    foreach ($item in @($cfg.ports)) {
+      $ports += [int]$item
+    }
+  }
+  return [ordered]@{
+    present = $true
+    conn_limit = [int]$cfg.conn_limit
+    rate_per_second = [int]$cfg.rate_per_second
+    rate_burst = [int]$cfg.rate_burst
+    destination_ip = [string]$cfg.destination_ip
+    ports = $ports
+  }
 }
 
 function Count-StateRecords {
@@ -145,6 +264,7 @@ function Write-MarkdownReport {
 # Sentinel smoke result: $($Result.profile)
 
 Generated at: $($Result.generated_at)
+Mode: $($Result.mode)
 
 ## Verdict
 
@@ -153,6 +273,8 @@ Generated at: $($Result.generated_at)
 - Adaptive entries: $($Result.adaptive_entries)
 - L7 suggestions: $($Result.l7_suggestions)
 - Tracked state records: $($Result.tracked_state_records)
+- L4 baseline present: $($Result.l4_baseline.present)
+- L4 conn_limit/rate/burst: $($Result.l4_baseline.conn_limit) / $($Result.l4_baseline.rate_per_second) / $($Result.l4_baseline.rate_burst)
 
 ## Scenario Coverage
 
@@ -173,6 +295,14 @@ $($actionLines -join "`n")
 ## False Positive Assessment
 
 The benign normal traffic source produced $($Result.normal_false_positive_entries) adaptive entries. A passing result requires this number to stay at zero.
+
+## Mode-specific expectation
+
+| Mode | Expected behavior |
+| --- | --- |
+| classic-only | No adaptive entries; baseline L4 Anti-DDoS limits active |
+| hybrid | Baseline L4 limits active and adaptive entries present for attack traffic |
+| adaptive-only | Adaptive entries drive mitigation while baseline L4 profile remains active |
 
 ## L7 Suggestions
 
@@ -267,12 +397,19 @@ Write-Host "[$ProfileName] injecting $($lines.Count) synthetic access-log events
 Add-ScenarioLines $lines.ToArray()
 Start-Sleep -Seconds $WaitSeconds
 
-$adaptive = Read-ContainerJSON "/out/adaptive.json"
-$suggestions = Read-ContainerJSON "/out/l7-suggestions.json"
-$state = Read-ContainerJSON "/state/model-state.json"
+$adaptive = Read-ContainerJSONSafe "/out/adaptive.json"
+$suggestions = Read-ContainerJSONSafe "/out/l7-suggestions.json"
+$state = Read-ContainerJSONSafe "/state/model-state.json"
+$l4Baseline = Get-L4BaselineSnapshot
 
-$entries = @($adaptive.entries | Where-Object { $null -ne $_ })
-$suggestionItems = @($suggestions.items | Where-Object { $null -ne $_ })
+$entries = @()
+if ($null -ne $adaptive -and $null -ne $adaptive.entries) {
+  $entries = @($adaptive.entries | Where-Object { $null -ne $_ })
+}
+$suggestionItems = @()
+if ($null -ne $suggestions -and $null -ne $suggestions.items) {
+  $suggestionItems = @($suggestions.items | Where-Object { $null -ne $_ })
+}
 $normalFalsePositive = @($entries | Where-Object { $_.ip -eq $normalIP }).Count
 $scannerSuggestionCount = @($suggestionItems | Where-Object { $_.path_prefix -in @("/.env", "/wp-admin", "/phpmyadmin", "/vendor/phpunit") }).Count
 $maliciousActions = @($entries | Where-Object { $_.ip -in @($bruteIP, $payloadIP, $floodIP) -or $_.reason_codes -contains "signal_emergency_botnet" -or $_.reason_codes -contains "signal_emergency_single" }).Count
@@ -281,8 +418,22 @@ $payloadEntries = @($entries | Where-Object { $_.ip -eq $payloadIP }).Count
 $singleEmergencyEntries = Count-EntriesMatchingReason $entries "signal_emergency_single"
 $botnetEmergencyEntries = Count-EntriesMatchingReason $entries "signal_emergency_botnet"
 
+$modePassed = $false
+switch ($Mode) {
+  "classic-only" {
+    $modePassed = ($entries.Count -eq 0 -and $normalFalsePositive -eq 0 -and $l4Baseline.present -and $l4Baseline.conn_limit -gt 0 -and $l4Baseline.rate_per_second -gt 0 -and $l4Baseline.rate_burst -gt 0)
+  }
+  "adaptive-only" {
+    $modePassed = ($normalFalsePositive -eq 0 -and $scannerSuggestionCount -gt 0 -and $maliciousActions -gt 0 -and $entries.Count -gt 0 -and $l4Baseline.present)
+  }
+  default {
+    $modePassed = ($normalFalsePositive -eq 0 -and $scannerSuggestionCount -gt 0 -and $maliciousActions -gt 0 -and $entries.Count -gt 0 -and $l4Baseline.present -and $l4Baseline.conn_limit -gt 0 -and $l4Baseline.rate_per_second -gt 0)
+  }
+}
+
 $result = [ordered]@{
   profile = $ProfileName
+  mode = $Mode
   generated_at = (Get-Date).ToUniversalTime().ToString("o")
   injected_events = $lines.Count
   adaptive_entries = $entries.Count
@@ -303,11 +454,12 @@ $result = [ordered]@{
     single_source_emergency_entries = $singleEmergencyEntries
     botnet_emergency_entries = $botnetEmergencyEntries
   }
+  l4_baseline = $l4Baseline
   normal_ip = $normalIP
   normal_false_positive_entries = $normalFalsePositive
   scanner_suggestion_count = $scannerSuggestionCount
   malicious_action_count = $maliciousActions
-  passed = ($normalFalsePositive -eq 0 -and $scannerSuggestionCount -gt 0 -and $maliciousActions -gt 0 -and $entries.Count -gt 0)
+  passed = $modePassed
 }
 
 if (-not [string]::IsNullOrWhiteSpace($OutputDir)) {

@@ -46,11 +46,17 @@ services:
       WAF_RUNTIME_HEALTH_URL: http://runtime:8081/readyz
       WAF_RUNTIME_RELOAD_URL: http://runtime:8081/reload
       WAF_RUNTIME_API_TOKEN: ${WAF_RUNTIME_API_TOKEN:-ha-lab-runtime-shared-token}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_ENABLED: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_ENABLED:-true}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_ADAPTIVE_PATH: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_ADAPTIVE_PATH:-/etc/waf/l4guard-adaptive/adaptive.json}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_POLL_SECONDS: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_POLL_SECONDS:-5}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_MIN_SCORE: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_MIN_SCORE:-10}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_MAX_PROMOTIONS_PER_TICK: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_MAX_PROMOTIONS_PER_TICK:-5}
       POSTGRES_DSN: postgres://${POSTGRES_USER:-waf}:${POSTGRES_PASSWORD:-waf}@postgres:5432/${POSTGRES_DB:-waf}?sslmode=disable
     volumes:
       - waf-ha-runtime-data:/var/lib/waf
       - waf-ha-control-plane-data:/var/lib/waf/control-plane
       - waf-ha-certificates-data:/var/lib/waf/control-plane/certificate-materials
+      - waf-ha-l4-adaptive:/etc/waf/l4guard-adaptive:ro
       - /var/run/docker.sock:/var/run/docker.sock
     expose:
       - "8080"
@@ -91,11 +97,17 @@ services:
       WAF_RUNTIME_HEALTH_URL: http://runtime:8081/readyz
       WAF_RUNTIME_RELOAD_URL: http://runtime:8081/reload
       WAF_RUNTIME_API_TOKEN: ${WAF_RUNTIME_API_TOKEN:-ha-lab-runtime-shared-token}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_ENABLED: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_ENABLED:-true}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_ADAPTIVE_PATH: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_ADAPTIVE_PATH:-/etc/waf/l4guard-adaptive/adaptive.json}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_POLL_SECONDS: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_POLL_SECONDS:-5}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_MIN_SCORE: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_MIN_SCORE:-10}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_MAX_PROMOTIONS_PER_TICK: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_MAX_PROMOTIONS_PER_TICK:-5}
       POSTGRES_DSN: postgres://${POSTGRES_USER:-waf}:${POSTGRES_PASSWORD:-waf}@postgres:5432/${POSTGRES_DB:-waf}?sslmode=disable
     volumes:
       - waf-ha-runtime-data:/var/lib/waf
       - waf-ha-control-plane-data:/var/lib/waf/control-plane
       - waf-ha-certificates-data:/var/lib/waf/control-plane/certificate-materials
+      - waf-ha-l4-adaptive:/etc/waf/l4guard-adaptive:ro
       - /var/run/docker.sock:/var/run/docker.sock
     expose:
       - "8080"
@@ -214,6 +226,7 @@ services:
     container_name: tarinio-ha-sentinel
     restart: unless-stopped
     environment:
+      MODEL_ENABLED: ${DDOS_MODEL_ENABLED:-true}
       MODEL_SOURCE_BACKEND: ${MODEL_SOURCE_BACKEND:-file}
       MODEL_LOG_PATH: /logs/access.log
       MODEL_STATE_PATH: /state/model-state.json
@@ -257,8 +270,8 @@ services:
       retries: 8
     networks:
       - waf-ha-net
-    mem_limit: 512m
-    cpus: 0.75
+    mem_limit: ${SENTINEL_MEM_LIMIT:-512m}
+    cpus: ${SENTINEL_CPU_LIMIT:-0.75}
 
   demo-app:
     build:

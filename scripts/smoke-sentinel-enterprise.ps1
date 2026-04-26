@@ -2,8 +2,8 @@ param(
   [string]$ResultRoot = ".work/sentinel-smoke",
   [string]$DefaultCompose = "deploy/compose/default/docker-compose.yml",
   [string]$HaLabCompose = "deploy/compose/ha-lab/docker-compose.yml",
-  [string]$WikiEnglishPath = "docs/eng/operators/sentinel-enterprise-validation.md",
-  [string]$WikiRussianPath = "docs/ru/operators/sentinel-enterprise-validation.md",
+  [string]$WikiEnglishPath = "docs/eng/high-availability-docs/sentinel-enterprise-validation.md",
+  [string]$WikiRussianPath = "docs/ru/high-availability-docs/sentinel-enterprise-validation.md",
   [switch]$SkipDefault,
   [switch]$SkipHaLab,
   [int]$WaitSeconds = 12
@@ -18,26 +18,13 @@ function Read-Result {
 
 function Action-Summary {
   param($Actions)
-  if ($null -eq $Actions) {
-    return "none"
-  }
+  if ($null -eq $Actions) { return "none" }
   $parts = New-Object System.Collections.Generic.List[string]
   foreach ($property in $Actions.PSObject.Properties) {
     $parts.Add("$($property.Name): $($property.Value)")
   }
-  if ($parts.Count -eq 0) {
-    return "none"
-  }
+  if ($parts.Count -eq 0) { return "none" }
   return ($parts -join ", ")
-}
-
-function Paths-Summary {
-  param($Paths)
-  $items = @($Paths | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
-  if ($items.Count -eq 0) {
-    return "none"
-  }
-  return ($items -join ", ")
 }
 
 function Write-EnglishWiki {
@@ -45,7 +32,7 @@ function Write-EnglishWiki {
 
   $rows = New-Object System.Collections.Generic.List[string]
   foreach ($result in $Results) {
-    $rows.Add("| $($result.profile) | $($result.passed) | $($result.injected_events) | $($result.adaptive_entries) | $(Action-Summary $result.adaptive_actions) | $($result.l7_suggestions) | $($result.normal_false_positive_entries) |")
+    $rows.Add("| $($result.profile) | $($result.mode) | $($result.passed) | $($result.injected_events) | $($result.adaptive_entries) | $(Action-Summary $result.adaptive_actions) | $($result.l7_suggestions) | $($result.normal_false_positive_entries) | $($result.l4_baseline.conn_limit)/$($result.l4_baseline.rate_per_second)/$($result.l4_baseline.rate_burst) |")
   }
 
   $md = @"
@@ -53,52 +40,51 @@ function Write-EnglishWiki {
 
 Last full smoke run: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss zzz")
 
-This page records the reproducible validation pack for tarinio-sentinel in TARINIO 3.0.4. The run starts the Docker Compose stacks for both the standalone default profile and the HA-ready ha-lab profile, injects controlled access-log evidence, and verifies that the model publishes bounded adaptive decisions without blocking benign traffic.
+This page records the reproducible enterprise validation pack for tarinio-sentinel in TARINIO 3.0.5.
 
-## Executive Summary
+## What Is Validated
 
-The validation covers normal traffic, scanner paths, brute-force behavior, XSS probes, SQL injection probes, command-injection probes, single-source DDoS, distributed DDoS, and high-cardinality noise. A profile passes only when normal traffic produces zero adaptive entries, malicious scenarios produce adaptive action evidence, and scanner paths are emitted as L7 suggestions before permanent enforcement.
+Three anti-DDoS operating modes are tested:
 
-| Profile | Passed | Events | Adaptive entries | Actions | L7 suggestions | Normal false positives |
-| --- | --- | ---: | ---: | --- | ---: | ---: |
+1. classic-only: baseline L4 anti-DDoS only, adaptive model disabled.
+2. hybrid: baseline anti-DDoS and adaptive model together.
+3. adaptive-only: adaptive model becomes primary escalation path while baseline L4 profile remains active.
+
+Each mode is executed in:
+
+- default profile
+- high-availability-lab profile
+
+## Executive Test Result
+
+| Profile | Mode | Passed | Events | Adaptive entries | Actions | L7 suggestions | Normal false positives | Baseline conn/rate/burst |
+| --- | --- | --- | ---: | ---: | --- | ---: | ---: | --- |
 $($rows -join "`n")
 
-## Scenario Matrix
+## 30-actor Enterprise Matrix
 
-| Scenario | Traffic Pattern | Expected Enterprise Signal |
-| --- | --- | --- |
-| Normal baseline | 20 benign dashboard requests from one source | No adaptive entries and no false positive block |
-| Scanner discovery | Repeated /.env, /wp-admin, /phpmyadmin, /vendor/phpunit from scanner sources | Trust decreases and L7 suggestions are produced |
-| Brute force | Repeated /login attempts with 401, 403, and 429 | Source receives adaptive scrutiny and can escalate |
-| XSS / SQLi / RCE probes | Encoded script tag, UNION SELECT, and shell metacharacter probes | Payload source contributes to adaptive risk |
-| Single-source DDoS | 140 requests in one second from one IP | Emergency single-source detection activates |
-| Distributed DDoS | 240 requests in one second across many IPs | Emergency botnet-like detection activates |
-| High cardinality | Many unique paths and sources | State remains bounded and publish output stays capped |
-
-## False Positive Assessment
-
-The benign source is tracked separately from attack sources. The acceptance threshold is strict: normal_false_positive_entries must be 0 in every profile. This guards against an enterprise deployment accidentally throttling normal users during noisy background scans.
+| Actor group | Count | Mode relevance | Expected signal |
+| --- | ---: | --- | --- |
+| Normal users (web + mobile + trusted) | 10 | all modes | no adaptive false positives |
+| Scanner actors | 8 | hybrid, adaptive-only | L7 suggestions and trust degradation |
+| Brute-force + payload actors | 6 | hybrid, adaptive-only | adaptive escalation with explainable reasons |
+| Flood actors (single + distributed) | 6+ synthetic botnet spread | all modes | baseline protection in classic, emergency/adaptive escalation in hybrid/adaptive-only |
 
 ## Evidence Location
 
-Run artifacts are stored under:
-
 $RunDir
 
-Each profile directory contains result.json, adaptive.json, l7-suggestions.json, model-state.json, and report.md.
+Each profile/mode directory includes:
+
+- result.json
+- adaptive.json
+- l7-suggestions.json
+- model-state.json
+- report.md
 
 ## Reproduce
 
 ./scripts/smoke-sentinel-enterprise.ps1
-
-For a single profile:
-
-./scripts/smoke-sentinel.ps1 -ComposeFile deploy/compose/default/docker-compose.yml -ProfileName default -OutputDir .work/sentinel-smoke/manual/default
-./scripts/smoke-sentinel.ps1 -ComposeFile deploy/compose/ha-lab/docker-compose.yml -ProfileName ha-lab -OutputDir .work/sentinel-smoke/manual/ha-lab
-
-## Notes For Reviewers
-
-This is a smoke and evidence test, not a replacement for external load testing. It validates the product control loop: runtime log ingestion, score calculation, explainable reasons, adaptive output compatibility, L7 suggestion publication, false-positive safety, and HA profile startup.
 "@
   Set-Content -LiteralPath $Path -Value $md -Encoding UTF8
 }
@@ -108,53 +94,107 @@ function Write-RussianWiki {
 
   $rows = New-Object System.Collections.Generic.List[string]
   foreach ($result in $Results) {
-    $rows.Add("| $($result.profile) | $($result.passed) | $($result.injected_events) | $($result.adaptive_entries) | $(Action-Summary $result.adaptive_actions) | $($result.l7_suggestions) | $($result.normal_false_positive_entries) |")
+    $rows.Add("| $($result.profile) | $($result.mode) | $($result.passed) | $($result.injected_events) | $($result.adaptive_entries) | $(Action-Summary $result.adaptive_actions) | $($result.l7_suggestions) | $($result.normal_false_positive_entries) | $($result.l4_baseline.conn_limit)/$($result.l4_baseline.rate_per_second)/$($result.l4_baseline.rate_burst) |")
   }
 
-  $md = @"
-# Enterprise-РїСЂРѕРІРµСЂРєР° Sentinel
+  $md = @'
+# Enterprise-proverka Sentinel
 
-РџРѕСЃР»РµРґРЅРёР№ РїРѕР»РЅС‹Р№ smoke-РїСЂРѕРіРѕРЅ: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss zzz")
+Posledniy smoke run: {RUN_DATE}
 
-Р­С‚Р° СЃС‚СЂР°РЅРёС†Р° С„РёРєСЃРёСЂСѓРµС‚ РІРѕСЃРїСЂРѕРёР·РІРѕРґРёРјСѓСЋ РїСЂРѕРІРµСЂРєСѓ tarinio-sentinel РІ TARINIO 3.0.4. РџСЂРѕРіРѕРЅ Р·Р°РїСѓСЃРєР°РµС‚ Docker Compose СЃС‚РµРєРё default Рё ha-lab, РґРѕР±Р°РІР»СЏРµС‚ РєРѕРЅС‚СЂРѕР»РёСЂСѓРµРјС‹Рµ СЃС‚СЂРѕРєРё access-log Рё РїСЂРѕРІРµСЂСЏРµС‚, С‡С‚Рѕ РјРѕРґРµР»СЊ РІС‹РґР°РµС‚ РѕРіСЂР°РЅРёС‡РµРЅРЅС‹Рµ adaptive-СЂРµС€РµРЅРёСЏ Р±РµР· Р±Р»РѕРєРёСЂРѕРІРєРё РЅРѕСЂРјР°Р»СЊРЅРѕРіРѕ С‚СЂР°С„РёРєР°.
+Dokument fiksiruet vosproizvodimyy enterprise validation pack dlya `tarinio-sentinel` v TARINIO `3.0.5`.
 
-## РС‚РѕРі
+## Chto proveryaetsya
 
-РџРѕРєСЂС‹С‚С‹ РЅРѕСЂРјР°Р»СЊРЅС‹Р№ С‚СЂР°С„РёРє, scanner paths, brute-force, XSS, SQL injection, command injection, single-source DDoS, distributed DDoS Рё high-cardinality noise. РџСЂРѕС„РёР»СЊ СЃС‡РёС‚Р°РµС‚СЃСЏ СѓСЃРїРµС€РЅС‹Рј С‚РѕР»СЊРєРѕ РµСЃР»Рё РЅРѕСЂРјР°Р»СЊРЅС‹Р№ РёСЃС‚РѕС‡РЅРёРє РЅРµ РїРѕРїР°Р» РІ adaptive output, РІСЂРµРґРѕРЅРѕСЃРЅС‹Рµ СЃС†РµРЅР°СЂРёРё РґР°Р»Рё evidence, Р° scanner paths РїРѕРїР°Р»Рё РІ L7 suggestions РґРѕ РїРѕСЃС‚РѕСЏРЅРЅРѕРіРѕ enforcement.
+Testiruyutsya tri rezhima Anti-DDoS:
 
-| РџСЂРѕС„РёР»СЊ | Passed | Events | Adaptive entries | Actions | L7 suggestions | Normal false positives |
-| --- | --- | ---: | ---: | --- | ---: | ---: |
-$($rows -join "`n")
+1. `classic-only`: tolko bazovyy L4 Anti-DDoS, adaptive model otklyuchena.
+2. `hybrid`: bazovyy Anti-DDoS i adaptive model vmeste.
+3. `adaptive-only`: osnova eskalatsii cherez adaptive model pri aktivnom baseline L4 profile.
 
-## РњР°С‚СЂРёС†Р° СЃС†РµРЅР°СЂРёРµРІ
+## Itogovye rezultaty
 
-| РЎС†РµРЅР°СЂРёР№ | РџР°С‚С‚РµСЂРЅ | РћР¶РёРґР°РµРјС‹Р№ СЃРёРіРЅР°Р» |
-| --- | --- | --- |
-| Normal baseline | 20 Р±РµР·РѕРїР°СЃРЅС‹С… Р·Р°РїСЂРѕСЃРѕРІ dashboard РѕС‚ РѕРґРЅРѕРіРѕ РёСЃС‚РѕС‡РЅРёРєР° | РќРµС‚ adaptive entries Рё false positive block |
-| Scanner discovery | /.env, /wp-admin, /phpmyadmin, /vendor/phpunit | РЎРЅРёР¶Р°РµС‚СЃСЏ trust Рё РїРѕСЏРІР»СЏСЋС‚СЃСЏ L7 suggestions |
-| Brute force | РџРѕРІС‚РѕСЂРЅС‹Рµ /login СЃ 401, 403, 429 | РСЃС‚РѕС‡РЅРёРє РїРѕР»СѓС‡Р°РµС‚ adaptive scrutiny Рё РјРѕР¶РµС‚ СЌСЃРєР°Р»РёСЂРѕРІР°С‚СЊСЃСЏ |
-| XSS / SQLi / RCE probes | Encoded script tag, UNION SELECT, shell metacharacters | Payload-РёСЃС‚РѕС‡РЅРёРє РїРѕРІС‹С€Р°РµС‚ adaptive risk |
-| Single-source DDoS | 140 Р·Р°РїСЂРѕСЃРѕРІ Р·Р° СЃРµРєСѓРЅРґСѓ РѕС‚ РѕРґРЅРѕРіРѕ IP | РЎСЂР°Р±Р°С‚С‹РІР°РµС‚ emergency single-source detection |
-| Distributed DDoS | 240 Р·Р°РїСЂРѕСЃРѕРІ Р·Р° СЃРµРєСѓРЅРґСѓ РѕС‚ РјРЅРѕРіРёС… IP | РЎСЂР°Р±Р°С‚С‹РІР°РµС‚ emergency botnet-like detection |
-| High cardinality | РњРЅРѕРіРѕ СѓРЅРёРєР°Р»СЊРЅС‹С… path Рё РёСЃС‚РѕС‡РЅРёРєРѕРІ | State РѕСЃС‚Р°РµС‚СЃСЏ РѕРіСЂР°РЅРёС‡РµРЅРЅС‹Рј, publish output capped |
+| Profil | Rezhim | Passed | Events | Adaptive entries | Actions | L7 suggestions | Normal false positives | Bazovyy conn/rate/burst |
+| --- | --- | --- | ---: | ---: | --- | ---: | ---: | --- |
+{ROWS}
 
-## False Positive
+## Matritsa na 30 aktorov
 
-РќРѕСЂРјР°Р»СЊРЅС‹Р№ РёСЃС‚РѕС‡РЅРёРє РїСЂРѕРІРµСЂСЏРµС‚СЃСЏ РѕС‚РґРµР»СЊРЅРѕ РѕС‚ Р°С‚Р°РєСѓСЋС‰РёС… РёСЃС‚РѕС‡РЅРёРєРѕРІ. РљСЂРёС‚РµСЂРёР№ РїСЂРёРµРјРєРё Р¶РµСЃС‚РєРёР№: normal_false_positive_entries РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ 0 РІ РєР°Р¶РґРѕРј РїСЂРѕС„РёР»Рµ.
+| Gruppa aktorov | Kol-vo | Relevatnost po rezhimam | Ozhidaemyy signal |
+| --- | ---: | --- | --- |
+| Obychnye polzovateli (`web`, `mobile`, `trusted`) | 10 | vse rezhimy | net adaptive false positive |
+| Scanner-istochniki | 8 | `hybrid`, `adaptive-only` | poyavlyayutsya L7 suggestions i snizhaetsya trust |
+| Brute-force + payload istochniki | 6 | `hybrid`, `adaptive-only` | adaptive-eskalatsiya s explainable-prichinami |
+| Flood-istochniki (`single` + `distributed`) | 6+ synthetic spread | vse rezhimy | baseline zashchita v `classic`, emergency/adaptive eskalatsiya v `hybrid`/`adaptive-only` |
 
-## РђСЂС‚РµС„Р°РєС‚С‹
+## Artefakty
 
-$RunDir
+{RUN_DIR}
 
-Р’ РєР°Р¶РґРѕРј РєР°С‚Р°Р»РѕРіРµ РїСЂРѕС„РёР»СЏ Р»РµР¶Р°С‚ result.json, adaptive.json, l7-suggestions.json, model-state.json Рё report.md.
+## Kak vosproizvesti
 
-## РџРѕРІС‚РѕСЂРёС‚СЊ РїСЂРѕРіРѕРЅ
-
-./scripts/smoke-sentinel-enterprise.ps1
-
-Р­С‚Рѕ smoke Рё evidence test, Р° РЅРµ Р·Р°РјРµРЅР° РІРЅРµС€РЅРµРјСѓ РЅР°РіСЂСѓР·РѕС‡РЅРѕРјСѓ С‚РµСЃС‚РёСЂРѕРІР°РЅРёСЋ. РћРЅ РїСЂРѕРІРµСЂСЏРµС‚ РєРѕРЅС‚СѓСЂ РїСЂРѕРґСѓРєС‚Р°: ingestion Р»РѕРіРѕРІ runtime, score calculation, explainable reasons, adaptive output compatibility, L7 suggestions, FP safety Рё Р·Р°РїСѓСЃРє HA-РїСЂРѕС„РёР»СЏ.
-"@
+`./scripts/smoke-sentinel-enterprise.ps1`
+'@
+  $md = $md.Replace("{RUN_DATE}", (Get-Date -Format "yyyy-MM-dd HH:mm:ss zzz"))
+  $md = $md.Replace("{ROWS}", ($rows -join "`n"))
+  $md = $md.Replace("{RUN_DIR}", $RunDir)
   Set-Content -LiteralPath $Path -Value $md -Encoding UTF8
+}
+
+function Invoke-ModeRun {
+  param(
+    [string]$ScriptPath,
+    [string]$ComposeFile,
+    [string]$ProfileName,
+    [string]$Mode,
+    [string]$OutputDir,
+    [int]$WaitSeconds
+  )
+
+  $originalModelEnabled = $env:WAF_DEFAULT_ANTIDDOS_MODEL_ENABLED
+  $originalSentinelModelEnabled = $env:DDOS_MODEL_ENABLED
+  $originalRuntimeRoot = $env:DDOS_MODEL_RUNTIME_ROOT
+  $originalConnLimit = $env:WAF_DEFAULT_ANTIDDOS_CONN_LIMIT
+  $originalRate = $env:WAF_DEFAULT_ANTIDDOS_RATE_PER_SECOND
+  $originalBurst = $env:WAF_DEFAULT_ANTIDDOS_RATE_BURST
+
+  try {
+    switch ($Mode) {
+      "classic-only" {
+        $env:WAF_DEFAULT_ANTIDDOS_MODEL_ENABLED = "false"
+        $env:DDOS_MODEL_ENABLED = "false"
+        $env:DDOS_MODEL_RUNTIME_ROOT = "/var/lib/waf-disabled"
+        $env:WAF_DEFAULT_ANTIDDOS_CONN_LIMIT = "120"
+        $env:WAF_DEFAULT_ANTIDDOS_RATE_PER_SECOND = "180"
+        $env:WAF_DEFAULT_ANTIDDOS_RATE_BURST = "360"
+      }
+      "adaptive-only" {
+        $env:WAF_DEFAULT_ANTIDDOS_MODEL_ENABLED = "true"
+        $env:DDOS_MODEL_ENABLED = "true"
+        $env:DDOS_MODEL_RUNTIME_ROOT = "/var/lib/waf-disabled"
+        $env:WAF_DEFAULT_ANTIDDOS_CONN_LIMIT = "50000"
+        $env:WAF_DEFAULT_ANTIDDOS_RATE_PER_SECOND = "20000"
+        $env:WAF_DEFAULT_ANTIDDOS_RATE_BURST = "40000"
+      }
+      default {
+        $env:WAF_DEFAULT_ANTIDDOS_MODEL_ENABLED = "true"
+        $env:DDOS_MODEL_ENABLED = "true"
+        $env:DDOS_MODEL_RUNTIME_ROOT = "/var/lib/waf"
+        $env:WAF_DEFAULT_ANTIDDOS_CONN_LIMIT = "120"
+        $env:WAF_DEFAULT_ANTIDDOS_RATE_PER_SECOND = "180"
+        $env:WAF_DEFAULT_ANTIDDOS_RATE_BURST = "360"
+      }
+    }
+
+    & $ScriptPath -ComposeFile $ComposeFile -ProfileName $ProfileName -Mode $Mode -OutputDir $OutputDir -WaitSeconds $WaitSeconds
+  } finally {
+    $env:WAF_DEFAULT_ANTIDDOS_MODEL_ENABLED = $originalModelEnabled
+    $env:DDOS_MODEL_ENABLED = $originalSentinelModelEnabled
+    $env:DDOS_MODEL_RUNTIME_ROOT = $originalRuntimeRoot
+    $env:WAF_DEFAULT_ANTIDDOS_CONN_LIMIT = $originalConnLimit
+    $env:WAF_DEFAULT_ANTIDDOS_RATE_PER_SECOND = $originalRate
+    $env:WAF_DEFAULT_ANTIDDOS_RATE_BURST = $originalBurst
+  }
 }
 
 $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
@@ -163,29 +203,36 @@ New-Item -ItemType Directory -Force -Path $runDir | Out-Null
 
 $script = Join-Path $PSScriptRoot "smoke-sentinel.ps1"
 $results = New-Object System.Collections.Generic.List[object]
+$modes = @("classic-only", "hybrid", "adaptive-only")
+
 $env:DDOS_MODEL_SUGGEST_MIN_HITS = "4"
 $env:DDOS_MODEL_SUGGEST_MIN_UNIQUE_IPS = "2"
-$env:DDOS_MODEL_RUNTIME_ROOT = "/var/lib/waf-smoke-no-runtime-profile"
+$env:DDOS_MODEL_RUNTIME_ROOT = "/var/lib/waf"
 
 if (-not $SkipDefault) {
-  $defaultDir = Join-Path $runDir "default"
-  & $script -ComposeFile $DefaultCompose -ProfileName "default" -OutputDir $defaultDir -WaitSeconds $WaitSeconds
-  $results.Add((Read-Result (Join-Path $defaultDir "result.json")))
+  foreach ($mode in $modes) {
+    $defaultDir = Join-Path $runDir ("default-" + $mode)
+    Invoke-ModeRun -ScriptPath $script -ComposeFile $DefaultCompose -ProfileName "default" -Mode $mode -OutputDir $defaultDir -WaitSeconds $WaitSeconds
+    $results.Add((Read-Result (Join-Path $defaultDir "result.json")))
+  }
 }
 
 if (-not $SkipHaLab) {
-  $haDir = Join-Path $runDir "ha-lab"
-  & $script -ComposeFile $HaLabCompose -ProfileName "ha-lab" -OutputDir $haDir -WaitSeconds $WaitSeconds
-  $results.Add((Read-Result (Join-Path $haDir "result.json")))
+  foreach ($mode in $modes) {
+    $haDir = Join-Path $runDir ("ha-lab-" + $mode)
+    Invoke-ModeRun -ScriptPath $script -ComposeFile $HaLabCompose -ProfileName "ha-lab" -Mode $mode -OutputDir $haDir -WaitSeconds $WaitSeconds
+    $results.Add((Read-Result (Join-Path $haDir "result.json")))
+  }
 }
 
-Write-EnglishWiki $WikiEnglishPath $runDir $results
-Write-RussianWiki $WikiRussianPath $runDir $results
+Write-EnglishWiki -Path $WikiEnglishPath -RunDir $runDir -Results $results
+Write-RussianWiki -Path $WikiRussianPath -RunDir $runDir -Results $results
 
 $summary = [ordered]@{
   generated_at = (Get-Date).ToUniversalTime().ToString("o")
   run_dir = $runDir
-  profiles = @($results | ForEach-Object { $_.profile })
+  profiles = @($results | ForEach-Object { $_.profile } | Sort-Object -Unique)
+  modes = @($results | ForEach-Object { $_.mode } | Sort-Object -Unique)
   passed = (@($results | Where-Object { -not $_.passed }).Count -eq 0)
   wiki = @($WikiEnglishPath, $WikiRussianPath)
 }
@@ -196,4 +243,3 @@ $summary | ConvertTo-Json -Depth 6
 if (-not $summary.passed) {
   throw "sentinel enterprise smoke failed"
 }
-

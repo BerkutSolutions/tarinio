@@ -37,6 +37,7 @@ type Config struct {
 	Redis            redis.Config
 	HA               HAConfig
 	Metrics          MetricsConfig
+	SentinelBanSync  SentinelBanSyncConfig
 }
 
 type ACMEConfig struct {
@@ -88,6 +89,15 @@ type HAConfig struct {
 
 type MetricsConfig struct {
 	Token string
+}
+
+type SentinelBanSyncConfig struct {
+	Enabled             bool
+	AdaptivePath        string
+	StatePath           string
+	PollIntervalSeconds int
+	MinScore            float64
+	MaxPromotionsPerTick int
 }
 
 func LoadFromEnv() (Config, error) {
@@ -144,6 +154,14 @@ func LoadFromEnv() (Config, error) {
 			LeaderLockTTLSeconds:    30,
 		},
 		Metrics: MetricsConfig{},
+		SentinelBanSync: SentinelBanSyncConfig{
+			Enabled:              false,
+			AdaptivePath:         "/etc/waf/l4guard-adaptive/adaptive.json",
+			StatePath:            filepath.Join(defaultRuntimeRoot, defaultRevisionsDir, "sentinel-ban-sync", "state.json"),
+			PollIntervalSeconds:  5,
+			MinScore:             10,
+			MaxPromotionsPerTick: 5,
+		},
 	}
 
 	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_HTTP_ADDR")); value != "" {
@@ -154,9 +172,11 @@ func LoadFromEnv() (Config, error) {
 		cfg.RevisionStoreDir = filepath.Join(value, defaultRevisionsDir)
 		cfg.ACME.StateDir = filepath.Join(value, defaultRevisionsDir, "acme-state")
 		cfg.ACME.ChallengeDir = filepath.Join(value, defaultRevisionsDir, "acme-challenges")
+		cfg.SentinelBanSync.StatePath = filepath.Join(value, defaultRevisionsDir, "sentinel-ban-sync", "state.json")
 	}
 	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_REVISION_STORE_DIR")); value != "" {
 		cfg.RevisionStoreDir = value
+		cfg.SentinelBanSync.StatePath = filepath.Join(value, "sentinel-ban-sync", "state.json")
 	}
 	if value := strings.TrimSpace(os.Getenv("POSTGRES_DSN")); value != "" {
 		cfg.PostgresDSN = value
@@ -315,6 +335,36 @@ func LoadFromEnv() (Config, error) {
 	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_METRICS_TOKEN")); value != "" {
 		cfg.Metrics.Token = value
 	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_SENTINEL_BAN_SYNC_ENABLED")); value != "" {
+		cfg.SentinelBanSync.Enabled = !strings.EqualFold(value, "false") && value != "0"
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_SENTINEL_BAN_SYNC_ADAPTIVE_PATH")); value != "" {
+		cfg.SentinelBanSync.AdaptivePath = value
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_SENTINEL_BAN_SYNC_STATE_PATH")); value != "" {
+		cfg.SentinelBanSync.StatePath = value
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_SENTINEL_BAN_SYNC_POLL_SECONDS")); value != "" {
+		seconds, err := strconv.Atoi(value)
+		if err != nil || seconds <= 0 {
+			return Config{}, fmt.Errorf("sentinel ban sync poll seconds must be a positive integer")
+		}
+		cfg.SentinelBanSync.PollIntervalSeconds = seconds
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_SENTINEL_BAN_SYNC_MIN_SCORE")); value != "" {
+		minScore, err := strconv.ParseFloat(value, 64)
+		if err != nil || minScore <= 0 {
+			return Config{}, fmt.Errorf("sentinel ban sync min score must be a positive number")
+		}
+		cfg.SentinelBanSync.MinScore = minScore
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_SENTINEL_BAN_SYNC_MAX_PROMOTIONS_PER_TICK")); value != "" {
+		limit, err := strconv.Atoi(value)
+		if err != nil || limit <= 0 {
+			return Config{}, fmt.Errorf("sentinel ban sync max promotions per tick must be a positive integer")
+		}
+		cfg.SentinelBanSync.MaxPromotionsPerTick = limit
+	}
 
 	if err := validate(cfg); err != nil {
 		return Config{}, err
@@ -405,6 +455,20 @@ func validate(cfg Config) error {
 		}
 		if cfg.HA.LeaderLockTTLSeconds <= 0 {
 			return fmt.Errorf("ha leader lock ttl must be positive")
+		}
+	}
+	if cfg.SentinelBanSync.Enabled {
+		if strings.TrimSpace(cfg.SentinelBanSync.AdaptivePath) == "" {
+			return fmt.Errorf("sentinel ban sync adaptive path is required when enabled")
+		}
+		if cfg.SentinelBanSync.PollIntervalSeconds <= 0 {
+			return fmt.Errorf("sentinel ban sync poll interval must be positive")
+		}
+		if cfg.SentinelBanSync.MinScore <= 0 {
+			return fmt.Errorf("sentinel ban sync min score must be positive")
+		}
+		if cfg.SentinelBanSync.MaxPromotionsPerTick <= 0 {
+			return fmt.Errorf("sentinel ban sync max promotions per tick must be positive")
 		}
 	}
 	return nil

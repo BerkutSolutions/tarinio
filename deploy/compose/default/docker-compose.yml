@@ -15,6 +15,11 @@ services:
       WAF_RUNTIME_HEALTH_URL: http://runtime:8081/readyz
       WAF_RUNTIME_RELOAD_URL: http://runtime:8081/reload
       WAF_RUNTIME_API_TOKEN: ${WAF_RUNTIME_API_TOKEN:?set WAF_RUNTIME_API_TOKEN in .env}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_ENABLED: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_ENABLED:-true}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_ADAPTIVE_PATH: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_ADAPTIVE_PATH:-/etc/waf/l4guard-adaptive/adaptive.json}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_POLL_SECONDS: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_POLL_SECONDS:-5}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_MIN_SCORE: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_MIN_SCORE:-10}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_MAX_PROMOTIONS_PER_TICK: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_MAX_PROMOTIONS_PER_TICK:-5}
       WAF_DEFAULT_BAD_BEHAVIOR_BAN_TIME_SECONDS: ${WAF_DEFAULT_BAD_BEHAVIOR_BAN_TIME_SECONDS:-300}
       WAF_DEFAULT_BAD_BEHAVIOR_THRESHOLD: ${WAF_DEFAULT_BAD_BEHAVIOR_THRESHOLD:-20}
       WAF_DEFAULT_BAD_BEHAVIOR_COUNT_TIME_SECONDS: ${WAF_DEFAULT_BAD_BEHAVIOR_COUNT_TIME_SECONDS:-30}
@@ -63,6 +68,7 @@ services:
       - waf-runtime-data:/var/lib/waf
       - waf-control-plane-data:/var/lib/waf/control-plane
       - waf-certificates-data:/var/lib/waf/control-plane/certificate-materials
+      - waf-l4-adaptive:/etc/waf/l4guard-adaptive:ro
       - waf-vault-bootstrap-data:/var/run/waf-secrets:ro
       - /var/run/docker.sock:/var/run/docker.sock
     expose:
@@ -228,6 +234,7 @@ services:
     container_name: tarinio-sentinel
     restart: unless-stopped
     environment:
+      MODEL_ENABLED: ${DDOS_MODEL_ENABLED:-true}
       MODEL_SOURCE_BACKEND: ${MODEL_SOURCE_BACKEND:-file}
       MODEL_LOG_PATH: /logs/access.log
       MODEL_STATE_PATH: /state/model-state.json
@@ -271,8 +278,8 @@ services:
       retries: 8
     networks:
       - waf-net
-    mem_limit: 256m
-    cpus: 0.5
+    mem_limit: ${SENTINEL_MEM_LIMIT:-512m}
+    cpus: ${SENTINEL_CPU_LIMIT:-0.75}
 
   cli:
     build:

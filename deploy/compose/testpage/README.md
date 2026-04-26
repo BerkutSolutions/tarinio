@@ -30,7 +30,7 @@ This profile runs two isolated WAF stacks in one compose project:
 
 Additionally:
 - `request-archive` container collects request logs from both runtimes.
-- `ddos-model-mgmt` and `ddos-model-app` provide independent adaptive DDoS scoring per runtime.
+- `tarinio-sentinel-mgmt` and `tarinio-sentinel-app` provide independent adaptive DDoS scoring per runtime.
 
 Notes:
 - `test-login-app` has no host port mapping (traffic goes only through WAF on `8081`).
@@ -55,8 +55,8 @@ Why this proves independence:
 
 This profile includes two adaptive model containers:
 
-- `ddos-model-mgmt` for management runtime (`8080`)
-- `ddos-model-app` for app runtime (`8081`)
+- `tarinio-sentinel-mgmt` for management runtime (`8080`)
+- `tarinio-sentinel-app` for app runtime (`8081`)
 
 They parse runtime access logs, compute per-IP risk score with decay, and publish adaptive L4 rules (`throttle` -> `drop`) into dedicated volumes.
 
@@ -147,8 +147,8 @@ docker compose exec request-archive sh -lc "tail -n 40 /archive/requests.jsonl"
 Inspect adaptive model output:
 
 ```powershell
-docker compose exec ddos-model-mgmt sh -lc "cat /out/adaptive.json"
-docker compose exec ddos-model-app sh -lc "cat /out/adaptive.json"
+docker compose exec tarinio-sentinel-mgmt sh -lc "cat /out/adaptive.json"
+docker compose exec tarinio-sentinel-app sh -lc "cat /out/adaptive.json"
 ```
 
 Status:

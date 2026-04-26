@@ -83,12 +83,14 @@ Sentinel detects hot scanner paths and writes L7 candidates. Control-plane store
 - `POST|PUT /core-docs/api/anti-ddos/rule-suggestions`;
 - `POST|PUT /core-docs/api/anti-ddos/rule-suggestions/{id}/status`.
 
-The MVP statuses are:
+The lifecycle statuses are:
 
 - `suggested`: visible candidate, no runtime blocking;
-- `shadow`: would-block counters are collected, still no runtime blocking.
+- `shadow`: would-block counters are collected, still no runtime blocking;
+- `temporary`: runtime candidate is enabled with TTL and rollback safety;
+- `permanent`: candidate reached promotion thresholds and requires final operator review/approval.
 
-There is no automatic permanent apply in current release.
+Current release keeps permanent enforcement conservative: there is no unconditional automatic permanent apply.
 
 ## False Positive Safety
 
@@ -105,7 +107,8 @@ The safety model is conservative:
 
 Recommended container limits:
 
-- default profile: `0.5 CPU`, `256MB`;
+- default profile: `0.75 CPU`, `512MB`;
+- enterprise profile: `0.75 CPU`, `512MB`;
 - High Availability lab: `0.75 CPU`, `512MB`;
 - minimum practical range: `0.25-0.75 CPU`, `128-512MB`.
 

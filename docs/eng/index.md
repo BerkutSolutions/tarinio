@@ -4,7 +4,7 @@ This page belongs to the current documentation branch.
 
 This is the main English index for TARINIO documentation. It is structured as an operator wiki for the real `current release` product and is meant to complement the Russian branch, not lag behind it.
 
-Documentation cycle baseline: `3.0.4`.
+Documentation cycle baseline: `3.0.5`.
 
 ## Start Here
 
@@ -104,7 +104,6 @@ Stage 0 architecture decisions remain the binding foundation:
 - `docs/architecture/`
 
 Those documents define product boundaries, revision semantics, compilation, and deployment assumptions.
-
 
 
 

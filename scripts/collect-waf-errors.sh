@@ -17,7 +17,7 @@ set -u
 #   SINCE=24h
 #   RUNTIME_CONTAINER=tarinio-runtime
 #   CONTROL_PLANE_CONTAINER=tarinio-control-plane
-#   DDOS_MODEL_CONTAINER=tarinio-ddos-model
+#   DDOS_MODEL_CONTAINER=tarinio-sentinel
 #   UI_CONTAINER=tarinio-ui
 #   FILTER_HOST=example.com
 #   FILTER_IP=203.0.113.10 198.51.100.20
@@ -25,7 +25,7 @@ set -u
 SINCE="${SINCE:-24h}"
 RUNTIME_CONTAINER="${RUNTIME_CONTAINER:-tarinio-runtime}"
 CONTROL_PLANE_CONTAINER="${CONTROL_PLANE_CONTAINER:-tarinio-control-plane}"
-DDOS_MODEL_CONTAINER="${DDOS_MODEL_CONTAINER:-tarinio-ddos-model}"
+DDOS_MODEL_CONTAINER="${DDOS_MODEL_CONTAINER:-tarinio-sentinel}"
 UI_CONTAINER="${UI_CONTAINER:-tarinio-ui}"
 FILTER_HOST="${FILTER_HOST:-}"
 FILTER_IP="${FILTER_IP:-}"

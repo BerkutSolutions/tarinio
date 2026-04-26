@@ -2,7 +2,7 @@
 
 Эта страница относится к текущей ветке документации.
 
-Релизный baseline для этой ревизии документа: `3.0.4`.
+Релизный baseline для этой ревизии документа: `3.0.5`.
 
 Документ описывает фактическую модель обработки и хранения request-логов в TARINIO.
 
@@ -66,7 +66,7 @@
 - `Vault`
 - `runtime`
 - `ui`
-- `ddos-model`
+- `tarinio-sentinel`
 
 В этом режиме `OpenSearch` — основной request backend, локальный архив — fallback.
 
@@ -94,4 +94,3 @@
 
 - `deploy/lab-k8s-terraform/k8s/scripts/smoke-k8s-lab.ps1`
 - `deploy/lab-k8s-terraform/k8s/scripts/apply-profile-opensearch-clickhouse.ps1`
-

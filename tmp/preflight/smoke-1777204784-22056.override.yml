@@ -1,0 +1,39 @@
+services:
+  control-plane:
+    container_name: tarinio-control-plane-1777204784-22056
+    env_file:
+      - "C:/Trash/Development/WAF/tmp/preflight/smoke-1777204784-22056.env"
+  runtime:
+    container_name: tarinio-runtime-1777204784-22056
+    ports:
+      - "50927:443"
+  redis:
+    container_name: tarinio-redis-1777204784-22056
+  postgres:
+    container_name: tarinio-postgres-1777204784-22056
+  ui:
+    container_name: tarinio-ui-1777204784-22056
+    ports:
+      - "50926:80"
+  tarinio-sentinel:
+    container_name: tarinio-sentinel-1777204784-22056
+
+networks:
+  waf-net:
+    name: waf-net-1777204784-22056
+
+volumes:
+  waf-runtime-data:
+    name: waf-runtime-data-1777204784-22056
+  waf-control-plane-data:
+    name: waf-control-plane-data-1777204784-22056
+  waf-certificates-data:
+    name: waf-certificates-data-1777204784-22056
+  waf-postgres-data:
+    name: waf-postgres-data-1777204784-22056
+  waf-nginx-logs:
+    name: waf-nginx-logs-1777204784-22056
+  waf-l4-adaptive:
+    name: waf-l4-adaptive-1777204784-22056
+  waf-ddos-model-state:
+    name: waf-ddos-model-state-1777204784-22056

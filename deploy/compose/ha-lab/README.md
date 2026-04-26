@@ -35,7 +35,7 @@ Main endpoints:
 - `redis`
 - `ui`
 - `runtime`
-- `ddos-model`
+- `tarinio-sentinel`
 - `demo-app`
 - `toolbox` profile
   - helper container with `curl`, `jq`, and `waf-cli`
@@ -178,7 +178,7 @@ The benchmark pack saves timestamped JSON summaries under `benchmarks/results` a
 Logs:
 
 ```powershell
-docker compose logs -f api-lb control-plane-a control-plane-b runtime ddos-model
+docker compose logs -f api-lb control-plane-a control-plane-b runtime tarinio-sentinel
 ```
 
 Status:
@@ -190,7 +190,7 @@ docker compose ps
 Inspect adaptive decisions:
 
 ```powershell
-docker compose exec ddos-model sh -lc "cat /out/adaptive.json"
+docker compose exec tarinio-sentinel sh -lc "cat /out/adaptive.json"
 ```
 
 Stop:

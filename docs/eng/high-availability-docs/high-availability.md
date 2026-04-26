@@ -140,7 +140,7 @@ This profile includes:
 - `redis`
 - `ui`
 - `runtime`
-- `ddos-model`
+- `tarinio-sentinel`
 - `demo-app`
 - `toolbox`
 - optional `prometheus`, `grafana`, `postgres-exporter`, `redis-exporter` through the `observability` profile

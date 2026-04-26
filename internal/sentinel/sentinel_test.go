@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	sentinelsource "waf/internal/sentinel/source"
 )
 
 func TestDecideActionThresholds(t *testing.T) {
@@ -29,6 +31,21 @@ func TestDecideActionThresholds(t *testing.T) {
 		if got := decideAction(cfg, tc.score); got != tc.want {
 			t.Fatalf("score %.2f: expected %q, got %q", tc.score, tc.want, got)
 		}
+	}
+}
+
+func TestNewSourceBackendModes(t *testing.T) {
+	fileBackend := newSourceBackend(Config{SourceBackend: "file", LogPath: "access.log"})
+	if _, ok := fileBackend.(*sentinelsource.FileBackend); !ok {
+		t.Fatalf("expected file backend for file mode, got %T", fileBackend)
+	}
+	redisBackend := newSourceBackend(Config{SourceBackend: "redis", LogPath: "access.log"})
+	if _, ok := redisBackend.(*sentinelsource.FallbackBackend); !ok {
+		t.Fatalf("expected fallback backend for redis mode, got %T", redisBackend)
+	}
+	unknownBackend := newSourceBackend(Config{SourceBackend: "unknown", LogPath: "access.log"})
+	if _, ok := unknownBackend.(*sentinelsource.FallbackBackend); !ok {
+		t.Fatalf("expected fallback backend for unknown mode, got %T", unknownBackend)
 	}
 }
 
@@ -204,6 +221,100 @@ func TestBuildRuleSuggestionsAccumulatesShadowHits(t *testing.T) {
 	}
 }
 
+func TestBuildRuleSuggestionsPipelinePromotions(t *testing.T) {
+	now := time.Now().UTC()
+	cfg := Config{
+		SuggestMinHits:              10,
+		SuggestMinUniqueIPs:         2,
+		SuggestShadowPromoteHits:    15,
+		SuggestTemporaryPromoteHits: 30,
+		SuggestPermanentPromoteHits: 50,
+		SuggestShadowMaxFPRate:      0.05,
+		SuggestTemporaryHoldSeconds: 60,
+		SuggestPermanentMinLifetime: 30 * time.Second,
+	}
+	stats := map[string]*scannerPathStat{
+		"/.env": {
+			Hits:      20,
+			IPs:       map[string]struct{}{"203.0.113.1": {}, "203.0.113.2": {}},
+			FirstSeen: now.Add(-2 * time.Minute),
+			LastSeen:  now,
+		},
+	}
+	suggestions := buildRuleSuggestions(cfg, stats, nil, now)
+	if len(suggestions) != 1 || suggestions[0].Status != "shadow" {
+		t.Fatalf("expected promote to shadow, got %+v", suggestions)
+	}
+
+	stats["/.env"].Hits = 35
+	stats["/.env"].FirstSeen = now.Add(-3 * time.Minute)
+	stats["/.env"].LastSeen = now.Add(5 * time.Second)
+	suggestions = buildRuleSuggestions(cfg, stats, suggestions, now.Add(5*time.Second))
+	if len(suggestions) != 1 || suggestions[0].Status != "temporary" {
+		t.Fatalf("expected promote to temporary, got %+v", suggestions)
+	}
+	if suggestions[0].TemporaryUntil == "" {
+		t.Fatal("expected temporary_until for temporary stage")
+	}
+
+	stats["/.env"].Hits = 25
+	stats["/.env"].FirstSeen = now.Add(-4 * time.Minute)
+	stats["/.env"].LastSeen = now.Add(70 * time.Second)
+	suggestions = buildRuleSuggestions(cfg, stats, suggestions, now.Add(70*time.Second))
+	if len(suggestions) != 1 || suggestions[0].Status != "permanent" {
+		t.Fatalf("expected candidate promote to permanent, got %+v", suggestions)
+	}
+	if suggestions[0].PromotionReason == "" {
+		t.Fatal("expected promotion reason for permanent candidate")
+	}
+}
+
+func TestBuildRuleSuggestionsRollsBackOnHighShadowFalsePositiveRate(t *testing.T) {
+	now := time.Now().UTC()
+	cfg := Config{
+		SuggestMinHits:              10,
+		SuggestMinUniqueIPs:         2,
+		SuggestShadowPromoteHits:    15,
+		SuggestTemporaryPromoteHits: 25,
+		SuggestPermanentPromoteHits: 50,
+		SuggestShadowMaxFPRate:      0.05,
+	}
+	stats := map[string]*scannerPathStat{
+		"/.env": {
+			Hits:        30,
+			SuccessHits: 20,
+			IPs:         map[string]struct{}{"203.0.113.1": {}, "203.0.113.2": {}},
+			FirstSeen:   now.Add(-time.Minute),
+			LastSeen:    now,
+		},
+	}
+	previous := []RuleSuggestion{{PathPrefix: "/.env", Status: "shadow", ShadowHits: 30, ShadowFP: 0}}
+	suggestions := buildRuleSuggestions(cfg, stats, previous, now)
+	if len(suggestions) != 1 {
+		t.Fatalf("expected one suggestion, got %d", len(suggestions))
+	}
+	if suggestions[0].Status != "suggested" {
+		t.Fatalf("expected rollback to suggested on high fp rate, got %q", suggestions[0].Status)
+	}
+}
+
+func TestBuildRuleSuggestionsPrunesStaleSuggestions(t *testing.T) {
+	now := time.Now().UTC()
+	cfg := Config{
+		SuggestMinHits:            10,
+		SuggestMinUniqueIPs:       2,
+		SuggestInactiveTTLSeconds: 60,
+	}
+	previous := []RuleSuggestion{
+		{PathPrefix: "/.env", Status: "shadow", LastSeen: now.Add(-2 * time.Minute).Format(time.RFC3339)},
+		{PathPrefix: "/wp-admin", Status: "suggested", LastSeen: now.Add(-20 * time.Second).Format(time.RFC3339)},
+	}
+	got := buildRuleSuggestions(cfg, nil, previous, now)
+	if len(got) != 1 || got[0].PathPrefix != "/wp-admin" {
+		t.Fatalf("expected stale suggestion to be pruned, got %+v", got)
+	}
+}
+
 func TestBuildRuleSuggestionsPreservesPreviousOnQuietTick(t *testing.T) {
 	now := time.Now().UTC()
 	previous := []RuleSuggestion{
@@ -217,7 +328,7 @@ func TestBuildRuleSuggestionsPreservesPreviousOnQuietTick(t *testing.T) {
 		},
 	}
 
-	got := buildRuleSuggestions(Config{SuggestMinHits: 10, SuggestMinUniqueIPs: 2}, nil, previous, now)
+	got := buildRuleSuggestions(Config{SuggestMinHits: 10, SuggestMinUniqueIPs: 2, SuggestInactiveTTLSeconds: 3600}, nil, previous, now)
 	if len(got) != 1 {
 		t.Fatalf("expected previous suggestion to be preserved, got %d", len(got))
 	}
@@ -227,6 +338,52 @@ func TestBuildRuleSuggestionsPreservesPreviousOnQuietTick(t *testing.T) {
 	previous[0].PathPrefix = "/changed"
 	if got[0].PathPrefix != "/.env" {
 		t.Fatal("expected preserved suggestions to be copied")
+	}
+}
+
+func TestConsumeActionBudgetRespectsLimitAndWindowReset(t *testing.T) {
+	now := time.Now().UTC()
+	st := State{}
+	cfg := Config{MaxActionsPerMinute: 2}
+
+	if !consumeActionBudget(&st, cfg, now) {
+		t.Fatal("expected first action in window")
+	}
+	if !consumeActionBudget(&st, cfg, now.Add(10*time.Second)) {
+		t.Fatal("expected second action in window")
+	}
+	if consumeActionBudget(&st, cfg, now.Add(20*time.Second)) {
+		t.Fatal("expected third action to be rejected by max actions per minute")
+	}
+	if !consumeActionBudget(&st, cfg, now.Add(70*time.Second)) {
+		t.Fatal("expected action budget reset after one minute")
+	}
+}
+
+func TestNewSourceBackendRedisFallsBackToFile(t *testing.T) {
+	tmp := t.TempDir()
+	logPath := filepath.Join(tmp, "access.log")
+	line := `{"timestamp":"2026-04-26T12:00:00Z","client_ip":"203.0.113.44","site":"control-plane-access","status":404,"method":"GET","uri":"/.env","user_agent":"sqlmap"}` + "\n"
+	if err := os.WriteFile(logPath, []byte(line), 0o644); err != nil {
+		t.Fatalf("write access log: %v", err)
+	}
+
+	cfg := Config{
+		SourceBackend: "redis",
+		LogPath:       logPath,
+	}
+	items, nextOffset, err := readNewEvents(newSourceBackend(cfg), 0)
+	if err != nil {
+		t.Fatalf("read events with redis fallback: %v", err)
+	}
+	if nextOffset <= 0 {
+		t.Fatalf("expected next offset > 0, got %d", nextOffset)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected 1 parsed event, got %d", len(items))
+	}
+	if items[0].ip != "203.0.113.44" {
+		t.Fatalf("unexpected event ip: %+v", items[0])
 	}
 }
 
@@ -279,5 +436,45 @@ func TestRenderAdaptivePayload_ExplainabilityFields(t *testing.T) {
 	}
 	if len(entry.Recommendations) == 0 {
 		t.Fatal("expected recommendations in adaptive entry")
+	}
+}
+
+func TestResolveActionTransitionRequiresConsecutiveTicks(t *testing.T) {
+	cfg := Config{PromotionConsecutiveTicks: 2}
+	rec := Record{}
+
+	action, transitioned := resolveActionTransition(&rec, "watch", "drop", cfg, false)
+	if transitioned {
+		t.Fatal("expected first promotion tick to stay pending")
+	}
+	if action != "watch" {
+		t.Fatalf("expected action to remain watch, got %q", action)
+	}
+	if rec.CandidateAction != "drop" || rec.CandidateCount != 1 {
+		t.Fatalf("unexpected pending candidate state: %+v", rec)
+	}
+
+	action, transitioned = resolveActionTransition(&rec, "watch", "drop", cfg, false)
+	if !transitioned {
+		t.Fatal("expected transition on second consistent tick")
+	}
+	if action != "drop" {
+		t.Fatalf("expected drop action, got %q", action)
+	}
+	if rec.CandidateAction != "" || rec.CandidateCount != 0 {
+		t.Fatalf("expected candidate state reset, got %+v", rec)
+	}
+}
+
+func TestResolveActionTransitionEmergencyBypassesPendingTicks(t *testing.T) {
+	cfg := Config{PromotionConsecutiveTicks: 3}
+	rec := Record{}
+
+	action, transitioned := resolveActionTransition(&rec, "throttle", "drop", cfg, true)
+	if !transitioned {
+		t.Fatal("expected emergency transition to bypass pending ticks")
+	}
+	if action != "drop" {
+		t.Fatalf("expected drop action, got %q", action)
 	}
 }

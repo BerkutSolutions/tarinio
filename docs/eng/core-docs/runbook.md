@@ -6,7 +6,7 @@ This runbook describes daily operator checks, standard change flow, triage, and 
 
 ## Release Context
 
-Current validated documentation cycle: `3.0.4`.
+Current validated documentation cycle: `3.0.5`.
 
 For Kubernetes/Terraform lab operations and promotion criteria:
 
@@ -126,6 +126,5 @@ Escalation is mandatory when:
 - `docs/eng/core-docs/upgrade.md`
 - `docs/eng/core-docs/backups.md`
 - `docs/eng/model-docs/anti-ddos-runbook.md`
-
 
 

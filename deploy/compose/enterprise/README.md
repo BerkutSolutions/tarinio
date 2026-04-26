@@ -10,7 +10,7 @@
 - `Vault` for secret management
 - `OpenSearch` for hot search / investigations
 - `ClickHouse` for cold analytics / long retention
-- `runtime`, `ui`, and `ddos-model`
+- `runtime`, `ui`, and `tarinio-sentinel`
 - optional `toolbox`
 - optional `Prometheus` and `Grafana`
 
@@ -41,7 +41,7 @@ docker compose --profile tools --profile observability up -d --build
 
 ```powershell
 docker compose ps
-docker compose logs -f api-lb control-plane-a control-plane-b runtime ddos-model
+docker compose logs -f api-lb control-plane-a control-plane-b runtime tarinio-sentinel
 docker compose --profile tools exec toolbox /tools/cluster-status.sh
 docker compose down --remove-orphans
 ```

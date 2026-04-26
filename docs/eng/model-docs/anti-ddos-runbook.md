@@ -112,7 +112,7 @@ docker compose exec tarinio-sentinel sh -lc "cat /out/l7-suggestions.json"
 
 Expected resource envelope:
 
-- default profile: about `0.5 CPU` and `256MB`;
+- default profile: about `0.75 CPU` and `512MB`;
 - High Availability lab: about `0.75 CPU` and `512MB`.
 
 If `adaptive.json` is empty, confirm that the global model is enabled and at least one front service has `adaptive_model_enabled` enabled.

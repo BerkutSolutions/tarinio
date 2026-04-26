@@ -2,7 +2,7 @@
 
 This document describes the real request-log behavior in TARINIO `current release`.
 
-Release baseline for this revision: `3.0.4`.
+Release baseline for this revision: `3.0.5`.
 
 ## Overview
 
@@ -70,7 +70,7 @@ The normal `deploy/compose/default` posture is:
 - `Vault`
 - `runtime`
 - `ui`
-- `ddos-model`
+- `tarinio-sentinel`
 
 In this mode:
 
@@ -105,7 +105,6 @@ For lab profile rollout checks, use:
 
 - `deploy/lab-k8s-terraform/k8s/scripts/smoke-k8s-lab.ps1`
 - `deploy/lab-k8s-terraform/k8s/scripts/apply-profile-opensearch-clickhouse.ps1`
-
 
 
 

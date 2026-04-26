@@ -17,6 +17,11 @@ services:
       WAF_RUNTIME_HEALTH_URL: http://runtime:8081/readyz
       WAF_RUNTIME_RELOAD_URL: http://runtime:8081/reload
       WAF_RUNTIME_API_TOKEN: ${WAF_RUNTIME_API_TOKEN:-default-runtime-shared-token}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_ENABLED: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_ENABLED:-true}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_ADAPTIVE_PATH: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_ADAPTIVE_PATH:-/etc/waf/l4guard-adaptive/adaptive.json}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_POLL_SECONDS: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_POLL_SECONDS:-5}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_MIN_SCORE: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_MIN_SCORE:-10}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_MAX_PROMOTIONS_PER_TICK: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_MAX_PROMOTIONS_PER_TICK:-5}
       POSTGRES_DSN: postgres://${MGMT_POSTGRES_USER:-waf}:${MGMT_POSTGRES_PASSWORD:-waf}@postgres-mgmt:5432/${MGMT_POSTGRES_DB:-waf}?sslmode=disable
       WAF_DEFAULT_LIMIT_REQ_RATE: ${MGMT_WAF_DEFAULT_LIMIT_REQ_RATE:-20r/s}
       WAF_DEFAULT_BAD_BEHAVIOR_BAN_TIME_SECONDS: ${MGMT_WAF_DEFAULT_BAD_BEHAVIOR_BAN_TIME_SECONDS:-10}
@@ -37,6 +42,7 @@ services:
       - waf-test-mgmt-runtime-data:/var/lib/waf
       - waf-test-mgmt-control-plane-data:/var/lib/waf/control-plane
       - waf-test-mgmt-certificates-data:/var/lib/waf/control-plane/certificate-materials
+      - waf-test-mgmt-l4-adaptive:/etc/waf/l4guard-adaptive:ro
       - /var/run/docker.sock:/var/run/docker.sock
     expose:
       - "8080"
@@ -153,6 +159,11 @@ services:
       WAF_RUNTIME_HEALTH_URL: http://runtime-test:8081/readyz
       WAF_RUNTIME_RELOAD_URL: http://runtime-test:8081/reload
       WAF_RUNTIME_API_TOKEN: ${WAF_RUNTIME_API_TOKEN:-default-runtime-shared-token}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_ENABLED: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_ENABLED:-true}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_ADAPTIVE_PATH: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_ADAPTIVE_PATH:-/etc/waf/l4guard-adaptive/adaptive.json}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_POLL_SECONDS: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_POLL_SECONDS:-5}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_MIN_SCORE: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_MIN_SCORE:-10}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_MAX_PROMOTIONS_PER_TICK: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_MAX_PROMOTIONS_PER_TICK:-5}
       POSTGRES_DSN: postgres://${TEST_POSTGRES_USER:-waf}:${TEST_POSTGRES_PASSWORD:-waf}@postgres-app:5432/${TEST_POSTGRES_DB:-waf}?sslmode=disable
       WAF_DEFAULT_LIMIT_REQ_RATE: ${TEST_WAF_DEFAULT_LIMIT_REQ_RATE:-5r/s}
       WAF_DEFAULT_BAD_BEHAVIOR_BAN_TIME_SECONDS: ${TEST_WAF_DEFAULT_BAD_BEHAVIOR_BAN_TIME_SECONDS:-10}
@@ -173,6 +184,7 @@ services:
       - waf-test-app-runtime-data:/var/lib/waf
       - waf-test-app-control-plane-data:/var/lib/waf/control-plane
       - waf-test-app-certificates-data:/var/lib/waf/control-plane/certificate-materials
+      - waf-test-app-l4-adaptive:/etc/waf/l4guard-adaptive:ro
       - /var/run/docker.sock:/var/run/docker.sock
     expose:
       - "8080"
@@ -293,16 +305,19 @@ services:
     networks:
       - waf-test-net
 
-  ddos-model-mgmt:
+  tarinio-sentinel-mgmt:
     build:
       context: ../../..
       dockerfile: deploy/compose/testpage/ddos-model/Dockerfile
-    container_name: tarinio-test-ddos-model-mgmt
+    container_name: tarinio-test-sentinel-mgmt
     restart: unless-stopped
     environment:
+      MODEL_ENABLED: ${DDOS_MODEL_ENABLED:-true}
+      MODEL_SOURCE_BACKEND: ${MODEL_SOURCE_BACKEND:-file}
       MODEL_LOG_PATH: /logs/access.log
       MODEL_STATE_PATH: /state/model-state.json
       MODEL_OUTPUT_PATH: /out/adaptive.json
+      MODEL_SUGGESTIONS_OUTPUT_PATH: /out/l7-suggestions.json
       MODEL_RUNTIME_ROOT: /var/lib/waf
       MODEL_POLL_INTERVAL_SECONDS: ${DDOS_MODEL_POLL_INTERVAL_SECONDS:-2}
       MODEL_DECAY_LAMBDA: ${DDOS_MODEL_DECAY_LAMBDA:-0.08}
@@ -326,21 +341,26 @@ services:
     volumes:
       - waf-test-mgmt-nginx-logs:/logs:ro
       - waf-test-mgmt-runtime-data:/var/lib/waf:ro
-      - waf-test-mgmt-ddos-model-state:/state
+      - waf-test-mgmt-sentinel-state:/state
       - waf-test-mgmt-l4-adaptive:/out
     networks:
       - waf-test-net
+    mem_limit: ${SENTINEL_MEM_LIMIT:-512m}
+    cpus: ${SENTINEL_CPU_LIMIT:-0.75}
 
-  ddos-model-app:
+  tarinio-sentinel-app:
     build:
       context: ../../..
       dockerfile: deploy/compose/testpage/ddos-model/Dockerfile
-    container_name: tarinio-test-ddos-model-app
+    container_name: tarinio-test-sentinel-app
     restart: unless-stopped
     environment:
+      MODEL_ENABLED: ${DDOS_MODEL_ENABLED:-true}
+      MODEL_SOURCE_BACKEND: ${MODEL_SOURCE_BACKEND:-file}
       MODEL_LOG_PATH: /logs/access.log
       MODEL_STATE_PATH: /state/model-state.json
       MODEL_OUTPUT_PATH: /out/adaptive.json
+      MODEL_SUGGESTIONS_OUTPUT_PATH: /out/l7-suggestions.json
       MODEL_RUNTIME_ROOT: /var/lib/waf
       MODEL_POLL_INTERVAL_SECONDS: ${DDOS_MODEL_POLL_INTERVAL_SECONDS:-2}
       MODEL_DECAY_LAMBDA: ${DDOS_MODEL_DECAY_LAMBDA:-0.08}
@@ -364,10 +384,12 @@ services:
     volumes:
       - waf-test-app-nginx-logs:/logs:ro
       - waf-test-app-runtime-data:/var/lib/waf:ro
-      - waf-test-app-ddos-model-state:/state
+      - waf-test-app-sentinel-state:/state
       - waf-test-app-l4-adaptive:/out
     networks:
       - waf-test-net
+    mem_limit: ${SENTINEL_MEM_LIMIT:-512m}
+    cpus: ${SENTINEL_CPU_LIMIT:-0.75}
 
 networks:
   waf-test-net:
@@ -395,10 +417,10 @@ volumes:
     name: waf-test-mgmt-l4-adaptive
   waf-test-app-l4-adaptive:
     name: waf-test-app-l4-adaptive
-  waf-test-mgmt-ddos-model-state:
-    name: waf-test-mgmt-ddos-model-state
-  waf-test-app-ddos-model-state:
-    name: waf-test-app-ddos-model-state
+  waf-test-mgmt-sentinel-state:
+    name: waf-test-mgmt-sentinel-state
+  waf-test-app-sentinel-state:
+    name: waf-test-app-sentinel-state
   waf-test-request-archive-data:
     name: waf-test-request-archive-data
   waf-test-app-control-plane-data:

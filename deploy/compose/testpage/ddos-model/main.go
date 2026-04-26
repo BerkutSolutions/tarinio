@@ -13,7 +13,7 @@ type record = sentinel.Record
 type adaptiveOutput = sentinel.AdaptiveOutput
 
 func main() {
-	sentinel.Run("ddos-model")
+	sentinel.Run("tarinio-sentinel")
 }
 
 func applyRuntimeProfile(base modelConfig, profile runtimeProfile) modelConfig {

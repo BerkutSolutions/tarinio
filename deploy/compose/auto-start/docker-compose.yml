@@ -15,6 +15,11 @@ services:
       WAF_RUNTIME_HEALTH_URL: http://runtime:8081/readyz
       WAF_RUNTIME_RELOAD_URL: http://runtime:8081/reload
       WAF_RUNTIME_API_TOKEN: ${WAF_RUNTIME_API_TOKEN:-default-runtime-shared-token}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_ENABLED: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_ENABLED:-true}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_ADAPTIVE_PATH: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_ADAPTIVE_PATH:-/etc/waf/l4guard-adaptive/adaptive.json}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_POLL_SECONDS: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_POLL_SECONDS:-5}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_MIN_SCORE: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_MIN_SCORE:-10}
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_MAX_PROMOTIONS_PER_TICK: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_MAX_PROMOTIONS_PER_TICK:-5}
       WAF_DEFAULT_BAD_BEHAVIOR_BAN_TIME_SECONDS: ${WAF_DEFAULT_BAD_BEHAVIOR_BAN_TIME_SECONDS:-300}
       WAF_DEFAULT_BAD_BEHAVIOR_THRESHOLD: ${WAF_DEFAULT_BAD_BEHAVIOR_THRESHOLD:-20}
       WAF_DEFAULT_BAD_BEHAVIOR_COUNT_TIME_SECONDS: ${WAF_DEFAULT_BAD_BEHAVIOR_COUNT_TIME_SECONDS:-30}
@@ -53,6 +58,7 @@ services:
       - waf-runtime-data:/var/lib/waf
       - waf-control-plane-data:/var/lib/waf/control-plane
       - waf-certificates-data:/var/lib/waf/control-plane/certificate-materials
+      - waf-l4-adaptive:/etc/waf/l4guard-adaptive:ro
       - /var/run/docker.sock:/var/run/docker.sock
     expose:
       - "8080"
@@ -95,7 +101,7 @@ services:
       - waf-nginx-logs:/var/log/nginx
       - waf-l4-adaptive:/etc/waf/l4guard-adaptive:ro
     ports:
-      - "443:443"
+      - "${WAF_RUNTIME_HTTPS_PORT:-443}:443"
     expose:
       - "80"
       - "8081"
@@ -148,22 +154,24 @@ services:
       control-plane:
         condition: service_started
     ports:
-      - "80:80"
+      - "${WAF_UI_HTTP_PORT:-80}:80"
     expose:
       - "80"
     networks:
       - waf-net
 
-  ddos-model:
+  tarinio-sentinel:
     build:
       context: ../../..
       dockerfile: deploy/compose/auto-start/ddos-model/Dockerfile
-    container_name: tarinio-ddos-model
+    container_name: tarinio-sentinel
     restart: unless-stopped
     environment:
+      MODEL_SOURCE_BACKEND: ${MODEL_SOURCE_BACKEND:-file}
       MODEL_LOG_PATH: /logs/access.log
       MODEL_STATE_PATH: /state/model-state.json
       MODEL_OUTPUT_PATH: /out/adaptive.json
+      MODEL_SUGGESTIONS_OUTPUT_PATH: /out/l7-suggestions.json
       MODEL_RUNTIME_ROOT: /var/lib/waf
       MODEL_POLL_INTERVAL_SECONDS: ${DDOS_MODEL_POLL_INTERVAL_SECONDS:-2}
       MODEL_DECAY_LAMBDA: ${DDOS_MODEL_DECAY_LAMBDA:-0.08}
@@ -196,6 +204,8 @@ services:
       retries: 8
     networks:
       - waf-net
+    mem_limit: ${SENTINEL_MEM_LIMIT:-512m}
+    cpus: ${SENTINEL_CPU_LIMIT:-0.75}
 
   cli:
     build:

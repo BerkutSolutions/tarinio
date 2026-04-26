@@ -33,48 +33,60 @@ var scannerPathPrefixes = []string{
 
 // Config controls sentinel behavior and thresholds.
 type Config struct {
-	ModelEnabled          bool
-	LogPath               string
-	StatePath             string
-	OutputPath            string
-	RuntimeRoot           string
-	SourceBackend         string
-	EnabledSiteIDs        []string
-	PollInterval          time.Duration
-	DecayLambda           float64
-	ThrottleThreshold     float64
-	DropThreshold         float64
-	HoldSeconds           int
-	ThrottleRatePerSecond int
-	ThrottleBurst         int
-	ThrottleTarget        string
-	Weight429             float64
-	Weight403             float64
-	Weight444             float64
-	EmergencyRPS          int
-	EmergencyUniqueIPs    int
-	EmergencyPerIPRPS     int
-	WeightEmergencyBotnet float64
-	WeightEmergencySingle float64
-	ConnLimit             int
-	RatePerSecond         int
-	RateBurst             int
-	EnforceL7RateLimit    bool
-	L7RequestsPerSecond   int
-	L7Burst               int
-	WatchThreshold        float64
-	TempBanThreshold      float64
-	PromotionMinSignals   int
-	ActionCooldownSeconds int
-	MaxActiveIPs          int
-	MaxUniquePathsPerIP   int
-	MaxPublishedEntries   int
-	MaxActionsPerMinute   int
-	InactiveTTLSeconds    int
-	PublishInterval       time.Duration
-	SuggestionsOutputPath string
-	SuggestMinHits        int
-	SuggestMinUniqueIPs   int
+	ModelEnabled                bool
+	MLEnabled                   bool
+	MLArtifactPath              string
+	MLMinProbability            float64
+	MLMaxWeight                 float64
+	LogPath                     string
+	StatePath                   string
+	OutputPath                  string
+	RuntimeRoot                 string
+	SourceBackend               string
+	EnabledSiteIDs              []string
+	PollInterval                time.Duration
+	DecayLambda                 float64
+	ThrottleThreshold           float64
+	DropThreshold               float64
+	HoldSeconds                 int
+	ThrottleRatePerSecond       int
+	ThrottleBurst               int
+	ThrottleTarget              string
+	Weight429                   float64
+	Weight403                   float64
+	Weight444                   float64
+	EmergencyRPS                int
+	EmergencyUniqueIPs          int
+	EmergencyPerIPRPS           int
+	WeightEmergencyBotnet       float64
+	WeightEmergencySingle       float64
+	ConnLimit                   int
+	RatePerSecond               int
+	RateBurst                   int
+	EnforceL7RateLimit          bool
+	L7RequestsPerSecond         int
+	L7Burst                     int
+	WatchThreshold              float64
+	TempBanThreshold            float64
+	PromotionMinSignals         int
+	PromotionConsecutiveTicks   int
+	ActionCooldownSeconds       int
+	MaxActiveIPs                int
+	MaxUniquePathsPerIP         int
+	MaxPublishedEntries         int
+	MaxActionsPerMinute         int
+	InactiveTTLSeconds          int
+	PublishInterval             time.Duration
+	SuggestInactiveTTLSeconds   int
+	SuggestionsOutputPath       string
+	SuggestMinHits              int
+	SuggestMinUniqueIPs         int
+	SuggestShadowPromoteHits    int
+	SuggestTemporaryPromoteHits int
+	SuggestPermanentPromoteHits int
+	SuggestShadowMaxFPRate      float64
+	SuggestTemporaryHoldSeconds int
+	SuggestPermanentMinLifetime time.Duration
 }
 
 // Record is per (site,ip) adaptive state.
@@ -82,6 +94,7 @@ type Record struct {
 	Score           float64            `json:"score"`
 	RiskScore       float64            `json:"risk_score,omitempty"`
 	TrustScore      float64            `json:"trust_score,omitempty"`
+	ModelVersion    string             `json:"model_version,omitempty"`
 	FirstSeen       string             `json:"first_seen,omitempty"`
 	LastSeen        string             `json:"last_seen"`
 	LastUpdated     string             `json:"last_updated"`
@@ -93,6 +106,8 @@ type Record struct {
 	Recommendations []string           `json:"recommendations,omitempty"`
 	LastAction      string             `json:"last_action,omitempty"`
 	LastActionAt    string             `json:"last_action_at,omitempty"`
+	CandidateAction string             `json:"candidate_action,omitempty"`
+	CandidateCount  int                `json:"candidate_count,omitempty"`
 }
 
 // State stores persistent sentinel offset and adaptive records.
@@ -111,6 +126,7 @@ type AdaptiveEntry struct {
 	ExpiresAt       string               `json:"expires_at,omitempty"`
 	Score           float64              `json:"score,omitempty"`
 	TrustScore      float64              `json:"trust_score,omitempty"`
+	ModelVersion    string               `json:"model_version,omitempty"`
 	Source          string               `json:"source,omitempty"`
 	FirstSeen       string               `json:"first_seen,omitempty"`
 	LastSeen        string               `json:"last_seen,omitempty"`
@@ -138,26 +154,29 @@ type AdaptiveOutput struct {
 
 // RuleSuggestion is an L7 candidate generated from hot scanner paths.
 type RuleSuggestion struct {
-	ID          string `json:"id"`
-	PathPrefix  string `json:"path_prefix"`
-	Status      string `json:"status"`
-	Hits        int    `json:"hits"`
-	UniqueIPs   int    `json:"unique_ips"`
-	WouldBlock  int    `json:"would_block_hits,omitempty"`
-	ShadowHits  int    `json:"shadow_hits,omitempty"`
-	ShadowFP    int    `json:"shadow_false_positive_hits,omitempty"`
-	ShadowRate  string `json:"shadow_false_positive_rate,omitempty"`
-	Source      string `json:"source,omitempty"`
-	FirstSeen   string `json:"first_seen,omitempty"`
-	LastSeen    string `json:"last_seen,omitempty"`
-	GeneratedAt string `json:"generated_at,omitempty"`
+	ID              string `json:"id"`
+	PathPrefix      string `json:"path_prefix"`
+	Status          string `json:"status"`
+	Hits            int    `json:"hits"`
+	UniqueIPs       int    `json:"unique_ips"`
+	WouldBlock      int    `json:"would_block_hits,omitempty"`
+	ShadowHits      int    `json:"shadow_hits,omitempty"`
+	ShadowFP        int    `json:"shadow_false_positive_hits,omitempty"`
+	ShadowRate      string `json:"shadow_false_positive_rate,omitempty"`
+	TemporaryUntil  string `json:"temporary_until,omitempty"`
+	PromotionReason string `json:"promotion_reason,omitempty"`
+	Source          string `json:"source,omitempty"`
+	FirstSeen       string `json:"first_seen,omitempty"`
+	LastSeen        string `json:"last_seen,omitempty"`
+	GeneratedAt     string `json:"generated_at,omitempty"`
 }
 
 type scannerPathStat struct {
-	Hits      int
-	IPs       map[string]struct{}
-	FirstSeen time.Time
-	LastSeen  time.Time
+	Hits        int
+	SuccessHits int
+	IPs         map[string]struct{}
+	FirstSeen   time.Time
+	LastSeen    time.Time
 }
 
 type parsedAccess struct {
@@ -192,6 +211,7 @@ type ipStat struct {
 	ScannerHits      int
 	SuspiciousUAHits int
 	UniquePaths      map[string]struct{}
+	Sites            map[string]struct{}
 	Site             string
 }
 
@@ -248,9 +268,10 @@ func Run(componentName string) {
 	cfg := LoadConfig()
 	st := loadState(cfg.StatePath)
 	logInfof(
-		"%s: started (enabled=%t poll_interval=%s log_path=%s state_path=%s output_path=%s runtime_root=%s)",
+		"%s: started (enabled=%t ml_enabled=%t poll_interval=%s log_path=%s state_path=%s output_path=%s runtime_root=%s)",
 		name,
 		cfg.ModelEnabled,
+		cfg.MLEnabled,
 		cfg.PollInterval,
 		cfg.LogPath,
 		cfg.StatePath,
@@ -323,6 +344,10 @@ func LoadConfig() Config {
 	if promotionMinSignals <= 0 {
 		promotionMinSignals = 2
 	}
+	promotionConsecutiveTicks := envInt("MODEL_PROMOTION_CONSECUTIVE_TICKS", 2)
+	if promotionConsecutiveTicks <= 0 {
+		promotionConsecutiveTicks = 2
+	}
 	actionCooldown := envInt("MODEL_ACTION_COOLDOWN_SECONDS", 30)
 	if actionCooldown < 0 {
 		actionCooldown = 30
@@ -359,42 +384,90 @@ func LoadConfig() Config {
 	if suggestMinUnique <= 0 {
 		suggestMinUnique = 5
 	}
+	suggestShadowPromote := envInt("MODEL_SUGGEST_SHADOW_PROMOTE_HITS", suggestMinHits*2)
+	if suggestShadowPromote <= 0 {
+		suggestShadowPromote = suggestMinHits * 2
+	}
+	suggestTemporaryPromote := envInt("MODEL_SUGGEST_TEMPORARY_PROMOTE_HITS", suggestMinHits*4)
+	if suggestTemporaryPromote <= 0 {
+		suggestTemporaryPromote = suggestMinHits * 4
+	}
+	suggestPermanentPromote := envInt("MODEL_SUGGEST_PERMANENT_PROMOTE_HITS", suggestMinHits*8)
+	if suggestPermanentPromote <= 0 {
+		suggestPermanentPromote = suggestMinHits * 8
+	}
+	suggestShadowMaxFPRate := envFloat("MODEL_SUGGEST_SHADOW_MAX_FP_RATE", 0.02)
+	if suggestShadowMaxFPRate <= 0 {
+		suggestShadowMaxFPRate = 0.02
+	}
+	suggestTemporaryHold := envInt("MODEL_SUGGEST_TEMPORARY_HOLD_SECONDS", 14400)
+	if suggestTemporaryHold <= 0 {
+		suggestTemporaryHold = 14400
+	}
+	suggestPermanentMinLifetime := envInt("MODEL_SUGGEST_PERMANENT_MIN_LIFETIME_SECONDS", 21600)
+	if suggestPermanentMinLifetime <= 0 {
+		suggestPermanentMinLifetime = 21600
+	}
+	suggestInactiveTTL := envInt("MODEL_SUGGEST_INACTIVE_TTL_SECONDS", 86400)
+	if suggestInactiveTTL <= 0 {
+		suggestInactiveTTL = 86400
+	}
+	mlMinProbability := envFloat("MODEL_ML_MIN_PROBABILITY", 0.65)
+	if mlMinProbability <= 0 || mlMinProbability >= 1 {
+		mlMinProbability = 0.65
+	}
+	mlMaxWeight := envFloat("MODEL_ML_MAX_WEIGHT", 1.5)
+	if mlMaxWeight <= 0 {
+		mlMaxWeight = 1.5
+	}
 	return Config{
-		ModelEnabled:          envBool("MODEL_ENABLED", true),
-		LogPath:               envString("MODEL_LOG_PATH", "/logs/access.log"),
-		StatePath:             envString("MODEL_STATE_PATH", "/state/model-state.json"),
-		OutputPath:            envString("MODEL_OUTPUT_PATH", "/out/adaptive.json"),
-		RuntimeRoot:           envString("MODEL_RUNTIME_ROOT", "/var/lib/waf"),
-		SourceBackend:         strings.ToLower(envString("MODEL_SOURCE_BACKEND", "file")),
-		PollInterval:          time.Duration(poll) * time.Second,
-		DecayLambda:           envFloat("MODEL_DECAY_LAMBDA", 0.08),
-		ThrottleThreshold:     envFloat("MODEL_THROTTLE_THRESHOLD", 2.5),
-		DropThreshold:         envFloat("MODEL_DROP_THRESHOLD", 6.0),
-		HoldSeconds:           hold,
-		ThrottleRatePerSecond: rate,
-		ThrottleBurst:         burst,
-		ThrottleTarget:        target,
-		Weight429:             envFloat("MODEL_WEIGHT_429", 1.0),
-		Weight403:             envFloat("MODEL_WEIGHT_403", 1.8),
-		Weight444:             envFloat("MODEL_WEIGHT_444", 2.2),
-		EmergencyRPS:          envInt("MODEL_EMERGENCY_RPS", 180),
-		EmergencyUniqueIPs:    envInt("MODEL_EMERGENCY_UNIQUE_IPS", 40),
-		EmergencyPerIPRPS:     envInt("MODEL_EMERGENCY_PER_IP_RPS", 60),
-		WeightEmergencyBotnet: envFloat("MODEL_WEIGHT_EMERGENCY_BOTNET", 6.0),
-		WeightEmergencySingle: envFloat("MODEL_WEIGHT_EMERGENCY_SINGLE", 4.0),
-		WatchThreshold:        watchThreshold,
-		TempBanThreshold:      tempBanThreshold,
-		PromotionMinSignals:   promotionMinSignals,
-		ActionCooldownSeconds: actionCooldown,
-		MaxActiveIPs:          maxActiveIPs,
-		MaxUniquePathsPerIP:   maxUniquePaths,
-		MaxPublishedEntries:   maxPublishedEntries,
-		MaxActionsPerMinute:   maxActionsPerMinute,
-		InactiveTTLSeconds:    inactiveTTL,
-		PublishInterval:       time.Duration(publishInterval) * time.Second,
-		SuggestionsOutputPath: envString("MODEL_SUGGESTIONS_OUTPUT_PATH", "/out/l7-suggestions.json"),
-		SuggestMinHits:        suggestMinHits,
-		SuggestMinUniqueIPs:   suggestMinUnique,
+		ModelEnabled:                envBool("MODEL_ENABLED", true),
+		MLEnabled:                   envBool("MODEL_ML_ENABLED", false),
+		MLArtifactPath:              envString("MODEL_ML_ARTIFACT_PATH", "/etc/waf/ddos-model/ml-model.json"),
+		MLMinProbability:            mlMinProbability,
+		MLMaxWeight:                 mlMaxWeight,
+		LogPath:                     envString("MODEL_LOG_PATH", "/logs/access.log"),
+		StatePath:                   envString("MODEL_STATE_PATH", "/state/model-state.json"),
+		OutputPath:                  envString("MODEL_OUTPUT_PATH", "/out/adaptive.json"),
+		RuntimeRoot:                 envString("MODEL_RUNTIME_ROOT", "/var/lib/waf"),
+		SourceBackend:               strings.ToLower(envString("MODEL_SOURCE_BACKEND", "file")),
+		PollInterval:                time.Duration(poll) * time.Second,
+		DecayLambda:                 envFloat("MODEL_DECAY_LAMBDA", 0.08),
+		ThrottleThreshold:           envFloat("MODEL_THROTTLE_THRESHOLD", 2.5),
+		DropThreshold:               envFloat("MODEL_DROP_THRESHOLD", 6.0),
+		HoldSeconds:                 hold,
+		ThrottleRatePerSecond:       rate,
+		ThrottleBurst:               burst,
+		ThrottleTarget:              target,
+		Weight429:                   envFloat("MODEL_WEIGHT_429", 1.0),
+		Weight403:                   envFloat("MODEL_WEIGHT_403", 1.8),
+		Weight444:                   envFloat("MODEL_WEIGHT_444", 2.2),
+		EmergencyRPS:                envInt("MODEL_EMERGENCY_RPS", 180),
+		EmergencyUniqueIPs:          envInt("MODEL_EMERGENCY_UNIQUE_IPS", 40),
+		EmergencyPerIPRPS:           envInt("MODEL_EMERGENCY_PER_IP_RPS", 60),
+		WeightEmergencyBotnet:       envFloat("MODEL_WEIGHT_EMERGENCY_BOTNET", 6.0),
+		WeightEmergencySingle:       envFloat("MODEL_WEIGHT_EMERGENCY_SINGLE", 4.0),
+		WatchThreshold:              watchThreshold,
+		TempBanThreshold:            tempBanThreshold,
+		PromotionMinSignals:         promotionMinSignals,
+		PromotionConsecutiveTicks:   promotionConsecutiveTicks,
+		ActionCooldownSeconds:       actionCooldown,
+		MaxActiveIPs:                maxActiveIPs,
+		MaxUniquePathsPerIP:         maxUniquePaths,
+		MaxPublishedEntries:         maxPublishedEntries,
+		MaxActionsPerMinute:         maxActionsPerMinute,
+		InactiveTTLSeconds:          inactiveTTL,
+		PublishInterval:             time.Duration(publishInterval) * time.Second,
+		SuggestInactiveTTLSeconds:   suggestInactiveTTL,
+		SuggestionsOutputPath:       envString("MODEL_SUGGESTIONS_OUTPUT_PATH", "/out/l7-suggestions.json"),
+		SuggestMinHits:              suggestMinHits,
+		SuggestMinUniqueIPs:         suggestMinUnique,
+		SuggestShadowPromoteHits:    suggestShadowPromote,
+		SuggestTemporaryPromoteHits: suggestTemporaryPromote,
+		SuggestPermanentPromoteHits: suggestPermanentPromote,
+		SuggestShadowMaxFPRate:      suggestShadowMaxFPRate,
+		SuggestTemporaryHoldSeconds: suggestTemporaryHold,
+		SuggestPermanentMinLifetime: time.Duration(suggestPermanentMinLifetime) * time.Second,
 	}
 }
 
@@ -539,6 +612,15 @@ func processTick(cfg Config, current State, now time.Time) (State, bool, error) 
 	perIPSecond := map[string]int{}
 	perIPStats := map[string]*ipStat{}
 	scannerStats := map[string]*scannerPathStat{}
+	var mlModel *mlLogisticModel
+	if cfg.MLEnabled {
+		loaded, err := loadMLModel(cfg.MLArtifactPath)
+		if err != nil {
+			logWarnf("tarinio-sentinel: ml disabled for this tick: %v", err)
+		} else {
+			mlModel = loaded
+		}
+	}
 
 	for _, item := range items {
 		if !isSiteModelEnabled(cfg, item.site) {
@@ -556,8 +638,11 @@ func processTick(cfg Config, current State, now time.Time) (State, bool, error) 
 
 		ipStats := perIPStats[item.ip]
 		if ipStats == nil {
-			ipStats = &ipStat{UniquePaths: map[string]struct{}{}, Site: item.site}
+			ipStats = &ipStat{UniquePaths: map[string]struct{}{}, Sites: map[string]struct{}{}, Site: item.site}
 			perIPStats[item.ip] = ipStats
+		}
+		if site := normalizeSiteID(item.site); site != "" {
+			ipStats.Sites[site] = struct{}{}
 		}
 		ipStats.Count++
 		if item.status == 404 {
@@ -575,6 +660,9 @@ func processTick(cfg Config, current State, now time.Time) (State, bool, error) 
 					scannerStats[scannerPath] = stat
 				}
 				stat.Hits++
+				if item.status >= 200 && item.status < 400 {
+					stat.SuccessHits++
+				}
 				stat.IPs[item.ip] = struct{}{}
 				if item.when.Before(stat.FirstSeen) {
 					stat.FirstSeen = item.when
@@ -601,6 +689,14 @@ func processTick(cfg Config, current State, now time.Time) (State, bool, error) 
 
 	for ip, stats := range perIPStats {
 		signals := deriveSignalWeights(stats)
+		if mlWeight, modelVersion, ok := inferMLWeight(stats, cfg, mlModel); ok {
+			signals["signal_ml_risk"] = mlWeight
+			key := MakeScoreKey(stats.Site, ip)
+			rec := next.IPs[key]
+			rec.ModelVersion = modelVersion
+			next.IPs[key] = rec
+			changed = true
+		}
 		if len(signals) == 0 {
 			continue
 		}
@@ -687,7 +783,8 @@ func processTick(cfg Config, current State, now time.Time) (State, bool, error) 
 		if isCooldownDeescalation(prevAction, desiredAction, rec.LastActionAt, cfg.ActionCooldownSeconds, now) {
 			desiredAction = prevAction
 		}
-		if desiredAction != prevAction {
+		desiredAction, transitioned := resolveActionTransition(&rec, prevAction, desiredAction, cfg, hasEmergencySignal(rec.TopSignals))
+		if desiredAction != prevAction && transitioned {
 			if !consumeActionBudget(&next, cfg, now) {
 				desiredAction = prevAction
 			} else {
@@ -745,6 +842,9 @@ func deriveSignalWeights(stats *ipStat) map[string]float64 {
 	}
 	if stats.SuspiciousUAHits > 0 {
 		out["signal_ua_risk"] = math.Min(2.5, float64(stats.SuspiciousUAHits)*0.6)
+	}
+	if len(stats.Sites) >= 2 {
+		out["signal_cross_site_spread"] = math.Min(2.0, float64(len(stats.Sites)-1)*0.8)
 	}
 	blockedRatio := float64(stats.Blocked) / total
 	if stats.Count >= 10 && blockedRatio >= 0.6 {
@@ -873,6 +973,33 @@ func isCooldownDeescalation(previous, next string, lastActionAt string, cooldown
 		return false
 	}
 	return now.Sub(last) < time.Duration(cooldownSeconds)*time.Second
+}
+
+func resolveActionTransition(rec *Record, previous, desired string, cfg Config, emergency bool) (string, bool) {
+	if rec == nil {
+		return previous, false
+	}
+	if strings.TrimSpace(desired) == strings.TrimSpace(previous) {
+		rec.CandidateAction = ""
+		rec.CandidateCount = 0
+		return previous, false
+	}
+	requiredTicks := cfg.PromotionConsecutiveTicks
+	if requiredTicks <= 0 {
+		requiredTicks = 1
+	}
+	if rec.CandidateAction != desired {
+		rec.CandidateAction = desired
+		rec.CandidateCount = 1
+	} else {
+		rec.CandidateCount++
+	}
+	if emergency || rec.CandidateCount >= requiredTicks {
+		rec.CandidateAction = ""
+		rec.CandidateCount = 0
+		return desired, true
+	}
+	return previous, false
 }
 
 func actionExpiry(now time.Time, cfg Config, action string) time.Time {
@@ -1044,6 +1171,7 @@ func renderAdaptivePayload(cfg Config, st State, now time.Time) ([]byte, error) 
 		ExpiresAt  time.Time
 		Score      float64
 		TrustScore float64
+		ModelVer   string
 		TopSignals map[string]float64
 		FirstSeen  time.Time
 		LastSeen   time.Time
@@ -1093,6 +1221,9 @@ func renderAdaptivePayload(cfg Config, st State, now time.Time) ([]byte, error) 
 		if agg.TrustScore == 0 || rec.TrustScore < agg.TrustScore {
 			agg.TrustScore = rec.TrustScore
 		}
+		if strings.TrimSpace(agg.ModelVer) == "" && strings.TrimSpace(rec.ModelVersion) != "" {
+			agg.ModelVer = strings.TrimSpace(rec.ModelVersion)
+		}
 		for signal, value := range rec.TopSignals {
 			agg.TopSignals[signal] += value
 		}
@@ -1103,13 +1234,14 @@ func renderAdaptivePayload(cfg Config, st State, now time.Time) ([]byte, error) 
 			continue
 		}
 		entry := AdaptiveEntry{
-			IP:          ip,
-			Action:      agg.Action,
-			Score:       agg.Score,
-			TrustScore:  agg.TrustScore,
-			Source:      "tarinio-sentinel",
-			ReasonCodes: topSignalKeys(agg.TopSignals, 5),
-			TopSignals:  topSignalMap(agg.TopSignals, 8),
+			IP:           ip,
+			Action:       agg.Action,
+			Score:        agg.Score,
+			TrustScore:   agg.TrustScore,
+			ModelVersion: agg.ModelVer,
+			Source:       "tarinio-sentinel",
+			ReasonCodes:  topSignalKeys(agg.TopSignals, 5),
+			TopSignals:   topSignalMap(agg.TopSignals, 8),
 		}
 		entry.ExplainSummary, entry.ReasonDetails, entry.Recommendations = buildExplainability(agg.TopSignals, entry.Action)
 		if !agg.ExpiresAt.IsZero() {
@@ -1171,9 +1303,17 @@ func saveState(path string, st State) error {
 func newSourceBackend(cfg Config) sentinelsource.Backend {
 	switch strings.ToLower(strings.TrimSpace(cfg.SourceBackend)) {
 	case "redis":
-		return sentinelsource.NewRedisBackend()
-	default:
+		return sentinelsource.NewFallbackBackend(
+			sentinelsource.NewRedisBackend(),
+			sentinelsource.NewFileBackend(cfg.LogPath),
+		)
+	case "file":
 		return sentinelsource.NewFileBackend(cfg.LogPath)
+	default:
+		return sentinelsource.NewFallbackBackend(
+			sentinelsource.NewFileBackend(cfg.LogPath),
+			sentinelsource.NewRedisBackend(),
+		)
 	}
 }
 
@@ -1554,6 +1694,10 @@ func signalExplanation(code string) string {
 		return "Suspicious or automation-like user-agent was observed."
 	case "signal_blocked_ratio":
 		return "High ratio of blocked responses indicates persistent abusive traffic."
+	case "signal_cross_site_spread":
+		return "Same source touched multiple protected sites in a short window."
+	case "signal_ml_risk":
+		return "CPU-only logistic classifier raised anomaly probability for this source."
 	case "signal_emergency_botnet":
 		return "Distributed emergency pattern detected (many unique sources per second)."
 	case "signal_emergency_single":
@@ -1585,6 +1729,14 @@ func signalRecommendations(code string) []string {
 		return []string{
 			"Audit false positives and tune thresholds if legitimate clients are impacted.",
 		}
+	case "signal_cross_site_spread":
+		return []string{
+			"Review source activity across sites and enforce tenant/site segmentation controls.",
+		}
+	case "signal_ml_risk":
+		return []string{
+			"Validate ML-driven anomaly against deterministic signals before promoting to permanent ban.",
+		}
 	default:
 		return nil
 	}
@@ -1614,9 +1766,39 @@ func clamp(value, minValue, maxValue float64) float64 {
 }
 
 func buildRuleSuggestions(cfg Config, scannerStats map[string]*scannerPathStat, previous []RuleSuggestion, now time.Time) []RuleSuggestion {
-	if len(scannerStats) == 0 {
-		return append([]RuleSuggestion(nil), previous...)
+	minHits := cfg.SuggestMinHits
+	if minHits <= 0 {
+		minHits = 20
 	}
+	minUniqueIPs := cfg.SuggestMinUniqueIPs
+	if minUniqueIPs <= 0 {
+		minUniqueIPs = 5
+	}
+	shadowPromoteHits := cfg.SuggestShadowPromoteHits
+	if shadowPromoteHits <= 0 {
+		shadowPromoteHits = minHits * 2
+	}
+	temporaryPromoteHits := cfg.SuggestTemporaryPromoteHits
+	if temporaryPromoteHits <= 0 {
+		temporaryPromoteHits = minHits * 4
+	}
+	permanentPromoteHits := cfg.SuggestPermanentPromoteHits
+	if permanentPromoteHits <= 0 {
+		permanentPromoteHits = minHits * 8
+	}
+	shadowMaxFPRate := cfg.SuggestShadowMaxFPRate
+	if shadowMaxFPRate <= 0 {
+		shadowMaxFPRate = 0.02
+	}
+	temporaryHoldSeconds := cfg.SuggestTemporaryHoldSeconds
+	if temporaryHoldSeconds <= 0 {
+		temporaryHoldSeconds = 14400
+	}
+	suggestInactiveTTLSeconds := cfg.SuggestInactiveTTLSeconds
+	if suggestInactiveTTLSeconds <= 0 {
+		suggestInactiveTTLSeconds = 86400
+	}
+
 	prevByPath := map[string]RuleSuggestion{}
 	for _, item := range previous {
 		path := strings.TrimSpace(item.PathPrefix)
@@ -1625,24 +1807,24 @@ func buildRuleSuggestions(cfg Config, scannerStats map[string]*scannerPathStat, 
 		}
 		prevByPath[path] = item
 	}
-	out := make([]RuleSuggestion, 0, len(scannerStats))
+	out := make([]RuleSuggestion, 0, maxInt(len(scannerStats), len(previous)))
+	processed := map[string]struct{}{}
 	for path, stat := range scannerStats {
 		if stat == nil {
 			continue
 		}
+		processed[path] = struct{}{}
 		unique := len(stat.IPs)
-		if stat.Hits < cfg.SuggestMinHits || unique < cfg.SuggestMinUniqueIPs {
+		if stat.Hits < minHits || unique < minUniqueIPs {
 			continue
 		}
 		prev := prevByPath[path]
-		status := strings.TrimSpace(prev.Status)
-		if status == "" {
-			status = "suggested"
-		}
+		status := normalizeSuggestionStatus(prev.Status)
 		shadowHits := prev.ShadowHits
 		shadowFP := prev.ShadowFP
-		if status == "shadow" {
+		if status == "shadow" || status == "temporary" || status == "permanent" {
 			shadowHits += stat.Hits
+			shadowFP += stat.SuccessHits
 		}
 		firstSeen := stat.FirstSeen
 		if existing, err := parseTime(prev.FirstSeen); err == nil && !existing.IsZero() && (firstSeen.IsZero() || existing.Before(firstSeen)) {
@@ -1652,20 +1834,64 @@ func buildRuleSuggestions(cfg Config, scannerStats map[string]*scannerPathStat, 
 		if existing, err := parseTime(prev.LastSeen); err == nil && !existing.IsZero() && existing.After(lastSeen) {
 			lastSeen = existing
 		}
+		fpRate := 0.0
+		if shadowHits > 0 {
+			fpRate = float64(shadowFP) / float64(shadowHits)
+		}
+		temporaryUntil, _ := parseTime(prev.TemporaryUntil)
+		promotionReason := strings.TrimSpace(prev.PromotionReason)
+		switch status {
+		case "suggested":
+			if stat.Hits >= shadowPromoteHits && unique >= minUniqueIPs {
+				status = "shadow"
+				promotionReason = "auto_promote_shadow"
+			}
+		case "shadow":
+			if fpRate > shadowMaxFPRate*2 {
+				status = "suggested"
+				promotionReason = "rollback_high_shadow_fp"
+			} else if shadowHits >= temporaryPromoteHits && fpRate <= shadowMaxFPRate && unique >= minUniqueIPs {
+				status = "temporary"
+				temporaryUntil = now.Add(time.Duration(temporaryHoldSeconds) * time.Second).UTC()
+				promotionReason = "auto_promote_temporary"
+			}
+		case "temporary":
+			if fpRate > shadowMaxFPRate*2 {
+				status = "suggested"
+				temporaryUntil = time.Time{}
+				promotionReason = "rollback_high_shadow_fp"
+			} else if !temporaryUntil.IsZero() && now.After(temporaryUntil) {
+				lifetimeOK := cfg.SuggestPermanentMinLifetime <= 0 || (!firstSeen.IsZero() && now.Sub(firstSeen) >= cfg.SuggestPermanentMinLifetime)
+				if shadowHits >= permanentPromoteHits && fpRate <= shadowMaxFPRate*0.5 && lifetimeOK {
+					status = "permanent"
+					promotionReason = "candidate_permanent_review_required"
+				} else {
+					status = "shadow"
+					promotionReason = "temporary_expired_return_shadow"
+				}
+				temporaryUntil = time.Time{}
+			}
+		case "permanent":
+			if fpRate > shadowMaxFPRate*2 {
+				status = "shadow"
+				promotionReason = "rollback_permanent_high_fp"
+			}
+		}
 		s := RuleSuggestion{
-			ID:          "path-" + strings.TrimLeft(strings.ReplaceAll(path, "/", "-"), "-"),
-			PathPrefix:  path,
-			Status:      status,
-			Hits:        stat.Hits,
-			UniqueIPs:   unique,
-			WouldBlock:  stat.Hits,
-			ShadowHits:  shadowHits,
-			ShadowFP:    shadowFP,
-			Source:      "tarinio-sentinel",
-			GeneratedAt: now.Format(time.RFC3339),
+			ID:              "path-" + strings.TrimLeft(strings.ReplaceAll(path, "/", "-"), "-"),
+			PathPrefix:      path,
+			Status:          status,
+			Hits:            stat.Hits,
+			UniqueIPs:       unique,
+			WouldBlock:      stat.Hits,
+			ShadowHits:      shadowHits,
+			ShadowFP:        shadowFP,
+			PromotionReason: promotionReason,
+			Source:          "tarinio-sentinel",
+			GeneratedAt:     now.Format(time.RFC3339),
 		}
 		if shadowHits > 0 {
-			s.ShadowRate = strconv.FormatFloat(float64(shadowFP)/float64(shadowHits), 'f', 4, 64)
+			s.ShadowRate = strconv.FormatFloat(fpRate, 'f', 4, 64)
 		}
 		if !firstSeen.IsZero() {
 			s.FirstSeen = firstSeen.Format(time.RFC3339)
@@ -1673,7 +1899,23 @@ func buildRuleSuggestions(cfg Config, scannerStats map[string]*scannerPathStat, 
 		if !lastSeen.IsZero() {
 			s.LastSeen = lastSeen.Format(time.RFC3339)
 		}
+		if !temporaryUntil.IsZero() {
+			s.TemporaryUntil = temporaryUntil.Format(time.RFC3339)
+		}
 		out = append(out, s)
+	}
+	for path, prev := range prevByPath {
+		if _, ok := processed[path]; ok {
+			continue
+		}
+		if isSuggestionExpired(prev, now, suggestInactiveTTLSeconds) {
+			continue
+		}
+		copyItem := prev
+		if strings.TrimSpace(copyItem.Status) == "" {
+			copyItem.Status = "suggested"
+		}
+		out = append(out, copyItem)
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Hits == out[j].Hits {
@@ -1688,6 +1930,26 @@ func buildRuleSuggestions(cfg Config, scannerStats map[string]*scannerPathStat, 
 		return out[i].PathPrefix < out[j].PathPrefix
 	})
 	return out
+}
+
+func normalizeSuggestionStatus(status string) string {
+	switch strings.TrimSpace(strings.ToLower(status)) {
+	case "shadow", "temporary", "permanent":
+		return strings.TrimSpace(strings.ToLower(status))
+	default:
+		return "suggested"
+	}
+}
+
+func isSuggestionExpired(item RuleSuggestion, now time.Time, ttlSeconds int) bool {
+	if ttlSeconds <= 0 {
+		return false
+	}
+	lastSeen, err := parseTime(item.LastSeen)
+	if err != nil || lastSeen.IsZero() {
+		return false
+	}
+	return now.Sub(lastSeen) > time.Duration(ttlSeconds)*time.Second
 }
 
 func ruleSuggestionsEqual(left, right []RuleSuggestion) bool {
