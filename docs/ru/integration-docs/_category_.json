@@ -1,0 +1,10 @@
+{
+  "label": "Подключение",
+  "position": 6,
+  "collapsed": true,
+  "link": {
+    "type": "generated-index",
+    "title": "Подключение",
+    "description": "Сценарии интеграции TARINIO WAF с внешними контурами."
+  }
+}

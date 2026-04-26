@@ -2,7 +2,7 @@
 
 Last full smoke run: 2026-04-25 13:22:32 +03:00
 
-This document records a reproducible service-protection validation pack for TARINIO 3.0.5.
+This document records a reproducible service-protection validation pack for TARINIO 3.0.6.
 
 ## Scope
 

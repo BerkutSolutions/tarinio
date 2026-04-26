@@ -8,7 +8,7 @@ This document is intended for a Stage 1 operator who already has:
 
 It is not a theoretical ModSecurity reference. It is a practical guide for changing policies safely.
 
-Release baseline for this guide revision: `3.0.5`.
+Release baseline for this guide revision: `3.0.6`.
 
 ## How WAF Fits Into The Architecture
 
@@ -172,4 +172,3 @@ After rollback:
 - record the reason;
 - make the next change narrower;
 - release the fix as a separate revision.
-

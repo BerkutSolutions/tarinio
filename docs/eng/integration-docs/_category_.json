@@ -1,0 +1,10 @@
+{
+  "label": "Integration",
+  "position": 6,
+  "collapsed": true,
+  "link": {
+    "type": "generated-index",
+    "title": "Integration",
+    "description": "TARINIO WAF integration playbooks with external environments."
+  }
+}

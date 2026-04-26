@@ -2,7 +2,7 @@
 
 Last full smoke validation update: 2026-04-26
 
-This page records the enterprise smoke validation pack for `tarinio-sentinel` in TARINIO `3.0.5`.
+This page records the enterprise smoke validation pack for `tarinio-sentinel` in TARINIO `3.0.6`.
 
 ## What Is Validated
 

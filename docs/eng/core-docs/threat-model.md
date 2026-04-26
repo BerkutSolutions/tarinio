@@ -2,7 +2,7 @@
 
 This page belongs to the current documentation branch.
 
-Release baseline for this revision: `3.0.5`.
+Release baseline for this revision: `3.0.6`.
 
 ## Purpose
 

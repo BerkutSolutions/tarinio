@@ -2,7 +2,7 @@
 
 Дата последнего полного smoke-validation: 26.04.2026
 
-Документ фиксирует enterprise-пакет проверок `tarinio-sentinel` для TARINIO `3.0.5`.
+Документ фиксирует enterprise-пакет проверок `tarinio-sentinel` для TARINIO `3.0.6`.
 
 ## Что проверяется
 

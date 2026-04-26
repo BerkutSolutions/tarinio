@@ -40,7 +40,7 @@ function Write-EnglishWiki {
 
 Last full smoke run: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss zzz")
 
-This page records the reproducible enterprise validation pack for tarinio-sentinel in TARINIO 3.0.5.
+This page records the reproducible enterprise validation pack for tarinio-sentinel in TARINIO 3.0.6.
 
 ## What Is Validated
 
@@ -102,7 +102,7 @@ function Write-RussianWiki {
 
 Posledniy smoke run: {RUN_DATE}
 
-Dokument fiksiruet vosproizvodimyy enterprise validation pack dlya `tarinio-sentinel` v TARINIO `3.0.5`.
+Dokument fiksiruet vosproizvodimyy enterprise validation pack dlya `tarinio-sentinel` v TARINIO `3.0.6`.
 
 ## Chto proveryaetsya
 

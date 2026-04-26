@@ -2,7 +2,7 @@
 
 This document defines the `current release` compatibility contract for logging, secret handling, and standalone-to-enterprise cutover.
 
-Release baseline for this revision: `3.0.5`.
+Release baseline for this revision: `3.0.6`.
 
 ## Backward Compatibility
 
@@ -104,5 +104,4 @@ For the `deploy/lab-k8s-terraform` experimental profile, migration validation is
 1. `terraform apply` and `terraform destroy` pass without manual fixes;
 2. smoke checks pass on single-node and HA overlays;
 3. no-trace test leaves no local Terraform artifacts after execution.
-
 
