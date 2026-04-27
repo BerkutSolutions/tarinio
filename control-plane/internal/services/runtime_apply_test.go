@@ -265,6 +265,10 @@ func TestApplyService_CompilesEasyProfileArtifacts(t *testing.T) {
 	easy.HTTPHeaders.ReferrerPolicy = "same-origin"
 	easy.HTTPHeaders.ContentSecurityPolicy = "default-src 'self';"
 	easy.HTTPHeaders.PermissionsPolicy = []string{"geolocation=()", "camera=()"}
+	easy.HTTPHeaders.HSTSEnabled = true
+	easy.HTTPHeaders.HSTSMaxAgeSeconds = 31536000
+	easy.HTTPHeaders.HSTSIncludeSubdomains = true
+	easy.HTTPHeaders.HSTSPreload = true
 	easy.HTTPHeaders.UseCORS = true
 	easy.HTTPHeaders.CORSAllowedOrigins = []string{"https://app.example.com"}
 	easy.UpstreamRouting.ReverseProxyCustomHost = "backend.internal"
@@ -346,6 +350,9 @@ func TestApplyService_CompilesEasyProfileArtifacts(t *testing.T) {
 	}
 	if !strings.Contains(easyConf, "add_header Access-Control-Allow-Origin \"https://app.example.com\" always;") {
 		t.Fatalf("expected cors header in easy conf, got: %s", easyConf)
+	}
+	if !strings.Contains(easyConf, "add_header Strict-Transport-Security \"max-age=31536000; includeSubDomains; preload\" always;") {
+		t.Fatalf("expected hsts header in easy conf, got: %s", easyConf)
 	}
 	if !strings.Contains(easyConf, "proxy_set_header Host backend.internal;") {
 		t.Fatalf("expected reverse proxy custom host in easy conf, got: %s", easyConf)

@@ -406,6 +406,19 @@ func (s *EnterpriseService) BuildSupportBundle() ([]byte, string, error) {
 	tw := tar.NewWriter(gz)
 	files := map[string][]byte{}
 	files["evidence/public_key.pem"] = []byte(settings.Evidence.PublicKeyPEM)
+	if files["hardening/baseline.json"], err = json.MarshalIndent(map[string]any{
+		"network_stack": map[string]any{
+			"tcp_timestamps_expected": 0,
+		},
+		"tls": map[string]any{
+			"protocols_expected": []string{"TLSv1.2", "TLSv1.3"},
+		},
+		"http_headers": map[string]any{
+			"hsts_expected": "managed-per-site",
+		},
+	}, "", "  "); err != nil {
+		return nil, "", err
+	}
 	if files["audits.json"], err = json.MarshalIndent(auditItems, "", "  "); err != nil {
 		return nil, "", err
 	}

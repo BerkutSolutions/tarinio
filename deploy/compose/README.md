@@ -39,3 +39,8 @@ Profile docs:
 - `deploy/compose/testpage/README.md`
 - `deploy/compose/enterprise/README.md`
 - `deploy/compose/ha-lab/README.md`
+
+Security note for `auto-start`:
+
+- runtime publishes edge traffic on `80/443`;
+- management UI is bound to loopback by default (`127.0.0.1:18080`) to reduce external attack surface.

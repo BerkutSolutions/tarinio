@@ -38,6 +38,33 @@ func TestAdminScriptCatalogCollectWAFEventsHasNoCredentialFields(t *testing.T) {
 	}
 }
 
+func TestAdminScriptCatalogIncludesHardeningCollector(t *testing.T) {
+	service := NewAdminScriptService(t.TempDir(), "")
+	catalog := service.Catalog()
+
+	var target AdminScriptDefinition
+	found := false
+	for _, item := range catalog.Scripts {
+		if item.ID == "collect-waf-hardening" {
+			target = item
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("collect-waf-hardening definition not found")
+	}
+	fieldNames := map[string]bool{}
+	for _, field := range target.Fields {
+		fieldNames[field.Name] = true
+	}
+	for _, required := range []string{"RUNTIME_CONTAINER", "DEPLOY_DIR", "EXPECTED_TCP_TIMESTAMPS"} {
+		if !fieldNames[required] {
+			t.Fatalf("expected %s field in hardening collector", required)
+		}
+	}
+}
+
 func TestAdminScriptBuildEnvironmentCollectWAFEventsUsesNoAuthByDefault(t *testing.T) {
 	service := NewAdminScriptService(t.TempDir(), "")
 	definition := service.catalog["collect-waf-events"]
@@ -67,5 +94,16 @@ func TestAdminScriptBuildEnvironmentRejectsShellMetacharacters(t *testing.T) {
 	}, t.TempDir())
 	if err == nil {
 		t.Fatalf("expected validation error for unsafe shell characters")
+	}
+}
+
+func TestAdminScriptBuildEnvironmentRejectsInvalidExpectedTCPValue(t *testing.T) {
+	service := NewAdminScriptService(t.TempDir(), "")
+	definition := service.catalog["collect-waf-hardening"]
+	_, err := service.buildEnvironment(definition, map[string]string{
+		"EXPECTED_TCP_TIMESTAMPS": "2",
+	}, t.TempDir())
+	if err == nil {
+		t.Fatalf("expected validation error for invalid EXPECTED_TCP_TIMESTAMPS")
 	}
 }

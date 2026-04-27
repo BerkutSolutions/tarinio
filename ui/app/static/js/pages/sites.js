@@ -961,6 +961,8 @@ const SETTINGS_SEARCH_INDEX = [
   { id: "send_x_real_ip", tab: "upstream", selector: "#service-send-x-real-ip", labelKey: "sites.easy.upstream.sendXRealIp" },
   { id: "allowed_methods", tab: "http", selector: "#list-input-allowed_methods", labelKey: "sites.easy.http.allowedMethods" },
   { id: "max_client_size", tab: "http", selector: "#service-max-client-size", labelKey: "sites.easy.http.maxBodySize" },
+  { id: "hsts_enabled", tab: "headers", selector: "#service-hsts-enabled", labelKey: "sites.easy.headers.hstsEnabled" },
+  { id: "hsts_max_age_seconds", tab: "headers", selector: "#service-hsts-max-age", labelKey: "sites.easy.headers.hstsMaxAge" },
   { id: "content_security_policy", tab: "headers", selector: "#service-content-security-policy", labelKey: "sites.easy.headers.contentSecurityPolicy" },
   { id: "permissions_policy", tab: "headers", selector: "#list-input-permissions_policy", labelKey: "sites.easy.headers.permissionsPolicy" },
   { id: "access_allowlist", tab: "traffic", selector: "#list-input-access_allowlist", labelKey: "sites.lists.allowlist" },
@@ -1184,6 +1186,10 @@ function defaultSiteDraft() {
     permissions_policy: [],
     keep_upstream_headers: ["*"],
     referrer_policy: "no-referrer-when-downgrade",
+    hsts_enabled: true,
+    hsts_max_age_seconds: 15552000,
+    hsts_include_subdomains: false,
+    hsts_preload: false,
     use_cors: false,
     cors_allowed_origins: ["*"],
     use_allowlist: false,
@@ -1320,6 +1326,10 @@ function applyEasyProfileToDraft(draft, profile) {
     permissions_policy: normalizeStringArray(httpHeaders.permissions_policy),
     keep_upstream_headers: normalizeStringArray(httpHeaders.keep_upstream_headers).length ? normalizeStringArray(httpHeaders.keep_upstream_headers) : draft.keep_upstream_headers,
     referrer_policy: httpHeaders.referrer_policy || draft.referrer_policy,
+    hsts_enabled: Boolean(httpHeaders.hsts_enabled ?? draft.hsts_enabled),
+    hsts_max_age_seconds: Number(httpHeaders.hsts_max_age_seconds ?? draft.hsts_max_age_seconds),
+    hsts_include_subdomains: Boolean(httpHeaders.hsts_include_subdomains ?? draft.hsts_include_subdomains),
+    hsts_preload: Boolean(httpHeaders.hsts_preload ?? draft.hsts_preload),
     use_cors: Boolean(httpHeaders.use_cors ?? draft.use_cors),
     cors_allowed_origins: normalizeStringArray(httpHeaders.cors_allowed_origins).length ? normalizeStringArray(httpHeaders.cors_allowed_origins) : draft.cors_allowed_origins,
     use_bad_behavior: Boolean(security.use_bad_behavior ?? draft.use_bad_behavior),
@@ -1489,6 +1499,10 @@ function draftToEasyProfile(draft) {
       permissions_policy: draft.permissions_policy,
       keep_upstream_headers: draft.keep_upstream_headers,
       referrer_policy: draft.referrer_policy,
+      hsts_enabled: Boolean(draft.hsts_enabled),
+      hsts_max_age_seconds: Number(draft.hsts_max_age_seconds || 0),
+      hsts_include_subdomains: Boolean(draft.hsts_include_subdomains),
+      hsts_preload: Boolean(draft.hsts_preload),
       use_cors: draft.use_cors,
       cors_allowed_origins: draft.cors_allowed_origins
     },
@@ -1627,6 +1641,21 @@ function validateDraft(draft, ctx) {
   }
   if (normalizeCustomLimitRules(draft.custom_limit_rules).length > 32) {
     return ctx.t("sites.validation.customLimitRulesLimit");
+  }
+  if (draft.hsts_enabled && (!Number.isFinite(draft.hsts_max_age_seconds) || Number(draft.hsts_max_age_seconds) <= 0)) {
+    return ctx.t("sites.validation.hstsMaxAgePositive");
+  }
+  if (draft.hsts_preload && !draft.hsts_enabled) {
+    return ctx.t("sites.validation.hstsPreloadNeedsEnabled");
+  }
+  if (draft.hsts_include_subdomains && !draft.hsts_enabled) {
+    return ctx.t("sites.validation.hstsPreloadNeedsEnabled");
+  }
+  if (draft.hsts_preload && !draft.hsts_include_subdomains) {
+    return ctx.t("sites.validation.hstsPreloadNeedsIncludeSubdomains");
+  }
+  if (draft.hsts_preload && Number(draft.hsts_max_age_seconds || 0) < 31536000) {
+    return ctx.t("sites.validation.hstsPreloadNeedsMaxAge");
   }
   for (const rule of normalizeCustomLimitRules(draft.custom_limit_rules)) {
     if (!rule.path.startsWith("/")) {
@@ -2451,6 +2480,22 @@ function renderDetailView(state, ctx) {
                     <label for="service-referrer-policy">${escapeHtml(ctx.t("sites.easy.headers.referrerPolicy"))}</label>
                     <input id="service-referrer-policy" value="${escapeHtml(draft.referrer_policy)}">
                   </div>
+                  <label class="waf-checkbox">
+                    <input id="service-hsts-enabled" type="checkbox"${draft.hsts_enabled ? " checked" : ""}>
+                    <span>${escapeHtml(ctx.t("sites.easy.headers.hstsEnabled"))}</span>
+                  </label>
+                  <div class="waf-field">
+                    <label for="service-hsts-max-age">${escapeHtml(ctx.t("sites.easy.headers.hstsMaxAge"))}</label>
+                    <input id="service-hsts-max-age" type="number" min="0" value="${escapeHtml(String(draft.hsts_max_age_seconds || 0))}">
+                  </div>
+                  <label class="waf-checkbox">
+                    <input id="service-hsts-include-subdomains" type="checkbox"${draft.hsts_include_subdomains ? " checked" : ""}>
+                    <span>${escapeHtml(ctx.t("sites.easy.headers.hstsIncludeSubdomains"))}</span>
+                  </label>
+                  <label class="waf-checkbox">
+                    <input id="service-hsts-preload" type="checkbox"${draft.hsts_preload ? " checked" : ""}>
+                    <span>${escapeHtml(ctx.t("sites.easy.headers.hstsPreload"))}</span>
+                  </label>
                   <div class="waf-field full">
                     <label for="service-content-security-policy">${escapeHtml(ctx.t("sites.easy.headers.contentSecurityPolicy"))}</label>
                     <textarea id="service-content-security-policy" rows="3">${escapeHtml(draft.content_security_policy)}</textarea>
@@ -3916,6 +3961,10 @@ export async function renderSites(container, ctx) {
       permissions_policy: normalizeStringArray(state.draft.permissions_policy),
       keep_upstream_headers: normalizeStringArray(state.draft.keep_upstream_headers),
       referrer_policy: container.querySelector("#service-referrer-policy").value.trim(),
+      hsts_enabled: container.querySelector("#service-hsts-enabled")?.checked ?? true,
+      hsts_max_age_seconds: Number(container.querySelector("#service-hsts-max-age")?.value || "15552000"),
+      hsts_include_subdomains: container.querySelector("#service-hsts-include-subdomains")?.checked ?? false,
+      hsts_preload: container.querySelector("#service-hsts-preload")?.checked ?? false,
       use_cors: container.querySelector("#service-use-cors").checked,
       cors_allowed_origins: normalizeStringArray(state.draft.cors_allowed_origins),
       use_allowlist: container.querySelector("#service-use-allowlist")?.checked || false,

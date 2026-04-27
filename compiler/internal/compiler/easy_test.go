@@ -22,6 +22,10 @@ func TestRenderEasyArtifacts_GeneratesSiteAndAuthBasicFiles(t *testing.T) {
 			AuthBasicUser:                     "admin",
 			AuthBasicPassword:                 "secret",
 			AuthBasicText:                     "Restricted area",
+			HSTSEnabled:                       true,
+			HSTSMaxAgeSeconds:                 31536000,
+			HSTSIncludeSubdomains:             true,
+			HSTSPreload:                       true,
 			AntibotChallenge:                  "recaptcha",
 			AntibotURI:                        "/challenge",
 			AntibotRecaptchaKey:               "site-key",
@@ -93,6 +97,9 @@ func TestRenderEasyArtifacts_GeneratesSiteAndAuthBasicFiles(t *testing.T) {
 	}
 	if !strings.Contains(siteConf, "add_header X-WAF-Antibot-Provider \"recaptcha\" always;") {
 		t.Fatalf("expected antibot provider header, got: %s", siteConf)
+	}
+	if !strings.Contains(siteConf, "add_header Strict-Transport-Security \"max-age=31536000; includeSubDomains; preload\" always;") {
+		t.Fatalf("expected strict transport security header, got: %s", siteConf)
 	}
 	if !strings.Contains(siteConf, "modsecurity_rules_file /etc/waf/modsecurity/easy/site-a.conf;") {
 		t.Fatalf("expected modsecurity easy rules include, got: %s", siteConf)

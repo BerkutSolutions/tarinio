@@ -77,6 +77,10 @@ type HTTPHeadersSettings struct {
 	PermissionsPolicy     []string `json:"permissions_policy"`
 	KeepUpstreamHeaders   []string `json:"keep_upstream_headers"`
 	ReferrerPolicy        string   `json:"referrer_policy"`
+	HSTSEnabled           bool     `json:"hsts_enabled"`
+	HSTSMaxAgeSeconds     int      `json:"hsts_max_age_seconds"`
+	HSTSIncludeSubdomains bool     `json:"hsts_include_subdomains"`
+	HSTSPreload           bool     `json:"hsts_preload"`
 	UseCORS               bool     `json:"use_cors"`
 	CORSAllowedOrigins    []string `json:"cors_allowed_origins"`
 }
@@ -305,6 +309,10 @@ func DefaultProfile(siteID string) EasySiteProfile {
 			PermissionsPolicy:     []string{},
 			KeepUpstreamHeaders:   []string{"*"},
 			ReferrerPolicy:        "no-referrer-when-downgrade",
+			HSTSEnabled:           true,
+			HSTSMaxAgeSeconds:     15552000,
+			HSTSIncludeSubdomains: false,
+			HSTSPreload:           false,
 			UseCORS:               false,
 			CORSAllowedOrigins:    []string{"*"},
 		},

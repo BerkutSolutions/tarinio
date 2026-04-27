@@ -9,6 +9,13 @@ server {
 {{- if .ListenHTTPS }}
     listen 443 ssl;
     include /etc/waf/tls/{{ .SiteID }}.conf;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_tickets off;
+    ssl_ecdh_curve X25519:secp384r1;
     error_page 497 =307 https://$http_host$request_uri;
 {{- end }}
     set $waf_site_id "{{ .SiteIDSlug }}";

@@ -203,6 +203,8 @@ services:
     cap_add:
       - NET_ADMIN
       - NET_RAW
+    sysctls:
+      - net.ipv4.tcp_timestamps=${WAF_RUNTIME_SYSCTL_TCP_TIMESTAMPS:-0}
     volumes:
       - waf-ha-runtime-data:/var/lib/waf:ro
       - waf-ha-request-archive-data:/var/lib/waf-request-archive

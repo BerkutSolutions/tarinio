@@ -4,7 +4,7 @@
 
 Это руководство описывает ежедневные операторские действия, поток изменений, разбор инцидентов и откат для TARINIO.
 
-Релизный baseline для этой ревизии документа: `3.0.6`.
+Релизный baseline для этой ревизии документа: `3.0.7`.
 
 Для Kubernetes/Terraform lab-контура используйте:
 
@@ -88,6 +88,27 @@
 6. Убедиться, что пользовательский трафик восстановлен.
 
 Если откат невозможен на уровне ревизии, переходите к откату развёртывания и, при необходимости, к восстановлению из резервной копии.
+
+## Preflight перед внешним ASV-сканом
+
+Перед каждым окном внешнего ASV-сканирования запускайте perimeter preflight с edge-хоста:
+
+```bash
+TARGET_HOST=<public-waf-hostname> \
+TARGET_HTTPS_PORT=443 \
+TARGET_HTTP_PORT=80 \
+EXPECTED_OPEN_PORTS=80,443 \
+PORT_PROBE_SET=22,80,443,8080,8443,9200 \
+COMPLIANCE_POLICY_FILE=security/compliance/deprecated-controls-policy.json \
+./scripts/pci-preflight-perimeter.sh
+```
+
+Ожидаемый результат:
+
+1. В `summary.json` итог `"overall": "pass"`.
+2. Нет неожиданных публичных портов.
+3. Проверки TLS и HSTS проходят для публичной точки.
+4. В evidence присутствует policy по deprecated scanner checks.
 
 ## Работа с банами
 

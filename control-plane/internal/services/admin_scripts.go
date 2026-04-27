@@ -82,6 +82,7 @@ var (
 	adminScriptPathPattern        = regexp.MustCompile(`^[a-zA-Z0-9/_\.-]{1,256}$`)
 	adminScriptBinaryPathPattern  = regexp.MustCompile(`^[a-zA-Z0-9/_\.-]{1,128}$`)
 	adminScriptStatusCodePattern  = regexp.MustCompile(`^[0-9\s,;|]{1,256}$`)
+	adminScriptTogglePattern      = regexp.MustCompile(`^[01]$`)
 	adminScriptUnsafeShellPattern = regexp.MustCompile(`[\"'\\$` + "`" + `|&<>]`)
 )
 
@@ -122,6 +123,19 @@ func NewAdminScriptService(revisionStoreDir string, scriptsRoot string) *AdminSc
 				{Name: "CONTROL_PLANE_CONTAINER", Label: "Control-Plane Container", LabelKey: "administration.scripts.field.controlPlaneContainer", Type: "text", DefaultValue: "tarinio-control-plane", HelpText: "Docker container name for control-plane logs.", HelpTextKey: "administration.scripts.field.controlPlaneContainerHelp"},
 				{Name: "WAF_CLI_BIN", Label: "CLI Binary", LabelKey: "administration.scripts.field.cliBinary", Type: "text", DefaultValue: "waf-cli", HelpText: "Leave default for built-in control-plane CLI.", HelpTextKey: "administration.scripts.field.cliBinaryHelp"},
 				{Name: "DEPLOY_DIR", Label: "Deploy Directory", LabelKey: "administration.scripts.field.deployDir", Type: "text", DefaultValue: "/opt/tarinio/deploy/compose/default", HelpText: "Used only when the script falls back to docker compose.", HelpTextKey: "administration.scripts.field.deployDirHelp"},
+			},
+		},
+		{
+			ID:             "collect-waf-hardening",
+			TitleKey:       "administration.scripts.collectHardening.title",
+			Title:          "WAF Hardening Collector",
+			DescriptionKey: "administration.scripts.collectHardening.description",
+			Description:    "Collect runtime host/container hardening evidence: tcp_timestamps, sysctl and TLS/HSTS directives.",
+			FileName:       "collect-waf-hardening.sh",
+			Fields: []AdminScriptField{
+				{Name: "RUNTIME_CONTAINER", Label: "Runtime Container", LabelKey: "administration.scripts.field.runtimeContainer", Type: "text", DefaultValue: "tarinio-runtime", HelpText: "Docker container name for runtime logs.", HelpTextKey: "administration.scripts.field.runtimeContainerHelp"},
+				{Name: "DEPLOY_DIR", Label: "Deploy Directory", LabelKey: "administration.scripts.field.deployDir", Type: "text", DefaultValue: "/opt/tarinio/deploy/compose/default", HelpText: "Used only when docker compose config checks are enabled.", HelpTextKey: "administration.scripts.field.deployDirHelp"},
+				{Name: "EXPECTED_TCP_TIMESTAMPS", Label: "Expected tcp_timestamps", Type: "text", DefaultValue: "0", HelpText: "Expected value for net.ipv4.tcp_timestamps (0 or 1)."},
 			},
 		},
 	}
@@ -302,6 +316,10 @@ func validateAdminScriptFieldValue(fieldName, value string) (string, error) {
 	case "WAF_CLI_BIN":
 		if !adminScriptBinaryPathPattern.MatchString(trimmed) {
 			return "", errors.New("WAF_CLI_BIN must be a safe binary path")
+		}
+	case "EXPECTED_TCP_TIMESTAMPS":
+		if !adminScriptTogglePattern.MatchString(trimmed) {
+			return "", errors.New("EXPECTED_TCP_TIMESTAMPS must be 0 or 1")
 		}
 	case "FILTER_STATUS":
 		if !adminScriptStatusCodePattern.MatchString(trimmed) {

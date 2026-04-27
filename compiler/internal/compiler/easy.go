@@ -23,6 +23,7 @@ type easySiteData struct {
 	ReferrerPolicy        string
 	ContentSecurityPolicy string
 	PermissionsPolicy     string
+	HSTSHeader            string
 	UseCORS               bool
 	CORSAllowedOrigins    string
 
@@ -136,6 +137,9 @@ func RenderEasyArtifacts(sites []SiteInput, profiles []EasyProfileInput) ([]Arti
 		}
 		profile.ReferrerPolicy = strings.TrimSpace(profile.ReferrerPolicy)
 		profile.ContentSecurityPolicy = strings.TrimSpace(profile.ContentSecurityPolicy)
+		if profile.HSTSMaxAgeSeconds <= 0 {
+			profile.HSTSMaxAgeSeconds = 15552000
+		}
 		profile.ReverseProxyCustomHost = strings.TrimSpace(profile.ReverseProxyCustomHost)
 		profile.ReverseProxySSLSNIName = strings.TrimSpace(profile.ReverseProxySSLSNIName)
 		profile.AuthBasicUser = strings.TrimSpace(profile.AuthBasicUser)
@@ -293,6 +297,7 @@ func RenderEasyArtifacts(sites []SiteInput, profiles []EasyProfileInput) ([]Arti
 			ReferrerPolicy:               profile.ReferrerPolicy,
 			ContentSecurityPolicy:        profile.ContentSecurityPolicy,
 			PermissionsPolicy:            permissionsPolicy,
+			HSTSHeader:                   buildHSTSHeaderValue(profile),
 			UseCORS:                      profile.UseCORS,
 			CORSAllowedOrigins:           corsAllowedOrigins,
 			ReverseProxyCustomHost:       profile.ReverseProxyCustomHost,
@@ -853,6 +858,24 @@ func parseRatePerSecond(value string) int {
 		return 0
 	}
 	return v
+}
+
+func buildHSTSHeaderValue(profile EasyProfileInput) string {
+	if !profile.HSTSEnabled {
+		return ""
+	}
+	maxAge := profile.HSTSMaxAgeSeconds
+	if maxAge <= 0 {
+		maxAge = 15552000
+	}
+	parts := []string{fmt.Sprintf("max-age=%d", maxAge)}
+	if profile.HSTSIncludeSubdomains {
+		parts = append(parts, "includeSubDomains")
+	}
+	if profile.HSTSPreload {
+		parts = append(parts, "preload")
+	}
+	return strings.Join(parts, "; ")
 }
 
 func normalizeCompilerAntibotRules(values []AntibotChallengeRuleInput) []AntibotChallengeRuleInput {

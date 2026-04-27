@@ -6,7 +6,7 @@ This runbook describes daily operator checks, standard change flow, triage, and 
 
 ## Release Context
 
-Current validated documentation cycle: `3.0.6`.
+Current validated documentation cycle: `3.0.7`.
 
 For Kubernetes/Terraform lab operations and promotion criteria:
 
@@ -91,6 +91,27 @@ For Kubernetes/Terraform lab operations and promotion criteria:
 
 If revision rollback is not sufficient, continue with deployment rollback and, if needed, backup restoration.
 
+## PCI/ASV External Scan Preflight
+
+Before every external ASV scan window, run perimeter preflight from the deployed edge host:
+
+```bash
+TARGET_HOST=<public-waf-hostname> \
+TARGET_HTTPS_PORT=443 \
+TARGET_HTTP_PORT=80 \
+EXPECTED_OPEN_PORTS=80,443 \
+PORT_PROBE_SET=22,80,443,8080,8443,9200 \
+COMPLIANCE_POLICY_FILE=security/compliance/deprecated-controls-policy.json \
+./scripts/pci-preflight-perimeter.sh
+```
+
+Expected outcome:
+
+1. `summary.json` reports `"overall": "pass"`.
+2. No unexpected public ports are reported.
+3. TLS and HSTS checks pass for the public endpoint.
+4. Deprecated control policy evidence is present for scanner interpretation.
+
 ## Working With Bans
 
 If an attack source must be isolated quickly:
@@ -126,4 +147,3 @@ Escalation is mandatory when:
 - `docs/eng/core-docs/upgrade.md`
 - `docs/eng/core-docs/backups.md`
 - `docs/eng/model-docs/anti-ddos-runbook.md`
-

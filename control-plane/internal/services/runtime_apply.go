@@ -809,6 +809,10 @@ func mapEasyInputs(items []easysiteprofiles.EasySiteProfile) []pipeline.EasyProf
 			ReferrerPolicy:        item.HTTPHeaders.ReferrerPolicy,
 			ContentSecurityPolicy: item.HTTPHeaders.ContentSecurityPolicy,
 			PermissionsPolicy:     item.HTTPHeaders.PermissionsPolicy,
+			HSTSEnabled:           item.HTTPHeaders.HSTSEnabled,
+			HSTSMaxAgeSeconds:     item.HTTPHeaders.HSTSMaxAgeSeconds,
+			HSTSIncludeSubdomains: item.HTTPHeaders.HSTSIncludeSubdomains,
+			HSTSPreload:           item.HTTPHeaders.HSTSPreload,
 			UseCORS:               item.HTTPHeaders.UseCORS,
 			CORSAllowedOrigins:    item.HTTPHeaders.CORSAllowedOrigins,
 

@@ -74,6 +74,10 @@ This document describes all WAF service fields in env format used by the raw ser
 | `WAF_SITE_PERMISSIONS_POLICY` | `Permissions-Policy` directives. | JSON string array | `[]` | `["camera=()","geolocation=()"]` |
 | `WAF_SITE_KEEP_UPSTREAM_HEADERS` | Upstream headers to preserve without filtering. | JSON string array | `["*"]` | `["X-Request-Id","X-Upstream-Time"]` |
 | `WAF_SITE_REFERRER_POLICY` | `Referrer-Policy` header value. | String | `no-referrer-when-downgrade` | `strict-origin-when-cross-origin` |
+| `WAF_SITE_HSTS_ENABLED` | Enables `Strict-Transport-Security` header generation. | `true`, `false` | `true` | `true` |
+| `WAF_SITE_HSTS_MAX_AGE_SECONDS` | HSTS `max-age` value in seconds. | Integer `>= 0` | `15552000` | `31536000` |
+| `WAF_SITE_HSTS_INCLUDE_SUBDOMAINS` | Adds `includeSubDomains` to HSTS. | `true`, `false` | `false` | `true` |
+| `WAF_SITE_HSTS_PRELOAD` | Enables preload-ready HSTS mode. Requires `HSTS_ENABLED=true`, `HSTS_INCLUDE_SUBDOMAINS=true`, `HSTS_MAX_AGE_SECONDS>=31536000`. | `true`, `false` | `false` | `true` |
 | `WAF_SITE_USE_CORS` | Enables CORS responses on the frontend. | `true`, `false` | `false` | `true` |
 | `WAF_SITE_CORS_ALLOWED_ORIGINS` | Allowed CORS origins. | JSON string array | `["*"]` | `["https://app.example.com","https://admin.example.com"]` |
 

@@ -74,6 +74,10 @@
 | `WAF_SITE_PERMISSIONS_POLICY` | Список директив `Permissions-Policy`. | JSON-массив строк | `[]` | `["camera=()","geolocation=()"]` |
 | `WAF_SITE_KEEP_UPSTREAM_HEADERS` | Какие upstream-заголовки сохранить без фильтрации. | JSON-массив строк | `["*"]` | `["X-Request-Id","X-Upstream-Time"]` |
 | `WAF_SITE_REFERRER_POLICY` | Значение заголовка `Referrer-Policy`. | Строка | `no-referrer-when-downgrade` | `strict-origin-when-cross-origin` |
+| `WAF_SITE_HSTS_ENABLED` | Включает формирование заголовка строгой транспортной безопасности. | `true`, `false` | `true` | `true` |
+| `WAF_SITE_HSTS_MAX_AGE_SECONDS` | Значение `max-age` в секундах для политики строгой транспортной безопасности. | Целое число `>= 0` | `15552000` | `31536000` |
+| `WAF_SITE_HSTS_INCLUDE_SUBDOMAINS` | Распространяет политику строгой транспортной безопасности на все поддомены. | `true`, `false` | `false` | `true` |
+| `WAF_SITE_HSTS_PRELOAD` | Включает режим для включения домена в список предзагрузки браузеров. Требует `HSTS_ENABLED=true`, `HSTS_INCLUDE_SUBDOMAINS=true`, `HSTS_MAX_AGE_SECONDS>=31536000`. | `true`, `false` | `false` | `true` |
 | `WAF_SITE_USE_CORS` | Включает CORS-ответы на фронте. | `true`, `false` | `false` | `true` |
 | `WAF_SITE_CORS_ALLOWED_ORIGINS` | Какие origin разрешены по CORS. | JSON-массив строк | `["*"]` | `["https://app.example.com","https://admin.example.com"]` |
 

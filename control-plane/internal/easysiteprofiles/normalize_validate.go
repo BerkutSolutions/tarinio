@@ -49,6 +49,12 @@ func normalizeProfile(profile EasySiteProfile) EasySiteProfile {
 	profile.HTTPHeaders.PermissionsPolicy = normalizeTrimmedList(profile.HTTPHeaders.PermissionsPolicy)
 	profile.HTTPHeaders.KeepUpstreamHeaders = normalizeTrimmedList(profile.HTTPHeaders.KeepUpstreamHeaders)
 	profile.HTTPHeaders.ReferrerPolicy = strings.TrimSpace(profile.HTTPHeaders.ReferrerPolicy)
+	if profile.HTTPHeaders.HSTSMaxAgeSeconds == 0 {
+		profile.HTTPHeaders.HSTSMaxAgeSeconds = 15552000
+	}
+	if profile.HTTPHeaders.HSTSMaxAgeSeconds < 0 {
+		profile.HTTPHeaders.HSTSMaxAgeSeconds = 0
+	}
 	profile.HTTPHeaders.CORSAllowedOrigins = normalizeTrimmedList(profile.HTTPHeaders.CORSAllowedOrigins)
 
 	profile.SecurityBehaviorAndLimits.BadBehaviorStatusCodes = normalizeStatusCodes(profile.SecurityBehaviorAndLimits.BadBehaviorStatusCodes)
@@ -394,6 +400,24 @@ func validateProfile(profile EasySiteProfile) error {
 		if !isSafeHeaderValue(item) {
 			return errors.New("easy site profile http_headers.permissions_policy contains unsupported characters")
 		}
+	}
+	if profile.HTTPHeaders.HSTSMaxAgeSeconds < 0 {
+		return errors.New("easy site profile http_headers.hsts_max_age_seconds must be zero or positive")
+	}
+	if profile.HTTPHeaders.HSTSIncludeSubdomains && !profile.HTTPHeaders.HSTSEnabled {
+		return errors.New("easy site profile http_headers.hsts_include_subdomains requires hsts_enabled")
+	}
+	if profile.HTTPHeaders.HSTSPreload && !profile.HTTPHeaders.HSTSEnabled {
+		return errors.New("easy site profile http_headers.hsts_preload requires hsts_enabled")
+	}
+	if profile.HTTPHeaders.HSTSPreload && !profile.HTTPHeaders.HSTSIncludeSubdomains {
+		return errors.New("easy site profile http_headers.hsts_preload requires hsts_include_subdomains")
+	}
+	if profile.HTTPHeaders.HSTSEnabled && profile.HTTPHeaders.HSTSMaxAgeSeconds <= 0 {
+		return errors.New("easy site profile http_headers.hsts_max_age_seconds must be positive when hsts_enabled is true")
+	}
+	if profile.HTTPHeaders.HSTSPreload && profile.HTTPHeaders.HSTSMaxAgeSeconds < 31536000 {
+		return errors.New("easy site profile http_headers.hsts_max_age_seconds must be at least 31536000 when hsts_preload is true")
 	}
 	if profile.UpstreamRouting.ReverseProxyCustomHost != "" && !safeHostHeaderRegexp.MatchString(strings.TrimSpace(profile.UpstreamRouting.ReverseProxyCustomHost)) {
 		return errors.New("easy site profile upstream_routing.reverse_proxy_custom_host must be host or host:port")

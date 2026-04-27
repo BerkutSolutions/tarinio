@@ -134,6 +134,10 @@ type EasyProfileInput struct {
 	ReferrerPolicy        string
 	ContentSecurityPolicy string
 	PermissionsPolicy     []string
+	HSTSEnabled           bool
+	HSTSMaxAgeSeconds     int
+	HSTSIncludeSubdomains bool
+	HSTSPreload           bool
 	UseCORS               bool
 	CORSAllowedOrigins    []string
 

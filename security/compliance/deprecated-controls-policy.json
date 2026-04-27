@@ -1,0 +1,36 @@
+{
+  "policy_id": "pci-asv-deprecated-controls",
+  "version": "2026-04-27",
+  "owner": "security-compliance",
+  "review_period_days": 180,
+  "controls": [
+    {
+      "control_id": "HPKP_HEADER",
+      "scanner_aliases": [
+        "hpkp",
+        "public-key-pins",
+        "public-key-pins-report-only"
+      ],
+      "status": "deprecated_not_applicable",
+      "risk_classification": "legacy_deprecated",
+      "position": "Do not implement HPKP in production edge policy.",
+      "rationale": "HPKP is deprecated and operationally unsafe for modern browser security posture.",
+      "evidence_requirement": "Document policy and keep HSTS/TLS controls enforced.",
+      "owner": "security-compliance",
+      "next_review_date": "2026-10-24"
+    },
+    {
+      "control_id": "EXPECT_CT_HEADER",
+      "scanner_aliases": [
+        "expect-ct"
+      ],
+      "status": "deprecated_not_applicable",
+      "risk_classification": "legacy_deprecated",
+      "position": "Do not require Expect-CT header as a mandatory control.",
+      "rationale": "Expect-CT is deprecated and superseded by current CT ecosystem behavior.",
+      "evidence_requirement": "Document policy and validate certificate transparency through CA and monitoring process.",
+      "owner": "security-compliance",
+      "next_review_date": "2026-10-24"
+    }
+  ]
+}

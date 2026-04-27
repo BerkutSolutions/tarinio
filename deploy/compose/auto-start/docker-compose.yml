@@ -95,12 +95,15 @@ services:
     cap_add:
       - NET_ADMIN
       - NET_RAW
+    sysctls:
+      - net.ipv4.tcp_timestamps=${WAF_RUNTIME_SYSCTL_TCP_TIMESTAMPS:-0}
     volumes:
       - waf-runtime-data:/var/lib/waf:ro
       - waf-control-plane-data:/var/lib/waf/control-plane:ro
       - waf-nginx-logs:/var/log/nginx
       - waf-l4-adaptive:/etc/waf/l4guard-adaptive:ro
     ports:
+      - "${WAF_RUNTIME_HTTP_PORT:-80}:80"
       - "${WAF_RUNTIME_HTTPS_PORT:-443}:443"
     expose:
       - "80"
@@ -154,7 +157,7 @@ services:
       control-plane:
         condition: service_started
     ports:
-      - "${WAF_UI_HTTP_PORT:-80}:80"
+      - "${WAF_UI_BIND_ADDR:-127.0.0.1}:${WAF_UI_HTTP_PORT:-18080}:80"
     expose:
       - "80"
     networks:

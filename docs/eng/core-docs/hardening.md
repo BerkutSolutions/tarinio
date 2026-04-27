@@ -33,6 +33,14 @@ Recommended baseline:
 - use host firewall rules together with TARINIO protections;
 - expose only the ports required for your topology.
 
+## Host Stack Hardening
+
+Recommended baseline:
+
+- keep `net.ipv4.tcp_timestamps=0` on runtime hosts/containers used for internet-facing edge;
+- use `WAF_RUNTIME_SYSCTL_TCP_TIMESTAMPS=0` in compose profiles (`default`, `auto-start`, `enterprise`, `ha-lab`);
+- if compatibility requires enabling timestamps, document this as a temporary exception with risk acceptance and expiry date.
+
 ## Data Services
 
 Recommended baseline:
@@ -58,3 +66,11 @@ Recommended baseline:
 - enable metrics and dashboards;
 - monitor revision failures, runtime readiness, and lock contention;
 - keep enough retention to analyze incidents and releases.
+
+## Hardening Diagnostics
+
+Recommended baseline:
+
+- run administration script `collect-waf-hardening` before external scans;
+- archive `tcp_timestamps`, runtime nginx TLS/HSTS directives, and effective compose/sysctl evidence;
+- include the generated archive in support bundles shared with security/compliance teams.

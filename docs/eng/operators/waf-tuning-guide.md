@@ -8,7 +8,7 @@ This document is intended for a Stage 1 operator who already has:
 
 It is not a theoretical ModSecurity reference. It is a practical guide for changing policies safely.
 
-Release baseline for this guide revision: `3.0.6`.
+Release baseline for this guide revision: `3.0.7`.
 
 ## How WAF Fits Into The Architecture
 
@@ -140,6 +140,8 @@ Helpful discipline:
 - make one meaningful change at a time;
 - avoid packing unrelated changes into one revision;
 - validate immediately after apply.
+
+For internet-facing production sites, run `scripts/pci-preflight-perimeter.sh` before an external ASV window and treat a failing preflight as a hard stop for policy rollout.
 
 ## Observability Without External SIEM
 

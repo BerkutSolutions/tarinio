@@ -57,6 +57,9 @@ add_header Content-Security-Policy "{{ .ContentSecurityPolicy }}" always;
 {{- if .PermissionsPolicy }}
 add_header Permissions-Policy "{{ .PermissionsPolicy }}" always;
 {{- end }}
+{{- if .HSTSHeader }}
+add_header Strict-Transport-Security "{{ .HSTSHeader }}" always;
+{{- end }}
 {{- if .UseCORS }}
 add_header Access-Control-Allow-Origin "{{ .CORSAllowedOrigins }}" always;
 add_header Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS" always;

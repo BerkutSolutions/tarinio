@@ -32,6 +32,10 @@ func TestSiteSettings_FieldContract(t *testing.T) {
 		"http_headers.cookie_flags",
 		"http_headers.cors_allowed_origins",
 		"http_headers.keep_upstream_headers",
+		"http_headers.hsts_enabled",
+		"http_headers.hsts_include_subdomains",
+		"http_headers.hsts_max_age_seconds",
+		"http_headers.hsts_preload",
 		"http_headers.permissions_policy",
 		"http_headers.referrer_policy",
 		"http_headers.use_cors",
@@ -245,6 +249,10 @@ func allFieldsProfile(siteID string) EasySiteProfile {
 	profile.HTTPHeaders.PermissionsPolicy = []string{"camera=()", "microphone=()"}
 	profile.HTTPHeaders.KeepUpstreamHeaders = []string{"X-Trace-Id", "X-Request-Id"}
 	profile.HTTPHeaders.ReferrerPolicy = "strict-origin"
+	profile.HTTPHeaders.HSTSEnabled = true
+	profile.HTTPHeaders.HSTSMaxAgeSeconds = 31536000
+	profile.HTTPHeaders.HSTSIncludeSubdomains = true
+	profile.HTTPHeaders.HSTSPreload = true
 	profile.HTTPHeaders.UseCORS = true
 	profile.HTTPHeaders.CORSAllowedOrigins = []string{"https://app.example.com", "https://admin.example.com"}
 
