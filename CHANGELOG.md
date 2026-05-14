@@ -1,4 +1,4 @@
-## [1.2.0] - 2026-05-14
+﻿## [1.2.0] - 14.05.2026
 
 ### Ядро
 - Исправлена ошибка в runtime NGINX: `using uninitialized "waf_site_id" variable while logging request`.
