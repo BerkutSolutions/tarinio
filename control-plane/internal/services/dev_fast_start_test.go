@@ -440,7 +440,7 @@ func TestDevFastStartBootstrapperRunUpdatesExistingManagementRateDefaults(t *tes
 	}
 
 	updated := easyProfiles.items["control-plane-access"]
-	if updated.SecurityBehaviorAndLimits.LimitReqRate != "300r/s" {
+	if updated.SecurityBehaviorAndLimits.LimitReqRate != "600r/s" {
 		t.Fatalf("expected management rate limit update, got %s", updated.SecurityBehaviorAndLimits.LimitReqRate)
 	}
 	if len(updated.SecurityBehaviorAndLimits.CustomLimitRules) == 0 {

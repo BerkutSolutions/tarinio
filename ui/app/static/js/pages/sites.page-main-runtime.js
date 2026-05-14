@@ -1,0 +1,21 @@
+import { renderSitesRuntime } from "./sites.page-render-runtime.js";
+import {
+  buildRenderSitesDeps,
+  computeUpstreamID,
+  draftToEnvText,
+  envToDraft,
+  hydrateSiteDraft,
+  renderRawEditor
+} from "./sites.page-main-helpers.js";
+
+export async function renderSites(container, ctx) {
+  return renderSitesRuntime(container, ctx, buildRenderSitesDeps());
+}
+
+export {
+  computeUpstreamID,
+  draftToEnvText,
+  envToDraft,
+  hydrateSiteDraft,
+  renderRawEditor
+};

@@ -1,5 +1,20 @@
-import { availableLanguages } from "../i18n.js";
 import { escapeHtml } from "../ui.js";
+import {
+  activeTabFromPath,
+  availableTabs,
+  permissionSet,
+  renderLanguageOptions,
+  renderUpdateStatus,
+  showTab
+} from "./settings.shared.js";
+import {
+  buildLoggingPayload as buildLoggingPayloadExternal,
+  renderLoggingStatusText as renderLoggingStatusTextExternal,
+  renderStorageIndexes as renderStorageIndexesExternal
+} from "./settings.storage-logging.js";
+import { clearRuntimeAutoCheckTimer, setRuntimeAutoCheckTimer } from "./settings.runtime-timer.js";
+import { renderRuntimeData } from "./settings.runtime-render.js";
+import { bindSettingsActions } from "./settings.actions.js";
 
 const SETTINGS_TABS = [
   { id: "general", path: "/settings/general", labelKey: "settings.tabs.general", permissions: ["settings.general.read", "settings.general.write"] },
@@ -10,97 +25,13 @@ const SETTINGS_TABS = [
   { id: "about", path: "/settings/about", labelKey: "settings.tabs.about", permissions: ["settings.about.read"] },
 ];
 
-let runtimeAutoCheckTimer = null;
-
-function renderLanguageOptions() {
-  return availableLanguages()
-    .map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.label)}</option>`)
-    .join("");
-}
-
-function clearRuntimeAutoCheckTimer() {
-  if (runtimeAutoCheckTimer) {
-    window.clearInterval(runtimeAutoCheckTimer);
-    runtimeAutoCheckTimer = null;
-  }
-}
-
-function activeTabFromPath() {
-  const path = (window.location.pathname || "").replace(/\/+$/, "") || "/";
-  const matched = SETTINGS_TABS.find((tab) => path === tab.path || path.startsWith(`${tab.path}/`));
-  return matched?.id || "general";
-}
-
-function permissionSet(ctx) {
-  return new Set(Array.isArray(ctx?.currentUser?.permissions) ? ctx.currentUser.permissions.map((item) => String(item || "").trim()) : []);
-}
-
-function availableTabs(ctx) {
-  const permissions = permissionSet(ctx);
-  return SETTINGS_TABS.filter((tab) => (tab.permissions || []).some((permission) => permissions.has(permission)));
-}
-
-function showTab(root, tabID) {
-  root.querySelectorAll("[data-settings-tab-link]").forEach((link) => {
-    const active = String(link.getAttribute("data-settings-tab-link") || "") === tabID;
-    link.classList.toggle("active", active);
-    link.setAttribute("aria-current", active ? "page" : "false");
-  });
-  root.querySelectorAll("[data-settings-panel]").forEach((panel) => {
-    const active = String(panel.getAttribute("data-settings-panel") || "") === tabID;
-    panel.hidden = !active;
-  });
-}
-
-function renderUpdateStatus(ctx, element, payload) {
-  if (!element) {
-    return;
-  }
-  const result = payload?.update || payload?.result || payload || {};
-  const checkedAt = String(result?.checked_at || result?.checkedAt || "").trim();
-  const hasUpdate = !!(result?.has_update || result?.hasUpdate);
-  const latest = String(result?.latest_version || result?.latestVersion || "-").trim();
-  const releaseURL = String(result?.release_url || result?.releaseURL || "").trim();
-
-  element.classList.remove("banner", "settings-updates-banner", "muted");
-  element.textContent = "";
-  element.innerHTML = "";
-
-  if (!checkedAt) {
-    element.classList.add("muted");
-    element.textContent = ctx.t("settings.updates.notChecked");
-    return;
-  }
-
-  if (!hasUpdate) {
-    element.classList.add("muted");
-    element.textContent = `${ctx.t("settings.updates.noUpdates")} (${checkedAt})`;
-    return;
-  }
-
-  element.classList.add("banner", "settings-updates-banner");
-  const text = document.createElement("span");
-  text.textContent = `${ctx.t("settings.updates.availableVersion", { version: latest })} (${checkedAt})`;
-  element.appendChild(text);
-
-  if (releaseURL) {
-    const link = document.createElement("a");
-    link.className = "btn btn-sm primary";
-    link.href = releaseURL;
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
-    link.textContent = ctx.t("settings.updates.openRelease");
-    element.appendChild(link);
-  }
-}
-
 export async function renderSettings(container, ctx) {
   clearRuntimeAutoCheckTimer();
   let storageIndexesOffset = 0;
   const storageIndexesLimit = 10;
   let storageIndexesStream = "requests";
-  const tabs = availableTabs(ctx);
-  const currentTab = tabs.find((tab) => tab.id === activeTabFromPath()) || tabs[0] || SETTINGS_TABS.find((tab) => tab.id === "about");
+  const tabs = availableTabs(ctx, SETTINGS_TABS);
+  const currentTab = tabs.find((tab) => tab.id === activeTabFromPath(SETTINGS_TABS)) || tabs[0] || SETTINGS_TABS.find((tab) => tab.id === "about");
   if (!currentTab) {
     container.innerHTML = "";
     return;
@@ -754,300 +685,96 @@ export async function renderSettings(container, ctx) {
   });
 
   const renderRuntime = async () => {
-    const canReadGeneral = permissionSet(ctx).has("settings.general.read") || permissionSet(ctx).has("settings.general.write");
-    const canReadStorage = permissionSet(ctx).has("settings.storage.read") || permissionSet(ctx).has("settings.storage.write");
-    try {
-      let runtime = null;
-      if (canReadGeneral) {
-        runtime = await ctx.api.get("/api/settings/runtime");
-        const mode = String(runtime?.deployment_mode || "-");
-        const logging = runtime?.logging || {};
-        const loggingSummary = runtime?.logging_summary || {};
-        const security = runtime?.security || {};
-        const clickhouse = logging?.clickhouse || {};
-        const opensearch = logging?.opensearch || {};
-        const routing = logging?.routing || {};
-        const retention = logging?.retention || {};
-        const vault = logging?.vault || {};
-        runtimeStatus.textContent = ctx.t("settings.runtime.loaded", { mode });
-        if (languageSelect) {
-          languageSelect.value = String(runtime?.language || ctx.getLanguage?.() || "en");
-        }
-        if (updatesEnabled) {
-          updatesEnabled.checked = !!runtime?.update_checks_enabled;
-        }
-        renderUpdateStatus(ctx, updateStatus, runtime || {});
-        const currentVersion = String(runtime?.app_version || runtime?.version || "").trim();
-        if (currentVersion) {
-          const text = `${ctx.t("about.version")}: ${currentVersion}`;
-          aboutVersion.textContent = currentVersion;
-          aboutVersionInline.textContent = text;
-        }
-        if (runtime?.update_checks_enabled) {
-          clearRuntimeAutoCheckTimer();
-          runtimeAutoCheckTimer = window.setInterval(async () => {
-            try {
-              const result = await ctx.api.post("/api/settings/runtime/check-updates", { update_checks_enabled: true, manual: false });
-              renderUpdateStatus(ctx, updateStatus, result || {});
-            } catch {
-              // keep last known status silently
-            }
-          }, 60 * 60 * 1000);
-        } else {
-          clearRuntimeAutoCheckTimer();
-        }
-        if (loggingHotBackend) {
-          loggingHotBackend.value = String(logging?.hot?.backend || "opensearch");
-        }
-        if (loggingColdBackend) {
-          loggingColdBackend.value = String(logging?.cold?.backend || "opensearch");
-        }
-        if (loggingHotRetention) {
-          loggingHotRetention.value = String(Number(retention?.hot_days || 30));
-        }
-        if (loggingColdRetention) {
-          loggingColdRetention.value = String(Number(retention?.cold_days || 730));
-        }
-        if (loggingEndpoint) {
-          loggingEndpoint.value = String(clickhouse?.endpoint || "");
-        }
-        if (loggingDatabase) {
-          loggingDatabase.value = String(clickhouse?.database || "waf_logs");
-        }
-        if (loggingTable) {
-          loggingTable.value = String(clickhouse?.table || "request_logs");
-        }
-        if (loggingUsername) {
-          loggingUsername.value = String(clickhouse?.username || "");
-        }
-        if (loggingPassword) {
-          loggingPassword.value = String(clickhouse?.password || "");
-        }
-        if (loggingOpenSearchEndpoint) {
-          loggingOpenSearchEndpoint.value = String(opensearch?.endpoint || "");
-        }
-        if (loggingOpenSearchPrefix) {
-          loggingOpenSearchPrefix.value = String(opensearch?.index_prefix || "waf-hot");
-        }
-        if (loggingOpenSearchUsername) {
-          loggingOpenSearchUsername.value = String(opensearch?.username || "");
-        }
-        if (loggingOpenSearchPassword) {
-          loggingOpenSearchPassword.value = String(opensearch?.password || "");
-        }
-        if (loggingOpenSearchAPIKey) {
-          loggingOpenSearchAPIKey.value = String(opensearch?.api_key || "");
-        }
-        if (loggingMigrationEnabled) {
-          loggingMigrationEnabled.checked = !!clickhouse?.migration_enabled;
-        }
-        if (loggingRouteRequestsHot) {
-          loggingRouteRequestsHot.checked = !!routing?.write_requests_to_hot;
-        }
-        if (loggingRouteRequestsCold) {
-          loggingRouteRequestsCold.checked = !!routing?.write_requests_to_cold;
-        }
-        if (loggingRouteEventsHot) {
-          loggingRouteEventsHot.checked = !!routing?.write_events_to_hot;
-        }
-        if (loggingRouteEventsCold) {
-          loggingRouteEventsCold.checked = !!routing?.write_events_to_cold;
-        }
-        if (loggingRouteActivityHot) {
-          loggingRouteActivityHot.checked = !!routing?.write_activity_to_hot;
-        }
-        if (loggingRouteActivityCold) {
-          loggingRouteActivityCold.checked = !!routing?.write_activity_to_cold;
-        }
-        if (loggingRouteFallback) {
-          loggingRouteFallback.checked = routing?.keep_local_fallback !== false;
-        }
-        if (loggingSecretProvider) {
-          loggingSecretProvider.value = String(logging?.secret_provider || "vault");
-        }
-        if (loggingVaultEnabled) {
-          loggingVaultEnabled.checked = vault?.enabled !== false;
-        }
-        if (loggingVaultAddress) {
-          loggingVaultAddress.value = String(vault?.address || "");
-        }
-        if (loggingVaultMount) {
-          loggingVaultMount.value = String(vault?.mount || "secret");
-        }
-        if (loggingVaultPathPrefix) {
-          loggingVaultPathPrefix.value = String(vault?.path_prefix || "tarinio");
-        }
-        if (loggingVaultToken) {
-          loggingVaultToken.value = String(vault?.token || "");
-        }
-        if (loggingVaultTLSSkipVerify) {
-          loggingVaultTLSSkipVerify.checked = !!vault?.tls_skip_verify;
-        }
-        if (securityLoginRateEnabled) {
-          securityLoginRateEnabled.checked = security?.login_rate_limit_enabled !== false;
-        }
-        if (securityLoginRateAttempts) {
-          securityLoginRateAttempts.value = String(Number(security?.login_rate_limit_max_attempts || 10));
-        }
-        if (securityLoginRateWindow) {
-          securityLoginRateWindow.value = String(Number(security?.login_rate_limit_window_seconds || 300));
-        }
-        if (securityLoginRateBlock) {
-          securityLoginRateBlock.value = String(Number(security?.login_rate_limit_block_seconds || 600));
-        }
-        if (securityAllowInsecureVaultTLS) {
-          securityAllowInsecureVaultTLS.checked = !!security?.allow_insecure_vault_tls;
-        }
-        syncVaultTLSControls();
-        if (loggingStatus) {
-          loggingStatus.textContent = renderLoggingStatusText(logging, loggingSummary);
-        }
-      }
-      if (canReadStorage) {
-        const storage = runtime?.storage || {};
-        const storageRetention = runtime?.logging?.retention || {};
-        if (storageLogs) {
-          storageLogs.value = String(Number(storage?.logs_days || 14));
-        }
-        if (storageActivity) {
-          storageActivity.value = String(Number(storage?.activity_days || 30));
-        }
-        if (storageEvents) {
-          storageEvents.value = String(Number(storage?.events_days || 30));
-        }
-        if (storageBans) {
-          storageBans.value = String(Number(storage?.bans_days || 30));
-        }
-        if (storageHotIndexDays) {
-          storageHotIndexDays.value = String(Number(storage?.hot_index_days || storageRetention?.hot_days || 30));
-        }
-        if (storageColdIndexDays) {
-          storageColdIndexDays.value = String(Number(storage?.cold_index_days || storageRetention?.cold_days || 730));
-        }
-        const indexesPayload = await ctx.api.get(`/api/settings/runtime/storage-indexes?stream=${encodeURIComponent(storageIndexesStream)}&storage_indexes_limit=${storageIndexesLimit}&storage_indexes_offset=${storageIndexesOffset}`).catch(() => ({ items: [], total: 0, limit: storageIndexesLimit, offset: storageIndexesOffset, stream: storageIndexesStream }));
-        storageIndexesOffset = Number(indexesPayload?.offset || 0);
-        renderStorageIndexes(indexesPayload);
-      }
-    } catch {
-      runtimeStatus.textContent = ctx.t("settings.runtime.shell");
-      updateStatus.textContent = ctx.t("settings.updates.notAvailable");
-      renderStorageIndexes({ items: [], total: 0, limit: storageIndexesLimit, offset: storageIndexesOffset });
-      clearRuntimeAutoCheckTimer();
-    }
+    await renderRuntimeData({
+      ctx,
+      permissionSet,
+      runtimeStatus,
+      languageSelect,
+      updatesEnabled,
+      updateStatus,
+      aboutVersion,
+      aboutVersionInline,
+      clearRuntimeAutoCheckTimer,
+      setRuntimeAutoCheckTimer,
+      loggingHotBackend,
+      loggingColdBackend,
+      loggingHotRetention,
+      loggingColdRetention,
+      loggingEndpoint,
+      loggingDatabase,
+      loggingTable,
+      loggingUsername,
+      loggingPassword,
+      loggingOpenSearchEndpoint,
+      loggingOpenSearchPrefix,
+      loggingOpenSearchUsername,
+      loggingOpenSearchPassword,
+      loggingOpenSearchAPIKey,
+      loggingMigrationEnabled,
+      loggingRouteRequestsHot,
+      loggingRouteRequestsCold,
+      loggingRouteEventsHot,
+      loggingRouteEventsCold,
+      loggingRouteActivityHot,
+      loggingRouteActivityCold,
+      loggingRouteFallback,
+      loggingSecretProvider,
+      loggingVaultEnabled,
+      loggingVaultAddress,
+      loggingVaultMount,
+      loggingVaultPathPrefix,
+      loggingVaultToken,
+      loggingVaultTLSSkipVerify,
+      securityLoginRateEnabled,
+      securityLoginRateAttempts,
+      securityLoginRateWindow,
+      securityLoginRateBlock,
+      securityAllowInsecureVaultTLS,
+      syncVaultTLSControls,
+      loggingStatus,
+      settingsRenderLoggingStatusText: renderLoggingStatusText,
+      storageLogs,
+      storageActivity,
+      storageEvents,
+      storageBans,
+      storageHotIndexDays,
+      storageColdIndexDays,
+      storageIndexesLimit,
+      storageIndexesOffset,
+      storageIndexesStream,
+      setStorageIndexesOffset: (value) => { storageIndexesOffset = value; },
+      settingsStorageRenderIndexes: renderStorageIndexes
+    });
   };
 
-  securityAllowInsecureVaultTLS?.addEventListener("change", () => {
-    syncVaultTLSControls();
-  });
-
-  container.querySelector("#settings-update-check")?.addEventListener("click", async () => {
-    setAlert("");
-    updateStatus.textContent = ctx.t("settings.updates.checking");
-    try {
-      const result = await ctx.api.post("/api/settings/runtime/check-updates", {
-        update_checks_enabled: !!updatesEnabled?.checked,
-        manual: true,
-      });
-      renderUpdateStatus(ctx, updateStatus, result || {});
-      setAlert(ctx.t("settings.updates.checkCompleted"), true);
-    } catch {
-      updateStatus.textContent = ctx.t("settings.updates.notAvailable");
-      setAlert(updateStatus.textContent);
-    }
-  });
-
-  languageSave?.addEventListener("click", async () => {
-    setAlert("");
-    try {
-      const nextLanguage = String(languageSelect?.value || "en");
-      const result = await ctx.api.put("/api/settings/runtime", { language: nextLanguage });
-      if (typeof ctx.setLanguage === "function") {
-        await ctx.setLanguage(String(result?.language || nextLanguage || "en"));
-      }
-      setAlert(ctx.t("settings.saved"), true);
-      await renderRuntime();
-    } catch (error) {
-      setAlert(error?.message || ctx.t("common.error"));
-    }
-  });
-
-  runtimeSave?.addEventListener("click", async () => {
-    setAlert("");
-    try {
-      const payload = {
-        update_checks_enabled: !!updatesEnabled?.checked,
-      };
-      const result = await ctx.api.put("/api/settings/runtime", payload);
-      renderUpdateStatus(ctx, updateStatus, result || {});
-      setAlert(ctx.t("settings.saved"), true);
-      await renderRuntime();
-    } catch (error) {
-      setAlert(error?.message || ctx.t("common.error"));
-    }
-  });
-
-  storageSave?.addEventListener("click", async () => {
-    setAlert("");
-    try {
-      const payload = {
-        storage: {
-          logs_days: Number(storageLogs?.value || "14"),
-          activity_days: Number(storageActivity?.value || "30"),
-          events_days: Number(storageEvents?.value || "30"),
-          bans_days: Number(storageBans?.value || "30"),
-          hot_index_days: Number(storageHotIndexDays?.value || "30"),
-          cold_index_days: Number(storageColdIndexDays?.value || "730"),
-        },
-      };
-      await ctx.api.put("/api/settings/runtime", payload);
-      setAlert(ctx.t("settings.saved"), true);
-      await renderRuntime();
-    } catch (error) {
-      setAlert(error?.message || ctx.t("common.error"));
-    }
-  });
-
-  securitySave?.addEventListener("click", async () => {
-    setAlert("");
-    try {
-      const payload = {
-        security: {
-          allow_insecure_vault_tls: !!securityAllowInsecureVaultTLS?.checked,
-          login_rate_limit_enabled: !!securityLoginRateEnabled?.checked,
-          login_rate_limit_max_attempts: Number(securityLoginRateAttempts?.value || "10"),
-          login_rate_limit_window_seconds: Number(securityLoginRateWindow?.value || "300"),
-          login_rate_limit_block_seconds: Number(securityLoginRateBlock?.value || "600"),
-        },
-      };
-      await ctx.api.put("/api/settings/runtime", payload);
-      syncVaultTLSControls();
-      setAlert(ctx.t("settings.saved"), true);
-      await renderRuntime();
-    } catch (error) {
-      setAlert(error?.message || ctx.t("common.error"));
-    }
-  });
-
-  loggingSave?.addEventListener("click", async () => {
-    setAlert("");
-    try {
-      await ctx.api.put("/api/settings/runtime", buildLoggingPayload());
-      setAlert(ctx.t("settings.saved"), true);
-      await renderRuntime();
-    } catch (error) {
-      setAlert(error?.message || ctx.t("common.error"));
-    }
-  });
-
-  secretsSave?.addEventListener("click", async () => {
-    setAlert("");
-    try {
-      await ctx.api.put("/api/settings/runtime", buildLoggingPayload());
-      setAlert(ctx.t("settings.saved"), true);
-      await renderRuntime();
-    } catch (error) {
-      setAlert(error?.message || ctx.t("common.error"));
-    }
+  bindSettingsActions({
+    container,
+    ctx,
+    syncVaultTLSControls,
+    setAlert,
+    updateStatus,
+    updatesEnabled,
+    languageSelect,
+    languageSave,
+    runtimeSave,
+    storageSave,
+    securitySave,
+    loggingSave,
+    secretsSave,
+    storageLogs,
+    storageActivity,
+    storageEvents,
+    storageBans,
+    storageHotIndexDays,
+    storageColdIndexDays,
+    securityAllowInsecureVaultTLS,
+    securityLoginRateEnabled,
+    securityLoginRateAttempts,
+    securityLoginRateWindow,
+    securityLoginRateBlock,
+    renderRuntime,
+    buildLoggingPayload,
+    renderUpdateStatus
   });
 
   const selectedTab = currentTab.id;

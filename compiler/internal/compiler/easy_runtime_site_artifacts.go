@@ -1,0 +1,191 @@
+package compiler
+
+import (
+	"fmt"
+	"path/filepath"
+	"strings"
+)
+
+func defaultEasyProfileForSite(siteID string) EasyProfileInput {
+	return EasyProfileInput{
+		SiteID:                    siteID,
+		SecurityMode:              "block",
+		AllowedMethods:            []string{"GET", "POST", "HEAD", "OPTIONS", "PUT", "PATCH", "DELETE"},
+		MaxClientSize:             "100m",
+		UseModSecurity:            true,
+		UseModSecurityCRSPlugins:  true,
+		UseLimitConn:              true,
+		LimitConnMaxHTTP1:         200,
+		UseLimitReq:               true,
+		LimitReqRate:              "100r/s",
+		PassHostHeader:            true,
+		SendXForwardedFor:         true,
+		SendXForwardedProto:       true,
+		SendXRealIP:               false,
+		AntibotScannerAutoBan:     true,
+		UseBadBehavior:            true,
+		BadBehaviorStatusCodes:    []int{400, 401, 403, 404, 405, 429, 444},
+		BadBehaviorBanTimeSeconds: 30,
+	}
+}
+
+func renderEasySiteArtifacts(site SiteInput, profile EasyProfileInput) ([]ArtifactOutput, bool, int, int, error) {
+	l4Enabled := false
+	l4ConnLimit := 0
+	l4RatePerSec := 0
+	if profile.UseLimitConn {
+		l4Enabled = true
+		l4ConnLimit = profile.LimitConnMaxHTTP1
+	}
+	if profile.UseLimitReq {
+		l4Enabled = true
+		l4RatePerSec = parseRatePerSecond(profile.LimitReqRate)
+	}
+
+	permissionsPolicy := strings.Join(profile.PermissionsPolicy, ", ")
+	corsAllowedOrigins := strings.Join(profile.CORSAllowedOrigins, " ")
+	if corsAllowedOrigins == "" {
+		corsAllowedOrigins = "*"
+	}
+	antibotEnabled := profile.AntibotChallenge != "" && profile.AntibotChallenge != "no"
+	antibotTwoLayer := profile.ChallengeEscalationEnabled && antibotEnabled
+	defaultChallenge := profile.AntibotChallenge
+	if antibotTwoLayer && profile.ChallengeEscalationMode != "" && profile.ChallengeEscalationMode != "no" {
+		defaultChallenge = profile.ChallengeEscalationMode
+	}
+	authUsers := enabledAuthUsers(profile.AuthUsers)
+	data := easySiteData{
+		SiteID:                       site.ID,
+		RateLimitCookieVar:           rateLimitCookieVar(site.ID),
+		RateLimitEscalationCookieVar: rateLimitEscalationCookieVar(site.ID),
+		ExceptionVar:                 siteExceptionVar(site.ID),
+		AllowedMethodsPattern:        methodPattern(profile.AllowedMethods),
+		MaxClientSize:                profile.MaxClientSize,
+		ReferrerPolicy:               profile.ReferrerPolicy,
+		ContentSecurityPolicy:        profile.ContentSecurityPolicy,
+		PermissionsPolicy:            permissionsPolicy,
+		HSTSHeader:                   buildHSTSHeaderValue(profile),
+		UseCORS:                      profile.UseCORS,
+		CORSAllowedOrigins:           corsAllowedOrigins,
+		ReverseProxyCustomHost:       profile.ReverseProxyCustomHost,
+		ReverseProxySSLSNI:           profile.ReverseProxySSLSNI,
+		ReverseProxySSLSNIName:       profile.ReverseProxySSLSNIName,
+		ReverseProxyWebsocket:        profile.ReverseProxyWebsocket,
+		ReverseProxyKeepalive:        profile.ReverseProxyKeepalive,
+		PassHostHeader:               profile.PassHostHeader,
+		SendXForwardedFor:            profile.SendXForwardedFor,
+		SendXForwardedProto:          profile.SendXForwardedProto,
+		SendXRealIP:                  profile.SendXRealIP,
+		RateLimitBanSeconds:          rateLimitBanSeconds(profile),
+		AdminBypassPathPattern:       easyAdminBypassPathPatternForSite(site.ID),
+		UseAuthBasic:                 profile.UseAuthBasic && len(authUsers) > 0,
+		AuthBasicRealm:               profile.AuthBasicText,
+		AuthBasicUserFile:            fmt.Sprintf("/etc/waf/nginx/auth-basic/%s.htpasswd", site.ID),
+		AuthGateLoginURI:             authGateLoginURI(),
+		AuthGateVerifyURI:            authGateVerifyURI(),
+		AuthGateCookieKey:            authGateCookieName(site.ID),
+		AuthGateCookieVal:            authGateCookieValue(site.ID, profile),
+		AuthGateCookieTTL:            authGateCookieTTLSeconds(profile),
+		AntibotEnabled:               antibotEnabled,
+		AntibotTwoLayerEnabled:       antibotTwoLayer,
+		AntibotUsesInterstitial:      antibotUsesInterstitial(defaultChallenge),
+		AntibotChallenge:             defaultChallenge,
+		AntibotEscalationMode:        profile.ChallengeEscalationMode,
+		AntibotURI:                   profile.AntibotURI,
+		AntibotVerifyURI:             antibotVerifyURI(profile.AntibotURI),
+		AntibotStage1URI:             antibotStage1URI(profile.AntibotURI),
+		AntibotStage1VerifyURI:       antibotStage1VerifyURI(profile.AntibotURI),
+		AntibotRedirectURI:           antibotRedirectURI(defaultChallenge, profile.AntibotURI),
+		AntibotStage1RedirectURI:     antibotVerifyURI(antibotStage1URI(profile.AntibotURI)),
+		AntibotStage1CookieName:      antibotStage1CookieName(site.ID),
+		AntibotStage1CookieValue:     antibotStage1CookieValue(site.ID, profile),
+		AntibotCookieName:            antibotCookieName(site.ID),
+		AntibotCookieValue:           antibotCookieValue(site.ID, profile),
+		AntibotRecaptchaHint:         strings.TrimSpace(profile.AntibotRecaptchaKey),
+		AntibotHcaptchaHint:          strings.TrimSpace(profile.AntibotHcaptchaKey),
+		AntibotTurnstileHint:         strings.TrimSpace(profile.AntibotTurnstileKey),
+		AntibotRuleOverrides:         buildEasyAntibotRuleData(profile.AntibotChallengeRules, profile.AntibotURI),
+		AntibotScannerAutoBan:        profile.AntibotScannerAutoBan,
+		AntibotScannerPattern:        antibotScannerPattern(),
+		BlacklistIP:                  profile.BlacklistIP,
+		BlacklistUserAgent:           profile.BlacklistUserAgent,
+		BlacklistURI:                 profile.BlacklistURI,
+		BlacklistCountryGuardPattern: blacklistCountryGuardPattern(profile.BlacklistCountry),
+		WhitelistCountryGuardPattern: whitelistCountryGuardPattern(profile.WhitelistCountry),
+		UseModSecurity:               profile.UseModSecurity,
+		UseModSecurityEasyFile:       profile.UseModSecurity,
+		ModSecurityEasyRulesOn:       profile.UseModSecurity,
+		ModSecurityEasyRules: buildEasyModSecurityRules(
+			site.ID,
+			profile.SecurityMode,
+			profile.UseModSecurityCRSPlugins,
+			profile.ModSecurityCRSVersion,
+			profile.ModSecurityCRSPlugins,
+			profile.UseModSecurityCustomConfiguration,
+			profile.ModSecurityCustomPath,
+			profile.ModSecurityCustomContent,
+			profile.UseAPIPositiveSecurity,
+			profile.OpenAPISchemaRef,
+			profile.APIEnforcementMode,
+			profile.APIDefaultAction,
+			profile.APIEndpointPolicies,
+		),
+	}
+
+	content, err := renderTemplate(filepath.Join(templatesRoot(), "easy", "site.conf.tmpl"), data)
+	if err != nil {
+		return nil, false, 0, 0, fmt.Errorf("render easy site template for %s: %w", site.ID, err)
+	}
+	artifacts := []ArtifactOutput{
+		newArtifact(
+			fmt.Sprintf("nginx/easy/%s.conf", site.ID),
+			ArtifactKindNginxConfig,
+			content,
+		),
+	}
+
+	if data.UseAuthBasic {
+		lines := make([]string, 0, len(authUsers))
+		for _, user := range authUsers {
+			lines = append(lines, buildSHA1HTPasswdLine(user.Username, user.Password))
+		}
+		htpasswd := []byte(strings.Join(lines, "\n"))
+		artifacts = append(artifacts, newArtifact(
+			fmt.Sprintf("nginx/auth-basic/%s.htpasswd", site.ID),
+			ArtifactKindNginxConfig,
+			htpasswd,
+		))
+		authPage, err := renderTemplate(filepath.Join(templatesRoot(), "..", "errors", "auth.html.tmpl"), authGatePageData{
+			VerifyURI: data.AuthGateVerifyURI,
+		})
+		if err != nil {
+			return nil, false, 0, 0, fmt.Errorf("render auth gate page for %s: %w", site.ID, err)
+		}
+		artifacts = append(artifacts, newArtifact(
+			fmt.Sprintf("errors/%s/auth.html", site.ID),
+			ArtifactKindNginxConfig,
+			authPage,
+		))
+	}
+	if data.ModSecurityEasyRulesOn {
+		artifacts = append(artifacts, newArtifact(
+			fmt.Sprintf("modsecurity/easy/%s.conf", site.ID),
+			ArtifactKindModSecurity,
+			[]byte(data.ModSecurityEasyRules),
+		))
+	}
+	if data.AntibotUsesInterstitial {
+		challengePage, err := renderTemplate(filepath.Join(templatesRoot(), "..", "errors", "antibot.html.tmpl"), antibotChallengePageData{
+			VerifyURI: data.AntibotVerifyURI,
+		})
+		if err != nil {
+			return nil, false, 0, 0, fmt.Errorf("render antibot challenge page for %s: %w", site.ID, err)
+		}
+		artifacts = append(artifacts, newArtifact(
+			fmt.Sprintf("errors/%s/antibot.html", site.ID),
+			ArtifactKindNginxConfig,
+			challengePage,
+		))
+	}
+	return artifacts, l4Enabled, l4ConnLimit, l4RatePerSec, nil
+}

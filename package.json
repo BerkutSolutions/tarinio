@@ -1,7 +1,7 @@
 {
     "name": "tarinio-docs-site",
     "private": true,
-    "version": "3.0.7",
+    "version": "1.2.0",
     "scripts": {
         "start": "npm run clear && docusaurus start --host 127.0.0.1 --port 3000",
         "docs:start": "npm run clear && docusaurus start --host 127.0.0.1 --port 3000",
@@ -11,10 +11,10 @@
         "clear": "docusaurus clear"
     },
     "dependencies": {
-        "@docusaurus/core": "^3.10.0",
-        "@docusaurus/faster": "^3.10.0",
-        "@docusaurus/plugin-content-docs": "^3.10.0",
-        "@docusaurus/preset-classic": "^3.10.0",
+        "@docusaurus/core": "^3.10.1",
+        "@docusaurus/faster": "^3.10.1",
+        "@docusaurus/plugin-content-docs": "^3.10.1",
+        "@docusaurus/preset-classic": "^3.10.1",
         "@easyops-cn/docusaurus-search-local": "^0.55.1",
         "react": "^19.2.5",
         "react-dom": "^19.2.5"

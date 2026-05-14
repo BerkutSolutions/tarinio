@@ -1,11 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestRequestArchiveLatest_ByDayAndIncremental(t *testing.T) {
@@ -13,17 +15,21 @@ func TestRequestArchiveLatest_ByDayAndIncremental(t *testing.T) {
 	logPath := filepath.Join(root, "access.log")
 	archiveRoot := filepath.Join(root, "requests-archive")
 	source := newRequestStreamSource(logPath, 100, archiveRoot, 30)
+	day := time.Now().UTC().AddDate(0, 0, -1)
+	prevDay := day.AddDate(0, 0, -1)
+	dayStr := day.Format("2006-01-02")
+	prevDayStr := prevDay.Format("2006-01-02")
 
 	lines := []string{
-		`{"timestamp":"2026-04-07T12:10:00Z","request_id":"req-1","client_ip":"1.1.1.1","method":"GET","uri":"/a","status":200,"site":"site-a","host":"a.example.com"}`,
-		`{"timestamp":"2026-04-08T12:11:00Z","request_id":"req-2","client_ip":"2.2.2.2","method":"POST","uri":"/b","status":403,"site":"site-b","host":"b.example.com"}`,
+		fmt.Sprintf(`{"timestamp":"%sT12:10:00Z","request_id":"req-1","client_ip":"1.1.1.1","method":"GET","uri":"/a","status":200,"site":"site-a","host":"a.example.com"}`, prevDayStr),
+		fmt.Sprintf(`{"timestamp":"%sT12:11:00Z","request_id":"req-2","client_ip":"2.2.2.2","method":"POST","uri":"/b","status":403,"site":"site-b","host":"b.example.com"}`, dayStr),
 	}
 	if err := os.WriteFile(logPath, []byte(lines[0]+"\n"+lines[1]+"\n"), 0o644); err != nil {
 		t.Fatalf("write log fixture: %v", err)
 	}
 
 	dayQuery := url.Values{}
-	dayQuery.Set("day", "2026-04-08")
+	dayQuery.Set("day", dayStr)
 	items, err := source.latest(dayQuery)
 	if err != nil {
 		t.Fatalf("latest day query failed: %v", err)
@@ -36,7 +42,7 @@ func TestRequestArchiveLatest_ByDayAndIncremental(t *testing.T) {
 		t.Fatalf("unexpected request id: %s", got)
 	}
 
-	appendLine := `{"timestamp":"2026-04-08T12:12:00Z","request_id":"req-3","client_ip":"3.3.3.3","method":"GET","uri":"/c","status":200,"site":"site-b","host":"b.example.com"}`
+	appendLine := fmt.Sprintf(`{"timestamp":"%sT12:12:00Z","request_id":"req-3","client_ip":"3.3.3.3","method":"GET","uri":"/c","status":200,"site":"site-b","host":"b.example.com"}`, dayStr)
 	file, err := os.OpenFile(logPath, os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
 		t.Fatalf("open log for append: %v", err)

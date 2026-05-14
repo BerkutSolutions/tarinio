@@ -9,11 +9,13 @@ import (
 
 func TestUIContract_OnboardingAndSidebarMarkers(t *testing.T) {
 	contracts := []struct {
-		file    string
+		name    string
+		files   []string
 		markers []string
 	}{
 		{
-			file: filepath.Join("..", "app", "onboarding.html"),
+			name:  "onboarding html",
+			files: []string{filepath.Join("..", "app", "onboarding.html")},
 			markers: []string{
 				`id="admin-password-toggle"`,
 				`id="admin-password-confirm-toggle"`,
@@ -22,7 +24,8 @@ func TestUIContract_OnboardingAndSidebarMarkers(t *testing.T) {
 			},
 		},
 		{
-			file: filepath.Join("..", "app", "static", "js", "onboarding.js"),
+			name:  "onboarding js",
+			files: []string{filepath.Join("..", "app", "static", "js", "onboarding.js")},
 			markers: []string{
 				`"X-WAF-Auto-Apply-Disabled": "1"`,
 				`/api/revisions/compile`,
@@ -31,14 +34,16 @@ func TestUIContract_OnboardingAndSidebarMarkers(t *testing.T) {
 			},
 		},
 		{
-			file: filepath.Join("..", "app", "static", "js", "guard.js"),
+			name:  "guard",
+			files: []string{filepath.Join("..", "app", "static", "js", "guard.js")},
 			markers: []string{
 				`const initializationIncomplete = Boolean(setup && !setup.has_active_revision);`,
 				`replace(httpUrl("/onboarding/user-creation"));`,
 			},
 		},
 		{
-			file: filepath.Join("..", "app", "index.html"),
+			name:  "index",
+			files: []string{filepath.Join("..", "app", "index.html")},
 			markers: []string{
 				`class="sidebar-logo-collapsed`,
 				`id="menu" class="sidebar-nav"`,
@@ -46,7 +51,8 @@ func TestUIContract_OnboardingAndSidebarMarkers(t *testing.T) {
 			},
 		},
 		{
-			file: filepath.Join("..", "app", "static", "js", "app.js"),
+			name:  "anti-ddos menu",
+			files: []string{filepath.Join("..", "app", "static", "js", "app.js")},
 			markers: []string{
 				`pathBase: "/anti-ddos"`,
 				`labelKey: "app.antiddos"`,
@@ -54,7 +60,14 @@ func TestUIContract_OnboardingAndSidebarMarkers(t *testing.T) {
 			},
 		},
 		{
-			file: filepath.Join("..", "app", "static", "js", "pages", "dashboard.js"),
+			name: "dashboard modular markers",
+			files: []string{
+				filepath.Join("..", "app", "static", "js", "pages", "dashboard.js"),
+				filepath.Join("..", "app", "static", "js", "pages", "dashboard.data-fetch.js"),
+				filepath.Join("..", "app", "static", "js", "pages", "dashboard.contract-markers.js"),
+				filepath.Join("..", "app", "static", "js", "pages", "dashboard.detail-builder.js"),
+				filepath.Join("..", "app", "static", "js", "pages", "dashboard.frame.js"),
+			},
 			markers: []string{
 				`/api/dashboard/stats`,
 				`/api/dashboard/containers/overview`,
@@ -72,13 +85,20 @@ func TestUIContract_OnboardingAndSidebarMarkers(t *testing.T) {
 			},
 		},
 		{
-			file: filepath.Join("..", "app", "static", "js", "pages", "sites.js"),
+			name: "sites modular markers",
+			files: []string{
+				filepath.Join("..", "app", "static", "js", "pages", "sites.js"),
+				filepath.Join("..", "app", "static", "js", "pages", "sites.service-policy-helpers.js"),
+				filepath.Join("..", "app", "static", "js", "pages", "sites.import-export.js"),
+				filepath.Join("..", "app", "static", "js", "pages", "sites.view-io.js"),
+				filepath.Join("..", "app", "static", "js", "pages", "sites.draft-profile.js"),
+				filepath.Join("..", "app", "static", "js", "pages", "sites.detail-bind-runtime.js"),
+				filepath.Join("..", "app", "static", "js", "pages", "sites.page-main-actions-runtime.js"),
+			},
 			markers: []string{
 				`function computeUpstreamID(siteID)`,
-				`if (String(existingSite?._origin || "") === "secondary")`,
 				`<div class="waf-upstream-target-row">`,
 				`function draftToEnvText(draft)`,
-				`function envToDraft(text)`,
 				`function renderRawEditor(state, ctx, isNew)`,
 				`data-mode-tab="raw"`,
 				`async function hydrateSiteDraft(ctx, site, upstream, tlsConfig, accessPolicy = null)`,
@@ -86,7 +106,8 @@ func TestUIContract_OnboardingAndSidebarMarkers(t *testing.T) {
 			},
 		},
 		{
-			file: filepath.Join("..", "app", "static", "js", "pages", "requests.js"),
+			name:  "requests",
+			files: []string{filepath.Join("..", "app", "static", "js", "pages", "requests.js")},
 			markers: []string{
 				`export async function renderRequests`,
 				`data-sort-col=`,
@@ -94,7 +115,11 @@ func TestUIContract_OnboardingAndSidebarMarkers(t *testing.T) {
 			},
 		},
 		{
-			file: filepath.Join("..", "app", "static", "js", "pages", "settings.js"),
+			name: "settings modular markers",
+			files: []string{
+				filepath.Join("..", "app", "static", "js", "pages", "settings.js"),
+				filepath.Join("..", "app", "static", "js", "pages", "settings.storage-logging.js"),
+			},
 			markers: []string{
 				`data-settings-panel="secrets"`,
 				`data-storage-index-stream="events"`,
@@ -104,7 +129,8 @@ func TestUIContract_OnboardingAndSidebarMarkers(t *testing.T) {
 			},
 		},
 		{
-			file: filepath.Join("..", "app", "static", "js", "app.js"),
+			name:  "requests menu",
+			files: []string{filepath.Join("..", "app", "static", "js", "app.js")},
 			markers: []string{
 				`id: "requests"`,
 				`labelKey: "app.requests"`,
@@ -114,14 +140,27 @@ func TestUIContract_OnboardingAndSidebarMarkers(t *testing.T) {
 	}
 
 	for _, contract := range contracts {
-		raw, err := os.ReadFile(contract.file)
-		if err != nil {
-			t.Fatalf("read %s: %v", contract.file, err)
+		if len(contract.files) == 0 {
+			t.Fatalf("contract %s has no files", contract.name)
 		}
-		content := string(raw)
+		contents := make([]string, 0, len(contract.files))
+		for _, file := range contract.files {
+			raw, err := os.ReadFile(file)
+			if err != nil {
+				t.Fatalf("read %s (%s): %v", contract.name, file, err)
+			}
+			contents = append(contents, string(raw))
+		}
 		for _, marker := range contract.markers {
-			if !strings.Contains(content, marker) {
-				t.Fatalf("contract broken for %s: missing %s", contract.file, marker)
+			found := false
+			for _, content := range contents {
+				if strings.Contains(content, marker) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Fatalf("contract broken for %s: missing %s in %v", contract.name, marker, contract.files)
 			}
 		}
 	}

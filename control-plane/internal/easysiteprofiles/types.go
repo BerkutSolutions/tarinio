@@ -244,8 +244,8 @@ func DefaultProfile(siteID string) EasySiteProfile {
 		if limitConnHTTP3 < 500 {
 			limitConnHTTP3 = 500
 		}
-		if rate := normalizeLimitReqRate(limitReqRate); parseRatePerSecond(rate) < 300 {
-			limitReqRate = "300r/s"
+		if rate := normalizeLimitReqRate(limitReqRate); parseRatePerSecond(rate) < 600 {
+			limitReqRate = "600r/s"
 		} else {
 			limitReqRate = rate
 		}
@@ -259,13 +259,14 @@ func DefaultProfile(siteID string) EasySiteProfile {
 		// Keep local bad-behavior focused on clear abuse signals and avoid 429/403/404 escalation loops.
 		badBehaviorStatusCodes = []int{400, 401, 405, 444}
 		customLimitRules = []CustomLimitRule{
-			{Path: "/login", Rate: "6r/s"},
-			{Path: "/api/auth/", Rate: "12r/s"},
-			{Path: "/api/setup/", Rate: "8r/s"},
-			{Path: "/api/events", Rate: "8r/s"},
-			{Path: "/api/requests", Rate: "8r/s"},
-			{Path: "/api/reports/", Rate: "10r/s"},
-			{Path: "/api/", Rate: "30r/s"},
+			{Path: "/login", Rate: "30r/s"},
+			{Path: "/static/", Rate: "1200r/s"},
+			{Path: "/api/auth/", Rate: "120r/s"},
+			{Path: "/api/setup/", Rate: "80r/s"},
+			{Path: "/api/events", Rate: "80r/s"},
+			{Path: "/api/requests", Rate: "80r/s"},
+			{Path: "/api/reports/", Rate: "100r/s"},
+			{Path: "/api/", Rate: "180r/s"},
 		}
 	}
 

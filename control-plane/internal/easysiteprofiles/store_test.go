@@ -68,7 +68,7 @@ func TestDefaultProfile_ControlPlaneAccessUsesHigherRateLimitsWithout429Escalati
 	if profile.SecurityBehaviorAndLimits.LimitConnMaxHTTP3 < 500 {
 		t.Fatalf("expected higher http/3 conn limit for control-plane-access, got %d", profile.SecurityBehaviorAndLimits.LimitConnMaxHTTP3)
 	}
-	if profile.SecurityBehaviorAndLimits.LimitReqRate != "300r/s" {
+	if profile.SecurityBehaviorAndLimits.LimitReqRate != "600r/s" {
 		t.Fatalf("expected higher request rate for control-plane-access, got %s", profile.SecurityBehaviorAndLimits.LimitReqRate)
 	}
 	if profile.SecurityBehaviorAndLimits.LimitReqURL != "/api/" {

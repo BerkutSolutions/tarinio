@@ -3,7 +3,7 @@ services:
     build:
       context: ../../..
       dockerfile: control-plane/Dockerfile
-    container_name: tarinio-control-plane
+    container_name: tarinio-control-plane-auto-start
     restart: unless-stopped
     env_file:
       - .env
@@ -55,10 +55,10 @@ services:
       WAF_DEFAULT_ANTIDDOS_MODEL_WEIGHT_EMERGENCY_SINGLE: ${WAF_DEFAULT_ANTIDDOS_MODEL_WEIGHT_EMERGENCY_SINGLE:-4.0}
       POSTGRES_DSN: postgres://${POSTGRES_USER:-waf}:${POSTGRES_PASSWORD:-waf}@postgres:5432/${POSTGRES_DB:-waf}?sslmode=disable
     volumes:
-      - waf-runtime-data:/var/lib/waf
-      - waf-control-plane-data:/var/lib/waf/control-plane
-      - waf-certificates-data:/var/lib/waf/control-plane/certificate-materials
-      - waf-l4-adaptive:/etc/waf/l4guard-adaptive:ro
+      - waf-runtime-data-auto-start:/var/lib/waf
+      - waf-control-plane-data-auto-start:/var/lib/waf/control-plane
+      - waf-certificates-data-auto-start:/var/lib/waf/control-plane/certificate-materials
+      - waf-l4-adaptive-auto-start:/etc/waf/l4guard-adaptive:ro
       - /var/run/docker.sock:/var/run/docker.sock
     expose:
       - "8080"
@@ -73,13 +73,13 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - waf-net
+      - waf-net-auto-start
 
   runtime:
     build:
       context: ../../..
       dockerfile: runtime/image/Dockerfile
-    container_name: tarinio-runtime
+    container_name: tarinio-runtime-auto-start
     restart: unless-stopped
     depends_on:
       ui:
@@ -98,10 +98,10 @@ services:
     sysctls:
       - net.ipv4.tcp_timestamps=${WAF_RUNTIME_SYSCTL_TCP_TIMESTAMPS:-0}
     volumes:
-      - waf-runtime-data:/var/lib/waf:ro
-      - waf-control-plane-data:/var/lib/waf/control-plane:ro
-      - waf-nginx-logs:/var/log/nginx
-      - waf-l4-adaptive:/etc/waf/l4guard-adaptive:ro
+      - waf-runtime-data-auto-start:/var/lib/waf:ro
+      - waf-control-plane-data-auto-start:/var/lib/waf/control-plane:ro
+      - waf-nginx-logs-auto-start:/var/log/nginx
+      - waf-l4-adaptive-auto-start:/etc/waf/l4guard-adaptive:ro
     ports:
       - "${WAF_RUNTIME_HTTP_PORT:-80}:80"
       - "${WAF_RUNTIME_HTTPS_PORT:-443}:443"
@@ -114,11 +114,11 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - waf-net
+      - waf-net-auto-start
 
   redis:
     image: redis:7-alpine
-    container_name: tarinio-redis
+    container_name: tarinio-redis-auto-start
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -126,11 +126,11 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - waf-net
+      - waf-net-auto-start
 
   postgres:
     image: postgres:15
-    container_name: tarinio-postgres
+    container_name: tarinio-postgres-auto-start
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-waf}
@@ -138,20 +138,20 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-waf}
       POSTGRES_INITDB_ARGS: ${POSTGRES_INITDB_ARGS:---auth-local=scram-sha-256 --auth-host=scram-sha-256 --locale=C.UTF-8}
     volumes:
-      - waf-postgres-data:/var/lib/postgresql/data
+      - waf-postgres-data-auto-start:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-waf} -d ${POSTGRES_DB:-waf}"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - waf-net
+      - waf-net-auto-start
 
   ui:
     build:
       context: ../../..
       dockerfile: ui/Dockerfile
-    container_name: tarinio-ui
+    container_name: tarinio-ui-auto-start
     restart: unless-stopped
     depends_on:
       control-plane:
@@ -161,13 +161,13 @@ services:
     expose:
       - "80"
     networks:
-      - waf-net
+      - waf-net-auto-start
 
   tarinio-sentinel:
     build:
       context: ../../..
       dockerfile: deploy/compose/auto-start/ddos-model/Dockerfile
-    container_name: tarinio-sentinel
+    container_name: tarinio-sentinel-auto-start
     restart: unless-stopped
     environment:
       MODEL_SOURCE_BACKEND: ${MODEL_SOURCE_BACKEND:-file}
@@ -196,17 +196,17 @@ services:
       runtime:
         condition: service_started
     volumes:
-      - waf-nginx-logs:/logs:ro
-      - waf-runtime-data:/var/lib/waf:ro
-      - waf-ddos-model-state:/state
-      - waf-l4-adaptive:/out
+      - waf-nginx-logs-auto-start:/logs:ro
+      - waf-runtime-data-auto-start:/var/lib/waf:ro
+      - waf-ddos-model-state-auto-start:/state
+      - waf-l4-adaptive-auto-start:/out
     healthcheck:
       test: ["CMD-SHELL", "test -s /out/adaptive.json || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 8
     networks:
-      - waf-net
+      - waf-net-auto-start
     mem_limit: ${SENTINEL_MEM_LIMIT:-512m}
     cpus: ${SENTINEL_CPU_LIMIT:-0.75}
 
@@ -214,31 +214,31 @@ services:
     build:
       context: ../../..
       dockerfile: cli/Dockerfile
-    container_name: tarinio-cli
+    container_name: tarinio-cli-auto-start
     profiles:
       - tools
     environment:
       WAF_CLI_BASE_URL: http://control-plane:8080
     networks:
-      - waf-net
+      - waf-net-auto-start
 
 networks:
-  waf-net:
-    name: waf-net
+  waf-net-auto-start:
+    name: waf-net-auto-start
 
 volumes:
-  waf-runtime-data:
-    name: waf-runtime-data
-  waf-control-plane-data:
-    name: waf-control-plane-data
-  waf-certificates-data:
-    name: waf-certificates-data
-  waf-postgres-data:
-    name: waf-postgres-data
-  waf-nginx-logs:
-    name: waf-nginx-logs
-  waf-l4-adaptive:
-    name: waf-l4-adaptive
-  waf-ddos-model-state:
-    name: waf-ddos-model-state
+  waf-runtime-data-auto-start:
+    name: waf-runtime-data-auto-start
+  waf-control-plane-data-auto-start:
+    name: waf-control-plane-data-auto-start
+  waf-certificates-data-auto-start:
+    name: waf-certificates-data-auto-start
+  waf-postgres-data-auto-start:
+    name: waf-postgres-data-auto-start
+  waf-nginx-logs-auto-start:
+    name: waf-nginx-logs-auto-start
+  waf-l4-adaptive-auto-start:
+    name: waf-l4-adaptive-auto-start
+  waf-ddos-model-state-auto-start:
+    name: waf-ddos-model-state-auto-start
 
