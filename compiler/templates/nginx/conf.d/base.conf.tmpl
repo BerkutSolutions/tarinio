@@ -83,13 +83,18 @@ map $host $waf_site_id {
     default "_global";
 }
 
-log_format waf_security_json escape=json '{"timestamp":"$time_iso8601","request_id":"$request_id","client_ip":"$remote_addr","country":"$waf_country_code","city":"$waf_city_name","host":"$host","method":"$request_method","uri":"$request_uri","status":$status,"bytes_sent":$body_bytes_sent,"referer":"$http_referer","user_agent":"$http_user_agent","site":"$waf_site_id","upstream_addr":"$upstream_addr","request_time":$request_time}';
+map $waf_site_id $waf_site_id_log {
+    "" "_global";
+    default $waf_site_id;
+}
+
+log_format waf_security_json escape=json '{"timestamp":"$time_iso8601","request_id":"$request_id","client_ip":"$remote_addr","country":"$waf_country_code","city":"$waf_city_name","host":"$host","method":"$request_method","uri":"$request_uri","status":$status,"bytes_sent":$body_bytes_sent,"referer":"$http_referer","user_agent":"$http_user_agent","site":"$waf_site_id_log","upstream_addr":"$upstream_addr","request_time":$request_time}';
 access_log /var/log/nginx/access.log waf_security_json;
 
 server {
     listen 80 default_server;
     server_name _;
-    add_header Server-Timing "rid;desc=$arg_rid,ip;desc=$arg_ip,ts;desc=$arg_ts" always;
+    add_header Server-Timing "rid;desc=$request_id,ip;desc=$remote_addr,ts;desc=$msec" always;
     proxy_intercept_errors on;
 {{- range .ErrorStatusCodes }}
     error_page {{ . }} /__waf_errors/_global/{{ . }}.html?rid=$request_id&ip=$remote_addr&ts=$msec;

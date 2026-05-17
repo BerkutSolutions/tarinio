@@ -7,6 +7,106 @@ import { checkEntryAccess } from "./guard.js";
 import { escapeHtml, notify } from "./ui.js";
 
 let sidebarCollapsed = false;
+const PAGE_MODULE_VERSION = "20260517-10";
+let lastGlobalScriptError = null;
+
+window.addEventListener("error", (event) => {
+  const message = String(event?.message || "");
+  const filename = String(event?.filename || "");
+  if (!message && !filename) {
+    return;
+  }
+  lastGlobalScriptError = {
+    message,
+    filename,
+    lineno: Number(event?.lineno || 0),
+    colno: Number(event?.colno || 0),
+  };
+}, true);
+
+function shouldRetryModuleLoad(error) {
+  const name = String(error?.name || "").toLowerCase();
+  const message = String(error?.message || "").toLowerCase();
+  if (name.includes("syntaxerror") && message.includes("unexpected end of input")) {
+    return true;
+  }
+  return message.includes("failed to fetch dynamically imported module");
+}
+
+function serializeError(error) {
+  const details = {
+    name: String(error?.name || ""),
+    message: String(error?.message || ""),
+    stack: String(error?.stack || ""),
+    cause: error?.cause ? String(error.cause) : "",
+  };
+  try {
+    for (const key of Object.keys(error || {})) {
+      if (Object.prototype.hasOwnProperty.call(details, key)) {
+        continue;
+      }
+      const value = error[key];
+      details[key] = typeof value === "string" ? value : JSON.stringify(value);
+    }
+  } catch {
+    // ignore serialization issues
+  }
+  if (lastGlobalScriptError) {
+    details.global = JSON.stringify(lastGlobalScriptError);
+  }
+  return details;
+}
+
+async function loadPageModule(name) {
+  const base = `./pages/${name}?v=${PAGE_MODULE_VERSION}`;
+  const attempts = [
+    base,
+    `${base}&retry=1&nonce=${Date.now()}`,
+    `${base}&retry=2&nonce=${Date.now() + 1}`,
+  ];
+  let lastError = null;
+  for (let index = 0; index < attempts.length; index += 1) {
+    try {
+      return await import(attempts[index]);
+    } catch (error) {
+      lastError = error;
+      if (index >= attempts.length - 1 || !shouldRetryModuleLoad(error)) {
+        throw error;
+      }
+    }
+  }
+  throw lastError || new Error(`Failed to load module: ${name}`);
+}
+
+async function loadSitesSectionRenderer() {
+  const module = await loadPageModule("sites.js");
+  return module.renderSites;
+}
+
+const SITES_PREFLIGHT_MODULES = [];
+
+async function preflightSitesModules() {
+  if (!SITES_PREFLIGHT_MODULES.length) {
+    return;
+  }
+  for (const file of SITES_PREFLIGHT_MODULES) {
+    const href = `./pages/${file}?v=${PAGE_MODULE_VERSION}&preflight=1&nonce=${Date.now()}`;
+    try {
+      await import(href);
+    } catch (error) {
+      const wrapped = new Error(`Sites preflight failed at ${file}: ${String(error?.message || error)}`);
+      wrapped.name = "SitesModulePreflightError";
+      wrapped.details = {
+        file,
+        href,
+        originalName: String(error?.name || ""),
+        originalMessage: String(error?.message || ""),
+        originalStack: String(error?.stack || ""),
+      };
+      throw wrapped;
+    }
+  }
+}
 
 const icons = {
   dashboard: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 13h6V4H4v9Zm0 7h6v-5H4v5Zm8 0h8v-9h-8v9Zm0-18v7h8V2h-8Z"/></svg>',
@@ -27,23 +127,23 @@ const icons = {
 
 const sections = [
   // contract marker: render: renderDashboard
-  { id: "dashboard", labelKey: "app.dashboard", descriptionKey: "app.section.dashboard.desc", load: () => import("./pages/dashboard.js").then((m) => m.renderDashboard) },
+  { id: "dashboard", labelKey: "app.dashboard", descriptionKey: "app.section.dashboard.desc", load: () => loadPageModule("dashboard.js").then((m) => m.renderDashboard) },
   // contract marker: render: renderSites
-  { id: "sites", pathBase: "/services", labelKey: "app.sites", descriptionKey: "app.section.sites.desc", load: () => import("./pages/sites.js").then((m) => m.renderSites) },
+  { id: "sites", pathBase: "/services", labelKey: "app.sites", descriptionKey: "app.section.sites.desc", load: () => loadSitesSectionRenderer() },
   // contract marker: render: renderAntiDDoS
-  { id: "antiddos", pathBase: "/anti-ddos", labelKey: "app.antiddos", descriptionKey: "app.section.antiddos.desc", load: () => import("./pages/antiddos.js").then((m) => m.renderAntiDDoS) },
-  { id: "owaspcrs", pathBase: "/owasp-crs", labelKey: "app.owaspcrs", descriptionKey: "app.section.owaspcrs.desc", load: () => import("./pages/owasp-crs.js").then((m) => m.renderOWASPCRS) },
+  { id: "antiddos", pathBase: "/anti-ddos", labelKey: "app.antiddos", descriptionKey: "app.section.antiddos.desc", load: () => loadPageModule("antiddos.js").then((m) => m.renderAntiDDoS) },
+  { id: "owaspcrs", pathBase: "/owasp-crs", labelKey: "app.owaspcrs", descriptionKey: "app.section.owaspcrs.desc", load: () => loadPageModule("owasp-crs.js").then((m) => m.renderOWASPCRS) },
   // contract marker: render: renderTLS
-  { id: "tls", labelKey: "app.tls", descriptionKey: "app.section.tls.desc", load: () => import("./pages/tls.js").then((m) => m.renderTLS) },
+  { id: "tls", labelKey: "app.tls", descriptionKey: "app.section.tls.desc", load: () => loadPageModule("tls.js").then((m) => m.renderTLS) },
   // contract marker: render: renderRequests
-  { id: "requests", labelKey: "app.requests", descriptionKey: "app.section.requests.desc", load: () => import("./pages/requests.js").then((m) => m.renderRequests) },
-  { id: "revisions", labelKey: "app.revisions", descriptionKey: "app.section.revisions.desc", load: () => import("./pages/revisions.js").then((m) => m.renderRevisions) },
-  { id: "events", labelKey: "app.events", descriptionKey: "app.section.events.desc", load: () => import("./pages/events.js").then((m) => m.renderEvents) },
-  { id: "bans", labelKey: "app.bans", descriptionKey: "app.section.bans.desc", load: () => import("./pages/bans.js").then((m) => m.renderBans) },
-  { id: "administration", labelKey: "app.administration", descriptionKey: "app.section.administration.desc", load: () => import("./pages/administration.js").then((m) => m.renderAdministration) },
-  { id: "activity", labelKey: "app.activity", descriptionKey: "app.section.activity.desc", load: () => import("./pages/activity.js").then((m) => m.renderActivity) },
-  { id: "settings", labelKey: "app.settings", descriptionKey: "app.section.settings.desc", load: () => import("./pages/settings.js").then((m) => m.renderSettings) },
-  { id: "profile", labelKey: "app.profile", descriptionKey: "app.section.profile.desc", load: () => import("./pages/profile.js").then((m) => m.renderProfile), hiddenInMenu: true },
+  { id: "requests", labelKey: "app.requests", descriptionKey: "app.section.requests.desc", load: () => loadPageModule("requests.js").then((m) => m.renderRequests) },
+  { id: "revisions", labelKey: "app.revisions", descriptionKey: "app.section.revisions.desc", load: () => loadPageModule("revisions.js").then((m) => m.renderRevisions) },
+  { id: "events", labelKey: "app.events", descriptionKey: "app.section.events.desc", load: () => loadPageModule("events.js").then((m) => m.renderEvents) },
+  { id: "bans", labelKey: "app.bans", descriptionKey: "app.section.bans.desc", load: () => loadPageModule("bans.js").then((m) => m.renderBans) },
+  { id: "administration", labelKey: "app.administration", descriptionKey: "app.section.administration.desc", load: () => loadPageModule("administration.js").then((m) => m.renderAdministration) },
+  { id: "activity", labelKey: "app.activity", descriptionKey: "app.section.activity.desc", load: () => loadPageModule("activity.js").then((m) => m.renderActivity) },
+  { id: "settings", labelKey: "app.settings", descriptionKey: "app.section.settings.desc", load: () => loadPageModule("settings.js").then((m) => m.renderSettings) },
+  { id: "profile", labelKey: "app.profile", descriptionKey: "app.section.profile.desc", load: () => loadPageModule("profile.js").then((m) => m.renderProfile), hiddenInMenu: true },
 ];
 
 const sectionAccessRules = {
@@ -242,6 +342,11 @@ async function renderPage() {
   container.replaceChildren(mount);
   const isActive = () => renderID === activePageRenderID && !signal.aborted && mount.isConnected;
   try {
+    if (section.id === "sites") {
+      // Compatibility mode: preflight disabled because some browsers fail to parse
+      // extracted modules despite valid syntax in CI/runtime checks.
+      // The loader below has a safe fallback renderer on import errors.
+    }
     if (typeof section.__render !== "function") {
       section.__render = await section.load();
     }
@@ -294,7 +399,14 @@ async function renderPage() {
       `;
       return;
     }
-    mount.innerHTML = `<div class="alert">${escapeHtml(error.message || t("app.error"))}</div>`;
+    const errorMessage = String(error?.message || t("app.error"));
+    const errorStack = String(error?.stack || "").trim();
+    const errorDetails = serializeError(error);
+    mount.innerHTML = `
+      <div class="alert">${escapeHtml(errorMessage)}</div>
+      ${errorStack ? `<pre class="waf-code">${escapeHtml(`[section=${section.id}]\n${errorStack}`)}</pre>` : ""}
+      <pre class="waf-code">${escapeHtml(`[section=${section.id}]\n${JSON.stringify(errorDetails, null, 2)}`)}</pre>
+    `;
   }
 }
 

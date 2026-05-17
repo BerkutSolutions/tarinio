@@ -1,5 +1,85 @@
 import { escapeHtml, formatDate } from "../ui.js";
 
+export function renderUsersTable(users, roles, ctx) {
+  const roleNames = new Map((Array.isArray(roles) ? roles : []).map((role) => [
+    String(role?.id || ""),
+    formatRoleLabel(ctx, role)
+  ]));
+  const rows = (Array.isArray(users) ? users : []).map((user) => {
+    const userID = String(user?.id || "").trim();
+    const label = String(user?.username || userID || "").trim();
+    const assignedRoles = (Array.isArray(user?.role_ids) ? user.role_ids : [])
+      .map((id) => roleNames.get(String(id || "")) || String(id || ""))
+      .filter(Boolean)
+      .join(", ");
+    return `
+      <tr class="waf-table-row-clickable" tabindex="0" data-user-open="${escapeHtml(userID)}">
+        <td>${escapeHtml(label)}</td>
+        <td>${escapeHtml(String(user?.email || ""))}</td>
+        <td>${escapeHtml(assignedRoles || ctx.t("common.none"))}</td>
+        <td>${escapeHtml(user?.is_active === false ? ctx.t("administration.users.status.disabled") : ctx.t("administration.users.status.active"))}</td>
+        <td>${escapeHtml(formatDate(user?.last_login_at || ""))}</td>
+        <td>
+          <button class="btn ghost btn-sm" type="button" data-user-edit="${escapeHtml(userID)}">${escapeHtml(ctx.t("common.edit"))}</button>
+        </td>
+      </tr>
+    `;
+  }).join("");
+  return `
+    <div class="waf-table-wrap">
+      <table class="waf-table">
+        <thead>
+          <tr>
+            <th>${escapeHtml(ctx.t("administration.users.col.username"))}</th>
+            <th>${escapeHtml(ctx.t("administration.users.col.email"))}</th>
+            <th>${escapeHtml(ctx.t("administration.users.col.roles"))}</th>
+            <th>${escapeHtml(ctx.t("administration.users.col.status"))}</th>
+            <th>${escapeHtml(ctx.t("administration.users.meta.lastLogin"))}</th>
+            <th>${escapeHtml(ctx.t("sites.table.actions"))}</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows || `<tr><td colspan="6"><div class="waf-empty">${escapeHtml(ctx.t("common.empty"))}</div></td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+export function renderRolesTable(roles, ctx) {
+  const rows = (Array.isArray(roles) ? roles : []).map((role) => {
+    const roleID = String(role?.id || "").trim();
+    const perms = Array.isArray(role?.permissions) ? role.permissions : [];
+    return `
+      <tr class="waf-table-row-clickable" tabindex="0" data-role-open="${escapeHtml(roleID)}">
+        <td>${escapeHtml(roleID)}</td>
+        <td>${escapeHtml(formatRoleLabel(ctx, role))}</td>
+        <td>${escapeHtml(ctx.t("administration.roles.permissionSummary", { count: String(perms.length) }))}</td>
+        <td>
+          <button class="btn ghost btn-sm" type="button" data-role-edit="${escapeHtml(roleID)}">${escapeHtml(ctx.t("common.edit"))}</button>
+        </td>
+      </tr>
+    `;
+  }).join("");
+  return `
+    <div class="waf-table-wrap">
+      <table class="waf-table">
+        <thead>
+          <tr>
+            <th>${escapeHtml(ctx.t("administration.roles.col.id"))}</th>
+            <th>${escapeHtml(ctx.t("administration.roles.col.name"))}</th>
+            <th>${escapeHtml(ctx.t("administration.roles.col.permissions"))}</th>
+            <th>${escapeHtml(ctx.t("sites.table.actions"))}</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows || `<tr><td colspan="4"><div class="waf-empty">${escapeHtml(ctx.t("common.empty"))}</div></td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
 export function downloadBlob(filename, blob) {
   const link = document.createElement("a");
   const href = URL.createObjectURL(blob);
@@ -162,7 +242,7 @@ export function renderField(script, field, ctx) {
 
 export function renderRunResult(result, ctx) {
   if (!result) {
-    return `<div class="waf-note">${escapeHtml(ctx.t("administration.scripts.result.empty"))}</div>`;
+    return `<div class="administration-script-result-empty">${escapeHtml(ctx.t("administration.scripts.result.empty"))}</div>`;
   }
   const tone = result.status === "succeeded" ? "badge-success" : "badge-danger";
   const downloadButton = result.archive_name
@@ -170,15 +250,15 @@ export function renderRunResult(result, ctx) {
     : "";
   const errorLine = result.error ? `<div class="alert">${escapeHtml(result.error)}</div>` : "";
   return `
-    <div class="waf-subcard waf-stack waf-antiddos-frame">
-      <div class="waf-inline">
+    <div class="waf-subcard waf-stack waf-antiddos-frame administration-script-result-card">
+      <div class="waf-inline administration-script-result-row">
         <span class="waf-note">${escapeHtml(ctx.t("administration.scripts.result.status"))}:</span>
         <span class="badge ${tone}">${escapeHtml(result.status || "-")}</span>
       </div>
-      <div class="waf-inline"><span class="waf-note">${escapeHtml(ctx.t("administration.scripts.result.finished"))}:</span><span>${escapeHtml(formatDate(result.finished_at || result.started_at || ""))}</span></div>
-      <div class="waf-inline"><span class="waf-note">${escapeHtml(ctx.t("administration.scripts.result.exitCode"))}:</span><span>${escapeHtml(String(result.exit_code ?? "-"))}</span></div>
-      <div class="waf-inline"><span class="waf-note">${escapeHtml(ctx.t("administration.scripts.result.archive"))}:</span><span class="waf-code">${escapeHtml(result.archive_name || ctx.t("common.none"))}</span></div>
-      <div class="waf-inline">${downloadButton}</div>
+      <div class="waf-inline administration-script-result-row"><span class="waf-note">${escapeHtml(ctx.t("administration.scripts.result.finished"))}:</span><span>${escapeHtml(formatDate(result.finished_at || result.started_at || ""))}</span></div>
+      <div class="waf-inline administration-script-result-row"><span class="waf-note">${escapeHtml(ctx.t("administration.scripts.result.exitCode"))}:</span><span>${escapeHtml(String(result.exit_code ?? "-"))}</span></div>
+      <div class="waf-inline administration-script-result-row"><span class="waf-note">${escapeHtml(ctx.t("administration.scripts.result.archive"))}:</span><span class="waf-code">${escapeHtml(result.archive_name || ctx.t("common.none"))}</span></div>
+      <div class="waf-inline administration-script-result-actions">${downloadButton}</div>
       ${errorLine}
     </div>
   `;
@@ -194,20 +274,20 @@ export function renderScriptCard(script, ctx, latestRun = null) {
   const submitLabel = escapeHtml(ctx.t("administration.scripts.run"));
 
   return `
-    <section class="waf-subcard waf-stack">
-      <div>
-        <h4>${escapeHtml(title)}</h4>
+    <section class="waf-subcard waf-stack administration-script-card">
+      <div class="administration-script-head">
+        <h4 class="administration-script-title">${escapeHtml(title)}</h4>
         ${description ? `<div class="waf-note">${escapeHtml(description)}</div>` : ""}
-        <div class="waf-code">${escapeHtml(scriptID)}</div>
+        <div class="waf-code administration-script-id">${escapeHtml(scriptID)}</div>
       </div>
-      <form class="waf-form waf-stack" data-script-form="${escapeHtml(scriptID)}">
-        <div class="waf-form-grid">${fieldsHTML}</div>
-        <div class="waf-inline">
+      <form class="waf-form waf-stack administration-script-form" data-script-form="${escapeHtml(scriptID)}">
+        <div class="waf-form-grid administration-script-form-grid">${fieldsHTML}</div>
+        <div class="waf-inline administration-script-actions">
           <button type="submit" class="btn primary btn-sm">${submitLabel}</button>
           <span class="waf-note" data-script-running-note="${escapeHtml(scriptID)}"></span>
         </div>
       </form>
-      <div data-script-result="${escapeHtml(scriptID)}">${runResultHTML}</div>
+      <div class="administration-script-result" data-script-result="${escapeHtml(scriptID)}">${runResultHTML}</div>
     </section>
   `;
 }

@@ -85,6 +85,12 @@ func RenderEasyRateLimitArtifacts(sites []SiteInput, upstreams []UpstreamInput, 
 		if profile.AuthSessionTTLMin > 1440 {
 			profile.AuthSessionTTLMin = 1440
 		}
+		profile.SecurityMode = strings.ToLower(strings.TrimSpace(profile.SecurityMode))
+		switch profile.SecurityMode {
+		case "block", "monitor", "transparent":
+		default:
+			profile.SecurityMode = "block"
+		}
 		profile.AuthBasicText = strings.TrimSpace(profile.AuthBasicText)
 		if profile.AuthBasicText == "" {
 			profile.AuthBasicText = "Restricted area"
@@ -101,6 +107,7 @@ func RenderEasyRateLimitArtifacts(sites []SiteInput, upstreams []UpstreamInput, 
 				},
 			}
 		}
+		profile = applySecurityModePolicy(profile)
 		antibotEnabled := profile.AntibotChallenge != "" && profile.AntibotChallenge != "no"
 		antibotTwoLayer := profile.ChallengeEscalationEnabled && antibotEnabled
 		defaultChallenge := profile.AntibotChallenge

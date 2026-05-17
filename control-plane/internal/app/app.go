@@ -21,7 +21,6 @@ import (
 	"waf/control-plane/internal/easysiteprofiles"
 	"waf/control-plane/internal/enterprise"
 	"waf/control-plane/internal/events"
-	"waf/control-plane/internal/handlers"
 	"waf/control-plane/internal/httpserver"
 	"waf/control-plane/internal/jobs"
 	"waf/control-plane/internal/passkeys"
@@ -103,7 +102,6 @@ type App struct {
 }
 
 func New(cfg config.Config) (*App, error) {
-	handlers.SetSessionBootToken(cfg.Security.Pepper)
 	telemetry.Default().RecordBuild(cfg.HA.NodeID, cfg.HA.Enabled)
 
 	if err := appcompat.EnsureLegacyDataTransferred(cfg.RuntimeRoot, cfg.RevisionStoreDir); err != nil {

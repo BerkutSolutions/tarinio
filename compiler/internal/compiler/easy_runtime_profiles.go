@@ -120,8 +120,60 @@ func buildEasyProfileBySite(profiles []EasyProfileInput) (map[string]EasyProfile
 		if profile.BadBehaviorBanTimeSeconds < 0 {
 			profile.BadBehaviorBanTimeSeconds = 0
 		}
+		profile = applySecurityModePolicy(profile)
 
 		profileBySite[siteID] = profile
 	}
 	return profileBySite, nil
+}
+
+func applySecurityModePolicy(profile EasyProfileInput) EasyProfileInput {
+	mode := strings.ToLower(strings.TrimSpace(profile.SecurityMode))
+	switch mode {
+	case "transparent":
+		// Transparent mode is fully passive: disable all active protection modules.
+		profile.UseModSecurity = false
+		profile.UseModSecurityCRSPlugins = false
+		profile.UseModSecurityCustomConfiguration = false
+		profile.UseAPIPositiveSecurity = false
+		profile.UseLimitConn = false
+		profile.UseLimitReq = false
+		profile.CustomLimitRules = nil
+		profile.UseBadBehavior = false
+		profile.BadBehaviorStatusCodes = nil
+		profile.BadBehaviorBanTimeSeconds = 0
+		profile.BlacklistIP = nil
+		profile.BlacklistUserAgent = nil
+		profile.BlacklistURI = nil
+		profile.BlacklistCountry = nil
+		profile.WhitelistCountry = nil
+		profile.AntibotChallenge = "no"
+		profile.AntibotScannerAutoBan = false
+		profile.ChallengeEscalationEnabled = false
+		profile.ChallengeEscalationMode = "no"
+		profile.AntibotChallengeRules = nil
+		profile.UseAuthBasic = false
+	case "monitor":
+		// Monitor mode keeps logging-only inspection (ModSecurity DetectionOnly) and disables blockers.
+		profile.UseModSecurity = true
+		profile.UseLimitConn = false
+		profile.UseLimitReq = false
+		profile.CustomLimitRules = nil
+		profile.UseBadBehavior = false
+		profile.BadBehaviorStatusCodes = nil
+		profile.BadBehaviorBanTimeSeconds = 0
+		profile.BlacklistIP = nil
+		profile.BlacklistUserAgent = nil
+		profile.BlacklistURI = nil
+		profile.BlacklistCountry = nil
+		profile.WhitelistCountry = nil
+		profile.AntibotChallenge = "no"
+		profile.AntibotScannerAutoBan = false
+		profile.ChallengeEscalationEnabled = false
+		profile.ChallengeEscalationMode = "no"
+		profile.AntibotChallengeRules = nil
+		profile.UseAuthBasic = false
+		profile.UseAPIPositiveSecurity = false
+	}
+	return profile
 }

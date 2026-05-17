@@ -93,12 +93,12 @@ func TestRenderEasyArtifacts_ProtectionModesPerSite(t *testing.T) {
 		t.Fatalf("expected monitor mode to include CRS, got: %s", monitorRules)
 	}
 
-	transparentRules := byPath["modsecurity/easy/site-transparent.conf"]
-	if !strings.Contains(transparentRules, "SecRuleEngine Off") {
-		t.Fatalf("expected transparent mode to disable engine, got: %s", transparentRules)
+	if _, ok := byPath["modsecurity/easy/site-transparent.conf"]; ok {
+		t.Fatal("did not expect modsecurity/easy artifact for transparent mode")
 	}
-	if strings.Contains(transparentRules, "Include /etc/waf/modsecurity/coreruleset/rules/*.conf") {
-		t.Fatalf("expected transparent mode to skip CRS include, got: %s", transparentRules)
+	transparentNginx := byPath["nginx/easy/site-transparent.conf"]
+	if !strings.Contains(transparentNginx, "modsecurity off;") {
+		t.Fatalf("expected transparent mode to disable modsecurity in nginx config, got: %s", transparentNginx)
 	}
 
 	disabledNginx := byPath["nginx/easy/site-disabled.conf"]
@@ -109,4 +109,3 @@ func TestRenderEasyArtifacts_ProtectionModesPerSite(t *testing.T) {
 		t.Fatal("did not expect modsecurity/easy artifact when use_modsecurity=false")
 	}
 }
-

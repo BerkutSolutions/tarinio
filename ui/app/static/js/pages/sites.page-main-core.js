@@ -427,6 +427,17 @@ function parseRawDraft(rawEnvText) {
   return envToDraft(String(rawEnvText || ""));
 }
 
+function ensureControlPlaneAccessManagementMethods(draft) {
+  return ensureControlPlaneAccessManagementMethodsFacade(draft);
+}
+
+function upsertAccessPolicy(draft, ctx, existingAccessPolicy) {
+  return upsertAccessPolicyFacade(draft, ctx, existingAccessPolicy, {
+    normalizeSiteID,
+    normalizeArray
+  });
+}
+
 export {
   routeBase,
   routeInfo,

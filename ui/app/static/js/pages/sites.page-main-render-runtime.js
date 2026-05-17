@@ -1,4 +1,3 @@
-import { renderDetailViewRuntime } from "./sites.detail-render-view.js";
 import {
   deleteServiceWithResources as deleteServiceWithResourcesFacade,
   isAlreadyExistsError as isAlreadyExistsErrorFacade,
@@ -49,44 +48,38 @@ export function renderWizardNav(activeTab, ctx) {
 
 export function renderDetailView(state, ctx, deps) {
   // contract marker: <div class="waf-upstream-target-row">
-  const {
-    SETTINGS_SEARCH_INDEX,
-    escapeHtml,
-    renderModeTabs,
-    renderRawEditor,
-    renderWizardNav,
-    normalizeServiceProfile,
-    renderListEditor,
-    getQuickListTemplates,
-    normalizeStringArray,
-    renderStatusCodesEditor,
-    renderCustomLimitRulesEditor,
-    normalizeBanEscalationStages,
-    formatBanDurationSeconds,
-    renderAntibotChallengeRulesEditor,
-    renderAuthSessionTtlOptions,
-    renderAuthUsersEditor,
-    renderCountryEditor
-  } = deps;
-  return renderDetailViewRuntime(state, ctx, {
-    SETTINGS_SEARCH_INDEX,
-    escapeHtml,
-    renderModeTabs,
-    renderRawEditor,
-    renderWizardNav,
-    normalizeServiceProfile,
-    renderListEditor,
-    getQuickListTemplates,
-    normalizeStringArray,
-    renderStatusCodesEditor,
-    renderCustomLimitRulesEditor,
-    normalizeBanEscalationStages,
-    formatBanDurationSeconds,
-    renderAntibotChallengeRulesEditor,
-    renderAuthSessionTtlOptions,
-    renderAuthUsersEditor,
-    renderCountryEditor
-  });
+  const { escapeHtml } = deps;
+  const draft = state?.draft || {};
+  const isNew = state?.route?.mode === "create";
+  return `
+    <div class="waf-page-stack">
+      <section class="waf-card waf-service-shell-card">
+        <div class="waf-card-head">
+          <div>
+            <h3>${escapeHtml(ctx.t(isNew ? "sites.editor.newTitle" : "sites.editor.editTitle"))}</h3>
+            <div class="muted">${escapeHtml(ctx.t("sites.editor.temporarilyUnavailable"))}</div>
+          </div>
+          <div class="waf-actions">
+            <button class="btn ghost btn-sm" type="button" id="service-back">${escapeHtml(ctx.t("common.back"))}</button>
+            ${!isNew ? `<button class="btn ghost btn-sm" type="button" id="service-delete">${escapeHtml(ctx.t("common.delete"))}</button>` : ""}
+          </div>
+        </div>
+        <div class="waf-card-body waf-stack">
+          <div id="sites-feedback"></div>
+          <div class="alert">${escapeHtml(ctx.t("sites.editor.temporarilyUnavailable"))}</div>
+          <div class="muted">${escapeHtml(ctx.t("sites.editor.temporarilyUnavailableHint"))}</div>
+          <form id="service-editor-form" class="waf-form waf-stack">
+            <div class="waf-form-grid">
+              <div class="waf-field">
+                <label for="service-id">${escapeHtml(ctx.t("sites.easy.front.serviceId"))}</label>
+                <input id="service-id" value="${escapeHtml(String(draft.id || ""))}">
+              </div>
+            </div>
+          </form>
+        </div>
+      </section>
+    </div>
+  `;
 }
 
 export async function resolveACMEAccountEmail(draft, ctx, deps) {

@@ -150,6 +150,68 @@ func normalizeProfile(profile EasySiteProfile) EasySiteProfile {
 	profile.SecurityModSecurity.CustomConfiguration.Path = strings.TrimSpace(profile.SecurityModSecurity.CustomConfiguration.Path)
 	profile.SecurityModSecurity.CustomConfiguration.Content = strings.TrimSpace(profile.SecurityModSecurity.CustomConfiguration.Content)
 
+	profile = applySecurityModePolicy(profile)
+
+	return profile
+}
+
+func applySecurityModePolicy(profile EasySiteProfile) EasySiteProfile {
+	switch profile.FrontService.SecurityMode {
+	case SecurityModeTransparent:
+		profile.SecurityModSecurity.UseModSecurity = false
+		profile.SecurityModSecurity.UseModSecurityCRSPlugins = false
+		profile.SecurityModSecurity.UseCustomConfiguration = false
+		profile.SecurityBehaviorAndLimits.UseLimitConn = false
+		profile.SecurityBehaviorAndLimits.UseLimitReq = false
+		profile.SecurityBehaviorAndLimits.CustomLimitRules = nil
+		profile.SecurityBehaviorAndLimits.UseBadBehavior = false
+		profile.SecurityBehaviorAndLimits.UseBlacklist = false
+		profile.SecurityBehaviorAndLimits.BlacklistIP = nil
+		profile.SecurityBehaviorAndLimits.BlacklistRDNS = nil
+		profile.SecurityBehaviorAndLimits.BlacklistASN = nil
+		profile.SecurityBehaviorAndLimits.BlacklistUserAgent = nil
+		profile.SecurityBehaviorAndLimits.BlacklistURI = nil
+		profile.SecurityBehaviorAndLimits.BlacklistIPURLs = nil
+		profile.SecurityBehaviorAndLimits.BlacklistRDNSURLs = nil
+		profile.SecurityBehaviorAndLimits.BlacklistASNURLs = nil
+		profile.SecurityBehaviorAndLimits.BlacklistUserAgentURLs = nil
+		profile.SecurityBehaviorAndLimits.BlacklistURIURLs = nil
+		profile.SecurityCountryPolicy.BlacklistCountry = nil
+		profile.SecurityCountryPolicy.WhitelistCountry = nil
+		profile.SecurityAntibot.AntibotChallenge = AntibotChallengeNo
+		profile.SecurityAntibot.ScannerAutoBanEnabled = false
+		profile.SecurityAntibot.ChallengeEscalationEnabled = false
+		profile.SecurityAntibot.ChallengeEscalationMode = AntibotChallengeNo
+		profile.SecurityAntibot.ChallengeRules = nil
+		profile.SecurityAuthBasic.UseAuthBasic = false
+		profile.SecurityAPIPositive.UseAPIPositiveSecurity = false
+	case SecurityModeMonitor:
+		profile.SecurityModSecurity.UseModSecurity = true
+		profile.SecurityBehaviorAndLimits.UseLimitConn = false
+		profile.SecurityBehaviorAndLimits.UseLimitReq = false
+		profile.SecurityBehaviorAndLimits.CustomLimitRules = nil
+		profile.SecurityBehaviorAndLimits.UseBadBehavior = false
+		profile.SecurityBehaviorAndLimits.UseBlacklist = false
+		profile.SecurityBehaviorAndLimits.BlacklistIP = nil
+		profile.SecurityBehaviorAndLimits.BlacklistRDNS = nil
+		profile.SecurityBehaviorAndLimits.BlacklistASN = nil
+		profile.SecurityBehaviorAndLimits.BlacklistUserAgent = nil
+		profile.SecurityBehaviorAndLimits.BlacklistURI = nil
+		profile.SecurityBehaviorAndLimits.BlacklistIPURLs = nil
+		profile.SecurityBehaviorAndLimits.BlacklistRDNSURLs = nil
+		profile.SecurityBehaviorAndLimits.BlacklistASNURLs = nil
+		profile.SecurityBehaviorAndLimits.BlacklistUserAgentURLs = nil
+		profile.SecurityBehaviorAndLimits.BlacklistURIURLs = nil
+		profile.SecurityCountryPolicy.BlacklistCountry = nil
+		profile.SecurityCountryPolicy.WhitelistCountry = nil
+		profile.SecurityAntibot.AntibotChallenge = AntibotChallengeNo
+		profile.SecurityAntibot.ScannerAutoBanEnabled = false
+		profile.SecurityAntibot.ChallengeEscalationEnabled = false
+		profile.SecurityAntibot.ChallengeEscalationMode = AntibotChallengeNo
+		profile.SecurityAntibot.ChallengeRules = nil
+		profile.SecurityAuthBasic.UseAuthBasic = false
+		profile.SecurityAPIPositive.UseAPIPositiveSecurity = false
+	}
 	return profile
 }
 

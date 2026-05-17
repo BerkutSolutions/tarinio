@@ -841,8 +841,8 @@ func assertStartupProfileUpdate(profile easysiteprofiles.EasySiteProfile) error 
 	if profile.SecurityAuthBasic.AuthBasicPassword != "password-b" {
 		return fmt.Errorf("security_auth_basic.auth_basic_password expected updated value")
 	}
-	if len(profile.SecurityCountryPolicy.BlacklistCountry) != 1 || profile.SecurityCountryPolicy.BlacklistCountry[0] != "IR" {
-		return fmt.Errorf("security_country_policy.blacklist_country expected [IR]")
+	if len(profile.SecurityCountryPolicy.BlacklistCountry) != 0 {
+		return fmt.Errorf("security_country_policy.blacklist_country expected empty in monitor mode")
 	}
 	if profile.SecurityModSecurity.CustomConfiguration.Path != "modsec/custom-b.conf" {
 		return fmt.Errorf("security_modsecurity.custom_configuration.path expected modsec/custom-b.conf, got %s", profile.SecurityModSecurity.CustomConfiguration.Path)

@@ -40,6 +40,7 @@ scc/
 waf-old/
 .work/
 .tmp-gocache/
+.tmpfetch
 
 # IDE/editor
 .idea/

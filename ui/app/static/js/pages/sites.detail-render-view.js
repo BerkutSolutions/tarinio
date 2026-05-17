@@ -15,21 +15,6 @@ export function renderDetailViewRuntime(state, ctx, deps) {
       return label.includes(searchQuery) || id.includes(searchQuery) || selector.includes(searchQuery);
     }).slice(0, 10)
     : [];
-  return 
-  const { SETTINGS_SEARCH_INDEX, escapeHtml, renderModeTabs, renderRawEditor, renderWizardNav, normalizeServiceProfile, renderListEditor, getQuickListTemplates, normalizeStringArray, renderStatusCodesEditor, renderCustomLimitRulesEditor, normalizeBanEscalationStages, formatBanDurationSeconds, renderAntibotChallengeRulesEditor, renderAuthSessionTtlOptions, renderAuthUsersEditor, renderCountryEditor } = deps;
-  const draft = state.draft;
-  const isNew = state.route.mode === "create";
-  const titleKey = isNew ? "sites.editor.newTitle" : "sites.editor.editTitle";
-  const subtitleKey = isNew ? "sites.editor.newSubtitle" : "sites.editor.editSubtitle";
-  const searchQuery = state.settingsSearch.trim().toLowerCase();
-  const searchMatches = searchQuery
-    ? SETTINGS_SEARCH_INDEX.filter((item) => {
-      const label = String(ctx.t(item.labelKey) || "").toLowerCase();
-      const id = String(item.id || "").toLowerCase();
-      const selector = String(item.selector || "").toLowerCase();
-      return label.includes(searchQuery) || id.includes(searchQuery) || selector.includes(searchQuery);
-    }).slice(0, 10)
-    : [];
   return `
     <div class="waf-page-stack">
       <section class="waf-card waf-service-shell-card">
@@ -268,5 +253,5 @@ export function renderDetailViewRuntime(state, ctx, deps) {
               </section>
 
 ${renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew)}
-  ;
+  `;
 }

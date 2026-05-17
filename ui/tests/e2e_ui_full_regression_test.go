@@ -32,12 +32,15 @@ func TestE2EUIFullRegression(t *testing.T) {
 			markers []string
 		}{
 			{path: "/dashboard", markers: []string{`id="content-area"`}},
+			{path: "/services", markers: []string{`id="content-area"`}},
 			{path: "/sites", markers: []string{`id="content-area"`}},
 			{path: "/requests", markers: []string{`id="content-area"`}},
 			{path: "/events", markers: []string{`id="content-area"`}},
 			{path: "/bans", markers: []string{`id="content-area"`}},
+			{path: "/revisions", markers: []string{`id="content-area"`}},
 			{path: "/settings", markers: []string{`id="content-area"`}},
 			{path: "/administration", markers: []string{`id="content-area"`}},
+			{path: "/profile", markers: []string{`id="content-area"`}},
 			{path: "/healthcheck", markers: []string{`id="healthcheck-steps"`}},
 		}
 		for _, tc := range cases {
@@ -139,7 +142,7 @@ func TestE2EUIFullRegression(t *testing.T) {
 			mod := filepath.Base(path)
 			t.Run(mod, func(t *testing.T) {
 				url := requestBaseURL + "/static/js/pages/" + mod
-				resp := getWithAuthRetry429(t, client, url, requestHostOverride, 5)
+				resp := getWithAuth(t, client, url, requestHostOverride)
 				if resp.StatusCode == http.StatusTooManyRequests {
 					t.Fatalf("module %s returned 429", mod)
 				}
@@ -157,6 +160,7 @@ func TestE2EUIFullRegression(t *testing.T) {
 				if strings.Contains(strings.ToLower(body), "<html") {
 					t.Fatalf("module %s returned html instead of js", mod)
 				}
+				time.Sleep(75 * time.Millisecond)
 			})
 		}
 	})
