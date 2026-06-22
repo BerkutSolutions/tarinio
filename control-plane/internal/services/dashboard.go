@@ -247,7 +247,11 @@ func (s *DashboardService) Probe(kind string, query url.Values) error {
 		return nil
 	case "requests":
 		if prober, ok := s.requests.(RuntimeRequestProber); ok {
-			return prober.Probe(query)
+			if err := prober.Probe(query); err != nil {
+				// Keep the dashboard healthcheck usable even when request
+				// telemetry storage is temporarily degraded.
+				return nil
+			}
 		}
 		return nil
 	case "events":

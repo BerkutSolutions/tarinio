@@ -170,6 +170,22 @@ func TestDashboardService_RuntimeRequestsFailureDoesNotFailStats(t *testing.T) {
 	}
 }
 
+func TestDashboardService_RuntimeRequestsProbeFailureDoesNotFailProbe(t *testing.T) {
+	service := NewDashboardService(
+		&fakeDashboardEventReader{},
+		&fakeDashboardRequestCollector{err: errors.New("runtime requests unavailable")},
+		&fakeDashboardRuntimeProbe{},
+	)
+
+	query := url.Values{}
+	query.Set("day", "2026-06-22")
+	query.Set("probe", "requests")
+
+	if err := service.Probe("requests", query); err != nil {
+		t.Fatalf("expected requests probe failure to be tolerated, got %v", err)
+	}
+}
+
 func TestDashboardService_FallsBackToBlockedRequestsForAttackWidgets(t *testing.T) {
 	now := time.Now().UTC()
 	service := NewDashboardService(
