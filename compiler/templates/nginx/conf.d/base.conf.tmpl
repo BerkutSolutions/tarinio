@@ -83,9 +83,8 @@ map $host $waf_site_id {
     default "_global";
 }
 
-map $waf_site_id $waf_site_id_log {
-    "" "_global";
-    default $waf_site_id;
+map $host $waf_site_id_log {
+    default "_global";
 }
 
 log_format waf_security_json escape=json '{"timestamp":"$time_iso8601","request_id":"$request_id","client_ip":"$remote_addr","country":"$waf_country_code","city":"$waf_city_name","host":"$host","method":"$request_method","uri":"$request_uri","status":$status,"bytes_sent":$body_bytes_sent,"referer":"$http_referer","user_agent":"$http_user_agent","site":"$waf_site_id_log","upstream_addr":"$upstream_addr","request_time":$request_time}';

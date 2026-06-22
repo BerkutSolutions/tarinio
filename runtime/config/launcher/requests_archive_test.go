@@ -147,7 +147,8 @@ func TestRequestArchiveFallsBackWhenClickHouseConfigIsMissing(t *testing.T) {
 		withRequestClickHouse(settingsPath, "pepper-for-tests"),
 	)
 
-	line := `{"timestamp":"2026-04-22T11:09:00Z","request_id":"req-1","client_ip":"1.1.1.1","method":"GET","uri":"/catalog","status":200,"site":"localhost","host":"localhost","upstream_addr":"172.18.0.6:80"}`
+	stamp := time.Now().UTC().Add(-2 * time.Hour).Format(time.RFC3339)
+	line := fmt.Sprintf(`{"timestamp":"%s","request_id":"req-1","client_ip":"1.1.1.1","method":"GET","uri":"/catalog","status":200,"site":"localhost","host":"localhost","upstream_addr":"172.18.0.6:80"}`, stamp)
 	if err := os.WriteFile(logPath, []byte(line+"\n"), 0o644); err != nil {
 		t.Fatalf("write log fixture: %v", err)
 	}
@@ -171,9 +172,11 @@ func TestRequestArchiveSkipsInternalManagementTraffic(t *testing.T) {
 	archiveRoot := filepath.Join(root, "requests-archive")
 	source := newRequestStreamSource(logPath, 100, archiveRoot, 30)
 
+	uiStamp := time.Now().UTC().Add(-2 * time.Hour).Format(time.RFC3339)
+	realStamp := time.Now().UTC().Add(-1 * time.Hour).Format(time.RFC3339)
 	lines := []string{
-		`{"timestamp":"2026-04-22T11:09:00Z","request_id":"req-ui","client_ip":"127.0.0.1","method":"GET","uri":"/api/requests","status":200,"site":"","host":"localhost"}`,
-		`{"timestamp":"2026-04-22T11:10:00Z","request_id":"req-real","client_ip":"1.1.1.1","method":"GET","uri":"/checkout","status":200,"site":"site-a","host":"shop.example.com","upstream_addr":"172.18.0.7:80"}`,
+		fmt.Sprintf(`{"timestamp":"%s","request_id":"req-ui","client_ip":"127.0.0.1","method":"GET","uri":"/api/requests","status":200,"site":"","host":"localhost"}`, uiStamp),
+		fmt.Sprintf(`{"timestamp":"%s","request_id":"req-real","client_ip":"1.1.1.1","method":"GET","uri":"/checkout","status":200,"site":"site-a","host":"shop.example.com","upstream_addr":"172.18.0.7:80"}`, realStamp),
 	}
 	if err := os.WriteFile(logPath, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
 		t.Fatalf("write log fixture: %v", err)
