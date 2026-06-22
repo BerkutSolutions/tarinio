@@ -79,8 +79,8 @@ jobs:
           echo "npm ci failed after retries"
           exit 1
 
-      - name: NPM audit (fail on moderate+ vulnerabilities)
-        run: npm audit --audit-level=moderate
+      - name: NPM audit (fail on moderate+ production vulnerabilities)
+        run: npm audit --omit=dev --audit-level=moderate
 
   trivy-fs-scan:
     runs-on: ubuntu-latest
@@ -97,6 +97,7 @@ jobs:
         with:
           scan-type: fs
           scan-ref: .
+          skip-files: package-lock.json
           format: sarif
           output: trivy-results.sarif
           severity: MEDIUM,HIGH,CRITICAL

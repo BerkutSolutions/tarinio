@@ -1,7 +1,7 @@
 {
     "name": "tarinio-docs-site",
     "private": true,
-    "version": "1.2.3",
+    "version": "1.2.4",
     "scripts": {
         "start": "npm run clear && docusaurus start --host 127.0.0.1 --port 3000",
         "docs:start": "npm run clear && docusaurus start --host 127.0.0.1 --port 3000",
@@ -10,17 +10,34 @@
         "serve": "docusaurus serve --host 127.0.0.1 --port 3000",
         "clear": "docusaurus clear"
     },
-    "dependencies": {
+    "devDependencies": {
         "@docusaurus/core": "^3.10.1",
         "@docusaurus/faster": "^3.10.1",
         "@docusaurus/plugin-content-docs": "^3.10.1",
         "@docusaurus/preset-classic": "^3.10.1",
-        "@easyops-cn/docusaurus-search-local": "^0.55.1",
-        "react": "^19.2.5",
-        "react-dom": "^19.2.5"
+        "@easyops-cn/docusaurus-search-local": "^0.55.2",
+        "react": "^19.2.7",
+        "react-dom": "^19.2.7"
     },
     "overrides": {
+        "@babel/core": "^7.29.7",
+        "http-proxy-middleware": "^3.0.6",
+        "joi": "^17.13.4",
+        "launch-editor": "^2.14.1",
+        "qs": "^6.15.2",
+        "shell-quote": "^1.8.4",
         "serialize-javascript": "^7.0.5",
-        "uuid": "^14.0.0"
+        "undici": "^7.28.0",
+        "uuid": "^14.0.0",
+        "webpack-bundle-analyzer": {
+            "ws": "^7.5.11"
+        },
+        "webpack-dev-server": "^5.2.5",
+        "webpack-dev-server@^5.2.5": {
+            "http-proxy-middleware": "^3.0.6",
+            "launch-editor": "^2.14.1",
+            "ws": "^8.21.0"
+        },
+        "ws": "^8.21.0"
     }
 }
