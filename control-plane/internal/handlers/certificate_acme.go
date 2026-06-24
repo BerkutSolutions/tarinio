@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"strings"
 
@@ -64,19 +65,7 @@ func (h *CertificateACMEHandler) issue(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
 		return
 	}
-	options := &services.ACMEIssueOptions{
-		CertificateAuthorityServer: req.CertificateAuthorityServer,
-		CustomDirectoryURL:         req.CustomDirectoryURL,
-		UseLetsEncryptStaging:      req.UseLetsEncryptStaging,
-		AccountEmail:               req.AccountEmail,
-		ChallengeType:              req.ChallengeType,
-		DNSProvider:                req.DNSProvider,
-		DNSProviderEnv:             req.DNSProviderEnv,
-		DNSResolvers:               req.DNSResolvers,
-		DNSPropagationSeconds:      req.DNSPropagationSeconds,
-		ZeroSSLEABKID:              req.ZeroSSLEABKID,
-		ZeroSSLEABHMACKey:          req.ZeroSSLEABHMACKey,
-	}
+	options := buildACMEIssueOptions(req)
 	job, err := h.acme.Issue(withActorIP(r), req.CertificateID, req.CommonName, req.SANList, options)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
@@ -127,7 +116,12 @@ func (h *CertificateACMEHandler) renew(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "certificate id is required"})
 		return
 	}
-	job, err := h.acme.Renew(withActorIP(r), certificateID, nil)
+	var req certificateIssueRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err != io.EOF {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
+		return
+	}
+	job, err := h.acme.Renew(withActorIP(r), certificateID, buildACMEIssueOptions(req))
 	if err != nil {
 		status := http.StatusBadRequest
 		if strings.Contains(err.Error(), "not found") {
@@ -148,4 +142,20 @@ func (h *CertificateACMEHandler) renew(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, job)
+}
+
+func buildACMEIssueOptions(req certificateIssueRequest) *services.ACMEIssueOptions {
+	return &services.ACMEIssueOptions{
+		CertificateAuthorityServer: req.CertificateAuthorityServer,
+		CustomDirectoryURL:         req.CustomDirectoryURL,
+		UseLetsEncryptStaging:      req.UseLetsEncryptStaging,
+		AccountEmail:               req.AccountEmail,
+		ChallengeType:              req.ChallengeType,
+		DNSProvider:                req.DNSProvider,
+		DNSProviderEnv:             req.DNSProviderEnv,
+		DNSResolvers:               req.DNSResolvers,
+		DNSPropagationSeconds:      req.DNSPropagationSeconds,
+		ZeroSSLEABKID:              req.ZeroSSLEABKID,
+		ZeroSSLEABHMACKey:          req.ZeroSSLEABHMACKey,
+	}
 }

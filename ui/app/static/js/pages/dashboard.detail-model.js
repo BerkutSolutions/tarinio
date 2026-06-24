@@ -14,6 +14,14 @@ import {
 
 const OBSERVATION_WINDOW_MS = 24 * 60 * 60 * 1000;
 
+function sumMapValues(map) {
+  let total = 0;
+  map.forEach((value) => {
+    total += Number(value || 0);
+  });
+  return total;
+}
+
 export function buildDetailModel(stats, requestRows, eventRows) {
   const generatedAt = parseISOTime(stats?.generated_at) || Date.now();
   const cutoff = generatedAt - OBSERVATION_WINDOW_MS;
@@ -147,24 +155,29 @@ export function buildDetailModel(stats, requestRows, eventRows) {
     }
   });
 
-  if (eventAttackCount === 0) {
-    fallbackAttacksBySite.forEach((count, key) => addToMap(attacksBySite, key, count));
-    fallbackBlockedBySite.forEach((count, key) => addToMap(blockedBySite, key, count));
-    fallbackAttacksByURL.forEach((count, key) => addToMap(attacksByURL, key, count));
-    fallbackAttacksByCountry.forEach((count, key) => addToMap(attacksByCountry, key, count));
-    fallbackIPDetails.forEach((fallbackDetail, ip) => {
-      const detail = ensureIPDetail(ipDetails, ip);
-      if (!detail) {
-        return;
-      }
-      detail.attacks += fallbackDetail.attacks;
-      detail.blocked += fallbackDetail.blocked;
-      fallbackDetail.pages.forEach((count, key) => addToMap(detail.pages, key, count));
-      fallbackDetail.methods.forEach((count, key) => addToMap(detail.methods, key, count));
-      fallbackDetail.sites.forEach((count, key) => addToMap(detail.sites, key, count));
-      fallbackDetail.countryCounts.forEach((count, key) => addToMap(detail.countryCounts, key, count));
-    });
-  }
+  const fallbackAttackCount = sumMapValues(fallbackAttacksBySite);
+  const fallbackBlockedCount = sumMapValues(fallbackBlockedBySite);
+  const eventBlockedCount = sumMapValues(blockedBySite);
+  const useFallbackAttacks = fallbackAttackCount > eventAttackCount;
+  const useFallbackBlocked = fallbackBlockedCount > eventBlockedCount;
+
+  fallbackIPDetails.forEach((fallbackDetail, ip) => {
+    const detail = ensureIPDetail(ipDetails, ip);
+    if (!detail) {
+      return;
+    }
+    if (useFallbackAttacks) {
+      detail.attacks = Math.max(detail.attacks, fallbackDetail.attacks);
+    }
+    if (useFallbackBlocked) {
+      detail.blocked = Math.max(detail.blocked, fallbackDetail.blocked);
+    }
+  });
+
+  const attackSiteSource = useFallbackAttacks ? fallbackAttacksBySite : attacksBySite;
+  const blockedSiteSource = useFallbackBlocked ? fallbackBlockedBySite : blockedBySite;
+  const attackURLSource = useFallbackAttacks ? fallbackAttacksByURL : attacksByURL;
+  const attackCountrySource = useFallbackAttacks ? fallbackAttacksByCountry : attacksByCountry;
 
   const errorsByCode = [];
   const errorsByCodeSites = new Map();
@@ -200,10 +213,10 @@ export function buildDetailModel(stats, requestRows, eventRows) {
     requestsByURL: topCounts(requestsByURL, 20),
     requestsByMethod: topCounts(requestsByMethod, 10),
     requestsByIP: topCounts(requestsByIP, 20),
-    attacksBySite: topCounts(attacksBySite, 20),
-    blockedBySite: topCounts(blockedBySite, 20),
-    attacksByURL: topCounts(attacksByURL, 20),
-    attacksByCountry: topCounts(attacksByCountry, 20),
+    attacksBySite: topCounts(attackSiteSource, 20),
+    blockedBySite: topCounts(blockedSiteSource, 20),
+    attacksByURL: topCounts(attackURLSource, 20),
+    attacksByCountry: topCounts(attackCountrySource, 20),
     errorsByCode,
     errorsByCodeSites,
     ipDetailsByIP: new Map(ipDetailsSummary.map((item) => [item.ip, item])),

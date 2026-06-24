@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"waf/control-plane/internal/certificates"
+	"waf/control-plane/internal/easysiteprofiles"
 	"waf/control-plane/internal/jobs"
 	"waf/control-plane/internal/storage"
 	"waf/control-plane/internal/tlsconfigs"
@@ -25,11 +26,16 @@ type tlsAutoRenewRenewer interface {
 	Renew(ctx context.Context, certificateID string, options *ACMEIssueOptions) (jobs.Job, error)
 }
 
+type tlsAutoRenewProfileReader interface {
+	Get(siteID string) (easysiteprofiles.EasySiteProfile, bool, error)
+}
+
 type TLSAutoRenewService struct {
 	store        *tlsAutoRenewSettingsStore
 	certificates tlsAutoRenewCertificateReader
 	tlsConfigs   tlsAutoRenewTLSConfigReader
 	renewer      tlsAutoRenewRenewer
+	profiles     tlsAutoRenewProfileReader
 	interval     time.Duration
 	coord        DistributedCoordinator
 
@@ -93,6 +99,10 @@ func (s *TLSAutoRenewService) SetCoordinator(coord DistributedCoordinator) {
 	s.coord = coord
 }
 
+func (s *TLSAutoRenewService) SetEasySiteProfileReader(reader tlsAutoRenewProfileReader) {
+	s.profiles = reader
+}
+
 func (s *TLSAutoRenewService) runOnce() {
 	if s == nil || s.coord == nil {
 		s.runOnceUnlocked(context.Background())
@@ -121,10 +131,15 @@ func (s *TLSAutoRenewService) runOnceUnlocked(ctx context.Context) {
 		return
 	}
 	linked := make(map[string]struct{}, len(tlsItems))
+	linkedSites := make(map[string]string, len(tlsItems))
 	for _, item := range tlsItems {
 		id := strings.ToLower(strings.TrimSpace(item.CertificateID))
+		siteID := strings.ToLower(strings.TrimSpace(item.SiteID))
 		if id != "" {
 			linked[id] = struct{}{}
+			if siteID != "" {
+				linkedSites[id] = siteID
+			}
 		}
 	}
 	if len(linked) == 0 {
@@ -158,7 +173,11 @@ func (s *TLSAutoRenewService) runOnceUnlocked(ctx context.Context) {
 		if s.wasAttemptedRecently(id, now) {
 			continue
 		}
-		_, _ = s.renewer.Renew(ctx, id, nil)
+		options, shouldAttempt := s.resolveRenewOptions(id, linkedSites)
+		if !shouldAttempt {
+			continue
+		}
+		_, _ = s.renewer.Renew(ctx, id, options)
 		s.markAttempt(id, now)
 	}
 }
@@ -191,4 +210,31 @@ func (s *TLSAutoRenewService) markAttempt(certificateID string, now time.Time) {
 	s.attemptMu.Lock()
 	defer s.attemptMu.Unlock()
 	s.lastAttempt[certificateID] = now
+}
+
+func (s *TLSAutoRenewService) resolveRenewOptions(certificateID string, linkedSites map[string]string) (*ACMEIssueOptions, bool) {
+	if s == nil || s.profiles == nil {
+		return nil, true
+	}
+	siteID := strings.ToLower(strings.TrimSpace(linkedSites[certificateID]))
+	if siteID == "" {
+		return nil, true
+	}
+	profile, ok, err := s.profiles.Get(siteID)
+	if err != nil || !ok {
+		return nil, true
+	}
+	front := profile.FrontService
+	if !front.AutoLetsEncrypt || strings.EqualFold(strings.TrimSpace(front.CertificateAuthorityServer), "import") {
+		return nil, false
+	}
+	options := &ACMEIssueOptions{
+		CertificateAuthorityServer: strings.TrimSpace(front.CertificateAuthorityServer),
+		AccountEmail:               strings.TrimSpace(front.ACMEAccountEmail),
+		UseLetsEncryptStaging:      front.UseLetsEncryptStaging,
+	}
+	if options.CertificateAuthorityServer == "" && options.AccountEmail == "" && !options.UseLetsEncryptStaging {
+		return nil, true
+	}
+	return options, true
 }

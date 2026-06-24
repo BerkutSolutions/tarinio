@@ -11,13 +11,16 @@ import (
 	"waf/control-plane/internal/services"
 )
 
-type fakeCertificateACMEService struct{}
+type fakeCertificateACMEService struct {
+	renewOptions *services.ACMEIssueOptions
+}
 
 func (f *fakeCertificateACMEService) Issue(ctx context.Context, certificateID string, commonName string, sanList []string, options *services.ACMEIssueOptions) (jobs.Job, error) {
 	return jobs.Job{ID: "job-a", Status: jobs.StatusSucceeded}, nil
 }
 
 func (f *fakeCertificateACMEService) Renew(ctx context.Context, certificateID string, options *services.ACMEIssueOptions) (jobs.Job, error) {
+	f.renewOptions = options
 	return jobs.Job{ID: "job-b", Status: jobs.StatusSucceeded}, nil
 }
 
@@ -42,11 +45,15 @@ func TestCertificateACMEHandler_IssueSelfSigned(t *testing.T) {
 }
 
 func TestCertificateACMEHandler_Renew(t *testing.T) {
-	handler := NewCertificateACMEHandler(&fakeCertificateACMEService{}, &fakeCertificateACMEService{})
-	req := httptest.NewRequest(http.MethodPost, "/api/certificates/acme/renew/cert-a", nil)
+	service := &fakeCertificateACMEService{}
+	handler := NewCertificateACMEHandler(service, &fakeCertificateACMEService{})
+	req := httptest.NewRequest(http.MethodPost, "/api/certificates/acme/renew/cert-a", bytes.NewBufferString(`{"account_email":"admin@hantico.ru","certificate_authority_server":"letsencrypt","use_lets_encrypt_staging":true}`))
 	resp := httptest.NewRecorder()
 	handler.ServeHTTP(resp, req)
 	if resp.Code != http.StatusCreated {
 		t.Fatalf("expected 201, got %d", resp.Code)
+	}
+	if service.renewOptions == nil || service.renewOptions.AccountEmail != "admin@hantico.ru" || !service.renewOptions.UseLetsEncryptStaging {
+		t.Fatalf("expected renew options to be forwarded, got %#v", service.renewOptions)
 	}
 }

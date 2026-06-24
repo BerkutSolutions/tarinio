@@ -43,7 +43,7 @@ func newTLSAutoRenewSettingsStoreWithBackend(root string, backend storage.Backen
 }
 
 func defaultTLSAutoRenewSettings() TLSAutoRenewSettings {
-	return TLSAutoRenewSettings{Enabled: false, RenewBeforeDays: 30}
+	return TLSAutoRenewSettings{Enabled: true, RenewBeforeDays: 30}
 }
 
 func (s *tlsAutoRenewSettingsStore) Get() (TLSAutoRenewSettings, error) {

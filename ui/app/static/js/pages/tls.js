@@ -106,7 +106,8 @@ async function syncLetsEncryptProfileOptions(ctx, siteID, options) {
       auto_lets_encrypt: true,
       use_lets_encrypt_staging: Boolean(options?.useLetsEncryptStaging),
       use_lets_encrypt_wildcard: Boolean(options?.useLetsEncryptWildcard),
-      certificate_authority_server: String(options?.certificateAuthorityServer || "letsencrypt")
+      certificate_authority_server: String(options?.certificateAuthorityServer || "letsencrypt"),
+      acme_account_email: String(options?.accountEmail || "").trim().toLowerCase()
     }
   };
   await putWithPostFallback(ctx, endpoint, next);
@@ -219,7 +220,7 @@ export async function renderTLS(container, ctx) {
           <div class="waf-card-body waf-stack">
             <form id="tls-auto-renew-form" class="waf-form">
               <label class="waf-checkbox">
-                <input id="tls-auto-renew-enabled" type="checkbox">
+                <input id="tls-auto-renew-enabled" type="checkbox" checked>
                 <span>${escapeHtml(ctx.t("tls.autoRenew.enabled"))}</span>
               </label>
               <div class="waf-field">
@@ -358,7 +359,7 @@ export async function renderTLS(container, ctx) {
   };
 
   const loadAutoRenewSettings = async () => {
-    let settings = { enabled: false, renew_before_days: 30 };
+    let settings = { enabled: true, renew_before_days: 30 };
     try {
       const payload = await ctx.api.get("/api/tls/auto-renew");
       settings = {
@@ -623,6 +624,7 @@ export async function renderTLS(container, ctx) {
       ctx.notify(ctx.t("tls.toast.cloudflareTokenRequired"), "error");
       return;
     }
+    const accountEmail = container.querySelector("#le-account-email").value.trim();
     await ctx.api.post("/api/certificates/acme/issue", {
       certificate_id: certificateID,
       common_name: commonName,
@@ -630,7 +632,7 @@ export async function renderTLS(container, ctx) {
       certificate_authority_server: caServer,
       custom_directory_url: container.querySelector("#le-custom-directory-url").value.trim(),
       use_lets_encrypt_staging: container.querySelector("#le-use-staging").checked,
-      account_email: container.querySelector("#le-account-email").value.trim(),
+      account_email: accountEmail,
       challenge_type: challengeType,
       dns_provider: dnsProvider,
       dns_provider_env: dnsProviderEnv,
@@ -642,7 +644,8 @@ export async function renderTLS(container, ctx) {
     await syncLetsEncryptProfileOptions(ctx, siteID, {
       certificateAuthorityServer: container.querySelector("#le-ca-server").value,
       useLetsEncryptStaging: container.querySelector("#le-use-staging").checked,
-      useLetsEncryptWildcard: container.querySelector("#le-use-wildcard").checked
+      useLetsEncryptWildcard: container.querySelector("#le-use-wildcard").checked,
+      accountEmail
     });
     if (bindSite && siteID) {
       const bindingPayload = {
@@ -674,8 +677,29 @@ export async function renderTLS(container, ctx) {
   container.querySelector("#letsencrypt-renew").addEventListener("click", async () => {
     const id = container.querySelector("#le-certificate-id").value.trim();
     if (!id) return;
-    await ctx.api.post(`/api/certificates/acme/renew/${encodeURIComponent(id)}`, {});
+    const siteID = container.querySelector("#le-site-id").value.trim().toLowerCase();
+    const accountEmail = container.querySelector("#le-account-email").value.trim();
+    await ctx.api.post(`/api/certificates/acme/renew/${encodeURIComponent(id)}`, {
+      certificate_authority_server: container.querySelector("#le-ca-server").value,
+      custom_directory_url: container.querySelector("#le-custom-directory-url").value.trim(),
+      use_lets_encrypt_staging: container.querySelector("#le-use-staging").checked,
+      account_email: accountEmail,
+      challenge_type: container.querySelector("#le-challenge-type").value,
+      dns_provider: container.querySelector("#le-dns-provider").value.trim(),
+      dns_provider_env: parseKeyValueLines(container.querySelector("#le-dns-provider-env").value),
+      dns_resolvers: parseLineList(container.querySelector("#le-dns-resolvers").value),
+      dns_propagation_seconds: Number(container.querySelector("#le-dns-propagation-seconds").value || 0) || 0,
+      zerossl_eab_kid: container.querySelector("#le-zerossl-eab-kid").value.trim(),
+      zerossl_eab_hmac_key: container.querySelector("#le-zerossl-eab-hmac").value.trim()
+    });
+    await syncLetsEncryptProfileOptions(ctx, siteID, {
+      certificateAuthorityServer: container.querySelector("#le-ca-server").value,
+      useLetsEncryptStaging: container.querySelector("#le-use-staging").checked,
+      useLetsEncryptWildcard: container.querySelector("#le-use-wildcard").checked,
+      accountEmail
+    });
     ctx.notify(ctx.t("tls.toast.renewJob"));
+    await loadAutoRenewSettings();
   });
 
   await Promise.all([load(), loadAutoRenewSettings()]);

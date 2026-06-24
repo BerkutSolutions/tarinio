@@ -1,5 +1,27 @@
 import { escapeHtml } from "../ui.js";
 
+function captureScrollState(bodyNode) {
+  const selectors = [".dashboard-scroll-area", ".dashboard-containers-list"];
+  return selectors.flatMap((selector) => Array.from(bodyNode.querySelectorAll(selector)).map((node, index) => ({
+    selector,
+    index,
+    top: node.scrollTop || 0,
+    left: node.scrollLeft || 0
+  })));
+}
+
+function restoreScrollState(bodyNode, items) {
+  items.forEach((item) => {
+    const nodes = bodyNode.querySelectorAll(item.selector);
+    const node = nodes[item.index] || null;
+    if (!node) {
+      return;
+    }
+    node.scrollTop = item.top;
+    node.scrollLeft = item.left;
+  });
+}
+
 function mountWidgetFrame(widget, refs, deps) {
   const { boardNode, pageNode, layout } = refs;
   if (!widget || boardNode.querySelector(`.dashboard-frame[data-widget-id="${widget.id}"]`)) {
@@ -43,16 +65,9 @@ function renderStats(stats, refs, deps) {
     if (widget.id === "requests-series") {
       renderRequestsWidget(stats, refs, deps);
     } else {
-      const prevContainersScrollTop = widget.id === "containers-health"
-        ? (bodyNode.querySelector(".dashboard-containers-list")?.scrollTop || 0)
-        : 0;
+      const scrollState = captureScrollState(bodyNode);
       bodyNode.innerHTML = rendered[widget.id] || `<div class="dashboard-widget-content waf-empty">${escapeHtml(deps.ctx.t("common.none"))}</div>`;
-      if (widget.id === "containers-health") {
-        const nextList = bodyNode.querySelector(".dashboard-containers-list");
-        if (nextList) {
-          nextList.scrollTop = prevContainersScrollTop;
-        }
-      }
+      restoreScrollState(bodyNode, scrollState);
     }
   });
 
@@ -64,16 +79,9 @@ function renderStats(stats, refs, deps) {
     ["unique-attackers", "top-ips", "top-countries", "containers-health"].forEach((id) => {
       const bodyNode = refs.boardNode.querySelector(`[data-widget-body="${id}"]`);
       if (!bodyNode) return;
-      const prevContainersScrollTop = id === "containers-health"
-        ? (bodyNode.querySelector(".dashboard-containers-list")?.scrollTop || 0)
-        : 0;
+      const scrollState = captureScrollState(bodyNode);
       bodyNode.innerHTML = rerendered[id] || `<div class="dashboard-widget-content waf-empty">${escapeHtml(deps.ctx.t("common.none"))}</div>`;
-      if (id === "containers-health") {
-        const nextList = bodyNode.querySelector(".dashboard-containers-list");
-        if (nextList) {
-          nextList.scrollTop = prevContainersScrollTop;
-        }
-      }
+      restoreScrollState(bodyNode, scrollState);
     });
   }).catch(() => {});
 }

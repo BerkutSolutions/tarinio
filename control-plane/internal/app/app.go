@@ -436,6 +436,7 @@ func New(cfg config.Config) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	tlsAutoRenewService.SetEasySiteProfileReader(easySiteProfileStore)
 	tlsAutoRenewService.SetCoordinator(coord)
 	tlsAutoRenewService.Start()
 	wafPolicyService := services.NewWAFPolicyService(wafPolicyStore, siteStore, auditService)
