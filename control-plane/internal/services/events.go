@@ -26,6 +26,8 @@ type EventService struct {
 	collectorNextAttemptAt   time.Time
 	collectorLastError       string
 	collectorLastLoggedError time.Time
+	emitLastError            string
+	emitLastLoggedError      time.Time
 }
 
 type EventServiceOption func(*EventService)
@@ -114,7 +116,12 @@ func (s *EventService) collectRuntimeSecurityEventsBestEffort() {
 	s.recordCollectorSuccess()
 	for _, item := range items {
 		if _, err := s.Emit(item); err != nil && !strings.Contains(strings.ToLower(err.Error()), "already exists") {
-			log.Printf("[error] event service security event emit failed: %v", err)
+			if shouldLog, severity := s.recordEmitFailure(err); shouldLog {
+				log.Printf("[%s] event service security event emit failed: %v", severity, err)
+			}
+			if isTransientEventStoreError(err) {
+				break
+			}
 		}
 	}
 }
@@ -149,5 +156,43 @@ func (s *EventService) recordCollectorFailure(err error) {
 	if shouldLog {
 		s.collectorLastLoggedError = now
 		log.Printf("[error] event service runtime security collector failed: %v", err)
+	}
+}
+
+func (s *EventService) recordEmitFailure(err error) (bool, string) {
+	message := strings.TrimSpace(err.Error())
+	now := time.Now()
+
+	s.collectorMu.Lock()
+	defer s.collectorMu.Unlock()
+	shouldLog := message != s.emitLastError || now.Sub(s.emitLastLoggedError) >= time.Minute
+	s.emitLastError = message
+	if shouldLog {
+		s.emitLastLoggedError = now
+	}
+	if isTransientEventStoreError(err) {
+		return shouldLog, "warn"
+	}
+	return shouldLog, "error"
+}
+
+func isTransientEventStoreError(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(strings.TrimSpace(err.Error()))
+	switch {
+	case strings.Contains(message, "the database system is shutting down"):
+		return true
+	case strings.Contains(message, "terminating connection due to administrator command"):
+		return true
+	case strings.Contains(message, "connection refused"):
+		return true
+	case strings.Contains(message, "sqlstate 57p03"):
+		return true
+	case strings.Contains(message, "sqlstate 57p01"):
+		return true
+	default:
+		return false
 	}
 }

@@ -717,6 +717,10 @@ func classifyContainerLogIssue(message string) (string, bool) {
 		"failed to initialize logtype config index and builtin log types",
 		"tarinio-sentinel: emergency single-source flood detected:",
 		"tarinio-sentinel: emergency botnet burst detected:",
+		"the database system is shutting down",
+		"terminating connection due to administrator command",
+		"an upstream response is buffered to a temporary file",
+		"control-plane bootstrap: failed to connect to",
 	}
 	for _, pattern := range benignPatterns {
 		if strings.Contains(lower, pattern) {

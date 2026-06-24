@@ -25,6 +25,10 @@ func TestClassifyContainerLogIssue_IgnoresBenignOpenSearchStartupNoise(t *testin
 		`WARNING: Using incubator modules: jdk.incubator.vector`,
 		`2026/04/24 14:31:20 [warn] tarinio-sentinel: emergency single-source flood detected: ip=203.0.113.40 rps=140`,
 		`2026/04/24 14:31:20 [warn] tarinio-sentinel: emergency botnet burst detected: rps=240 unique_ips=240`,
+		`2026-06-24 14:10:15.280 UTC [432] FATAL: the database system is shutting down`,
+		`2026-06-24 14:10:15.154 UTC [233] FATAL: terminating connection due to administrator command`,
+		`2026/06/24 14:08:58 [warn] 31#31: *261 an upstream response is buffered to a temporary file /var/cache/nginx/proxy_temp/1/00/0000000001 while reading upstream`,
+		`control-plane bootstrap: failed to connect to user=waf database=waf: dial tcp 172.18.0.8:5432: connect: connection refused`,
 	}
 
 	for _, message := range cases {

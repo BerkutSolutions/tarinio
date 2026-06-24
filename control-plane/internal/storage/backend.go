@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -16,6 +17,8 @@ import (
 )
 
 var ErrNotFound = errors.New("storage object not found")
+
+const postgresBackendOperationTimeout = 5 * time.Second
 
 type Backend interface {
 	LoadDocument(key string) ([]byte, error)
@@ -191,7 +194,9 @@ func (b *PostgresBackend) Ping() error {
 	if b == nil || b.db == nil {
 		return errors.New("postgres backend is not initialized")
 	}
-	return b.db.Ping()
+	ctx, cancel := context.WithTimeout(context.Background(), postgresBackendOperationTimeout)
+	defer cancel()
+	return b.db.PingContext(ctx)
 }
 
 func (b *PostgresBackend) LoadDocument(key string) ([]byte, error) {
@@ -219,12 +224,16 @@ func (b *PostgresBackend) DeleteBlob(key string) error {
 }
 
 func (b *PostgresBackend) DeleteBlobsByPrefix(prefix string) error {
-	_, err := b.db.Exec(`DELETE FROM state_blobs WHERE key LIKE $1`, strings.TrimSpace(prefix)+"%")
+	ctx, cancel := context.WithTimeout(context.Background(), postgresBackendOperationTimeout)
+	defer cancel()
+	_, err := b.db.ExecContext(ctx, `DELETE FROM state_blobs WHERE key LIKE $1`, strings.TrimSpace(prefix)+"%")
 	return err
 }
 
 func (b *PostgresBackend) ListBlobKeys(prefix string) ([]string, error) {
-	rows, err := b.db.Query(`SELECT key FROM state_blobs WHERE key LIKE $1 ORDER BY key`, strings.TrimSpace(prefix)+"%")
+	ctx, cancel := context.WithTimeout(context.Background(), postgresBackendOperationTimeout)
+	defer cancel()
+	rows, err := b.db.QueryContext(ctx, `SELECT key FROM state_blobs WHERE key LIKE $1 ORDER BY key`, strings.TrimSpace(prefix)+"%")
 	if err != nil {
 		return nil, err
 	}
@@ -242,7 +251,9 @@ func (b *PostgresBackend) ListBlobKeys(prefix string) ([]string, error) {
 
 func (b *PostgresBackend) load(table string, key string) ([]byte, error) {
 	var content []byte
-	err := b.db.QueryRow(`SELECT content FROM `+table+` WHERE key = $1`, strings.TrimSpace(key)).Scan(&content)
+	ctx, cancel := context.WithTimeout(context.Background(), postgresBackendOperationTimeout)
+	defer cancel()
+	err := b.db.QueryRowContext(ctx, `SELECT content FROM `+table+` WHERE key = $1`, strings.TrimSpace(key)).Scan(&content)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -253,7 +264,10 @@ func (b *PostgresBackend) load(table string, key string) ([]byte, error) {
 }
 
 func (b *PostgresBackend) save(table string, key string, content []byte) error {
-	_, err := b.db.Exec(
+	ctx, cancel := context.WithTimeout(context.Background(), postgresBackendOperationTimeout)
+	defer cancel()
+	_, err := b.db.ExecContext(
+		ctx,
 		`INSERT INTO `+table+` (key, content, updated_at) VALUES ($1, $2, NOW())
 		 ON CONFLICT (key) DO UPDATE SET content = EXCLUDED.content, updated_at = EXCLUDED.updated_at`,
 		strings.TrimSpace(key),
@@ -263,6 +277,8 @@ func (b *PostgresBackend) save(table string, key string, content []byte) error {
 }
 
 func (b *PostgresBackend) del(table string, key string) error {
-	_, err := b.db.Exec(`DELETE FROM `+table+` WHERE key = $1`, strings.TrimSpace(key))
+	ctx, cancel := context.WithTimeout(context.Background(), postgresBackendOperationTimeout)
+	defer cancel()
+	_, err := b.db.ExecContext(ctx, `DELETE FROM `+table+` WHERE key = $1`, strings.TrimSpace(key))
 	return err
 }

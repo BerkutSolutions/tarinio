@@ -114,7 +114,7 @@ func New(cfg config.Config) (*App, error) {
 		if err != nil {
 			return nil, err
 		}
-		if err := backend.Ping(); err != nil {
+		if err := waitForPostgresReady(backend.Ping); err != nil {
 			return nil, err
 		}
 		if err := storemigrations.RunMigrations(backend.DB()); err != nil {

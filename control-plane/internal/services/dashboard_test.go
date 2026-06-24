@@ -450,6 +450,46 @@ func TestDashboardService_UsesCachedRequestsOnTransientCollectorFailure(t *testi
 	}
 }
 
+func TestDashboardService_UsesCachedEventsOnTransientStoreFailure(t *testing.T) {
+	now := time.Now().UTC()
+	eventReader := &fakeDashboardEventReader{
+		items: []events.Event{
+			{
+				ID:         "evt-1",
+				Type:       events.TypeSecurityWAF,
+				SiteID:     "site-a",
+				OccurredAt: now.Format(time.RFC3339),
+				Details: map[string]any{
+					"blocked":   true,
+					"status":    403,
+					"client_ip": "203.0.113.10",
+					"path":      "/checkout",
+				},
+			},
+		},
+	}
+	service := NewDashboardService(eventReader, &fakeDashboardRequestCollector{}, &fakeDashboardRuntimeProbe{})
+
+	first, err := service.Stats()
+	if err != nil {
+		t.Fatalf("first stats failed: %v", err)
+	}
+	if first.AttacksDay != 1 {
+		t.Fatalf("expected first attacks_day=1, got %d", first.AttacksDay)
+	}
+
+	eventReader.err = errors.New("events store unavailable")
+	eventReader.items = nil
+
+	second, err := service.Stats()
+	if err != nil {
+		t.Fatalf("second stats failed: %v", err)
+	}
+	if second.AttacksDay != 1 {
+		t.Fatalf("expected cached attacks_day=1 on transient event store failure, got %d", second.AttacksDay)
+	}
+}
+
 func TestDashboardService_SkipsAdminAppTrafficOnPublicHost(t *testing.T) {
 	now := time.Now().UTC()
 	service := NewDashboardService(

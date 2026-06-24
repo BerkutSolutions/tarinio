@@ -25,6 +25,10 @@ type DashboardService struct {
 		mu   sync.Mutex
 		rows []map[string]any
 	}
+	eventsCache struct {
+		mu    sync.Mutex
+		items []events.Event
+	}
 }
 
 type DashboardServiceStatus struct {
@@ -194,9 +198,28 @@ func (s *DashboardService) Stats() (DashboardStats, error) {
 		}
 	}
 
-	requestRows, err := s.collectRequests()
-	if err != nil {
-		return DashboardStats{}, err
+	var (
+		requestRows []map[string]any
+		eventItems  []events.Event
+		requestErr  error
+		eventErr    error
+	)
+	var fetchWG sync.WaitGroup
+	fetchWG.Add(2)
+	go func() {
+		defer fetchWG.Done()
+		requestRows, requestErr = s.collectRequests()
+	}()
+	go func() {
+		defer fetchWG.Done()
+		eventItems, eventErr = s.collectEvents()
+	}()
+	fetchWG.Wait()
+	if requestErr != nil {
+		return DashboardStats{}, requestErr
+	}
+	if eventErr != nil {
+		return DashboardStats{}, eventErr
 	}
 	requestsDay, requestsSeries, blockedFromRequestsSeries, blockedFromRequestsDay, popularErrors := summarizeRequests(requestRows, cutoff, now)
 	out.RequestsDay = requestsDay
@@ -204,10 +227,6 @@ func (s *DashboardService) Stats() (DashboardStats, error) {
 	out.BlockedSeries = blockedFromRequestsSeries
 	out.PopularErrors = popularErrors
 
-	eventItems, err := s.collectEvents()
-	if err != nil {
-		return DashboardStats{}, err
-	}
 	attacksDay, blockedAttacksDay, uniqueIPsDay, topIPs, topCountries, topURLs, blockedFromEventsSeries, eventErrors := summarizeAttackEvents(eventItems, cutoff, now)
 	out.AttacksDay = attacksDay
 	out.BlockedAttacksDay = blockedAttacksDay
@@ -312,7 +331,19 @@ func (s *DashboardService) collectEvents() ([]events.Event, error) {
 	if s.events == nil {
 		return []events.Event{}, nil
 	}
-	return s.events.List()
+	items, err := s.events.List()
+	if err != nil {
+		s.eventsCache.mu.Lock()
+		defer s.eventsCache.mu.Unlock()
+		if len(s.eventsCache.items) > 0 {
+			return append([]events.Event(nil), s.eventsCache.items...), nil
+		}
+		return []events.Event{}, nil
+	}
+	s.eventsCache.mu.Lock()
+	s.eventsCache.items = append([]events.Event(nil), items...)
+	s.eventsCache.mu.Unlock()
+	return items, nil
 }
 
 // moved to dashboard_attack_summaries.go and dashboard_attack_filters.go
