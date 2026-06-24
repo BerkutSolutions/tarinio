@@ -25,6 +25,7 @@ type nginxSiteData struct {
 	ServerNames               []string
 	ListenHTTP                bool
 	ListenHTTPS               bool
+	IsManagementSite          bool
 	UpstreamName              string
 	UpstreamAddress           string
 	ProxyPassTarget           string
@@ -104,6 +105,7 @@ func RenderSiteUpstreamArtifacts(sites []SiteInput, upstreams []UpstreamInput) (
 			ServerNames:               collectServerNames(site),
 			ListenHTTP:                site.ListenHTTP,
 			ListenHTTPS:               site.ListenHTTPS,
+			IsManagementSite:          isManagementSiteID(site.ID),
 			UpstreamName:              upstreamBlockName(site.ID, upstream.ID),
 			UpstreamAddress:           buildUpstreamAddress(upstream),
 			ProxyPassTarget:           "http://" + upstreamBlockName(site.ID, upstream.ID),

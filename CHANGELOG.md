@@ -1,6 +1,8 @@
 ## [1.2.4] - 22.06.2026
 
 ### Core
-- Исправлен healthcheck страницы `/healthcheck`: probe `API запросов` больше не валит `API дашборда` ответом `502`, если runtime request telemetry временно недоступен или деградировал.
-- runtime/nginx: убран лишний `set $waf_site_id` из site nginx template, чтобы healthcheck и прямые запросы по IP/невалидному host не создавали warning `using uninitialized "waf_site_id" variable while logging request` и не раздували runtime-логи.
-- security/go: `golang.org/x/crypto` обновлён до `v0.52.0`, чтобы закрыть Trivy code-scanning alert-ы и падение workflow `security-supply-chain`.
+- healthcheck `/healthcheck`: request probes no longer fail the dashboard API with `502` when runtime request telemetry is temporarily unavailable or degraded.
+- runtime/nginx: removed the extra `set $waf_site_id` from the site nginx template so direct IP and invalid-host healthchecks stop generating `using uninitialized "waf_site_id" variable while logging request` warnings.
+- security/go: upgraded `golang.org/x/crypto` to `v0.52.0` to close Trivy code-scanning findings and unblock `security-supply-chain`.
+- runtime/nginx: management-site hostnames now proxy `/api/*` to `control-plane:8080` instead of the UI upstream, which removes `504` and upstream-timeout failures for `/api/dashboard/stats`.
+- ui/dashboard: silent auto-refresh now marks dashboard stats polling as a background request, so transient `401`/`502`/`503`/`504` responses back off instead of repeatedly hammering the API from a background tab.

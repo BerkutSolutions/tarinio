@@ -1,5 +1,6 @@
 function loadDashboardStats(silent, deps) {
-  return deps.ctx.api.get("/api/dashboard/stats")
+  const options = silent ? { headers: { "X-Berkut-Background": "1" } } : {};
+  return deps.ctx.api.get("/api/dashboard/stats", options)
     .then(async (stats) => {
       if (Date.now() >= deps.containersOverviewNextRetryAtRef.value) {
         const containersOverview = await deps.fetchContainersOverview();
