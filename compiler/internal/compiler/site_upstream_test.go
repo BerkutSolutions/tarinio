@@ -206,6 +206,9 @@ func TestRenderSiteUpstreamArtifacts_WiresErrorPagesAndRateLimitIncludes(t *test
 	}
 
 	content := string(siteArtifact.Content)
+	if strings.Contains(content, "set $waf_site_id ") {
+		t.Fatal("did not expect nginx site config to set waf_site_id explicitly")
+	}
 	if !strings.Contains(content, "proxy_intercept_errors on;") {
 		t.Fatal("expected proxy_intercept_errors to be enabled in nginx site config")
 	}
