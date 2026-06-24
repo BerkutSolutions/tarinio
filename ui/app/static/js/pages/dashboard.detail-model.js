@@ -158,8 +158,8 @@ export function buildDetailModel(stats, requestRows, eventRows) {
   const fallbackAttackCount = sumMapValues(fallbackAttacksBySite);
   const fallbackBlockedCount = sumMapValues(fallbackBlockedBySite);
   const eventBlockedCount = sumMapValues(blockedBySite);
-  const useFallbackAttacks = fallbackAttackCount > eventAttackCount;
-  const useFallbackBlocked = fallbackBlockedCount > eventBlockedCount;
+  const useFallbackAttacks = eventAttackCount <= 0 && fallbackAttackCount > 0;
+  const useFallbackBlocked = eventBlockedCount <= 0 && fallbackBlockedCount > 0;
 
   fallbackIPDetails.forEach((fallbackDetail, ip) => {
     const detail = ensureIPDetail(ipDetails, ip);

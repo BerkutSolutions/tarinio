@@ -1,4 +1,9 @@
 import { escapeHtml } from "../ui.js";
+import { formatDateTimeInZone } from "../preferences.js";
+
+function formatIndexUpdatedAt(value) {
+  return formatDateTimeInZone(value);
+}
 
 export function renderStorageIndexes({
   ctx,
@@ -67,7 +72,7 @@ export function renderStorageIndexes({
                       <td>${escapeHtml(String(item?.file_name || "-"))}</td>
                       <td>${escapeHtml(String(item?.lines ?? 0))}</td>
                       <td>${escapeHtml(String(item?.size_bytes ?? 0))}</td>
-                      <td>${escapeHtml(String(item?.updated_at || "-"))}</td>
+                      <td>${escapeHtml(formatIndexUpdatedAt(item?.updated_at || "-"))}</td>
                       <td>
                         <button
                           class="btn ghost btn-sm"

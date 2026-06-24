@@ -70,20 +70,6 @@ function renderStats(stats, refs, deps) {
       restoreScrollState(bodyNode, scrollState);
     }
   });
-
-  deps.ensureDetailModel().then((computed) => {
-    if (!refs.latestStats || refs.latestStats !== stats) {
-      return;
-    }
-    const rerendered = deps.mergeWidgetData(stats, computed, refs.latestContainersOverview, deps.ctx);
-    ["unique-attackers", "top-ips", "top-countries", "containers-health"].forEach((id) => {
-      const bodyNode = refs.boardNode.querySelector(`[data-widget-body="${id}"]`);
-      if (!bodyNode) return;
-      const scrollState = captureScrollState(bodyNode);
-      bodyNode.innerHTML = rerendered[id] || `<div class="dashboard-widget-content waf-empty">${escapeHtml(deps.ctx.t("common.none"))}</div>`;
-      restoreScrollState(bodyNode, scrollState);
-    });
-  }).catch(() => {});
 }
 
 export {

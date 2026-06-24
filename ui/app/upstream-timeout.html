@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>504 Gateway Timeout</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #09111c;
+      --panel: rgba(17, 28, 43, 0.94);
+      --line: rgba(132, 170, 255, 0.2);
+      --text: #eef4ff;
+      --muted: rgba(238, 244, 255, 0.74);
+      --accent-soft: rgba(255, 190, 99, 0.18);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", Inter, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 15% 15%, rgba(95, 149, 255, 0.18), transparent 30%),
+        radial-gradient(circle at 85% 0%, rgba(84, 211, 162, 0.12), transparent 28%),
+        var(--bg);
+      display: grid;
+      place-items: center;
+      padding: 28px;
+    }
+    .shell {
+      width: min(1080px, 100%);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background: var(--panel);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
+      overflow: hidden;
+    }
+    .hero {
+      padding: 28px 30px 18px;
+      border-bottom: 1px solid var(--line);
+    }
+    .code {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.04);
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .code strong {
+      color: var(--text);
+      font-size: 22px;
+    }
+    .title {
+      font-size: clamp(34px, 5vw, 56px);
+      line-height: 1;
+      margin: 18px 0 0;
+    }
+    .subtitle {
+      margin: 10px 0 0;
+      color: var(--muted);
+      max-width: 760px;
+      font-size: 17px;
+      line-height: 1.55;
+    }
+    .meta {
+      margin-top: 12px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .meta-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .meta-item strong { color: var(--text); }
+    .body {
+      padding: 24px 30px 30px;
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 18px;
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 18px;
+      background: rgba(8, 14, 24, 0.56);
+    }
+    .card h2 {
+      margin: 0 0 14px;
+      font-size: 15px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+    }
+    .state-grid { display: grid; gap: 12px; }
+    .state {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 15px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .state strong { display: block; font-size: 15px; margin-bottom: 4px; }
+    .state span { color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      padding: 0 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .ok { color: #d7f8ea; background: rgba(85, 211, 158, 0.16); border: 1px solid rgba(85, 211, 158, 0.3); }
+    .bad { color: #ffd4d4; background: rgba(255, 127, 127, 0.16); border: 1px solid rgba(255, 127, 127, 0.28); }
+    .accent { background: linear-gradient(135deg, var(--accent-soft), transparent); }
+    .list { margin: 0; padding-left: 18px; color: var(--muted); line-height: 1.7; }
+    .footer { margin-top: 14px; color: var(--muted); font-size: 13px; }
+    .powered {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 20px;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center;
+    }
+    .powered a {
+      color: #cfe1ff;
+      text-decoration: none;
+      border-bottom: 1px solid rgba(207, 225, 255, 0.35);
+    }
+    @media (max-width: 860px) {
+      .body { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <div class="code"><strong>504</strong><span id="status-category">Slow upstream response</span></div>
+      <h1 class="title" id="status-title">Gateway Timeout</h1>
+      <p class="subtitle" id="status-summary">The WAF stayed online, but the upstream service took too long to answer this request.</p>
+      <div class="meta">
+        <div class="meta-item"><span id="meta-request-label">Request ID</span><strong>n/a</strong></div>
+        <div class="meta-item"><span id="meta-client-label">Client IP</span><strong>n/a</strong></div>
+        <div class="meta-item"><span id="meta-time-label">Time</span><strong>n/a</strong></div>
+      </div>
+    </section>
+    <section class="body">
+      <article class="card accent">
+        <h2 id="what-happened-title">What happened</h2>
+        <div class="state-grid">
+          <div class="state">
+            <div>
+              <strong id="client-title">Client request</strong>
+              <span id="client-text">The request reached the WAF and was forwarded normally.</span>
+            </div>
+            <span class="pill ok" id="client-label">Looks normal</span>
+          </div>
+          <div class="state">
+            <div>
+              <strong id="waf-title">WAF layer</strong>
+              <span id="waf-text">The WAF remained available while waiting for the upstream.</span>
+            </div>
+            <span class="pill ok" id="waf-label">Online</span>
+          </div>
+          <div class="state">
+            <div>
+              <strong id="upstream-title">Upstream service</strong>
+              <span id="upstream-text">The upstream exceeded the time budget for a valid response.</span>
+            </div>
+            <span class="pill bad" id="upstream-label">Too slow</span>
+          </div>
+        </div>
+      </article>
+      <article class="card">
+        <h2 id="what-next-title">What to do next</h2>
+        <ol class="list" id="suggestions">
+          <li>Inspect upstream latency and long-running handlers.</li>
+          <li>Review database or dependency timeouts.</li>
+          <li>Tune timeout values only after confirming the root cause.</li>
+        </ol>
+        <div class="footer" id="status-footer">TARINIO handled this response with an internal fallback page so the failure mode stays readable.</div>
+      </article>
+    </section>
+  </main>
+  <div class="powered">
+    <a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener noreferrer">Secured by Tarinio</a>
+  </div>
+  <script>
+    (function () {
+      var copies = {
+        en: {
+          category: "Slow upstream response",
+          title: "Gateway Timeout",
+          summary: "The WAF stayed online, but the upstream service took too long to answer this request.",
+          requestID: "Request ID",
+          clientIP: "Client IP",
+          time: "Time",
+          whatHappened: "What happened",
+          clientTitle: "Client request",
+          clientText: "The request reached the WAF and was forwarded normally.",
+          clientLabel: "Looks normal",
+          wafTitle: "WAF layer",
+          wafText: "The WAF remained available while waiting for the upstream.",
+          wafLabel: "Online",
+          upstreamTitle: "Upstream service",
+          upstreamText: "The upstream exceeded the time budget for a valid response.",
+          upstreamLabel: "Too slow",
+          whatNext: "What to do next",
+          suggestions: [
+            "Inspect upstream latency and long-running handlers.",
+            "Review database or dependency timeouts.",
+            "Tune timeout values only after confirming the root cause."
+          ],
+          footer: "TARINIO handled this response with an internal fallback page so the failure mode stays readable."
+        },
+        ru: {
+          category: "Медленный ответ upstream",
+          title: "Шлюз не дождался ответа",
+          summary: "WAF остался доступен, но upstream слишком долго не возвращал ответ на этот запрос.",
+          requestID: "ID запроса",
+          clientIP: "IP клиента",
+          time: "Время",
+          whatHappened: "Что произошло",
+          clientTitle: "Запрос клиента",
+          clientText: "Запрос дошёл до WAF и был штатно отправлен дальше.",
+          clientLabel: "Норма",
+          wafTitle: "Слой WAF",
+          wafText: "WAF оставался доступен, пока ждал ответ upstream.",
+          wafLabel: "Онлайн",
+          upstreamTitle: "Целевой сервис",
+          upstreamText: "Upstream превысил допустимое время ответа.",
+          upstreamLabel: "Слишком долго",
+          whatNext: "Что делать дальше",
+          suggestions: [
+            "Проверьте задержки upstream и долгие обработчики.",
+            "Проверьте таймауты базы данных и внешних зависимостей.",
+            "Меняйте таймауты только после проверки реальной причины."
+          ],
+          footer: "TARINIO показал внутреннюю fallback-страницу, чтобы режим ошибки оставался читаемым."
+        },
+        de: {
+          category: "Langsame Upstream-Antwort",
+          title: "Gateway-Timeout",
+          summary: "Die WAF blieb erreichbar, aber der Upstream antwortete zu langsam auf diese Anfrage.",
+          requestID: "Request-ID",
+          clientIP: "Client-IP",
+          time: "Zeit",
+          whatHappened: "Was ist passiert",
+          clientTitle: "Client-Anfrage",
+          clientText: "Die Anfrage erreichte die WAF und wurde normal weitergeleitet.",
+          clientLabel: "Normal",
+          wafTitle: "WAF-Schicht",
+          wafText: "Die WAF blieb erreichbar, während sie auf den Upstream wartete.",
+          wafLabel: "Online",
+          upstreamTitle: "Upstream-Dienst",
+          upstreamText: "Der Upstream überschritt das Zeitbudget für eine gültige Antwort.",
+          upstreamLabel: "Zu langsam",
+          whatNext: "Nächste Schritte",
+          suggestions: [
+            "Prüfen Sie die Upstream-Latenz und lang laufende Handler.",
+            "Prüfen Sie Zeitlimits für Datenbank und Abhängigkeiten.",
+            "Passen Sie Timeouts erst an, wenn die Ursache bestätigt ist."
+          ],
+          footer: "TARINIO hat diese Antwort über eine interne Fallback-Seite bereitgestellt, damit der Fehlerfall lesbar bleibt."
+        },
+        sr: {
+          category: "Спор одговор upstream-а",
+          title: "Gateway Timeout",
+          summary: "WAF је остао доступан, али је upstream предуго одговарао на овај захтев.",
+          requestID: "ID захтева",
+          clientIP: "IP клијента",
+          time: "Време",
+          whatHappened: "Шта се догодило",
+          clientTitle: "Захтев клијента",
+          clientText: "Захтев је стигао до WAF-а и нормално је прослеђен даље.",
+          clientLabel: "Нормално",
+          wafTitle: "WAF слој",
+          wafText: "WAF је остао доступан док је чекао upstream.",
+          wafLabel: "Онлајн",
+          upstreamTitle: "Циљни сервис",
+          upstreamText: "Upstream је прекорачио дозвољено време за валидан одговор.",
+          upstreamLabel: "Преспоро",
+          whatNext: "Шта даље",
+          suggestions: [
+            "Проверите кашњење upstream-а и дуготрајне handler-е.",
+            "Проверите timeout-ове базе и спољних зависности.",
+            "Мењајте timeout-ове тек након провере стварног узрока."
+          ],
+          footer: "TARINIO је приказао интерну fallback страницу како би грешка остала читљива."
+        },
+        zh: {
+          category: "上游响应过慢",
+          title: "网关超时",
+          summary: "WAF 仍然在线，但上游服务响应此请求耗时过长。",
+          requestID: "请求 ID",
+          clientIP: "客户端 IP",
+          time: "时间",
+          whatHappened: "发生了什么",
+          clientTitle: "客户端请求",
+          clientText: "请求已到达 WAF，并被正常转发。",
+          clientLabel: "正常",
+          wafTitle: "WAF 层",
+          wafText: "WAF 在等待上游时保持在线。",
+          wafLabel: "在线",
+          upstreamTitle: "目标服务",
+          upstreamText: "上游超过了有效响应的时间预算。",
+          upstreamLabel: "过慢",
+          whatNext: "接下来做什么",
+          suggestions: [
+            "检查上游延迟和耗时较长的处理器。",
+            "检查数据库或外部依赖的超时设置。",
+            "确认根因后再调整超时。"
+          ],
+          footer: "TARINIO 使用内部回退页面处理了此响应，以便错误状态仍然易于阅读。"
+        }
+      };
+      var lang = "en";
+      try {
+        var candidates = [];
+        if (Array.isArray(navigator.languages)) candidates = candidates.concat(navigator.languages);
+        if (navigator.language) candidates.push(navigator.language);
+        for (var i = 0; i < candidates.length; i += 1) {
+          var token = String(candidates[i] || "").toLowerCase().split(/[-_]/)[0];
+          if (copies[token]) {
+            lang = token;
+            break;
+          }
+        }
+      } catch (_error) {}
+      var copy = copies[lang] || copies.en;
+      document.documentElement.lang = lang;
+      document.title = "504 " + copy.title;
+      document.getElementById("status-category").textContent = copy.category;
+      document.getElementById("status-title").textContent = copy.title;
+      document.getElementById("status-summary").textContent = copy.summary;
+      document.getElementById("meta-request-label").textContent = copy.requestID;
+      document.getElementById("meta-client-label").textContent = copy.clientIP;
+      document.getElementById("meta-time-label").textContent = copy.time;
+      document.getElementById("what-happened-title").textContent = copy.whatHappened;
+      document.getElementById("client-title").textContent = copy.clientTitle;
+      document.getElementById("client-text").textContent = copy.clientText;
+      document.getElementById("client-label").textContent = copy.clientLabel;
+      document.getElementById("waf-title").textContent = copy.wafTitle;
+      document.getElementById("waf-text").textContent = copy.wafText;
+      document.getElementById("waf-label").textContent = copy.wafLabel;
+      document.getElementById("upstream-title").textContent = copy.upstreamTitle;
+      document.getElementById("upstream-text").textContent = copy.upstreamText;
+      document.getElementById("upstream-label").textContent = copy.upstreamLabel;
+      document.getElementById("what-next-title").textContent = copy.whatNext;
+      document.getElementById("status-footer").textContent = copy.footer;
+      document.getElementById("suggestions").innerHTML = copy.suggestions.map(function (item) {
+        return "<li>" + item.replace(/[&<>]/g, function (ch) {
+          return { "&": "&amp;", "<": "&lt;", ">": "&gt;" }[ch];
+        }) + "</li>";
+      }).join("");
+    })();
+  </script>
+</body>
+</html>

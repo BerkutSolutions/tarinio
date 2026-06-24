@@ -212,13 +212,13 @@ func (s *DashboardService) Stats() (DashboardStats, error) {
 	out.TopAttackerCountries = topCountries
 	out.MostAttackedURLs = topURLs
 	requestAttackFallback := summarizeRequestAttacks(requestRows, cutoff)
-	if requestAttackFallback.AttacksDay > out.AttacksDay {
+	if out.AttacksDay <= 0 && requestAttackFallback.AttacksDay > 0 {
 		out.AttacksDay = requestAttackFallback.AttacksDay
 	}
-	if requestAttackFallback.BlockedAttacksDay > out.BlockedAttacksDay {
+	if out.BlockedAttacksDay <= 0 && requestAttackFallback.BlockedAttacksDay > 0 {
 		out.BlockedAttacksDay = requestAttackFallback.BlockedAttacksDay
 	}
-	if requestAttackFallback.UniqueIPsDay > out.UniqueAttackerIPsDay {
+	if out.UniqueAttackerIPsDay <= 0 && requestAttackFallback.UniqueIPsDay > 0 {
 		out.UniqueAttackerIPsDay = requestAttackFallback.UniqueIPsDay
 	}
 	if len(out.TopAttackerIPs) == 0 {
@@ -231,8 +231,12 @@ func (s *DashboardService) Stats() (DashboardStats, error) {
 		out.MostAttackedURLs = requestAttackFallback.TopURLs
 	}
 	out.BlockedSeries = blockedFromEventsSeries
-	out.BlockedSeries = mergeSeriesMax(out.BlockedSeries, blockedFromRequestsSeries)
-	if blockedFromRequestsDay > out.BlockedAttacksDay {
+	if len(out.BlockedSeries) == 0 {
+		out.BlockedSeries = blockedFromRequestsSeries
+	} else if out.BlockedAttacksDay <= 0 {
+		out.BlockedSeries = mergeSeriesMax(out.BlockedSeries, blockedFromRequestsSeries)
+	}
+	if out.BlockedAttacksDay <= 0 && blockedFromRequestsDay > 0 {
 		out.BlockedAttacksDay = blockedFromRequestsDay
 	}
 	out.PopularErrors = mergeKeyCountsSum(out.PopularErrors, eventErrors, 7)

@@ -246,6 +246,70 @@ func TestDashboardService_FallsBackToBlockedRequestsForAttackWidgets(t *testing.
 	}
 }
 
+func TestDashboardService_DoesNotOverrideEventAttacksWithBlockedRequestFallback(t *testing.T) {
+	now := time.Now().UTC()
+	service := NewDashboardService(
+		&fakeDashboardEventReader{
+			items: []events.Event{
+				{
+					ID:         "evt-attack",
+					Type:       events.TypeSecurityWAF,
+					SiteID:     "site-a",
+					OccurredAt: now.Format(time.RFC3339),
+					Details: map[string]any{
+						"blocked":   true,
+						"status":    403,
+						"client_ip": "203.0.113.77",
+						"path":      "/checkout",
+						"country":   "RU",
+					},
+				},
+			},
+		},
+		&fakeDashboardRequestCollector{
+			items: []map[string]any{
+				{
+					"ingested_at": now.Format(time.RFC3339),
+					"entry": map[string]any{
+						"timestamp": now.Format(time.RFC3339),
+						"site":      "site-a",
+						"uri":       "/challenge",
+						"status":    403,
+						"client_ip": "198.51.100.20",
+						"country":   "DE",
+					},
+				},
+				{
+					"ingested_at": now.Add(-time.Minute).Format(time.RFC3339),
+					"entry": map[string]any{
+						"timestamp": now.Add(-time.Minute).Format(time.RFC3339),
+						"site":      "site-a",
+						"uri":       "/challenge",
+						"status":    403,
+						"client_ip": "198.51.100.21",
+						"country":   "FR",
+					},
+				},
+			},
+		},
+		&fakeDashboardRuntimeProbe{},
+	)
+
+	stats, err := service.Stats()
+	if err != nil {
+		t.Fatalf("stats failed: %v", err)
+	}
+	if stats.AttacksDay != 1 {
+		t.Fatalf("expected event-derived attacks to win over request fallback, got %d", stats.AttacksDay)
+	}
+	if stats.BlockedAttacksDay != 1 {
+		t.Fatalf("expected event-derived blocked attacks to win over request fallback, got %d", stats.BlockedAttacksDay)
+	}
+	if len(stats.TopAttackerIPs) == 0 || stats.TopAttackerIPs[0].Key != "203.0.113.77" {
+		t.Fatalf("expected event-derived top attacker IP, got %#v", stats.TopAttackerIPs)
+	}
+}
+
 func TestDashboardService_SkipsInternalManagementTraffic(t *testing.T) {
 	now := time.Now().UTC()
 	service := NewDashboardService(

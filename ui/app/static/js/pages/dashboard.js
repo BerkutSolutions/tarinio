@@ -64,7 +64,10 @@ function buildWidgetDetail(action, payload, stats, detailModel, containersOvervi
     formatPercent,
     formatBytes,
     normalizeCountryCode,
-    renderCountryBadge
+    renderCountryBadge: (code) => renderCountryBadge(code, { normalizeCountryCode }),
+    formatUptimeLocalized,
+    formatContainerStatusLabel,
+    getContainerStatusTone
   });
   return extracted;
 }
@@ -300,5 +303,29 @@ export async function renderDashboard(container, ctx) {
   });
 
   await load(false);
+  return () => {
+    liveLogs.stop();
+    persistLayoutNow();
+    if (container.__dashboardAutoRefreshTimer) {
+      clearInterval(container.__dashboardAutoRefreshTimer);
+      container.__dashboardAutoRefreshTimer = null;
+    }
+    if (container.__dashboardResizeHandler) {
+      window.removeEventListener("resize", container.__dashboardResizeHandler);
+      container.__dashboardResizeHandler = null;
+    }
+    if (container.__dashboardPageHideHandler) {
+      window.removeEventListener("pagehide", container.__dashboardPageHideHandler);
+      container.__dashboardPageHideHandler = null;
+    }
+    if (container.__dashboardRequestsResizeObserver) {
+      container.__dashboardRequestsResizeObserver.disconnect();
+      container.__dashboardRequestsResizeObserver = null;
+    }
+    if (requestsChartRenderRAF) {
+      window.cancelAnimationFrame(requestsChartRenderRAF);
+      requestsChartRenderRAF = 0;
+    }
+  };
 }
 
