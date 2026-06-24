@@ -490,6 +490,57 @@ func TestDashboardService_UsesCachedEventsOnTransientStoreFailure(t *testing.T) 
 	}
 }
 
+func TestDashboardService_BackgroundRefreshWarmsSnapshot(t *testing.T) {
+	now := time.Now().UTC()
+	service := NewDashboardService(
+		&fakeDashboardEventReader{
+			items: []events.Event{
+				{
+					ID:         "evt-1",
+					Type:       events.TypeSecurityWAF,
+					SiteID:     "site-a",
+					OccurredAt: now.Format(time.RFC3339),
+					Details: map[string]any{
+						"blocked":   true,
+						"status":    403,
+						"client_ip": "203.0.113.10",
+						"path":      "/checkout",
+					},
+				},
+			},
+		},
+		&fakeDashboardRequestCollector{
+			items: []map[string]any{
+				{
+					"ingested_at": now.Format(time.RFC3339),
+					"entry": map[string]any{
+						"timestamp": now.Format(time.RFC3339),
+						"site":      "site-a",
+						"uri":       "/checkout",
+						"status":    200,
+						"client_ip": "203.0.113.10",
+					},
+				},
+			},
+		},
+		&fakeDashboardRuntimeProbe{},
+	)
+	service.startBackgroundRefresh(5 * time.Millisecond)
+	defer service.stopBackgroundRefresh()
+
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for time.Now().Before(deadline) {
+		if cached, ok := service.snapshot(); ok {
+			if cached.RequestsDay != 1 || cached.AttacksDay != 1 {
+				t.Fatalf("unexpected warmed snapshot: %#v", cached)
+			}
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("expected background refresh to warm a dashboard snapshot")
+}
+
 func TestDashboardService_SkipsAdminAppTrafficOnPublicHost(t *testing.T) {
 	now := time.Now().UTC()
 	service := NewDashboardService(

@@ -21,6 +21,7 @@ type DashboardService struct {
 	events       dashboardEventReader
 	requests     RuntimeRequestCollector
 	runtimeReady dashboardEventProber
+	sampler      dashboardSnapshotSampler
 	requestsCache struct {
 		mu   sync.Mutex
 		rows []map[string]any
@@ -177,94 +178,22 @@ func NewDashboardService(events dashboardEventReader, requests RuntimeRequestCol
 		events:       events,
 		requests:     requests,
 		runtimeReady: runtimeReady,
+		sampler: dashboardSnapshotSampler{
+			interval: 15 * time.Second,
+		},
 	}
 }
 
 func (s *DashboardService) Stats() (DashboardStats, error) {
-	now := time.Now().UTC()
-	cutoff := now.Add(-24 * time.Hour)
-
-	out := DashboardStats{
-		GeneratedAt:            now.Format(time.RFC3339Nano),
-		ObservationWindowHours: 24,
+	if cached, ok := s.snapshot(); ok {
+		return cached, nil
 	}
-
-	out.Services = s.collectServiceStatus(now)
-	for _, item := range out.Services {
-		if item.Up {
-			out.ServicesUp++
-		} else {
-			out.ServicesDown++
-		}
+	stats, err := s.buildSnapshot()
+	if err != nil {
+		return DashboardStats{}, err
 	}
-
-	var (
-		requestRows []map[string]any
-		eventItems  []events.Event
-		requestErr  error
-		eventErr    error
-	)
-	var fetchWG sync.WaitGroup
-	fetchWG.Add(2)
-	go func() {
-		defer fetchWG.Done()
-		requestRows, requestErr = s.collectRequests()
-	}()
-	go func() {
-		defer fetchWG.Done()
-		eventItems, eventErr = s.collectEvents()
-	}()
-	fetchWG.Wait()
-	if requestErr != nil {
-		return DashboardStats{}, requestErr
-	}
-	if eventErr != nil {
-		return DashboardStats{}, eventErr
-	}
-	requestsDay, requestsSeries, blockedFromRequestsSeries, blockedFromRequestsDay, popularErrors := summarizeRequests(requestRows, cutoff, now)
-	out.RequestsDay = requestsDay
-	out.RequestsSeries = requestsSeries
-	out.BlockedSeries = blockedFromRequestsSeries
-	out.PopularErrors = popularErrors
-
-	attacksDay, blockedAttacksDay, uniqueIPsDay, topIPs, topCountries, topURLs, blockedFromEventsSeries, eventErrors := summarizeAttackEvents(eventItems, cutoff, now)
-	out.AttacksDay = attacksDay
-	out.BlockedAttacksDay = blockedAttacksDay
-	out.UniqueAttackerIPsDay = uniqueIPsDay
-	out.TopAttackerIPs = topIPs
-	out.TopAttackerCountries = topCountries
-	out.MostAttackedURLs = topURLs
-	requestAttackFallback := summarizeRequestAttacks(requestRows, cutoff)
-	if out.AttacksDay <= 0 && requestAttackFallback.AttacksDay > 0 {
-		out.AttacksDay = requestAttackFallback.AttacksDay
-	}
-	if out.BlockedAttacksDay <= 0 && requestAttackFallback.BlockedAttacksDay > 0 {
-		out.BlockedAttacksDay = requestAttackFallback.BlockedAttacksDay
-	}
-	if out.UniqueAttackerIPsDay <= 0 && requestAttackFallback.UniqueIPsDay > 0 {
-		out.UniqueAttackerIPsDay = requestAttackFallback.UniqueIPsDay
-	}
-	if len(out.TopAttackerIPs) == 0 {
-		out.TopAttackerIPs = requestAttackFallback.TopIPs
-	}
-	if len(out.TopAttackerCountries) == 0 {
-		out.TopAttackerCountries = requestAttackFallback.TopCountries
-	}
-	if len(out.MostAttackedURLs) == 0 {
-		out.MostAttackedURLs = requestAttackFallback.TopURLs
-	}
-	out.BlockedSeries = blockedFromEventsSeries
-	if len(out.BlockedSeries) == 0 {
-		out.BlockedSeries = blockedFromRequestsSeries
-	} else if out.BlockedAttacksDay <= 0 {
-		out.BlockedSeries = mergeSeriesMax(out.BlockedSeries, blockedFromRequestsSeries)
-	}
-	if out.BlockedAttacksDay <= 0 && blockedFromRequestsDay > 0 {
-		out.BlockedAttacksDay = blockedFromRequestsDay
-	}
-	out.PopularErrors = mergeKeyCountsSum(out.PopularErrors, eventErrors, 7)
-	out.System = collectSystemStats()
-	return out, nil
+	s.storeSnapshot(stats)
+	return stats, nil
 }
 
 func (s *DashboardService) Probe(kind string, query url.Values) error {

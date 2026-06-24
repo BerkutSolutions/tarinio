@@ -463,6 +463,7 @@ func New(cfg config.Config) (*App, error) {
 	runtimeRequestCollector := services.NewHTTPRuntimeRequestCollector(cfg.RuntimeHealthURL, cfg.RuntimeAPIToken)
 	runtimeReadyProbe := services.NewHTTPRuntimeReadyProbe(cfg.RuntimeHealthURL, cfg.RuntimeAPIToken)
 	dashboardService := services.NewDashboardService(eventService, runtimeRequestCollector, runtimeReadyProbe)
+	dashboardService.StartBackgroundRefresh()
 	runtimeCRSService := services.NewRuntimeCRSService(services.RuntimeBaseURLFromHealthURL(cfg.RuntimeHealthURL), cfg.RuntimeAPIToken)
 	containerRuntimeService := services.NewContainerRuntimeService()
 	adminScriptService := services.NewAdminScriptService(cfg.RevisionStoreDir, detectScriptsRoot())
