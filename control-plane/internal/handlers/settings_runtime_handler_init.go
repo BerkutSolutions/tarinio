@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -57,6 +58,7 @@ func NewSettingsRuntimeHandlerWithBackend(settingsRoot string, runtimeHealthURL 
 	savePersistedRuntimeSettingsLocked()
 	if runtimeRequestIndexes != nil {
 		runtimeRequestIndexes.url = deriveRuntimeIndexesURL(runtimeHealthURL)
+		runtimeRequestIndexes.token = strings.TrimSpace(os.Getenv("WAF_RUNTIME_API_TOKEN"))
 	}
 	return &SettingsRuntimeHandler{}
 }

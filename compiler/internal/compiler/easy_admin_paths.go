@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	"os"
 	"regexp"
 	"strings"
 )
@@ -81,11 +82,13 @@ func easyAdminBypassPathPattern() string {
 }
 
 func isManagementSiteID(siteID string) bool {
-	switch strings.ToLower(strings.TrimSpace(siteID)) {
+	normalized := strings.ToLower(strings.TrimSpace(siteID))
+	switch normalized {
 	case "control-plane-access", "control-plane", "ui", "localhost":
 		return true
 	default:
-		return false
+		configuredID := strings.ToLower(strings.TrimSpace(os.Getenv("CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID")))
+		return configuredID != "" && normalized == configuredID
 	}
 }
 

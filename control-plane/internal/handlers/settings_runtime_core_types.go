@@ -15,6 +15,7 @@ type SettingsRuntimeHandler struct{}
 type runtimeIndexFetcher struct {
 	url    string
 	client *http.Client
+	token  string
 }
 
 type storageIndexItem struct {

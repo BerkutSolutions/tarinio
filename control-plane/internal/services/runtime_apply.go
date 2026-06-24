@@ -449,7 +449,7 @@ func applyAntiDDoSRateOverrides(siteInputs []pipeline.SiteInput, items []pipelin
 		if !site.Enabled {
 			continue
 		}
-		if strings.EqualFold(strings.TrimSpace(site.ID), "control-plane-access") {
+		if isManagementSiteID(strings.TrimSpace(site.ID)) {
 			// Never enforce global anti-ddos L7 override on the management UI site.
 			continue
 		}

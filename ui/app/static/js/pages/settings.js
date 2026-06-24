@@ -12,6 +12,10 @@ import {
   renderLoggingStatusText as renderLoggingStatusTextExternal,
   renderStorageIndexes as renderStorageIndexesExternal
 } from "./settings.storage-logging.js";
+import {
+  bindSecretFieldToggles,
+  syncLoggingEndpointDefaults
+} from "./settings.logging-form.js";
 import { clearRuntimeAutoCheckTimer, setRuntimeAutoCheckTimer } from "./settings.runtime-timer.js";
 import { renderRuntimeData } from "./settings.runtime-render.js";
 import { bindSettingsActions } from "./settings.actions.js";
@@ -237,11 +241,17 @@ export async function renderSettings(container, ctx) {
                   </div>
                   <div class="waf-field">
                     <label for="settings-logging-opensearch-password">${escapeHtml(ctx.t("settings.logging.opensearch.password"))}</label>
-                    <input id="settings-logging-opensearch-password" type="password" placeholder="${escapeHtml(ctx.t("settings.logging.passwordPlaceholder"))}">
+                    <div class="waf-inline">
+                      <input id="settings-logging-opensearch-password" type="password" placeholder="${escapeHtml(ctx.t("settings.logging.passwordPlaceholder"))}">
+                      <button id="settings-logging-opensearch-password-toggle" class="btn ghost btn-sm" type="button">${escapeHtml(ctx.t("common.show"))}</button>
+                    </div>
                   </div>
                   <div class="waf-field">
                     <label for="settings-logging-opensearch-apikey">${escapeHtml(ctx.t("settings.logging.opensearch.apiKey"))}</label>
-                    <input id="settings-logging-opensearch-apikey" type="password" placeholder="${escapeHtml(ctx.t("settings.logging.passwordPlaceholder"))}">
+                    <div class="waf-inline">
+                      <input id="settings-logging-opensearch-apikey" type="password" placeholder="${escapeHtml(ctx.t("settings.logging.passwordPlaceholder"))}">
+                      <button id="settings-logging-opensearch-apikey-toggle" class="btn ghost btn-sm" type="button">${escapeHtml(ctx.t("common.show"))}</button>
+                    </div>
                   </div>
                 </div>
               </section>
@@ -278,7 +288,10 @@ export async function renderSettings(container, ctx) {
                   </div>
                   <div class="waf-field">
                     <label for="settings-logging-password">${escapeHtml(ctx.t("settings.logging.password"))}</label>
-                    <input id="settings-logging-password" type="password" placeholder="${escapeHtml(ctx.t("settings.logging.passwordPlaceholder"))}">
+                    <div class="waf-inline">
+                      <input id="settings-logging-password" type="password" placeholder="${escapeHtml(ctx.t("settings.logging.passwordPlaceholder"))}">
+                      <button id="settings-logging-password-toggle" class="btn ghost btn-sm" type="button">${escapeHtml(ctx.t("common.show"))}</button>
+                    </div>
                   </div>
                 </div>
                 <label class="waf-checkbox" for="settings-logging-migration-enabled">
@@ -351,7 +364,10 @@ export async function renderSettings(container, ctx) {
                 </div>
                 <div class="waf-field">
                   <label for="settings-logging-vault-token">${escapeHtml(ctx.t("settings.logging.vault.token"))}</label>
-                  <input id="settings-logging-vault-token" type="password" placeholder="${escapeHtml(ctx.t("settings.logging.passwordPlaceholder"))}">
+                  <div class="waf-inline">
+                    <input id="settings-logging-vault-token" type="password" placeholder="${escapeHtml(ctx.t("settings.logging.passwordPlaceholder"))}">
+                    <button id="settings-logging-vault-token-toggle" class="btn ghost btn-sm" type="button">${escapeHtml(ctx.t("common.show"))}</button>
+                  </div>
                 </div>
               </div>
               <label class="waf-checkbox" for="settings-logging-vault-enabled">
@@ -458,6 +474,7 @@ export async function renderSettings(container, ctx) {
   if (languageSelect) {
     languageSelect.value = String(ctx.getLanguage?.() || "en");
   }
+  let loggingContainersOverview = null;
 
   const setAlert = (message, success = false) => {
     const text = String(message || "").trim();
@@ -745,7 +762,45 @@ export async function renderSettings(container, ctx) {
       setStorageIndexesOffset: (value) => { storageIndexesOffset = value; },
       settingsStorageRenderIndexes: renderStorageIndexes
     });
+    if (loggingContainersOverview === null) {
+      loggingContainersOverview = await ctx.api.get("/api/dashboard/containers/overview").catch(() => ({}));
+    }
+    syncLoggingEndpointDefaults({
+      overview: loggingContainersOverview,
+      loggingHotBackend,
+      loggingColdBackend,
+      loggingOpenSearchEndpoint,
+      loggingEndpoint,
+      loggingVaultAddress
+    });
   };
+
+  bindSecretFieldToggles(container, ctx, [
+    { inputId: "settings-logging-opensearch-password", buttonId: "settings-logging-opensearch-password-toggle" },
+    { inputId: "settings-logging-opensearch-apikey", buttonId: "settings-logging-opensearch-apikey-toggle" },
+    { inputId: "settings-logging-password", buttonId: "settings-logging-password-toggle" },
+    { inputId: "settings-logging-vault-token", buttonId: "settings-logging-vault-token-toggle" }
+  ]);
+  loggingHotBackend?.addEventListener("change", () => {
+    syncLoggingEndpointDefaults({
+      overview: loggingContainersOverview,
+      loggingHotBackend,
+      loggingColdBackend,
+      loggingOpenSearchEndpoint,
+      loggingEndpoint,
+      loggingVaultAddress
+    });
+  });
+  loggingColdBackend?.addEventListener("change", () => {
+    syncLoggingEndpointDefaults({
+      overview: loggingContainersOverview,
+      loggingHotBackend,
+      loggingColdBackend,
+      loggingOpenSearchEndpoint,
+      loggingEndpoint,
+      loggingVaultAddress
+    });
+  });
 
   bindSettingsActions({
     container,

@@ -97,13 +97,20 @@ function bindDashboardLifecycle(deps) {
   if (deps.container.__dashboardAutoRefreshTimer) {
     clearInterval(deps.container.__dashboardAutoRefreshTimer);
   }
+  let backgroundLoadInFlight = false;
   deps.container.__dashboardAutoRefreshTimer = window.setInterval(() => {
     if (!document.body.contains(deps.pageNode)) {
       clearInterval(deps.container.__dashboardAutoRefreshTimer);
       deps.container.__dashboardAutoRefreshTimer = null;
       return;
     }
-    deps.loadDashboardStats(true);
+    if (document.hidden || backgroundLoadInFlight) {
+      return;
+    }
+    backgroundLoadInFlight = true;
+    Promise.resolve(deps.loadDashboardStats(true)).finally(() => {
+      backgroundLoadInFlight = false;
+    });
   }, 5000);
 }
 

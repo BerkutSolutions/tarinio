@@ -94,6 +94,9 @@ func (f *runtimeIndexFetcher) Fetch(stream string, limit int, offset int) (map[s
 	if err != nil {
 		return nil, err
 	}
+	if strings.TrimSpace(f.token) != "" {
+		req.Header.Set("X-WAF-Runtime-Token", strings.TrimSpace(f.token))
+	}
 	client := f.client
 	if client == nil {
 		client = &http.Client{Timeout: 3 * time.Second}
@@ -139,6 +142,9 @@ func (f *runtimeIndexFetcher) Delete(stream string, date string) error {
 	req, err := http.NewRequest(http.MethodDelete, target.String(), nil)
 	if err != nil {
 		return err
+	}
+	if strings.TrimSpace(f.token) != "" {
+		req.Header.Set("X-WAF-Runtime-Token", strings.TrimSpace(f.token))
 	}
 	client := f.client
 	if client == nil {

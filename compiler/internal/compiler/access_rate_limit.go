@@ -203,8 +203,7 @@ func normalizeDefaultAction(value string) string {
 }
 
 func shouldDefaultDenySite(siteID string, policy AccessPolicyInput) bool {
-	normalizedSiteID := strings.ToLower(strings.TrimSpace(siteID))
-	if normalizedSiteID != "control-plane-access" && normalizedSiteID != "control-plane" && normalizedSiteID != "ui" {
+	if !isManagementSiteID(siteID) {
 		return false
 	}
 	if normalizeDefaultAction(policy.DefaultAction) == "deny" {
