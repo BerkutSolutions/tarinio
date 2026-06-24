@@ -369,6 +369,87 @@ func TestDashboardService_SkipsInternalManagementTraffic(t *testing.T) {
 	}
 }
 
+func TestDashboardService_SkipsChallengeRequestsWithQueryString(t *testing.T) {
+	now := time.Now().UTC()
+	service := NewDashboardService(
+		&fakeDashboardEventReader{},
+		&fakeDashboardRequestCollector{
+			items: []map[string]any{
+				{
+					"ingested_at": now.Format(time.RFC3339),
+					"entry": map[string]any{
+						"timestamp": now.Format(time.RFC3339),
+						"site":      "waf_hantico_ru",
+						"host":      "waf.hantico.ru",
+						"uri":       "/challenge?return_uri=/login&return_args=",
+						"status":    200,
+						"client_ip": "203.0.113.10",
+					},
+				},
+				{
+					"ingested_at": now.Format(time.RFC3339),
+					"entry": map[string]any{
+						"timestamp": now.Format(time.RFC3339),
+						"site":      "site-a",
+						"host":      "site-a.example.com",
+						"uri":       "/checkout",
+						"status":    200,
+						"client_ip": "198.51.100.7",
+					},
+				},
+			},
+		},
+		&fakeDashboardRuntimeProbe{},
+	)
+
+	stats, err := service.Stats()
+	if err != nil {
+		t.Fatalf("stats failed: %v", err)
+	}
+	if stats.RequestsDay != 1 {
+		t.Fatalf("expected challenge request with query string to be skipped, got %d", stats.RequestsDay)
+	}
+}
+
+func TestDashboardService_UsesCachedRequestsOnTransientCollectorFailure(t *testing.T) {
+	now := time.Now().UTC()
+	requests := &fakeDashboardRequestCollector{
+		items: []map[string]any{
+			{
+				"ingested_at": now.Format(time.RFC3339),
+				"entry": map[string]any{
+					"timestamp": now.Format(time.RFC3339),
+					"site":      "site-a",
+					"host":      "site-a.example.com",
+					"uri":       "/checkout",
+					"status":    200,
+					"client_ip": "198.51.100.7",
+				},
+			},
+		},
+	}
+	service := NewDashboardService(&fakeDashboardEventReader{}, requests, &fakeDashboardRuntimeProbe{})
+
+	first, err := service.Stats()
+	if err != nil {
+		t.Fatalf("first stats failed: %v", err)
+	}
+	if first.RequestsDay != 1 {
+		t.Fatalf("expected first requests_day=1, got %d", first.RequestsDay)
+	}
+
+	requests.err = errors.New("runtime requests unavailable")
+	requests.items = nil
+
+	second, err := service.Stats()
+	if err != nil {
+		t.Fatalf("second stats failed: %v", err)
+	}
+	if second.RequestsDay != 1 {
+		t.Fatalf("expected cached requests_day=1 on transient collector failure, got %d", second.RequestsDay)
+	}
+}
+
 func TestDashboardService_SkipsAdminAppTrafficOnPublicHost(t *testing.T) {
 	now := time.Now().UTC()
 	service := NewDashboardService(

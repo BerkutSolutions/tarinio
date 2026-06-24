@@ -21,6 +21,10 @@ type DashboardService struct {
 	events       dashboardEventReader
 	requests     RuntimeRequestCollector
 	runtimeReady dashboardEventProber
+	requestsCache struct {
+		mu   sync.Mutex
+		rows []map[string]any
+	}
 }
 
 type DashboardServiceStatus struct {
@@ -289,10 +293,18 @@ func (s *DashboardService) collectRequests() ([]map[string]any, error) {
 	}
 	items, err := s.requests.Collect()
 	if err != nil {
+		s.requestsCache.mu.Lock()
+		defer s.requestsCache.mu.Unlock()
+		if len(s.requestsCache.rows) > 0 {
+			return append([]map[string]any(nil), s.requestsCache.rows...), nil
+		}
 		// Dashboard must stay available even when runtime request telemetry
 		// is temporarily unavailable during startup or reload.
 		return []map[string]any{}, nil
 	}
+	s.requestsCache.mu.Lock()
+	s.requestsCache.rows = append([]map[string]any(nil), items...)
+	s.requestsCache.mu.Unlock()
 	return items, nil
 }
 

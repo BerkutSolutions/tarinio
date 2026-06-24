@@ -8,7 +8,7 @@ import (
 )
 
 func shouldSkipInternalRequest(uri string, siteID string, host string) bool {
-	path := strings.ToLower(strings.TrimSpace(uri))
+	path := normalizeTelemetryPath(uri)
 	site := strings.ToLower(strings.TrimSpace(siteID))
 	site = strings.ReplaceAll(site, "_", "-")
 	if site == "control-plane-access" || site == "control-plane" || site == "ui" {
@@ -27,8 +27,19 @@ func shouldSkipInternalRequest(uri string, siteID string, host string) bool {
 	return host == "" || host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "control-plane" || host == "ui" || site == ""
 }
 
+func normalizeTelemetryPath(uri string) string {
+	canonical := strings.ToLower(strings.TrimSpace(uri))
+	if canonical == "" {
+		return ""
+	}
+	if cut := strings.IndexAny(canonical, "?#"); cut >= 0 {
+		canonical = canonical[:cut]
+	}
+	return canonical
+}
+
 func isTarinioAdminAppPath(path string) bool {
-	canonical := strings.ToLower(strings.TrimSpace(path))
+	canonical := normalizeTelemetryPath(path)
 	if canonical == "" {
 		return false
 	}

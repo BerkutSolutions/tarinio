@@ -162,8 +162,6 @@ set $waf_antibot_exception_guard 0;
 if ($cookie_waf_session != "") { set $waf_antibot_exception_guard 1; }
 if ($cookie_waf_session_boot != "") { set $waf_antibot_exception_guard 1; }
 {{- if .UseAuthBasic }}
-if ($uri = "{{ .AuthGateLoginURI }}") { set $waf_antibot_exception_guard 1; }
-if ($uri = "{{ .AuthGateVerifyURI }}") { set $waf_antibot_exception_guard 1; }
 {{- end }}
 if (${{ .ExceptionVar }} = 1) { set $waf_antibot_exception_guard 1; }
 set $waf_antibot_effective_challenge "{{ .AntibotChallenge }}";

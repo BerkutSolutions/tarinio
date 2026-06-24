@@ -72,12 +72,12 @@ func (c *HTTPRuntimeRequestCollector) CollectWithOptions(query url.Values) ([]ma
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return []map[string]any{}, nil
+		return nil, fmt.Errorf("runtime requests endpoint returned %d", resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return []map[string]any{}, nil
+		return nil, err
 	}
 
 	var list []map[string]any
@@ -91,7 +91,7 @@ func (c *HTTPRuntimeRequestCollector) CollectWithOptions(query url.Values) ([]ma
 	if err := json.Unmarshal(body, &wrapped); err == nil {
 		return wrapped.Requests, nil
 	}
-	return []map[string]any{}, nil
+	return nil, fmt.Errorf("decode runtime requests payload")
 }
 
 func (c *HTTPRuntimeRequestCollector) Probe(query url.Values) error {

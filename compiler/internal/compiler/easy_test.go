@@ -83,6 +83,9 @@ func TestRenderEasyArtifacts_GeneratesSiteAndAuthBasicFiles(t *testing.T) {
 	if !strings.Contains(siteConf, `set $waf_antibot_guard "$waf_antibot_exception_guard:$waf_antibot_verified:$waf_antibot_safe_method";`) {
 		t.Fatalf("expected antibot guard to use antibot-specific exception variable, got: %s", siteConf)
 	}
+	if strings.Contains(siteConf, `if ($uri = "/auth") { set $waf_antibot_exception_guard 1; }`) || strings.Contains(siteConf, `if ($uri = "/auth/verify") { set $waf_antibot_exception_guard 1; }`) {
+		t.Fatalf("did not expect auth gate endpoints to bypass antibot before verification, got: %s", siteConf)
+	}
 	if strings.Contains(siteConf, `dashboard(?:/.*)?`) {
 		t.Fatalf("did not expect admin path bypass guard for non-management site, got: %s", siteConf)
 	}
