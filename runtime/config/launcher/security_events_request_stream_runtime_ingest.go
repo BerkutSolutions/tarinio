@@ -45,8 +45,14 @@ func (s *requestStreamSource) probe(query url.Values) error {
 	if err := s.ensureArchiveRootLocked(); err != nil {
 		return err
 	}
-	if err := s.ingestLatestLocked(options.RetentionDays); err != nil {
-		return err
+	if _, err := os.Stat(s.path); err != nil {
+		if os.IsNotExist(err) {
+			if err := s.ingestLatestLocked(options.RetentionDays); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
 	}
 	if strings.TrimSpace(s.lastIngestError) != "" {
 		return errors.New(strings.TrimSpace(s.lastIngestError))
@@ -59,20 +65,23 @@ func (s *requestStreamSource) startBackgroundIngest(interval time.Duration) {
 		interval = 3 * time.Second
 	}
 	ticker := time.NewTicker(interval)
+	runIngest := func() {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if err := s.ensureArchiveRootLocked(); err != nil {
+			s.lastIngestError = err.Error()
+			return
+		}
+		if err := s.ingestLatestLocked(s.defaultRetention); err != nil {
+			s.lastIngestError = err.Error()
+			return
+		}
+		s.lastIngestError = ""
+	}
 	go func() {
+		runIngest()
 		for range ticker.C {
-			s.mu.Lock()
-			if err := s.ensureArchiveRootLocked(); err != nil {
-				s.lastIngestError = err.Error()
-				s.mu.Unlock()
-				continue
-			}
-			if err := s.ingestLatestLocked(s.defaultRetention); err != nil {
-				s.lastIngestError = err.Error()
-			} else {
-				s.lastIngestError = ""
-			}
-			s.mu.Unlock()
+			runIngest()
 		}
 	}()
 }

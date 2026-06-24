@@ -26,9 +26,6 @@ func (s *requestStreamSource) indexes(query url.Values) (map[string]any, error) 
 	if err := s.ensureArchiveRootLocked(); err != nil {
 		return nil, err
 	}
-	if err := s.ingestLatestLocked(s.defaultRetention); err != nil {
-		s.lastIngestError = err.Error()
-	}
 
 	limit := 10
 	offset := 0

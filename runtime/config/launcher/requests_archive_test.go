@@ -194,3 +194,66 @@ func TestRequestArchiveSkipsInternalManagementTraffic(t *testing.T) {
 		t.Fatalf("unexpected request id: %s", got)
 	}
 }
+
+func TestRequestArchiveProbeDoesNotIngestSynchronously(t *testing.T) {
+	root := t.TempDir()
+	logPath := filepath.Join(root, "access.log")
+	archiveRoot := filepath.Join(root, "requests-archive")
+	source := newRequestStreamSource(logPath, 100, archiveRoot, 30)
+
+	stamp := time.Now().UTC().Format(time.RFC3339)
+	line := fmt.Sprintf(`{"timestamp":"%s","request_id":"req-probe","client_ip":"1.1.1.1","method":"GET","uri":"/probe","status":200,"site":"site-a","host":"a.example.com"}`, stamp)
+	if err := os.WriteFile(logPath, []byte(line+"\n"), 0o644); err != nil {
+		t.Fatalf("write log fixture: %v", err)
+	}
+
+	if err := source.probe(url.Values{}); err != nil {
+		t.Fatalf("probe failed: %v", err)
+	}
+	if source.lastProcessedOffset != 0 {
+		t.Fatalf("expected probe to avoid log ingest, offset=%d", source.lastProcessedOffset)
+	}
+
+	items, err := source.latest(url.Values{})
+	if err != nil {
+		t.Fatalf("latest failed after probe: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected one row after latest ingest, got %d", len(items))
+	}
+}
+
+func TestRequestArchiveIndexesDoNotIngestSynchronously(t *testing.T) {
+	root := t.TempDir()
+	logPath := filepath.Join(root, "access.log")
+	archiveRoot := filepath.Join(root, "requests-archive")
+	source := newRequestStreamSource(logPath, 100, archiveRoot, 30)
+
+	day := time.Now().UTC().Format("2006-01-02")
+	line := fmt.Sprintf(`{"timestamp":"%sT12:00:00Z","request_id":"req-index","client_ip":"1.1.1.1","method":"GET","uri":"/index","status":200,"site":"site-a","host":"a.example.com"}`, day)
+	if err := os.WriteFile(logPath, []byte(line+"\n"), 0o644); err != nil {
+		t.Fatalf("write log fixture: %v", err)
+	}
+
+	payload, err := source.indexes(url.Values{})
+	if err != nil {
+		t.Fatalf("indexes failed: %v", err)
+	}
+	if total := payload["total"]; total != 0 {
+		t.Fatalf("expected no synchronous index ingest, total=%v", total)
+	}
+	if source.lastProcessedOffset != 0 {
+		t.Fatalf("expected indexes to avoid log ingest, offset=%d", source.lastProcessedOffset)
+	}
+
+	if _, err := source.latest(url.Values{}); err != nil {
+		t.Fatalf("latest failed: %v", err)
+	}
+	payload, err = source.indexes(url.Values{})
+	if err != nil {
+		t.Fatalf("indexes after latest failed: %v", err)
+	}
+	if total := payload["total"]; total != 1 {
+		t.Fatalf("expected one index after ingest, total=%v", total)
+	}
+}
