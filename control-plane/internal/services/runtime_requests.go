@@ -10,6 +10,8 @@ import (
 	"time"
 )
 
+const runtimeRequestsHTTPTimeout = 8 * time.Second
+
 type RuntimeRequestCollector interface {
 	Collect() ([]map[string]any, error)
 }
@@ -28,7 +30,7 @@ func NewHTTPRuntimeRequestCollector(healthURL string, token string) *HTTPRuntime
 	return &HTTPRuntimeRequestCollector{
 		URL: deriveRuntimeRequestsURL(healthURL),
 		Client: &http.Client{
-			Timeout: 2 * time.Second,
+			Timeout: runtimeRequestsHTTPTimeout,
 		},
 		Token: strings.TrimSpace(token),
 	}
@@ -64,7 +66,7 @@ func (c *HTTPRuntimeRequestCollector) CollectWithOptions(query url.Values) ([]ma
 	setRuntimeAuthHeader(req, c.Token)
 	client := c.Client
 	if client == nil {
-		client = &http.Client{Timeout: 2 * time.Second}
+		client = &http.Client{Timeout: runtimeRequestsHTTPTimeout}
 	}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -120,7 +122,7 @@ func (c *HTTPRuntimeRequestCollector) Probe(query url.Values) error {
 	setRuntimeAuthHeader(req, c.Token)
 	client := c.Client
 	if client == nil {
-		client = &http.Client{Timeout: 2 * time.Second}
+		client = &http.Client{Timeout: runtimeRequestsHTTPTimeout}
 	}
 	resp, err := client.Do(req)
 	if err != nil {

@@ -63,7 +63,7 @@ func (h *RequestsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		items, err = h.collector.Collect()
 	}
 	if err != nil {
-		writeJSON(w, http.StatusOK, []map[string]any{})
+		writeJSON(w, http.StatusBadGateway, map[string]any{"error": err.Error()})
 		return
 	}
 	if !collectorPaginates {

@@ -138,6 +138,23 @@ func NewAdminScriptService(revisionStoreDir string, scriptsRoot string) *AdminSc
 				{Name: "EXPECTED_TCP_TIMESTAMPS", Label: "Expected tcp_timestamps", Type: "text", DefaultValue: "0", HelpText: "Expected value for net.ipv4.tcp_timestamps (0 or 1)."},
 			},
 		},
+		{
+			ID:             "collect-waf-index-health",
+			TitleKey:       "administration.scripts.collectIndexHealth.title",
+			Title:          "WAF Index Health Collector",
+			DescriptionKey: "administration.scripts.collectIndexHealth.description",
+			Description:    "Collect request index snapshots, backend storage health and request/archive probe diagnostics.",
+			FileName:       "collect-waf-index-health.sh",
+			Fields: []AdminScriptField{
+				{Name: "SINCE", Label: "Since", LabelKey: "administration.scripts.field.since", Type: "text", DefaultValue: "24h", Placeholder: "24h", HelpText: "Docker log range, for example 30m, 6h, 24h.", HelpTextKey: "administration.scripts.field.sinceHelp"},
+				{Name: "RUNTIME_CONTAINER", Label: "Runtime Container", LabelKey: "administration.scripts.field.runtimeContainer", Type: "text", DefaultValue: "tarinio-runtime", HelpText: "Docker container name for runtime logs.", HelpTextKey: "administration.scripts.field.runtimeContainerHelp"},
+				{Name: "CONTROL_PLANE_CONTAINER", Label: "Control-Plane Container", LabelKey: "administration.scripts.field.controlPlaneContainer", Type: "text", DefaultValue: "tarinio-control-plane", HelpText: "Docker container name for control-plane logs.", HelpTextKey: "administration.scripts.field.controlPlaneContainerHelp"},
+				{Name: "OPENSEARCH_CONTAINER", Label: "OpenSearch Container", LabelKey: "administration.scripts.field.opensearchContainer", Type: "text", DefaultValue: "tarinio-opensearch", HelpText: "Docker container name for OpenSearch diagnostics.", HelpTextKey: "administration.scripts.field.opensearchContainerHelp"},
+				{Name: "CLICKHOUSE_CONTAINER", Label: "ClickHouse Container", LabelKey: "administration.scripts.field.clickhouseContainer", Type: "text", DefaultValue: "tarinio-clickhouse", HelpText: "Docker container name for ClickHouse diagnostics.", HelpTextKey: "administration.scripts.field.clickhouseContainerHelp"},
+				{Name: "WAF_CLI_BIN", Label: "CLI Binary", LabelKey: "administration.scripts.field.cliBinary", Type: "text", DefaultValue: "waf-cli", HelpText: "Leave default for built-in control-plane CLI.", HelpTextKey: "administration.scripts.field.cliBinaryHelp"},
+				{Name: "DEPLOY_DIR", Label: "Deploy Directory", LabelKey: "administration.scripts.field.deployDir", Type: "text", DefaultValue: "/opt/tarinio/deploy/compose/default", HelpText: "Used only when the script falls back to docker compose.", HelpTextKey: "administration.scripts.field.deployDirHelp"},
+			},
+		},
 	}
 
 	catalog := make(map[string]AdminScriptDefinition, len(definitions))

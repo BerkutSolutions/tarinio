@@ -65,6 +65,33 @@ func TestAdminScriptCatalogIncludesHardeningCollector(t *testing.T) {
 	}
 }
 
+func TestAdminScriptCatalogIncludesIndexHealthCollector(t *testing.T) {
+	service := NewAdminScriptService(t.TempDir(), "")
+	catalog := service.Catalog()
+
+	var target AdminScriptDefinition
+	found := false
+	for _, item := range catalog.Scripts {
+		if item.ID == "collect-waf-index-health" {
+			target = item
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("collect-waf-index-health definition not found")
+	}
+	fieldNames := map[string]bool{}
+	for _, field := range target.Fields {
+		fieldNames[field.Name] = true
+	}
+	for _, required := range []string{"SINCE", "RUNTIME_CONTAINER", "CONTROL_PLANE_CONTAINER", "OPENSEARCH_CONTAINER", "CLICKHOUSE_CONTAINER"} {
+		if !fieldNames[required] {
+			t.Fatalf("expected %s field in index health collector", required)
+		}
+	}
+}
+
 func TestAdminScriptBuildEnvironmentCollectWAFEventsUsesNoAuthByDefault(t *testing.T) {
 	service := NewAdminScriptService(t.TempDir(), "")
 	definition := service.catalog["collect-waf-events"]
@@ -82,6 +109,26 @@ func TestAdminScriptBuildEnvironmentCollectWAFEventsUsesNoAuthByDefault(t *testi
 	}
 	if !strings.Contains(joined, "SINCE=24h") {
 		t.Fatalf("expected default SINCE value in env, got %q", joined)
+	}
+}
+
+func TestAdminScriptBuildEnvironmentAcceptsIndexHealthContainers(t *testing.T) {
+	service := NewAdminScriptService(t.TempDir(), "")
+	definition := service.catalog["collect-waf-index-health"]
+
+	env, err := service.buildEnvironment(definition, map[string]string{
+		"OPENSEARCH_CONTAINER": "tarinio-opensearch",
+		"CLICKHOUSE_CONTAINER": "tarinio-clickhouse",
+	}, t.TempDir())
+	if err != nil {
+		t.Fatalf("buildEnvironment failed: %v", err)
+	}
+
+	joined := strings.Join(env, "\n")
+	for _, expected := range []string{"SINCE=24h", "OPENSEARCH_CONTAINER=tarinio-opensearch", "CLICKHOUSE_CONTAINER=tarinio-clickhouse"} {
+		if !strings.Contains(joined, expected) {
+			t.Fatalf("expected %s in env, got %q", expected, joined)
+		}
 	}
 }
 

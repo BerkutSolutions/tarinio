@@ -34,6 +34,7 @@ import {
   DASHBOARD_CONTRACT_MARKERS_FRAME
 } from "./dashboard.contract-markers.js";
 const DASHBOARD_CONTRACT_MARKER_STATS = "/api/dashboard/stats";
+const DASHBOARD_DETAIL_MODEL_TTL_MS = 60000;
 /* dashboard contract markers:
  "/api/dashboard/containers/overview"
  "dashboard.widget.servicesUp" "dashboard.widget.servicesDown" "dashboard.widget.requestsDay" "dashboard.widget.attacksDay"
@@ -117,11 +118,13 @@ export async function renderDashboard(container, ctx) {
     latestContainersOverview: null,
     detailModel: null,
     detailModelGeneratedAt: "",
+    detailModelBuiltAt: 0,
     detailModelPromise: null
   };
   let layoutDirty = false;
   let requestsChartRenderRAF = 0;
   let containersOverviewFailCount = 0;
+  let containersOverviewInFlight = false;
   let containersOverviewNextRetryAt = 0;
   const widgetsScopeID = String(ctx?.currentUser?.username || ctx?.currentUser?.id || "").trim().toLowerCase();
   const visibleWidgetIDs = new Set(loadVisibleWidgetIDs(widgetsScopeID));
@@ -139,7 +142,8 @@ export async function renderDashboard(container, ctx) {
       return null;
     }
     const generatedAt = String(pageState.latestStats?.generated_at || "");
-    if (pageState.detailModel && pageState.detailModelGeneratedAt === generatedAt) {
+    const detailModelAge = Date.now() - pageState.detailModelBuiltAt;
+    if (pageState.detailModel && (pageState.detailModelGeneratedAt === generatedAt || detailModelAge < DASHBOARD_DETAIL_MODEL_TTL_MS)) {
       return pageState.detailModel;
     }
     if (pageState.detailModelPromise) {
@@ -149,11 +153,16 @@ export async function renderDashboard(container, ctx) {
       .then(([requestsRows, eventsRows]) => {
         pageState.detailModel = buildDetailModel(pageState.latestStats, requestsRows, eventsRows);
         pageState.detailModelGeneratedAt = generatedAt;
+        pageState.detailModelBuiltAt = Date.now();
         return pageState.detailModel;
       })
       .catch(() => {
+        if (pageState.detailModel) {
+          return pageState.detailModel;
+        }
         pageState.detailModel = buildDetailModel(pageState.latestStats, [], []);
         pageState.detailModelGeneratedAt = generatedAt;
+        pageState.detailModelBuiltAt = Date.now();
         return pageState.detailModel;
       })
       .finally(() => {
@@ -253,6 +262,14 @@ export async function renderDashboard(container, ctx) {
       },
       set value(next) {
         containersOverviewFailCount = next;
+      }
+    },
+    containersOverviewInFlightRef: {
+      get value() {
+        return containersOverviewInFlight;
+      },
+      set value(next) {
+        containersOverviewInFlight = next;
       }
     },
     containersOverviewNextRetryAtRef: {
