@@ -1,4 +1,5 @@
 import { renderUpdateStatus } from "./settings.shared.js";
+import { setSecretFieldValue } from "./settings.logging-form.js";
 
 export async function renderRuntimeData(params) {
   const {
@@ -128,7 +129,7 @@ export async function renderRuntimeData(params) {
         loggingUsername.value = String(clickhouse?.username || "");
       }
       if (loggingPassword) {
-        loggingPassword.value = String(clickhouse?.password || "");
+        setSecretFieldValue(loggingPassword, clickhouse?.password);
       }
       if (loggingOpenSearchEndpoint) {
         loggingOpenSearchEndpoint.value = String(opensearch?.endpoint || "");
@@ -140,10 +141,10 @@ export async function renderRuntimeData(params) {
         loggingOpenSearchUsername.value = String(opensearch?.username || "");
       }
       if (loggingOpenSearchPassword) {
-        loggingOpenSearchPassword.value = String(opensearch?.password || "");
+        setSecretFieldValue(loggingOpenSearchPassword, opensearch?.password);
       }
       if (loggingOpenSearchAPIKey) {
-        loggingOpenSearchAPIKey.value = String(opensearch?.api_key || "");
+        setSecretFieldValue(loggingOpenSearchAPIKey, opensearch?.api_key);
       }
       if (loggingMigrationEnabled) {
         loggingMigrationEnabled.checked = !!clickhouse?.migration_enabled;
@@ -185,7 +186,7 @@ export async function renderRuntimeData(params) {
         loggingVaultPathPrefix.value = String(vault?.path_prefix || "tarinio");
       }
       if (loggingVaultToken) {
-        loggingVaultToken.value = String(vault?.token || "");
+        setSecretFieldValue(loggingVaultToken, vault?.token);
       }
       if (loggingVaultTLSSkipVerify) {
         loggingVaultTLSSkipVerify.checked = !!vault?.tls_skip_verify;

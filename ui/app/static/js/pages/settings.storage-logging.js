@@ -1,5 +1,6 @@
 import { escapeHtml } from "../ui.js";
 import { formatDateTimeInZone } from "../preferences.js";
+import { readSecretFieldValue } from "./settings.logging-form.js";
 
 function formatIndexUpdatedAt(value) {
   return formatDateTimeInZone(value);
@@ -52,6 +53,7 @@ export function renderStorageIndexes({
         </div>
         <div class="waf-card-body waf-stack">
           <div class="waf-empty">${escapeHtml(ctx.t("settings.storage.indexes.total"))}: ${total}</div>
+          ${payload?.error ? `<div class="alert alert-danger">${escapeHtml(String(payload.error))}</div>` : ""}
           <div class="waf-table-wrap">
             <table class="waf-table">
               <thead>
@@ -234,22 +236,22 @@ export function buildLoggingPayload(nodes) {
         address: String(loggingVaultAddress?.value || "").trim(),
         mount: String(loggingVaultMount?.value || "secret").trim(),
         path_prefix: String(loggingVaultPathPrefix?.value || "tarinio").trim(),
-        token: String(loggingVaultToken?.value || "").trim(),
+        token: readSecretFieldValue(loggingVaultToken),
         tls_skip_verify: !!loggingVaultTLSSkipVerify?.checked,
       },
       opensearch: {
         endpoint: String(loggingOpenSearchEndpoint?.value || "").trim(),
         index_prefix: String(loggingOpenSearchPrefix?.value || "waf-hot").trim(),
         username: String(loggingOpenSearchUsername?.value || "").trim(),
-        password: String(loggingOpenSearchPassword?.value || "").trim(),
-        api_key: String(loggingOpenSearchAPIKey?.value || "").trim(),
+        password: readSecretFieldValue(loggingOpenSearchPassword),
+        api_key: readSecretFieldValue(loggingOpenSearchAPIKey),
       },
       clickhouse: {
         endpoint: String(loggingEndpoint?.value || "").trim(),
         database: String(loggingDatabase?.value || "waf_logs").trim(),
         table: String(loggingTable?.value || "request_logs").trim(),
         username: String(loggingUsername?.value || "").trim(),
-        password: String(loggingPassword?.value || "").trim(),
+        password: readSecretFieldValue(loggingPassword),
         migration_enabled: !!loggingMigrationEnabled?.checked,
       },
     },

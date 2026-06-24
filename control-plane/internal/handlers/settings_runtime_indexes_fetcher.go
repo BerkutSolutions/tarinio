@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,6 +11,8 @@ import (
 	"strings"
 	"time"
 )
+
+const runtimeIndexesAttemptTimeout = 1500 * time.Millisecond
 
 func runtimeIndexesFromQuery(values url.Values) map[string]any {
 	if strings.TrimSpace(values.Get("storage_indexes_limit")) == "" && strings.TrimSpace(values.Get("storage_indexes_offset")) == "" {
@@ -78,42 +81,60 @@ func (f *runtimeIndexFetcher) Fetch(stream string, limit int, offset int) (map[s
 			"offset": offset,
 		}, nil
 	}
-	target, err := url.Parse(f.url)
-	if err != nil {
-		return nil, err
-	}
-	q := target.Query()
-	q.Set("limit", strconv.Itoa(limit))
-	q.Set("offset", strconv.Itoa(offset))
-	if strings.TrimSpace(stream) != "" {
-		q.Set("stream", stream)
-	}
-	target.RawQuery = q.Encode()
+	var lastErr error
+	for _, candidate := range runtimeEndpointCandidates(f.url, "") {
+		target, err := url.Parse(candidate)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		q := target.Query()
+		q.Set("limit", strconv.Itoa(limit))
+		q.Set("offset", strconv.Itoa(offset))
+		if strings.TrimSpace(stream) != "" {
+			q.Set("stream", stream)
+		}
+		target.RawQuery = q.Encode()
 
-	req, err := http.NewRequest(http.MethodGet, target.String(), nil)
-	if err != nil {
-		return nil, err
+		reqCtx, cancel := context.WithTimeout(context.Background(), runtimeIndexesAttemptTimeout)
+		req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, target.String(), nil)
+		if err != nil {
+			cancel()
+			lastErr = err
+			continue
+		}
+		if strings.TrimSpace(f.token) != "" {
+			req.Header.Set("X-WAF-Runtime-Token", strings.TrimSpace(f.token))
+		}
+		client := f.client
+		if client == nil {
+			client = &http.Client{}
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			cancel()
+			lastErr = err
+			continue
+		}
+		var payload map[string]any
+		func() {
+			defer cancel()
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				lastErr = fmt.Errorf("runtime indexes endpoint returned %d", resp.StatusCode)
+				return
+			}
+			if err := json.NewDecoder(io.LimitReader(resp.Body, 2<<20)).Decode(&payload); err != nil {
+				lastErr = err
+				return
+			}
+			lastErr = nil
+		}()
+		if lastErr == nil {
+			return payload, nil
+		}
 	}
-	if strings.TrimSpace(f.token) != "" {
-		req.Header.Set("X-WAF-Runtime-Token", strings.TrimSpace(f.token))
-	}
-	client := f.client
-	if client == nil {
-		client = &http.Client{Timeout: 3 * time.Second}
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("runtime indexes endpoint returned %d", resp.StatusCode)
-	}
-	var payload map[string]any
-	if err := json.NewDecoder(io.LimitReader(resp.Body, 2<<20)).Decode(&payload); err != nil {
-		return nil, err
-	}
-	return payload, nil
+	return nil, lastErr
 }
 
 func (f *runtimeIndexFetcher) Delete(stream string, date string) error {
@@ -128,37 +149,54 @@ func (f *runtimeIndexFetcher) Delete(stream string, date string) error {
 		return fmt.Errorf("date must be in YYYY-MM-DD format")
 	}
 
-	target, err := url.Parse(f.url)
-	if err != nil {
-		return err
-	}
-	q := target.Query()
-	q.Set("date", day)
-	if strings.TrimSpace(stream) != "" {
-		q.Set("stream", stream)
-	}
-	target.RawQuery = q.Encode()
+	var lastErr error
+	for _, candidate := range runtimeEndpointCandidates(f.url, "") {
+		target, err := url.Parse(candidate)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		q := target.Query()
+		q.Set("date", day)
+		if strings.TrimSpace(stream) != "" {
+			q.Set("stream", stream)
+		}
+		target.RawQuery = q.Encode()
 
-	req, err := http.NewRequest(http.MethodDelete, target.String(), nil)
-	if err != nil {
-		return err
+		reqCtx, cancel := context.WithTimeout(context.Background(), runtimeIndexesAttemptTimeout)
+		req, err := http.NewRequestWithContext(reqCtx, http.MethodDelete, target.String(), nil)
+		if err != nil {
+			cancel()
+			lastErr = err
+			continue
+		}
+		if strings.TrimSpace(f.token) != "" {
+			req.Header.Set("X-WAF-Runtime-Token", strings.TrimSpace(f.token))
+		}
+		client := f.client
+		if client == nil {
+			client = &http.Client{}
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			cancel()
+			lastErr = err
+			continue
+		}
+		func() {
+			defer cancel()
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusNoContent {
+				lastErr = fmt.Errorf("runtime indexes delete endpoint returned %d", resp.StatusCode)
+				return
+			}
+			lastErr = nil
+		}()
+		if lastErr == nil {
+			return nil
+		}
 	}
-	if strings.TrimSpace(f.token) != "" {
-		req.Header.Set("X-WAF-Runtime-Token", strings.TrimSpace(f.token))
-	}
-	client := f.client
-	if client == nil {
-		client = &http.Client{Timeout: 3 * time.Second}
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusNoContent {
-		return fmt.Errorf("runtime indexes delete endpoint returned %d", resp.StatusCode)
-	}
-	return nil
+	return lastErr
 }
 
 func fetchStorageIndexes(stream string, limit int, offset int) (map[string]any, error) {

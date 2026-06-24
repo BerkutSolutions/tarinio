@@ -3,6 +3,7 @@ const AUTO_BACKEND_ENDPOINTS = {
   clickhouse: "http://clickhouse:8123",
   vault: "http://vault:8200",
 };
+const MASKED_SECRET_VALUE = "********";
 
 function normalizedAutoDefaults() {
   return new Set(Object.values(AUTO_BACKEND_ENDPOINTS).map((value) => String(value).trim().toLowerCase()));
@@ -62,6 +63,9 @@ export function bindSecretFieldToggles(container, ctx, items) {
     if (!input || !button) {
       return;
     }
+    if (!input.dataset.defaultPlaceholder) {
+      input.dataset.defaultPlaceholder = input.getAttribute("placeholder") || "";
+    }
     const sync = () => {
       const hidden = input.type === "password";
       button.textContent = ctx.t(hidden ? "common.show" : "common.hide");
@@ -73,4 +77,36 @@ export function bindSecretFieldToggles(container, ctx, items) {
       sync();
     });
   });
+}
+
+export function setSecretFieldValue(input, nextValue) {
+  if (!input) {
+    return;
+  }
+  if (!input.dataset.defaultPlaceholder) {
+    input.dataset.defaultPlaceholder = input.getAttribute("placeholder") || "";
+  }
+  const normalized = String(nextValue || "");
+  if (normalized === MASKED_SECRET_VALUE) {
+    input.dataset.secretStored = "true";
+    if (!String(input.value || "").trim()) {
+      input.value = "";
+    }
+    input.setAttribute("placeholder", MASKED_SECRET_VALUE);
+    return;
+  }
+  input.dataset.secretStored = normalized.trim() ? "true" : "false";
+  input.value = normalized;
+  input.setAttribute("placeholder", input.dataset.defaultPlaceholder || "");
+}
+
+export function readSecretFieldValue(input) {
+  if (!input) {
+    return "";
+  }
+  const typed = String(input.value || "").trim();
+  if (typed) {
+    return typed;
+  }
+  return input.dataset.secretStored === "true" ? MASKED_SECRET_VALUE : "";
 }
