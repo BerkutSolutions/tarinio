@@ -880,7 +880,7 @@
     "revisions.timeline.field.site":  "Service",
     "revisions.timeline.field.details":  "Details",
     "revisions.timeline.noDetails":  "Keine weiteren Details.",
-    "revisions.revision.sites":  "Snapshot-Dienste",
+    "revisions.revision.sites":  "Betroffene Dienste",
     "revisions.revision.lastApply":  "Letzte Bewerbung",
     "revisions.revision.lastEvent":  "Letztes Ereignis",
     "revisions.revision.noApply":  "Noch keine Bewerbung",

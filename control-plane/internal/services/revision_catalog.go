@@ -91,6 +91,7 @@ type RevisionCatalogItem struct {
 	SignatureKeyID    string                     `json:"signature_key_id,omitempty"`
 	Sites             []RevisionCatalogSite      `json:"sites"`
 	SiteCount         int                        `json:"site_count"`
+	ActiveSiteIDs     []string                   `json:"active_site_ids,omitempty"`
 	LastApplyJobID    string                     `json:"last_apply_job_id,omitempty"`
 	LastApplyStatus   string                     `json:"last_apply_status,omitempty"`
 	LastApplyResult   string                     `json:"last_apply_result,omitempty"`
@@ -247,6 +248,26 @@ func (s *RevisionCatalogService) List(_ context.Context) (RevisionCatalogRespons
 			Enabled:     item.Enabled,
 		})
 	}
+	revisionsAsc := append([]revisions.Revision(nil), revisionsDesc...)
+	sort.Slice(revisionsAsc, func(i, j int) bool {
+		if revisionsAsc[i].Version == revisionsAsc[j].Version {
+			return revisionsAsc[i].ID < revisionsAsc[j].ID
+		}
+		return revisionsAsc[i].Version < revisionsAsc[j].Version
+	})
+	snapshotsByRevision := make(map[string]revisionsnapshots.Snapshot, len(revisionsDesc))
+	for _, revision := range revisionsDesc {
+		snapshot, loadErr := s.snapshots.Load(revision.BundlePath)
+		if loadErr != nil {
+			continue
+		}
+		snapshotsByRevision[revision.ID] = snapshot
+	}
+	activeRevisionID := ""
+	if activeExists {
+		activeRevisionID = activeRevision.ID
+	}
+	siteScopes := buildRevisionSiteScopes(revisionsAsc, snapshotsByRevision, activeRevisionID, siteRefByID)
 
 	for _, revision := range revisionsDesc {
 		lastApplyJob, hasLastApplyJob := latestApplyJobByRevision[revision.ID]
@@ -273,12 +294,12 @@ func (s *RevisionCatalogService) List(_ context.Context) (RevisionCatalogRespons
 			Signature:         revision.Signature,
 			SignatureKeyID:    revision.SignatureKeyID,
 		}
-		snapshot, loadErr := s.snapshots.Load(revision.BundlePath)
-		if loadErr != nil {
-			card.SnapshotError = loadErr.Error()
-		} else {
-			card.Sites = mapRevisionSites(snapshot.Sites, siteRefByID)
+		scope := siteScopes[revision.ID]
+		_, hasSnapshot := snapshotsByRevision[revision.ID]
+		if hasSnapshot {
+			card.Sites = append([]RevisionCatalogSite(nil), scope.ChangedSites...)
 			card.SiteCount = len(card.Sites)
+			card.ActiveSiteIDs = append([]string(nil), scope.ActiveSiteIDs...)
 			for _, site := range card.Sites {
 				index, ok := serviceIndexByID[site.SiteID]
 				if !ok {
@@ -291,20 +312,45 @@ func (s *RevisionCatalogService) List(_ context.Context) (RevisionCatalogRespons
 					serviceIndexByID[site.SiteID] = index
 				}
 				serviceCards[index].RevisionCount++
-				switch derivedStatus {
-				case revisions.StatusActive:
+				switch {
+				case containsSiteID(card.ActiveSiteIDs, site.SiteID):
 					serviceCards[index].ActiveRevisionCount++
-				case revisions.StatusPending:
-					serviceCards[index].PendingRevisionCount++
-				case revisions.StatusFailed:
+				case derivedStatus == revisions.StatusFailed:
 					serviceCards[index].FailedRevisionCount++
+				case derivedStatus == revisions.StatusPending || derivedStatus == revisions.StatusPendingApproval:
+					serviceCards[index].PendingRevisionCount++
 				}
 				if serviceCards[index].LastRevisionID == "" || serviceCards[index].LastRevisionCreated <= revision.CreatedAt {
 					serviceCards[index].LastRevisionID = revision.ID
 					serviceCards[index].LastRevisionCreated = revision.CreatedAt
-					serviceCards[index].LastRevisionStatus = string(derivedStatus)
+					if containsSiteID(card.ActiveSiteIDs, site.SiteID) {
+						serviceCards[index].LastRevisionStatus = string(revisions.StatusActive)
+					} else {
+						serviceCards[index].LastRevisionStatus = string(derivedStatus)
+					}
 				}
 			}
+		}
+		if !hasSnapshot {
+			card.SnapshotError = fmt.Sprintf("snapshot %s not found", revision.BundlePath)
+			if hasLastApplyJob {
+				card.LastApplyJobID = lastApplyJob.ID
+				card.LastApplyStatus = string(lastApplyJob.Status)
+				card.LastApplyResult = lastApplyJob.Result
+				card.LastApplyAt = coalesceJobTime(lastApplyJob)
+			} else {
+				card.LastApplyJobID = revision.LastApplyJobID
+				card.LastApplyStatus = revision.LastApplyStatus
+				card.LastApplyResult = revision.LastApplyResult
+				card.LastApplyAt = revision.LastApplyAt
+			}
+			if latestEvent, ok := latestEventByRevision[revision.ID]; ok {
+				card.LastEventType = string(latestEvent.Type)
+				card.LastEventTime = latestEvent.OccurredAt
+				card.LastEventSummary = latestEvent.Summary
+			}
+			revisionCards = append(revisionCards, card)
+			continue
 		}
 		if hasLastApplyJob {
 			card.LastApplyJobID = lastApplyJob.ID
@@ -392,28 +438,6 @@ func (s *RevisionCatalogService) ClearTimeline(_ context.Context) error {
 	return s.revisions.ResetStatuses()
 }
 
-func mapRevisionSites(snapshotSites []sites.Site, siteRefByID map[string]RevisionCatalogSite) []RevisionCatalogSite {
-	items := make([]RevisionCatalogSite, 0, len(snapshotSites))
-	seen := make(map[string]struct{}, len(snapshotSites))
-	for _, item := range snapshotSites {
-		if _, ok := seen[item.ID]; ok {
-			continue
-		}
-		seen[item.ID] = struct{}{}
-		if ref, ok := siteRefByID[item.ID]; ok {
-			items = append(items, ref)
-			continue
-		}
-		items = append(items, RevisionCatalogSite{
-			SiteID:      item.ID,
-			PrimaryHost: item.PrimaryHost,
-			Enabled:     item.Enabled,
-		})
-	}
-	sort.Slice(items, func(i, j int) bool { return items[i].SiteID < items[j].SiteID })
-	return items
-}
-
 func coalesceJobTime(item jobs.Job) string {
 	if strings.TrimSpace(item.FinishedAt) != "" {
 		return item.FinishedAt
@@ -442,6 +466,15 @@ func cloneDetails(input map[string]any) map[string]any {
 		out[key] = value
 	}
 	return out
+}
+
+func containsSiteID(items []string, siteID string) bool {
+	for _, item := range items {
+		if item == siteID {
+			return true
+		}
+	}
+	return false
 }
 
 func deriveRevisionStatus(revision revisions.Revision, hasLastApplyJob bool, lastApplyJob jobs.Job) revisions.Status {

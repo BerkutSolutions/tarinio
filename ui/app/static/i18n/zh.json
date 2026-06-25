@@ -880,7 +880,7 @@
     "revisions.timeline.field.site":  "服务",
     "revisions.timeline.field.details":  "详情",
     "revisions.timeline.noDetails":  "没有更多详细信息。",
-    "revisions.revision.sites":  "快照服务",
+    "revisions.revision.sites":  "受影响的服务",
     "revisions.revision.lastApply":  "最后申请",
     "revisions.revision.lastEvent":  "最后一次活动",
     "revisions.revision.noApply":  "尚未申请",

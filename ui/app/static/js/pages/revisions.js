@@ -20,6 +20,12 @@ function normalizeSites(value) {
   }));
 }
 
+function normalizeSiteIDs(value) {
+  return normalizeList(value)
+    .map((item) => String(item || "").trim())
+    .filter(Boolean);
+}
+
 function translateKey(ctx, key) {
   const value = ctx.t(key);
   return value === key ? "" : value;
@@ -88,8 +94,8 @@ function lastStatusBadge(service) {
   return statusBadge(lastStatus || "unknown");
 }
 
-function revisionVisualStatus(item) {
-  if (item?.is_active) {
+function revisionVisualStatus(item, selectedSiteID = "") {
+  if (normalizeSiteIDs(item?.active_site_ids).includes(String(selectedSiteID || ""))) {
     return "active";
   }
   if (String(item?.approval_status || "").trim().toLowerCase() === "pending") {
@@ -379,12 +385,12 @@ export async function renderRevisions(container, ctx) {
         <div class="revisions-modal-list">
           ${filtered.map((item) => {
             const sites = normalizeSites(item?.sites);
-            const isActive = Boolean(item?.is_active);
-            const isExpanded = isActive || state.expandedRevisionIDs.has(String(item?.id || ""));
+            const isServiceActive = normalizeSiteIDs(item?.active_site_ids).includes(state.selectedSiteID);
+            const isExpanded = isServiceActive || state.expandedRevisionIDs.has(String(item?.id || ""));
             const approvalPending = String(item?.approval_status || "").trim().toLowerCase() === "pending";
-            const applyDisabled = state.pendingRevisionID === item.id || Boolean(item?.is_active) || approvalPending;
+            const applyDisabled = state.pendingRevisionID === item.id || isServiceActive || approvalPending;
             const deleteDisabled = state.pendingRevisionID === item.id || Boolean(item?.is_active);
-            const visualStatus = revisionVisualStatus(item);
+            const visualStatus = revisionVisualStatus(item, state.selectedSiteID);
             return `
               <article class="revisions-modal-item ${isExpanded ? "is-expanded" : ""}">
                 <div class="revisions-modal-item-head">
@@ -396,12 +402,12 @@ export async function renderRevisions(container, ctx) {
                     ${statusBadge(visualStatus)}
                     ${approvalPending ? `<button type="button" class="btn btn-sm" data-revision-approve="${escapeHtml(String(item?.id || ""))}">${escapeHtml(ctx.t("revisions.action.approve"))}</button>` : ""}
                     <button type="button" class="btn btn-sm" data-revision-apply="${escapeHtml(String(item?.id || ""))}" ${applyDisabled ? "disabled" : ""}>
-                      ${escapeHtml(state.pendingRevisionID === item.id ? ctx.t("revisions.action.applying") : item?.is_active ? ctx.t("revisions.revision.applyBlocked") : ctx.t("revisions.action.apply"))}
+                      ${escapeHtml(state.pendingRevisionID === item.id ? ctx.t("revisions.action.applying") : isServiceActive ? ctx.t("revisions.revision.applyBlocked") : ctx.t("revisions.action.apply"))}
                     </button>
                     <button type="button" class="btn ghost btn-sm" data-revision-delete="${escapeHtml(String(item?.id || ""))}" ${deleteDisabled ? "disabled" : ""}>
                       ${escapeHtml(state.pendingRevisionID === item.id ? ctx.t("revisions.action.deleting") : ctx.t("revisions.action.delete"))}
                     </button>
-                    ${isActive ? "" : `
+                    ${isServiceActive ? "" : `
                       <button type="button" class="revisions-accordion-indicator" data-revision-toggle="${escapeHtml(String(item?.id || ""))}" aria-label="${escapeHtml(ctx.t("revisions.action.toggleDetails"))}">
                         ${isExpanded ? "-" : "+"}
                       </button>

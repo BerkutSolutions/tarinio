@@ -880,7 +880,7 @@
   "revisions.timeline.field.site": "Service",
   "revisions.timeline.field.details": "Details",
   "revisions.timeline.noDetails": "No additional details.",
-  "revisions.revision.sites": "Snapshot services",
+  "revisions.revision.sites": "Affected services",
   "revisions.revision.lastApply": "Last apply",
   "revisions.revision.lastEvent": "Last event",
   "revisions.revision.noApply": "No apply yet",

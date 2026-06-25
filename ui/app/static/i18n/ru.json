@@ -875,7 +875,7 @@
   "revisions.timeline.field.site": "Сервис",
   "revisions.timeline.field.details": "Подробности",
   "revisions.timeline.noDetails": "Дополнительных подробностей нет.",
-  "revisions.revision.sites": "Сервисы в snapshot",
+  "revisions.revision.sites": "Затронутые сервисы",
   "revisions.revision.lastApply": "Последнее применение",
   "revisions.revision.lastApplyAt": "Время последнего применения",
   "revisions.revision.lastEvent": "Последнее событие",

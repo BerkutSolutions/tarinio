@@ -197,14 +197,32 @@ func TestRevisionCatalogService_ListBuildsServiceTilesAndTimeline(t *testing.T) 
 	if len(payload.Services) != 2 || payload.Services[0].SiteID != "site-a" {
 		t.Fatalf("unexpected services: %+v", payload.Services)
 	}
-	if payload.Services[0].RevisionCount != 2 {
-		t.Fatalf("expected site-a to aggregate both revisions, got %+v", payload.Services[0])
+	if payload.Services[0].RevisionCount != 1 || payload.Services[0].LastRevisionID != "rev-000001" {
+		t.Fatalf("expected site-a to keep only its own config revision, got %+v", payload.Services[0])
+	}
+	if payload.Services[0].ActiveRevisionCount != 1 {
+		t.Fatalf("expected site-a active service revision to point at its last changed config, got %+v", payload.Services[0])
 	}
 	if payload.Services[0].PendingRevisionCount != 0 {
 		t.Fatalf("expected old succeeded revision not to stay pending, got %+v", payload.Services[0])
 	}
+	if payload.Services[1].RevisionCount != 1 || payload.Services[1].LastRevisionID != "rev-000002" {
+		t.Fatalf("expected site-b to inherit only the revision where it changed, got %+v", payload.Services[1])
+	}
 	if len(payload.Revisions) != 2 || payload.Revisions[0].ID != "rev-000002" {
 		t.Fatalf("expected descending revisions list, got %+v", payload.Revisions)
+	}
+	if len(payload.Revisions[0].Sites) != 1 || payload.Revisions[0].Sites[0].SiteID != "site-b" {
+		t.Fatalf("expected latest revision to scope changed services to site-b, got %+v", payload.Revisions[0].Sites)
+	}
+	if !containsSiteID(payload.Revisions[0].ActiveSiteIDs, "site-b") || containsSiteID(payload.Revisions[0].ActiveSiteIDs, "site-a") {
+		t.Fatalf("expected latest revision active service scope to include only site-b, got %+v", payload.Revisions[0].ActiveSiteIDs)
+	}
+	if len(payload.Revisions[1].Sites) != 1 || payload.Revisions[1].Sites[0].SiteID != "site-a" {
+		t.Fatalf("expected first revision to keep site-a change scope, got %+v", payload.Revisions[1].Sites)
+	}
+	if !containsSiteID(payload.Revisions[1].ActiveSiteIDs, "site-a") {
+		t.Fatalf("expected site-a to stay tied to the revision that introduced its active config, got %+v", payload.Revisions[1].ActiveSiteIDs)
 	}
 	if payload.Revisions[1].Status != string(revisions.StatusInactive) {
 		t.Fatalf("expected old succeeded revision to become inactive, got %+v", payload.Revisions[1])
