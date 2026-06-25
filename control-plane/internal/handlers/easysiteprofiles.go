@@ -13,6 +13,7 @@ type easySiteProfileService interface {
 	List() ([]easysiteprofiles.EasySiteProfile, error)
 	Get(siteID string) (easysiteprofiles.EasySiteProfile, error)
 	Upsert(ctx context.Context, profile easysiteprofiles.EasySiteProfile) (easysiteprofiles.EasySiteProfile, error)
+	Delete(ctx context.Context, siteID string) error
 }
 
 type EasySiteProfilesHandler struct {
@@ -33,6 +34,8 @@ func (h *EasySiteProfilesHandler) ServeHTTP(w http.ResponseWriter, r *http.Reque
 		h.upsert(w, r)
 	case strings.HasPrefix(r.URL.Path, "/api/easy-site-profiles/") && r.Method == http.MethodPost:
 		h.upsert(w, r)
+	case strings.HasPrefix(r.URL.Path, "/api/easy-site-profiles/") && r.Method == http.MethodDelete:
+		h.delete(w, r)
 	default:
 		w.WriteHeader(http.StatusNotFound)
 	}
@@ -87,4 +90,21 @@ func (h *EasySiteProfilesHandler) upsert(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	writeJSON(w, http.StatusOK, updated)
+}
+
+func (h *EasySiteProfilesHandler) delete(w http.ResponseWriter, r *http.Request) {
+	siteID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/api/easy-site-profiles/"), "/")
+	if siteID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "site id is required"})
+		return
+	}
+	if err := h.profiles.Delete(withActorIP(r), siteID); err != nil {
+		status := http.StatusBadRequest
+		if strings.Contains(err.Error(), "not found") {
+			status = http.StatusNotFound
+		}
+		writeJSON(w, status, map[string]any{"error": err.Error()})
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

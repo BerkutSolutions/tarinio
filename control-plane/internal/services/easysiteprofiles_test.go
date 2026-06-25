@@ -40,6 +40,11 @@ func (f *fakeEasySiteProfileStore) Update(profile easysiteprofiles.EasySiteProfi
 	return profile, nil
 }
 
+func (f *fakeEasySiteProfileStore) Delete(siteID string) error {
+	delete(f.items, siteID)
+	return nil
+}
+
 type fakeEasyWAFStore struct {
 	items []wafpolicies.WAFPolicy
 }
@@ -195,6 +200,36 @@ func TestEasySiteProfileService_UpsertRejectsMissingSite(t *testing.T) {
 	_, err := service.Upsert(context.Background(), easysiteprofiles.DefaultProfile("site-a"))
 	if err == nil {
 		t.Fatal("expected missing site error")
+	}
+}
+
+func TestEasySiteProfileService_DeleteRemovesProfileAndTriggersCompileApply(t *testing.T) {
+	store := &fakeEasySiteProfileStore{
+		items: map[string]easysiteprofiles.EasySiteProfile{
+			"site-a": easysiteprofiles.DefaultProfile("site-a"),
+		},
+	}
+	compile := &fakeEasyCompileService{}
+	apply := &fakeEasyApplyService{}
+	service := NewEasySiteProfileService(
+		store,
+		&fakeSiteReader{items: []sites.Site{{ID: "site-a", PrimaryHost: "www.example.com"}}},
+		&fakeEasyWAFStore{},
+		&fakeEasyAccessStore{},
+		&fakeEasyRateStore{},
+		compile,
+		apply,
+		nil,
+	)
+
+	if err := service.Delete(context.Background(), "site-a"); err != nil {
+		t.Fatalf("delete failed: %v", err)
+	}
+	if _, ok := store.items["site-a"]; ok {
+		t.Fatal("expected profile to be deleted from store")
+	}
+	if compile.calls != 1 || apply.calls != 1 {
+		t.Fatalf("expected compile/apply to run once, got compile=%d apply=%d", compile.calls, apply.calls)
 	}
 }
 

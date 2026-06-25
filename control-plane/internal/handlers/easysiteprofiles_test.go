@@ -11,8 +11,9 @@ import (
 )
 
 type fakeEasySiteProfileService struct {
-	item easysiteprofiles.EasySiteProfile
-	err  error
+	item          easysiteprofiles.EasySiteProfile
+	err           error
+	deletedSiteID string
 }
 
 func (f *fakeEasySiteProfileService) List() ([]easysiteprofiles.EasySiteProfile, error) {
@@ -53,6 +54,14 @@ func (f *fakeEasySiteProfileService) Upsert(ctx context.Context, profile easysit
 	return profile, nil
 }
 
+func (f *fakeEasySiteProfileService) Delete(ctx context.Context, siteID string) error {
+	if f.err != nil {
+		return f.err
+	}
+	f.deletedSiteID = siteID
+	return nil
+}
+
 func TestEasySiteProfilesHandler_Get(t *testing.T) {
 	handler := NewEasySiteProfilesHandler(&fakeEasySiteProfileService{})
 	req := httptest.NewRequest(http.MethodGet, "/api/easy-site-profiles/site-a", nil)
@@ -82,5 +91,19 @@ func TestEasySiteProfilesHandler_Post(t *testing.T) {
 	handler.ServeHTTP(resp, req)
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+}
+
+func TestEasySiteProfilesHandler_Delete(t *testing.T) {
+	service := &fakeEasySiteProfileService{}
+	handler := NewEasySiteProfilesHandler(service)
+	req := httptest.NewRequest(http.MethodDelete, "/api/easy-site-profiles/site-a", nil)
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, req)
+	if resp.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d", resp.Code)
+	}
+	if service.deletedSiteID != "site-a" {
+		t.Fatalf("expected deleted site id to be recorded, got %q", service.deletedSiteID)
 	}
 }

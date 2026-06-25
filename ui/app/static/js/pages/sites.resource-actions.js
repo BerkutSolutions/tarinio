@@ -243,12 +243,6 @@ export async function deleteServiceWithResources(siteID, ctx, snapshot = null, d
       return !includesByID(latest, policyID);
     });
   }
-  if (hasSite) {
-    await deleteIgnoreSafe(`/api/sites/${encodeURIComponent(normalizedSiteID)}`, async () => {
-      const latest = await ctx.api.get("/api/sites").catch(() => []);
-      return !includesByID(latest, normalizedSiteID);
-    });
-  }
   for (const upstream of upstreamsForSite) {
     const upstreamID = String(upstream?.id || "").trim();
     if (!upstreamID) {
@@ -257,6 +251,12 @@ export async function deleteServiceWithResources(siteID, ctx, snapshot = null, d
     await deleteIgnoreSafe(`/api/upstreams/${encodeURIComponent(upstreamID)}`, async () => {
       const latest = await ctx.api.get("/api/upstreams").catch(() => []);
       return !includesByID(latest, upstreamID);
+    });
+  }
+  if (hasSite) {
+    await deleteIgnoreSafe(`/api/sites/${encodeURIComponent(normalizedSiteID)}`, async () => {
+      const latest = await ctx.api.get("/api/sites").catch(() => []);
+      return !includesByID(latest, normalizedSiteID);
     });
   }
 }

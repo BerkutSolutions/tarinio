@@ -227,9 +227,10 @@ func New(
 		http.MethodGet: rbac.PermissionSitesRead,
 	}, handlers.NewEasySiteProfilesHandler(easySiteProfileService)))
 	mux.Handle("/api/easy-site-profiles/", withMethodPermissions(authService, map[string]rbac.Permission{
-		http.MethodGet:  rbac.PermissionSitesRead,
-		http.MethodPut:  rbac.PermissionSitesWrite,
-		http.MethodPost: rbac.PermissionSitesWrite,
+		http.MethodGet:    rbac.PermissionSitesRead,
+		http.MethodPut:    rbac.PermissionSitesWrite,
+		http.MethodPost:   rbac.PermissionSitesWrite,
+		http.MethodDelete: rbac.PermissionSitesWrite,
 	}, handlers.NewEasySiteProfilesHandler(easySiteProfileService)))
 	mux.Handle("/api/easy-site-profiles/catalog/countries", withMethodPermissions(authService, map[string]rbac.Permission{
 		http.MethodGet: rbac.PermissionSitesRead,

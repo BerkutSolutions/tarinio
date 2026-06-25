@@ -20,6 +20,7 @@ type EasySiteProfileStore interface {
 	List() ([]easysiteprofiles.EasySiteProfile, error)
 	Create(profile easysiteprofiles.EasySiteProfile) (easysiteprofiles.EasySiteProfile, error)
 	Update(profile easysiteprofiles.EasySiteProfile) (easysiteprofiles.EasySiteProfile, error)
+	Delete(siteID string) error
 }
 
 type EasySiteProfileService struct {
@@ -157,6 +158,28 @@ func (s *EasySiteProfileService) Upsert(ctx context.Context, profile easysitepro
 		return easysiteprofiles.EasySiteProfile{}, err
 	}
 	return maskEasySiteProfileSecrets(updated), nil
+}
+
+func (s *EasySiteProfileService) Delete(ctx context.Context, siteID string) (err error) {
+	defer func() {
+		recordAudit(ctx, s.audits, audits.AuditEvent{
+			Action:       "easysiteprofile.delete",
+			ResourceType: "easysiteprofile",
+			ResourceID:   siteID,
+			SiteID:       siteID,
+			Status:       auditStatus(err),
+			Summary:      "easy site profile delete",
+		})
+	}()
+
+	normalizedSiteID := normalizeSiteID(siteID)
+	if normalizedSiteID == "" {
+		return fmt.Errorf("site %s not found", normalizedSiteID)
+	}
+	if err := s.store.Delete(normalizedSiteID); err != nil {
+		return err
+	}
+	return s.compileAndApply(ctx)
 }
 
 func (s *EasySiteProfileService) compileAndApply(ctx context.Context) error {
