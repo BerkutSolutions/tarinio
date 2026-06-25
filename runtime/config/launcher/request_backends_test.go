@@ -396,6 +396,51 @@ func TestRequestStreamKeepsLegacyArchiveWhenOpenSearchValidationFails(t *testing
 	}
 }
 
+func TestRequestOpenSearchIndexesIncludeEstimatedSizeBytes(t *testing.T) {
+	pepper := "pepper-for-tests"
+	dayA := "2026-06-25"
+	dayB := "2026-06-24"
+	records := []requestLogRecord{
+		{EventHash: "a1", Stream: "runtime", IngestedAt: dayA + "T10:00:00Z", Timestamp: dayA + "T10:00:00Z", RequestID: "req-a1", ClientIP: "203.0.113.10", Method: "GET", URI: "/a1", Status: 200, Site: "waf", Host: "example.com"},
+		{EventHash: "a2", Stream: "runtime", IngestedAt: dayA + "T11:00:00Z", Timestamp: dayA + "T11:00:00Z", RequestID: "req-a2", ClientIP: "203.0.113.11", Method: "GET", URI: "/a2", Status: 200, Site: "waf", Host: "example.com"},
+		{EventHash: "b1", Stream: "runtime", IngestedAt: dayB + "T12:00:00Z", Timestamp: dayB + "T12:00:00Z", RequestID: "req-b1", ClientIP: "203.0.113.12", Method: "GET", URI: "/b1", Status: 200, Site: "waf", Host: "example.com"},
+	}
+	opensearch := newFakeOpenSearch(records)
+	opensearchServer := httptest.NewServer(opensearch)
+	defer opensearchServer.Close()
+
+	root := t.TempDir()
+	settingsPath := filepath.Join(root, "runtime_settings.json")
+	writeRuntimeSettingsFixture(t, settingsPath, pepper, loggingconfig.Settings{
+		Backend: loggingconfig.BackendOpenSearch,
+		Hot:     loggingconfig.HotSettings{Backend: loggingconfig.BackendOpenSearch},
+		Cold:    loggingconfig.ColdSettings{Backend: loggingconfig.BackendOpenSearch},
+		Retention: loggingconfig.RetentionSettings{
+			HotDays:  loggingconfig.DefaultHotDays,
+			ColdDays: loggingconfig.DefaultColdDays,
+		},
+		OpenSearch: loggingconfig.OpenSearchSettings{
+			Endpoint:      opensearchServer.URL,
+			RequestsIndex: "waf-requests",
+		},
+	})
+
+	store := newRequestOpenSearchStore(settingsPath, pepper)
+	payload, err := store.indexes(requestQueryOptions{Limit: 10, Offset: 0}, filepath.Join(root, "archive"))
+	if err != nil {
+		t.Fatalf("indexes failed: %v", err)
+	}
+	items := parseIndexItems(payload)
+	if len(items) != 2 {
+		t.Fatalf("expected 2 day buckets, got %d", len(items))
+	}
+	for _, item := range items {
+		if got := parseIntValue(item["size_bytes"]); got <= 0 {
+			t.Fatalf("expected positive size_bytes for item %+v", item)
+		}
+	}
+}
+
 func writeRuntimeSettingsFixture(t *testing.T, path string, _ string, logging loggingconfig.Settings) {
 	t.Helper()
 	logging = loggingconfig.Normalize(logging)
@@ -532,10 +577,19 @@ func (f *fakeClickHouse) groupedDaysJSON() []string {
 func (f *fakeClickHouse) recordsJSON(query string) []string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	rangeStart, rangeEnd, hasRange := extractQuotedTimeRange(query)
 	day := extractSingleQuotedValue(query)
 	out := make([]requestLogRecord, 0, len(f.records))
 	for _, record := range f.records {
-		if day != "" && !strings.HasPrefix(record.Timestamp, day) {
+		if hasRange {
+			stamp, err := time.Parse(time.RFC3339Nano, record.Timestamp)
+			if err != nil {
+				stamp, err = time.Parse(time.RFC3339, record.Timestamp)
+			}
+			if err != nil || stamp.Before(rangeStart) || !stamp.Before(rangeEnd) {
+				continue
+			}
+		} else if day != "" && !strings.HasPrefix(record.Timestamp, day) {
 			continue
 		}
 		out = append(out, record)
@@ -550,8 +604,8 @@ func (f *fakeClickHouse) recordsJSON(query string) []string {
 }
 
 type fakeOpenSearch struct {
-	mu      sync.Mutex
-	records []requestLogRecord
+	mu       sync.Mutex
+	records  []requestLogRecord
 	dropBulk bool
 }
 
@@ -573,6 +627,8 @@ func (f *fakeOpenSearch) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.Method == http.MethodPut:
 		w.WriteHeader(http.StatusOK)
+	case strings.HasSuffix(r.URL.Path, "/_stats/store"):
+		f.handleStats(w, r)
 	case strings.HasSuffix(r.URL.Path, "/_search"):
 		f.handleSearch(w, r)
 	case strings.HasSuffix(r.URL.Path, "/_delete_by_query"):
@@ -685,6 +741,28 @@ func (f *fakeOpenSearch) handleSearch(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (f *fakeOpenSearch) handleStats(w http.ResponseWriter, r *http.Request) {
+	indexName := strings.Trim(strings.TrimSuffix(r.URL.Path, "/_stats/store"), "/")
+	sizeBytes := int64(0)
+	f.mu.Lock()
+	for _, record := range f.records {
+		line, _ := json.Marshal(record)
+		sizeBytes += int64(len(line) + 1)
+	}
+	f.mu.Unlock()
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"indices": map[string]any{
+			indexName: map[string]any{
+				"total": map[string]any{
+					"store": map[string]any{
+						"size_in_bytes": sizeBytes,
+					},
+				},
+			},
+		},
+	})
+}
+
 func rangeDayFromBody(body map[string]any) string {
 	query, _ := body["query"].(map[string]any)
 	if query == nil {
@@ -723,6 +801,29 @@ func extractSingleQuotedValue(query string) string {
 		return matches[1]
 	}
 	return ""
+}
+
+func extractQuotedTimeRange(query string) (time.Time, time.Time, bool) {
+	re := regexp.MustCompile(`parseDateTime64BestEffort\('([^']+)'`)
+	matches := re.FindAllStringSubmatch(query, -1)
+	if len(matches) < 2 {
+		return time.Time{}, time.Time{}, false
+	}
+	start, err := time.Parse(time.RFC3339Nano, matches[0][1])
+	if err != nil {
+		start, err = time.Parse(time.RFC3339, matches[0][1])
+	}
+	if err != nil {
+		return time.Time{}, time.Time{}, false
+	}
+	end, err := time.Parse(time.RFC3339Nano, matches[1][1])
+	if err != nil {
+		end, err = time.Parse(time.RFC3339, matches[1][1])
+	}
+	if err != nil {
+		return time.Time{}, time.Time{}, false
+	}
+	return start.UTC(), end.UTC(), true
 }
 
 func strconvString(value int) string { return strconv.Itoa(value) }

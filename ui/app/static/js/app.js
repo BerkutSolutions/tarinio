@@ -618,10 +618,17 @@ async function loadMeta() {
   }
 }
 
-function startSessionPing() {
+function stopSessionPing() {
   if (sessionPingTimer) {
     window.clearInterval(sessionPingTimer);
     sessionPingTimer = null;
+  }
+}
+
+function startSessionPing() {
+  stopSessionPing();
+  if (document.hidden) {
+    return;
   }
   const run = async () => {
     try {
@@ -631,15 +638,38 @@ function startSessionPing() {
       const message = String(error?.message || "").toLowerCase();
       const networkLike = message.includes("network") || message.includes("failed to fetch") || message.includes("unavailable");
       if (status === 401 || networkLike) {
-        if (sessionPingTimer) {
-          window.clearInterval(sessionPingTimer);
-          sessionPingTimer = null;
-        }
+        stopSessionPing();
       }
     }
   };
   sessionPingTimer = window.setInterval(run, 45000);
   run().catch(() => {});
+}
+
+function pauseBackgroundActivity() {
+  stopSessionPing();
+  notificationCenter?.stop?.();
+}
+
+function resumeBackgroundActivity() {
+  if (document.hidden) {
+    return;
+  }
+  notificationCenter?.start?.();
+  startSessionPing();
+}
+
+function bindVisibilityLifecycle() {
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      pauseBackgroundActivity();
+      return;
+    }
+    resumeBackgroundActivity();
+  });
+  window.addEventListener("beforeunload", () => {
+    pauseBackgroundActivity();
+  });
 }
 
 async function bootstrap() {
@@ -673,8 +703,8 @@ async function bootstrap() {
 
   notificationCenter = createNotificationCenter({ api, t });
   bindNotificationsUI();
-  notificationCenter.start();
-  startSessionPing();
+  bindVisibilityLifecycle();
+  resumeBackgroundActivity();
 
   await loadMeta();
   await renderPage();

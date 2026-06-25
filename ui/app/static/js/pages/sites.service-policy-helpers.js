@@ -39,6 +39,11 @@ export function normalizeAPIPositiveEndpointPolicies(value, deps = {}) {
   return out;
 }
 
+function hasCustomLimitReqURL(value) {
+  const normalized = String(value || "").trim();
+  return normalized.startsWith("/") && normalized !== "/" && normalized !== "/api/";
+}
+
 export function applyServiceProfilePresetToDraft(draft, profile) {
   const next = { ...draft, service_profile: normalizeServiceProfile(profile) };
   if (next.service_profile === "strict") {
@@ -49,7 +54,9 @@ export function applyServiceProfilePresetToDraft(draft, profile) {
     next.bad_behavior_count_time_seconds = 60;
     next.bad_behavior_ban_time_seconds = 900;
     next.use_limit_req = true;
-    next.limit_req_url = "/";
+    if (!hasCustomLimitReqURL(next.limit_req_url)) {
+      next.limit_req_url = "/";
+    }
     next.limit_req_rate = "80r/s";
     next.use_limit_conn = true;
     next.limit_conn_max_http1 = 120;
@@ -71,7 +78,9 @@ export function applyServiceProfilePresetToDraft(draft, profile) {
     next.use_cors = true;
     next.cors_allowed_origins = ["*"];
     next.use_limit_req = true;
-    next.limit_req_url = "/api/";
+    if (!hasCustomLimitReqURL(next.limit_req_url)) {
+      next.limit_req_url = "/api/";
+    }
     next.limit_req_rate = "200r/s";
     next.antibot_challenge = "no";
     next.api_positive_security_enabled = true;
@@ -87,7 +96,9 @@ export function applyServiceProfilePresetToDraft(draft, profile) {
     next.use_blacklist = true;
     next.use_dnsbl = true;
     next.use_limit_req = true;
-    next.limit_req_url = "/";
+    if (!hasCustomLimitReqURL(next.limit_req_url)) {
+      next.limit_req_url = "/";
+    }
     next.limit_req_rate = "100r/s";
     next.antibot_challenge = "javascript";
   } else {

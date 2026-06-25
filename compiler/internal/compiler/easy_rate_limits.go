@@ -23,6 +23,7 @@ type easyRateLimitHTTPData struct {
 type easyLocationRuleData struct {
 	LocationModifier            string
 	LocationPath                string
+	IsAdminAPIPath              bool
 	DisableProxyInterceptErrors bool
 	ZoneName                    string
 	Burst                       int
@@ -151,7 +152,13 @@ func RenderEasyRateLimitArtifacts(sites []SiteInput, upstreams []UpstreamInput, 
 		}
 		for index, rule := range rules {
 			canonicalPath := customLimitCanonicalPath(rule.Path)
+			isAdminAPIPath := isManagementSiteID(site.ID) && strings.HasPrefix(canonicalPath, "/api/")
+			proxyPassTarget := "http://" + upstreamBlockName(site.ID, upstream.ID)
+			if isAdminAPIPath {
+				proxyPassTarget = "http://control-plane:8080"
+			}
 			locationData.Rules = append(locationData.Rules, easyLocationRuleData{
+				IsAdminAPIPath:              isAdminAPIPath,
 				LocationModifier:            customLimitLocationModifier(rule.Path),
 				LocationPath:                customLimitLocationPath(rule.Path),
 				DisableProxyInterceptErrors: strings.HasPrefix(canonicalPath, "/api/"),
@@ -159,7 +166,7 @@ func RenderEasyRateLimitArtifacts(sites []SiteInput, upstreams []UpstreamInput, 
 				Burst:                       customLimitBurst(rule.Rate),
 				StatusCode:                  statusCode,
 				PassHostHeader:              upstream.PassHostHeader,
-				ProxyPassTarget:             "http://" + upstreamBlockName(site.ID, upstream.ID),
+				ProxyPassTarget:             proxyPassTarget,
 			})
 		}
 		locationContent, err := renderTemplate(filepath.Join(templatesRoot(), "easy", "locations.conf.tmpl"), locationData)

@@ -179,8 +179,12 @@ func (s *requestClickHouseStore) latest(options requestQueryOptions) ([]map[stri
 	if !options.Since.IsZero() {
 		query.WriteString(fmt.Sprintf(" AND timestamp >= parseDateTime64BestEffort('%s', 9, 'UTC')", escapeSQLString(options.Since.UTC().Format(time.RFC3339Nano))))
 	}
-	if strings.TrimSpace(options.Day) != "" {
-		query.WriteString(fmt.Sprintf(" AND toDate(timestamp) = toDate('%s')", escapeSQLString(options.Day)))
+	if start, end, ok := requestDayRangeUTC(options); ok {
+		query.WriteString(fmt.Sprintf(
+			" AND timestamp >= parseDateTime64BestEffort('%s', 9, 'UTC') AND timestamp < parseDateTime64BestEffort('%s', 9, 'UTC')",
+			escapeSQLString(start.Format(time.RFC3339Nano)),
+			escapeSQLString(end.Format(time.RFC3339Nano)),
+		))
 	}
 	query.WriteString(" ORDER BY timestamp DESC")
 	query.WriteString(fmt.Sprintf(" LIMIT %d OFFSET %d FORMAT JSONEachRow", limit, maxInt(options.Offset, 0)))

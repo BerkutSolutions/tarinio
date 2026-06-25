@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"sync"
 	"time"
 
 	"waf/control-plane/internal/events"
@@ -17,6 +18,10 @@ type eventProbeService interface {
 
 type EventsHandler struct {
 	events eventService
+	cache  struct {
+		mu    sync.Mutex
+		items []events.Event
+	}
 }
 
 func NewEventsHandler(events eventService) *EventsHandler {
@@ -41,6 +46,12 @@ func (h *EventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	items, err := h.events.List()
 	if err != nil {
+		if cached, ok := h.cachedEvents(); ok {
+			writeJSON(w, http.StatusOK, map[string]any{
+				"events": cached,
+			})
+			return
+		}
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
 		return
 	}
@@ -60,7 +71,23 @@ func (h *EventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		items = filtered
 	}
+	h.storeEvents(items)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"events": items,
 	})
+}
+
+func (h *EventsHandler) cachedEvents() ([]events.Event, bool) {
+	h.cache.mu.Lock()
+	defer h.cache.mu.Unlock()
+	if len(h.cache.items) == 0 {
+		return nil, false
+	}
+	return append([]events.Event(nil), h.cache.items...), true
+}
+
+func (h *EventsHandler) storeEvents(items []events.Event) {
+	h.cache.mu.Lock()
+	h.cache.items = append([]events.Event(nil), items...)
+	h.cache.mu.Unlock()
 }

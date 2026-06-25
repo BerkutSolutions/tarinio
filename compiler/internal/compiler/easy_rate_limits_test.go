@@ -35,6 +35,8 @@ func TestRenderEasyRateLimitArtifacts_GeneratesRouteSpecificArtifacts(t *testing
 			CustomLimitRules: []CustomRateLimitRuleInput{
 				{Path: "/login", Rate: "6r/s"},
 				{Path: "/api/auth/", Rate: "12r/s"},
+				{Path: "/api/requests", Rate: "80r/s"},
+				{Path: "/api/events", Rate: "80r/s"},
 			},
 		}},
 	)
@@ -48,10 +50,16 @@ func TestRenderEasyRateLimitArtifacts_GeneratesRouteSpecificArtifacts(t *testing
 	}
 
 	httpConf := byPath["nginx/conf.d/easy-ratelimits.conf"]
-	if !strings.Contains(httpConf, "limit_req_zone $waf_rate_limit_key_control_plane_access zone=easy_control_plane_access_req_v2_0:10m rate=6r/s;") {
+	if !strings.Contains(httpConf, "limit_req_zone $waf_rate_limit_key_control_plane_access zone=easy_control_plane_access_req_v2_0:10m rate=80r/s;") {
+		t.Fatalf("expected exact requests zone in easy rate limit http conf, got: %s", httpConf)
+	}
+	if !strings.Contains(httpConf, "limit_req_zone $waf_rate_limit_key_control_plane_access zone=easy_control_plane_access_req_v2_1:10m rate=80r/s;") {
+		t.Fatalf("expected exact events zone in easy rate limit http conf, got: %s", httpConf)
+	}
+	if !strings.Contains(httpConf, "limit_req_zone $waf_rate_limit_key_control_plane_access zone=easy_control_plane_access_req_v2_2:10m rate=6r/s;") {
 		t.Fatalf("expected exact login zone in easy rate limit http conf, got: %s", httpConf)
 	}
-	if !strings.Contains(httpConf, "limit_req_zone $waf_rate_limit_key_control_plane_access zone=easy_control_plane_access_req_v2_1:10m rate=12r/s;") {
+	if !strings.Contains(httpConf, "limit_req_zone $waf_rate_limit_key_control_plane_access zone=easy_control_plane_access_req_v2_3:10m rate=12r/s;") {
 		t.Fatalf("expected prefix api auth zone in easy rate limit http conf, got: %s", httpConf)
 	}
 
@@ -77,17 +85,29 @@ func TestRenderEasyRateLimitArtifacts_GeneratesRouteSpecificArtifacts(t *testing
 	if !strings.Contains(locationsConf, "location ^~ /api/auth/ {") {
 		t.Fatalf("expected prefix location for /api/auth/, got: %s", locationsConf)
 	}
-	if !strings.Contains(locationsConf, "limit_req zone=easy_control_plane_access_req_v2_0 burst=6 nodelay;") {
+	if !strings.Contains(locationsConf, "location = /api/requests {") {
+		t.Fatalf("expected exact location for /api/requests, got: %s", locationsConf)
+	}
+	if !strings.Contains(locationsConf, "location = /api/events {") {
+		t.Fatalf("expected exact location for /api/events, got: %s", locationsConf)
+	}
+	if !strings.Contains(locationsConf, "limit_req zone=easy_control_plane_access_req_v2_2 burst=6 nodelay;") {
 		t.Fatalf("expected exact route limit_req directive, got: %s", locationsConf)
 	}
 	if !strings.Contains(locationsConf, "limit_req_status 429;") {
 		t.Fatalf("expected custom route limit_req_status directive, got: %s", locationsConf)
 	}
-	if !strings.Contains(locationsConf, "limit_req zone=easy_control_plane_access_req_v2_1 burst=12 nodelay;") {
+	if !strings.Contains(locationsConf, "limit_req zone=easy_control_plane_access_req_v2_3 burst=12 nodelay;") {
 		t.Fatalf("expected prefix route limit_req directive, got: %s", locationsConf)
 	}
 	if !strings.Contains(locationsConf, "proxy_set_header Host $http_host;") {
 		t.Fatalf("expected host header pass-through for route-specific proxying, got: %s", locationsConf)
+	}
+	if !strings.Contains(locationsConf, "proxy_pass http://control-plane:8080;") {
+		t.Fatalf("expected management api easy locations to proxy to control-plane, got: %s", locationsConf)
+	}
+	if strings.Contains(locationsConf, "location = /api/requests {\n    proxy_intercept_errors off;\n    modsecurity on;\n    modsecurity_rules_file /etc/waf/modsecurity/sites/control-plane-access.conf;\n    include /etc/waf/nginx/easy/control-plane-access.conf;\n    limit_req zone=easy_control_plane_access_req_v2_0 burst=80 nodelay;\n    limit_req_status 429;\n    proxy_set_header Host $http_host;\n    proxy_pass http://site_control-plane-access_upstream_control-plane-access-upstream;") {
+		t.Fatalf("did not expect /api/requests easy location to proxy to the UI upstream, got: %s", locationsConf)
 	}
 }
 

@@ -74,8 +74,9 @@ type Passkey2FABeginResult struct {
 }
 
 type AuthSecurityConfig struct {
-	Pepper   string
-	WebAuthn WebAuthnConfig
+	Pepper     string
+	SessionTTL time.Duration
+	WebAuthn   WebAuthnConfig
 }
 
 type WebAuthnConfig struct {

@@ -80,10 +80,16 @@ map $waf_city_header $waf_city_name {
 }
 
 map $host $waf_site_id {
+{{- range .HostMapEntries }}
+    {{ .Host }} "{{ .SiteID }}";
+{{- end }}
     default "_global";
 }
 
 map $host $waf_site_id_log {
+{{- range .HostMapEntries }}
+    {{ .Host }} "{{ .SiteID }}";
+{{- end }}
     default "_global";
 }
 

@@ -24,17 +24,24 @@ func (s *requestStreamSource) latest(query url.Values) ([]map[string]any, error)
 		return nil, err
 	}
 
-	if err := s.ingestLatestLocked(options.RetentionDays); err != nil {
+	if err := s.ingestArchiveLocked(options.RetentionDays); err != nil {
 		return nil, err
 	}
 	if options.Probe {
 		return []map[string]any{}, nil
 	}
+	items, err := s.loadArchiveRowsLocked(options)
+	if err != nil {
+		return nil, err
+	}
+	if len(items) > 0 {
+		return items, nil
+	}
 	items, handled, err := s.latestFromBackendsLocked(options)
 	if handled {
 		return items, err
 	}
-	return s.loadArchiveRowsLocked(options)
+	return items, nil
 }
 
 func (s *requestStreamSource) probe(query url.Values) error {
@@ -87,22 +94,16 @@ func (s *requestStreamSource) startBackgroundIngest(interval time.Duration) {
 }
 
 func (s *requestStreamSource) ingestLatestLocked(retentionDays int) error {
+	if err := s.ingestArchiveLocked(retentionDays); err != nil {
+		return err
+	}
+	return s.syncRequestBackendsLocked(retentionDays)
+}
+
+func (s *requestStreamSource) ingestArchiveLocked(retentionDays int) error {
 	file, err := os.Open(s.path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			if s.clickhouse != nil {
-				if importErr := s.importArchiveDaysToClickHouseLocked(); importErr != nil {
-					s.lastIngestError = importErr.Error()
-				}
-			}
-			if s.opensearch != nil {
-				if importErr := s.importArchiveDaysToOpenSearchLocked(); importErr != nil {
-					s.lastIngestError = importErr.Error()
-				}
-			}
-			if migrateErr := s.migrateHotToColdLocked(retentionDays); migrateErr != nil {
-				s.lastIngestError = migrateErr.Error()
-			}
 			s.pruneArchiveLocked(retentionDays)
 			return nil
 		}
@@ -201,6 +202,11 @@ func (s *requestStreamSource) ingestLatestLocked(retentionDays int) error {
 			s.lastIngestError = ""
 		}
 	}
+	s.pruneArchiveLocked(retentionDays)
+	return nil
+}
+
+func (s *requestStreamSource) syncRequestBackendsLocked(retentionDays int) error {
 	if s.clickhouse != nil {
 		if err := s.importArchiveDaysToClickHouseLocked(); err != nil {
 			s.lastIngestError = err.Error()
@@ -214,6 +220,5 @@ func (s *requestStreamSource) ingestLatestLocked(retentionDays int) error {
 	if err := s.migrateHotToColdLocked(retentionDays); err != nil {
 		s.lastIngestError = err.Error()
 	}
-	s.pruneArchiveLocked(retentionDays)
 	return nil
 }

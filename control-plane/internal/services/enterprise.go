@@ -121,6 +121,13 @@ func NewEnterpriseService(store *enterprise.Store, users EnterpriseUserStore, ro
 	}
 }
 
+func (s *EnterpriseService) SetSessionTTL(ttl time.Duration) {
+	if s == nil || ttl <= 0 {
+		return
+	}
+	s.sessionTTL = ttl
+}
+
 func (s *EnterpriseService) GetSettingsView() (enterprise.SettingsView, error) {
 	if s == nil || s.store == nil {
 		return enterprise.SettingsView{}, errors.New("enterprise store is unavailable")

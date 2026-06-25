@@ -181,7 +181,19 @@ func (s *requestStreamSource) listArchiveDaysLocked(targetDay string) ([]string,
 }
 
 func (s *requestStreamSource) loadArchiveRowsLocked(options requestQueryOptions) ([]map[string]any, error) {
-	days, err := s.listArchiveDaysLocked(options.Day)
+	var (
+		days []string
+		err  error
+	)
+	dayKeys := requestDayArchiveKeys(options)
+	switch len(dayKeys) {
+	case 0:
+		days, err = s.listArchiveDaysLocked("")
+	case 1:
+		days, err = s.listArchiveDaysLocked(dayKeys[0])
+	default:
+		days = append([]string(nil), dayKeys...)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -209,24 +221,16 @@ func (s *requestStreamSource) loadArchiveRowsLocked(options requestQueryOptions)
 			if err := json.Unmarshal([]byte(line), &row); err != nil {
 				continue
 			}
-			if !options.Since.IsZero() {
-				entry, _ := row["entry"].(map[string]any)
-				ts := ""
-				if entry != nil {
-					ts = strings.TrimSpace(asString(entry["timestamp"]))
-				}
-				if ts == "" {
-					ts = strings.TrimSpace(asString(row["ingested_at"]))
-				}
-				if ts != "" {
-					parsed, err := time.Parse(time.RFC3339Nano, ts)
-					if err != nil {
-						parsed, err = time.Parse(time.RFC3339, ts)
-					}
-					if err == nil && parsed.UTC().Before(options.Since) {
-						continue
-					}
-				}
+			entry, _ := row["entry"].(map[string]any)
+			ts := ""
+			if entry != nil {
+				ts = strings.TrimSpace(asString(entry["timestamp"]))
+			}
+			if ts == "" {
+				ts = strings.TrimSpace(asString(row["ingested_at"]))
+			}
+			if !requestTimestampMatchesOptions(ts, options) {
+				continue
 			}
 			if skip > 0 {
 				skip--

@@ -21,6 +21,7 @@ import (
 	"waf/control-plane/internal/easysiteprofiles"
 	"waf/control-plane/internal/enterprise"
 	"waf/control-plane/internal/events"
+	"waf/control-plane/internal/handlers"
 	"waf/control-plane/internal/httpserver"
 	"waf/control-plane/internal/jobs"
 	"waf/control-plane/internal/passkeys"
@@ -387,8 +388,14 @@ func New(cfg config.Config) (*App, error) {
 	)
 	jobService := services.NewJobService(jobStore)
 	enterpriseService := services.NewEnterpriseService(enterpriseStore, userStore, roleStore, sessionStore, revisionStore, auditStore, eventStore, jobStore, auditService)
+	sessionTTL := time.Duration(cfg.Security.SessionTTLMinutes) * time.Minute
+	if sessionTTL <= 0 {
+		sessionTTL = time.Hour
+	}
+	enterpriseService.SetSessionTTL(sessionTTL)
 	authService := services.NewAuthService(userStore, roleStore, sessionStore, passkeyStore, cfg.AuthIssuer, services.AuthSecurityConfig{
-		Pepper: cfg.Security.Pepper,
+		Pepper:     cfg.Security.Pepper,
+		SessionTTL: sessionTTL,
 		WebAuthn: services.WebAuthnConfig{
 			Enabled: cfg.Security.WebAuthn.Enabled,
 			RPID:    cfg.Security.WebAuthn.RPID,
@@ -396,6 +403,7 @@ func New(cfg config.Config) (*App, error) {
 			Origins: append([]string(nil), cfg.Security.WebAuthn.Origins...),
 		},
 	}, auditService)
+	handlers.SetSessionCookieTTL(sessionTTL)
 	revisionCompileService.SetGovernance(enterpriseService)
 	siteService := services.NewSiteService(siteStore, auditService)
 	manualBanService := services.NewManualBanService(accessPolicyStore, siteStore, auditService)

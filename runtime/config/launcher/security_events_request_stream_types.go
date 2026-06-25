@@ -65,12 +65,13 @@ func newRequestStreamSource(path string, maxItems int, archiveRoot string, defau
 }
 
 type requestQueryOptions struct {
-	Limit         int
-	Offset        int
-	Since         time.Time
-	Day           string
-	RetentionDays int
-	Probe         bool
+	Limit                 int
+	Offset                int
+	Since                 time.Time
+	Day                   string
+	TimezoneOffsetMinutes int
+	RetentionDays         int
+	Probe                 bool
 }
 
 func parseRequestQueryOptions(values url.Values, maxItems int, defaultRetention int) requestQueryOptions {
@@ -103,6 +104,12 @@ func parseRequestQueryOptions(values url.Values, maxItems int, defaultRetention 
 			day = ""
 		}
 	}
+	timezoneOffsetMinutes := 0
+	if raw := strings.TrimSpace(values.Get("tz_offset_minutes")); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil {
+			timezoneOffsetMinutes = normalizeTimezoneOffsetMinutes(parsed)
+		}
+	}
 	retentionDays := defaultRetention
 	if raw := strings.TrimSpace(values.Get("retention_days")); raw != "" {
 		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
@@ -120,11 +127,12 @@ func parseRequestQueryOptions(values url.Values, maxItems int, defaultRetention 
 		}
 	}
 	return requestQueryOptions{
-		Limit:         limit,
-		Offset:        offset,
-		Since:         since,
-		Day:           day,
-		RetentionDays: retentionDays,
-		Probe:         probe,
+		Limit:                 limit,
+		Offset:                offset,
+		Since:                 since,
+		Day:                   day,
+		TimezoneOffsetMinutes: timezoneOffsetMinutes,
+		RetentionDays:         retentionDays,
+		Probe:                 probe,
 	}
 }

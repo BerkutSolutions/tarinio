@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 type requestCollector interface {
@@ -21,6 +22,10 @@ type requestCollectorProber interface {
 
 type RequestsHandler struct {
 	collector requestCollector
+	cache     struct {
+		mu   sync.Mutex
+		rows []map[string]any
+	}
 }
 
 func NewRequestsHandler(collector requestCollector) *RequestsHandler {
@@ -63,13 +68,33 @@ func (h *RequestsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		items, err = h.collector.Collect()
 	}
 	if err != nil {
+		if cached, ok := h.cachedRows(); ok {
+			writeJSON(w, http.StatusOK, cached)
+			return
+		}
 		writeJSON(w, http.StatusBadGateway, map[string]any{"error": err.Error()})
 		return
 	}
 	if !collectorPaginates {
 		items = applyOffsetLimit(items, r.URL.Query())
 	}
+	h.storeRows(items)
 	writeJSON(w, http.StatusOK, items)
+}
+
+func (h *RequestsHandler) cachedRows() ([]map[string]any, bool) {
+	h.cache.mu.Lock()
+	defer h.cache.mu.Unlock()
+	if len(h.cache.rows) == 0 {
+		return nil, false
+	}
+	return append([]map[string]any(nil), h.cache.rows...), true
+}
+
+func (h *RequestsHandler) storeRows(items []map[string]any) {
+	h.cache.mu.Lock()
+	h.cache.rows = append([]map[string]any(nil), items...)
+	h.cache.mu.Unlock()
 }
 
 func applyOffsetLimit(items []map[string]any, query url.Values) []map[string]any {

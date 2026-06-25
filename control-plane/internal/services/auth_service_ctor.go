@@ -8,6 +8,7 @@ import (
 )
 
 func NewAuthService(users AuthUserStore, roles AuthRoleStore, sessions AuthSessionStore, passkeys AuthPasskeyStore, issuer string, security AuthSecurityConfig, audits *AuditService) *AuthService {
+	normalizedSecurity := normalizeAuthSecurityConfig(security)
 	return &AuthService{
 		users:        users,
 		roles:        roles,
@@ -15,8 +16,8 @@ func NewAuthService(users AuthUserStore, roles AuthRoleStore, sessions AuthSessi
 		passkeys:     passkeys,
 		policy:       rbac.NewPolicy(roles),
 		issuer:       strings.TrimSpace(issuer),
-		security:     normalizeAuthSecurityConfig(security),
-		sessionTTL:   12 * time.Hour,
+		security:     normalizedSecurity,
+		sessionTTL:   normalizedSecurity.SessionTTL,
 		challengeTTL: 5 * time.Minute,
 		audits:       audits,
 	}

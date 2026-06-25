@@ -33,6 +33,7 @@ func TestE2EBurstStability(t *testing.T) {
 	total := 0
 	hardFailures := 0
 	softRate := 0
+	hardFailureDetails := make([]string, 0)
 	for i := 0; i < 5; i++ {
 		for _, path := range targets {
 			total++
@@ -44,6 +45,7 @@ func TestE2EBurstStability(t *testing.T) {
 			}
 			if resp.StatusCode >= 500 || resp.StatusCode == 0 {
 				hardFailures++
+				hardFailureDetails = append(hardFailureDetails, path+"="+resp.Status)
 				_ = resp.Body.Close()
 				continue
 			}
@@ -53,7 +55,7 @@ func TestE2EBurstStability(t *testing.T) {
 	}
 
 	if hardFailures > 0 {
-		t.Fatalf("burst stability hard failures=%d total=%d soft429=%d", hardFailures, total, softRate)
+		t.Fatalf("burst stability hard failures=%d total=%d soft429=%d details=%v", hardFailures, total, softRate, hardFailureDetails)
 	}
 	t.Logf("burst stability: total=%d hardFailures=%d soft429=%d", total, hardFailures, softRate)
 }

@@ -34,6 +34,11 @@ type nginxSiteData struct {
 	RateLimitEscalationCookie string
 }
 
+type nginxHostMapEntry struct {
+	Host   string
+	SiteID string
+}
+
 type errorPageData struct {
 	StatusCode         int
 	Title              string
@@ -81,6 +86,7 @@ func RenderSiteUpstreamArtifacts(sites []SiteInput, upstreams []UpstreamInput) (
 
 	baseContent, err := renderTemplate(filepath.Join(templatesRoot(), "conf.d", "base.conf.tmpl"), nginxBaseData{
 		ErrorStatusCodes: append([]int(nil), supportedErrorStatusCodes...),
+		HostMapEntries:   buildHostMapEntries(sortedSites),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("render nginx base template: %w", err)
@@ -296,6 +302,27 @@ func renderSiteErrorArtifacts(siteID string) ([]ArtifactOutput, error) {
 
 type nginxBaseData struct {
 	ErrorStatusCodes []int
+	HostMapEntries   []nginxHostMapEntry
+}
+
+func buildHostMapEntries(sites []SiteInput) []nginxHostMapEntry {
+	var entries []nginxHostMapEntry
+	for _, site := range sites {
+		if !site.Enabled {
+			continue
+		}
+		for _, host := range collectServerNames(site) {
+			normalizedHost := strings.ToLower(strings.TrimSpace(host))
+			if normalizedHost == "" {
+				continue
+			}
+			entries = append(entries, nginxHostMapEntry{
+				Host:   normalizedHost,
+				SiteID: site.ID,
+			})
+		}
+	}
+	return entries
 }
 
 func buildErrorPageCatalog() []errorPageData {

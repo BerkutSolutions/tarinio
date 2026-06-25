@@ -269,17 +269,28 @@ func (s *requestOpenSearchStore) indexes(options requestQueryOptions, archiveRoo
 	if err := s.doRequest(cfg, http.MethodPost, "/"+cfg.RequestsIndex+"/_search", query, &payload); err != nil {
 		return nil, err
 	}
+	totalSizeBytes, err := s.indexStoreSizeBytes(cfg)
+	if err != nil {
+		totalSizeBytes = 0
+	}
 	items := make([]map[string]any, 0, len(payload.Aggregations.ByDay.Buckets))
 	for _, bucket := range payload.Aggregations.ByDay.Buckets {
 		date := bucket.KeyAsString
 		if len(date) >= 10 {
 			date = date[:10]
 		}
+		sizeBytes := int64(0)
+		if totalSizeBytes > 0 && payload.Hits.Total.Value > 0 && bucket.DocCount > 0 {
+			sizeBytes = int64((float64(totalSizeBytes) * float64(bucket.DocCount)) / float64(payload.Hits.Total.Value))
+			if sizeBytes <= 0 {
+				sizeBytes = 1
+			}
+		}
 		items = append(items, map[string]any{
 			"date":         date,
 			"file_name":    fmt.Sprintf("opensearch:%s", cfg.RequestsIndex),
 			"lines":        bucket.DocCount,
-			"size_bytes":   0,
+			"size_bytes":   sizeBytes,
 			"updated_at":   bucket.KeyAsString,
 			"storage_type": "opensearch",
 		})
@@ -295,6 +306,26 @@ func (s *requestOpenSearchStore) indexes(options requestQueryOptions, archiveRoo
 		"migration_state":   state,
 		"opensearch_target": fmt.Sprintf("%s/%s", cfg.Endpoint, cfg.RequestsIndex),
 	}, nil
+}
+
+func (s *requestOpenSearchStore) indexStoreSizeBytes(cfg requestOpenSearchConfig) (int64, error) {
+	var payload struct {
+		Indices map[string]struct {
+			Total struct {
+				Store struct {
+					SizeInBytes int64 `json:"size_in_bytes"`
+				} `json:"store"`
+			} `json:"total"`
+		} `json:"indices"`
+	}
+	if err := s.doRequest(cfg, http.MethodGet, "/"+cfg.RequestsIndex+"/_stats/store", nil, &payload); err != nil {
+		return 0, err
+	}
+	stats, ok := payload.Indices[cfg.RequestsIndex]
+	if !ok {
+		return 0, nil
+	}
+	return stats.Total.Store.SizeInBytes, nil
 }
 
 func (s *requestOpenSearchStore) days() ([]string, error) {
@@ -495,12 +526,12 @@ func buildOpenSearchRequestQuery(options requestQueryOptions) map[string]any {
 			},
 		})
 	}
-	if strings.TrimSpace(options.Day) != "" {
+	if start, end, ok := requestDayRangeUTC(options); ok {
 		filters = append(filters, map[string]any{
 			"range": map[string]any{
 				"timestamp": map[string]any{
-					"gte": options.Day + "T00:00:00Z",
-					"lt":  options.Day + "T23:59:59Z",
+					"gte": start.Format(time.RFC3339Nano),
+					"lt":  end.Format(time.RFC3339Nano),
 				},
 			},
 		})

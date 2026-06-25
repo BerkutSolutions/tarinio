@@ -290,6 +290,72 @@ func TestRenderSiteUpstreamArtifacts_DefaultServerKeepsAdminRoutesReachable(t *t
 	}
 }
 
+func TestRenderSiteUpstreamArtifacts_MapsHostsToSiteIDsInBaseConfig(t *testing.T) {
+	artifacts, err := RenderSiteUpstreamArtifacts(
+		[]SiteInput{
+			{
+				ID:                "site-a",
+				Enabled:           true,
+				PrimaryHost:       "a.example.com",
+				Aliases:           []string{"www.a.example.com"},
+				ListenHTTP:        true,
+				ListenHTTPS:       true,
+				DefaultUpstreamID: "up-a",
+			},
+			{
+				ID:                "site-b",
+				Enabled:           true,
+				PrimaryHost:       "sentry.hantico.ru",
+				ListenHTTP:        true,
+				ListenHTTPS:       false,
+				DefaultUpstreamID: "up-b",
+			},
+		},
+		[]UpstreamInput{
+			{
+				ID:             "up-a",
+				SiteID:         "site-a",
+				Scheme:         "http",
+				Host:           "app-a",
+				Port:           8080,
+				BasePath:       "/",
+				PassHostHeader: true,
+			},
+			{
+				ID:             "up-b",
+				SiteID:         "site-b",
+				Scheme:         "http",
+				Host:           "app-b",
+				Port:           9000,
+				BasePath:       "/",
+				PassHostHeader: true,
+			},
+		},
+	)
+	if err != nil {
+		t.Fatalf("render failed: %v", err)
+	}
+
+	var baseArtifact ArtifactOutput
+	for _, artifact := range artifacts {
+		if artifact.Path == "nginx/conf.d/base.conf" {
+			baseArtifact = artifact
+			break
+		}
+	}
+
+	content := string(baseArtifact.Content)
+	for _, fragment := range []string{
+		`a.example.com "site-a";`,
+		`www.a.example.com "site-a";`,
+		`sentry.hantico.ru "site-b";`,
+	} {
+		if !strings.Contains(content, fragment) {
+			t.Fatalf("expected base config to contain host map entry %q, got: %s", fragment, content)
+		}
+	}
+}
+
 func TestRenderSiteUpstreamArtifacts_UsesValidUpstreamServerAddress(t *testing.T) {
 	artifacts, err := RenderSiteUpstreamArtifacts(
 		[]SiteInput{

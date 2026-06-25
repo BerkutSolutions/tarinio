@@ -50,8 +50,9 @@ type ACMEConfig struct {
 }
 
 type SecurityConfig struct {
-	Pepper   string
-	WebAuthn WebAuthnConfig
+	Pepper            string
+	SessionTTLMinutes int
+	WebAuthn          WebAuthnConfig
 }
 
 type WebAuthnConfig struct {
@@ -109,7 +110,8 @@ func LoadFromEnv() (Config, error) {
 		AuthIssuer:       "WAF",
 		StartupSelfTest:  true,
 		Security: SecurityConfig{
-			Pepper: "",
+			Pepper:            "",
+			SessionTTLMinutes: 60,
 			WebAuthn: WebAuthnConfig{
 				Enabled: true,
 				RPName:  "TARINIO",
@@ -189,6 +191,16 @@ func LoadFromEnv() (Config, error) {
 	}
 	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_SECURITY_PEPPER")); value != "" {
 		cfg.Security.Pepper = value
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_AUTH_SESSION_TTL_MINUTES")); value != "" {
+		parsed, err := strconv.Atoi(value)
+		if err != nil {
+			return Config{}, fmt.Errorf("invalid CONTROL_PLANE_AUTH_SESSION_TTL_MINUTES: %w", err)
+		}
+		if parsed <= 0 {
+			return Config{}, fmt.Errorf("CONTROL_PLANE_AUTH_SESSION_TTL_MINUTES must be > 0")
+		}
+		cfg.Security.SessionTTLMinutes = parsed
 	}
 	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_ACME_ENABLED")); value != "" {
 		cfg.ACME.Enabled = !strings.EqualFold(value, "false") && value != "0"

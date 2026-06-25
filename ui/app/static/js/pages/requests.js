@@ -97,6 +97,11 @@ function todayDateKeyLocal() {
   return toDateKeyLocal(new Date());
 }
 
+function currentTimezoneOffsetMinutes() {
+  const offset = new Date().getTimezoneOffset();
+  return Number.isFinite(offset) ? String(offset) : "0";
+}
+
 export async function renderRequests(container, ctx) {
   const signal = ctx?.signal;
   const isActive = typeof ctx?.isActive === "function" ? ctx.isActive : () => true;
@@ -148,10 +153,11 @@ export async function renderRequests(container, ctx) {
     return { totalPages, start, end };
   };
 
-  const resolveServiceDisplay = (rawSite, siteHostMap) => {
+  const resolveServiceDisplay = (rawSite, rawHost, siteHostMap) => {
     const source = String(rawSite || "").trim();
+    const host = String(rawHost || "").trim();
     if (!source) {
-      return "-";
+      return host || "-";
     }
     if (isInternalGlobalService(source)) {
       return "";
@@ -165,6 +171,9 @@ export async function renderRequests(container, ctx) {
     }
     if (/^[a-z0-9_]+$/i.test(source)) {
       return source.replace(/_/g, ".");
+    }
+    if (host) {
+      return host;
     }
     return source;
   };
@@ -610,7 +619,8 @@ export async function renderRequests(container, ctx) {
       params.set("limit", String(state.fetchLimit));
       params.set("day", state.selectedDate || todayDateKeyLocal());
       params.set("retention_days", String(state.storageLogsDays || 14));
-      const [response, sites] = await Promise.all([
+      params.set("tz_offset_minutes", currentTimezoneOffsetMinutes());
+      const [response, sites, easyProfiles] = await Promise.all([
         fetch(`/api/requests?${params.toString()}`, {
           method: "GET",
           credentials: "include",
@@ -618,6 +628,7 @@ export async function renderRequests(container, ctx) {
           signal
         }),
         ctx.api.get("/api/sites", { signal }).catch(() => []),
+        ctx.api.get("/api/easy-site-profiles", { signal }).catch(() => []),
       ]);
       if (!isActive()) {
         return;
@@ -648,11 +659,22 @@ export async function renderRequests(container, ctx) {
         const host = String(site?.primary_host || "").trim();
         if (id && host) {
           siteHostMap.set(id, host);
+          siteHostMap.set(normalizeHostLike(host), host);
+        }
+      }
+      for (const profile of normalizeList(easyProfiles)) {
+        const id = normalizeHostLike(profile?.site_id);
+        const host = String(profile?.front_service?.server_name || "").trim();
+        if (id && host && !siteHostMap.has(id)) {
+          siteHostMap.set(id, host);
+        }
+        if (host) {
+          siteHostMap.set(normalizeHostLike(host), host);
         }
       }
       state.rows = normalizeRequestRowsPayload(payload).map((row) => {
         const entry = row?.entry && typeof row.entry === "object" ? row.entry : {};
-        const serviceDisplay = resolveServiceDisplay(entry.site, siteHostMap);
+        const serviceDisplay = resolveServiceDisplay(entry.site, entry.host, siteHostMap);
         const timestampDate = parseTimestamp(entry.timestamp || row?.ingested_at);
         return { ...row, entry, serviceDisplay, timestampDate };
       }).filter((row) => !isInternalGlobalService(row?.entry?.site || row?.serviceDisplay));

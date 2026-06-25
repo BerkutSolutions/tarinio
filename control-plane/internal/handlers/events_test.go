@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"waf/control-plane/internal/events"
 )
@@ -64,5 +66,39 @@ func TestEventsHandler_Probe(t *testing.T) {
 	handler.ServeHTTP(resp, req)
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+}
+
+func TestEventsHandler_UsesCachedEventsOnServiceFailure(t *testing.T) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	service := &fakeEventService{
+		items: []events.Event{
+			{
+				ID:              "evt-1",
+				Type:            events.TypeApplySucceeded,
+				Severity:        events.SeverityInfo,
+				SourceComponent: "apply-runner",
+				OccurredAt:      now,
+				Summary:         "apply done",
+			},
+		},
+	}
+	handler := NewEventsHandler(service)
+
+	firstReq := httptest.NewRequest(http.MethodGet, "/api/events", nil)
+	firstResp := httptest.NewRecorder()
+	handler.ServeHTTP(firstResp, firstReq)
+	if firstResp.Code != http.StatusOK {
+		t.Fatalf("expected first response 200, got %d", firstResp.Code)
+	}
+
+	service.err = errors.New("boom")
+	service.items = nil
+
+	secondReq := httptest.NewRequest(http.MethodGet, "/api/events", nil)
+	secondResp := httptest.NewRecorder()
+	handler.ServeHTTP(secondResp, secondReq)
+	if secondResp.Code != http.StatusOK {
+		t.Fatalf("expected cached response 200, got %d", secondResp.Code)
 	}
 }

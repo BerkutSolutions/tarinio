@@ -16,7 +16,8 @@ import (
 
 const SessionCookieName = "waf_session"
 const SessionBootCookieName = "waf_session_boot"
-const sessionCookieMaxAgeSeconds = 12 * 60 * 60
+
+var sessionCookieMaxAgeSeconds = int((time.Hour).Seconds())
 
 var (
 	sessionBootToken   = generateSessionBootToken()
@@ -539,6 +540,17 @@ func (h *AuthHandler) passkeysDelete(w http.ResponseWriter, r *http.Request) {
 
 func SetSessionCookie(w http.ResponseWriter, sessionID string) {
 	SetSessionCookieWithOptions(w, sessionID, false)
+}
+
+func SetSessionCookieTTL(ttl time.Duration) {
+	if ttl <= 0 {
+		sessionCookieMaxAgeSeconds = int((time.Hour).Seconds())
+		return
+	}
+	sessionCookieMaxAgeSeconds = int(ttl.Seconds())
+	if sessionCookieMaxAgeSeconds <= 0 {
+		sessionCookieMaxAgeSeconds = 1
+	}
 }
 
 func SetSessionCookieForRequest(w http.ResponseWriter, r *http.Request, sessionID string) {

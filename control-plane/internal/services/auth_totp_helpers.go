@@ -73,6 +73,9 @@ func normalizeAuthSecurityConfig(input AuthSecurityConfig) AuthSecurityConfig {
 	if cfg.Pepper == "" {
 		cfg.Pepper = "waf-dev-pepper-change-me"
 	}
+	if cfg.SessionTTL <= 0 {
+		cfg.SessionTTL = time.Hour
+	}
 	cfg.WebAuthn.RPID = strings.ToLower(strings.TrimSpace(cfg.WebAuthn.RPID))
 	cfg.WebAuthn.RPName = strings.TrimSpace(cfg.WebAuthn.RPName)
 	if cfg.WebAuthn.RPName == "" {

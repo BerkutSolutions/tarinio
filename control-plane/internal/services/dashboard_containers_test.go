@@ -29,6 +29,8 @@ func TestClassifyContainerLogIssue_IgnoresBenignOpenSearchStartupNoise(t *testin
 		`2026-06-24 14:10:15.154 UTC [233] FATAL: terminating connection due to administrator command`,
 		`2026/06/24 14:08:58 [warn] 31#31: *261 an upstream response is buffered to a temporary file /var/cache/nginx/proxy_temp/1/00/0000000001 while reading upstream`,
 		`control-plane bootstrap: failed to connect to user=waf database=waf: dial tcp 172.18.0.8:5432: connect: connection refused`,
+		`[2026-06-24T21:47:03,025][WARN ][o.o.m.j.JvmGcMonitorService] [7de753eb623f] [gc][13067] overhead, spent [836ms] collecting in the last [1.4s]`,
+		`2026/06/24 18:09:04 [error] event service runtime security collector failed: Get "http://localhost:8081/security-events": dial tcp [::1]:8081: connect: connection refused`,
 	}
 
 	for _, message := range cases {
