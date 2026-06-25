@@ -1,6 +1,6 @@
 import { escapeHtml, formatDate, setError, setLoading } from "../ui.js";
 
-const DEFAULT_REQUESTS_FETCH_LIMIT = 2000;
+const DEFAULT_REQUESTS_FETCH_LIMIT = 200;
 
 function normalizeList(value) {
   return Array.isArray(value) ? value : [];
