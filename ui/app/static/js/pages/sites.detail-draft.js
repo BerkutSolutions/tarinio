@@ -18,6 +18,7 @@ export function getDraftFromForm(container, state, deps) {
     normalizeStringArray,
     normalizeArray,
     normalizeBanEscalationStages,
+    normalizeAntibotExclusionRules,
     normalizeAuthBasicUsers,
     normalizeAuthSessionTTLMinutes,
     normalizeAPIPositiveEndpointPolicies,
@@ -116,6 +117,11 @@ export function getDraftFromForm(container, state, deps) {
     antibot_hcaptcha_secret: container.querySelector("#service-antibot-hcaptcha-secret").value.trim(),
     antibot_turnstile_sitekey: container.querySelector("#service-antibot-turnstile-sitekey").value.trim(),
     antibot_turnstile_secret: container.querySelector("#service-antibot-turnstile-secret").value.trim(),
+    antibot_exclusion_rules: normalizeAntibotExclusionRules(Array.from(container.querySelectorAll("[data-antibot-exclusion-path]")).map((input) => {
+      const index = String(input.dataset.antibotExclusionPath || "");
+      const methodsInput = container.querySelector(`[data-antibot-exclusion-methods="${index}"]`);
+      return { path: String(input.value || "").trim(), methods: String(methodsInput?.value || "").split(/[\s,|]+/).map((item) => item.trim()).filter(Boolean) };
+    })),
     challenge_escalation_enabled: container.querySelector("#service-antibot-escalation-enabled")?.checked || false,
     challenge_escalation_mode: container.querySelector("#service-antibot-escalation-mode")?.value || "javascript",
     antibot_challenge_rules: Array.from(container.querySelectorAll("[data-antibot-rule-path]")).map((input) => {

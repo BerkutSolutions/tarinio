@@ -136,9 +136,15 @@ type SecurityAntibotSettings struct {
 	AntibotHcaptchaSecret      string                 `json:"antibot_hcaptcha_secret"`
 	AntibotTurnstileSitekey    string                 `json:"antibot_turnstile_sitekey"`
 	AntibotTurnstileSecret     string                 `json:"antibot_turnstile_secret"`
+	ExclusionRules             []AntibotExclusionRule `json:"exclusion_rules"`
 	ChallengeEscalationEnabled bool                   `json:"challenge_escalation_enabled"`
 	ChallengeEscalationMode    string                 `json:"challenge_escalation_mode"`
 	ChallengeRules             []AntibotChallengeRule `json:"challenge_rules"`
+}
+
+type AntibotExclusionRule struct {
+	Path    string   `json:"path"`
+	Methods []string `json:"methods"`
 }
 
 type AntibotChallengeRule struct {
@@ -360,6 +366,7 @@ func DefaultProfile(siteID string) EasySiteProfile {
 			AntibotHcaptchaSecret:      "",
 			AntibotTurnstileSitekey:    "",
 			AntibotTurnstileSecret:     "",
+			ExclusionRules:             []AntibotExclusionRule{},
 			ChallengeEscalationEnabled: false,
 			ChallengeEscalationMode:    AntibotChallengeJavascript,
 			ChallengeRules:             []AntibotChallengeRule{},

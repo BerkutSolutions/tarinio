@@ -18,6 +18,7 @@ type AccessPolicyInput = internal.AccessPolicyInput
 type RateLimitPolicyInput = internal.RateLimitPolicyInput
 type CustomRateLimitRuleInput = internal.CustomRateLimitRuleInput
 type APIPositiveEndpointPolicyInput = internal.APIPositiveEndpointPolicyInput
+type AntibotExclusionRuleInput = internal.AntibotExclusionRuleInput
 type AntibotChallengeRuleInput = internal.AntibotChallengeRuleInput
 type EasyProfileInput = internal.EasyProfileInput
 type ArtifactKind = internal.ArtifactKind

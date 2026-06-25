@@ -1,4 +1,8 @@
 import {
+  normalizeAntibotExclusionRules as normalizeAntibotExclusionRulesModule,
+  renderAntibotExclusionRulesEditor as renderAntibotExclusionRulesEditorModule
+} from "./sites.antibot-exclusion-editors.js";
+import {
   formatAuthLastLogin as formatAuthLastLoginModule,
   normalizeAntibotChallengeRules as normalizeAntibotChallengeRulesModule,
   normalizeAuthBasicUsers as normalizeAuthBasicUsersModule,
@@ -53,6 +57,10 @@ export function normalizeCustomLimitRules(value, normalizeArray) {
   return normalizeCustomLimitRulesModule(value, { normalizeArray });
 }
 
+export function normalizeAntibotExclusionRules(value, normalizeArray) {
+  return normalizeAntibotExclusionRulesModule(value, { normalizeArray });
+}
+
 export function normalizeAntibotChallengeRules(value, normalizeArray) {
   return normalizeAntibotChallengeRulesModule(value, { normalizeArray });
 }
@@ -87,6 +95,10 @@ export function renderAuthSessionTtlOptions(ttlMinutes, ctx, escapeHtml) {
 
 export function renderCustomLimitRulesEditor(rules, ctx, escapeHtml, normalizeArray) {
   return renderCustomLimitRulesEditorModule(rules, ctx, { escapeHtml, normalizeArray });
+}
+
+export function renderAntibotExclusionRulesEditor(rules, ctx, escapeHtml, normalizeArray) {
+  return renderAntibotExclusionRulesEditorModule(rules, ctx, { escapeHtml, normalizeArray });
 }
 
 export function renderAntibotChallengeRulesEditor(rules, ctx, escapeHtml, normalizeArray) {

@@ -794,6 +794,17 @@ func mapAntibotChallengeRules(items []easysiteprofiles.AntibotChallengeRule) []p
 	return out
 }
 
+func mapAntibotExclusionRules(items []easysiteprofiles.AntibotExclusionRule) []pipeline.AntibotExclusionRuleInput {
+	out := make([]pipeline.AntibotExclusionRuleInput, 0, len(items))
+	for _, item := range items {
+		out = append(out, pipeline.AntibotExclusionRuleInput{
+			Path:    item.Path,
+			Methods: append([]string(nil), item.Methods...),
+		})
+	}
+	return out
+}
+
 func mapEasyInputs(items []easysiteprofiles.EasySiteProfile) []pipeline.EasyProfileInput {
 	sorted := append([]easysiteprofiles.EasySiteProfile(nil), items...)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].SiteID < sorted[j].SiteID })
@@ -838,6 +849,7 @@ func mapEasyInputs(items []easysiteprofiles.EasySiteProfile) []pipeline.EasyProf
 			AntibotRecaptchaKey:        item.SecurityAntibot.AntibotRecaptchaSitekey,
 			AntibotHcaptchaKey:         item.SecurityAntibot.AntibotHcaptchaSitekey,
 			AntibotTurnstileKey:        item.SecurityAntibot.AntibotTurnstileSitekey,
+			AntibotExclusionRules:      mapAntibotExclusionRules(item.SecurityAntibot.ExclusionRules),
 			ChallengeEscalationEnabled: item.SecurityAntibot.ChallengeEscalationEnabled,
 			ChallengeEscalationMode:    item.SecurityAntibot.ChallengeEscalationMode,
 			AntibotChallengeRules:      mapAntibotChallengeRules(item.SecurityAntibot.ChallengeRules),

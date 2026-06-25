@@ -115,6 +115,11 @@ type AntibotChallengeRuleInput struct {
 	Challenge string
 }
 
+type AntibotExclusionRuleInput struct {
+	Path    string
+	Methods []string
+}
+
 // ArtifactOutput is a rendered compiler artifact ready to be placed into a bundle.
 type ArtifactOutput struct {
 	Path     string
@@ -167,6 +172,7 @@ type EasyProfileInput struct {
 	AntibotTurnstileKey        string
 	AntibotCookieName          string
 	AntibotCookieValue         string
+	AntibotExclusionRules      []AntibotExclusionRuleInput
 	ChallengeEscalationEnabled bool
 	ChallengeEscalationMode    string
 	AntibotChallengeRules      []AntibotChallengeRuleInput

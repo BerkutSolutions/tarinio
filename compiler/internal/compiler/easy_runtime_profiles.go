@@ -76,6 +76,7 @@ func buildEasyProfileBySite(profiles []EasyProfileInput) (map[string]EasyProfile
 		if profile.ChallengeEscalationMode == "" {
 			profile.ChallengeEscalationMode = "javascript"
 		}
+		profile.AntibotExclusionRules = normalizeCompilerAntibotExclusionRules(profile.AntibotExclusionRules)
 		profile.AntibotChallengeRules = normalizeCompilerAntibotRules(profile.AntibotChallengeRules)
 		if profile.AntibotChallenge == "" {
 			profile.AntibotChallenge = "no"
@@ -151,6 +152,7 @@ func applySecurityModePolicy(profile EasyProfileInput) EasyProfileInput {
 		profile.AntibotScannerAutoBan = false
 		profile.ChallengeEscalationEnabled = false
 		profile.ChallengeEscalationMode = "no"
+		profile.AntibotExclusionRules = nil
 		profile.AntibotChallengeRules = nil
 		profile.UseAuthBasic = false
 	case "monitor":
@@ -171,6 +173,7 @@ func applySecurityModePolicy(profile EasyProfileInput) EasyProfileInput {
 		profile.AntibotScannerAutoBan = false
 		profile.ChallengeEscalationEnabled = false
 		profile.ChallengeEscalationMode = "no"
+		profile.AntibotExclusionRules = nil
 		profile.AntibotChallengeRules = nil
 		profile.UseAuthBasic = false
 		profile.UseAPIPositiveSecurity = false

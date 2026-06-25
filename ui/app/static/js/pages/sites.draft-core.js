@@ -1,6 +1,7 @@
 import { normalizeArray } from "./sites.routing-merge.js";
 import {
   normalizeAPIPositiveEndpointPolicies,
+  normalizeAntibotExclusionRules,
   normalizeAntibotChallengeRules,
   normalizeCustomLimitRules,
   normalizeServiceProfile,
@@ -31,7 +32,7 @@ export function defaultSiteDraft() {
     blacklist_uri: [], blacklist_ip_urls: [], blacklist_rdns_urls: [], blacklist_asn_urls: [], blacklist_user_agent_urls: [], blacklist_uri_urls: [], use_limit_conn: true,
     limit_conn_max_http1: 200, limit_conn_max_http2: 400, limit_conn_max_http3: 400, use_limit_req: true, limit_req_url: "/", limit_req_rate: "120r/s", custom_limit_rules: [],
     antibot_challenge: "no", antibot_uri: "/challenge", antibot_scanner_auto_ban_enabled: true, antibot_recaptcha_score: 0.7, antibot_recaptcha_sitekey: "", antibot_recaptcha_secret: "",
-    antibot_hcaptcha_sitekey: "", antibot_hcaptcha_secret: "", antibot_turnstile_sitekey: "", antibot_turnstile_secret: "", challenge_escalation_enabled: false,
+    antibot_hcaptcha_sitekey: "", antibot_hcaptcha_secret: "", antibot_turnstile_sitekey: "", antibot_turnstile_secret: "", antibot_exclusion_rules: [], challenge_escalation_enabled: false,
     challenge_escalation_mode: "javascript", antibot_challenge_rules: [], use_auth_basic: false, auth_basic_location: "sitewide", auth_basic_user: "changeme", auth_basic_password: "",
     auth_basic_text: "Restricted area", auth_basic_users: [{ username: "changeme", password: "", enabled: true, last_login_at: "" }], auth_basic_session_inactivity_minutes: 60,
     blacklist_country: [], whitelist_country: [], api_positive_security_enabled: false, api_positive_openapi_schema_ref: "", api_positive_enforcement_mode: "monitor",
@@ -99,7 +100,7 @@ export function draftToEasyProfile(draft) {
       antibot_challenge: draft.antibot_challenge, antibot_uri: draft.antibot_uri, scanner_auto_ban_enabled: Boolean(draft.antibot_scanner_auto_ban_enabled),
       antibot_recaptcha_score: draft.antibot_recaptcha_score, antibot_recaptcha_sitekey: draft.antibot_recaptcha_sitekey, antibot_recaptcha_secret: draft.antibot_recaptcha_secret,
       antibot_hcaptcha_sitekey: draft.antibot_hcaptcha_sitekey, antibot_hcaptcha_secret: draft.antibot_hcaptcha_secret, antibot_turnstile_sitekey: draft.antibot_turnstile_sitekey,
-      antibot_turnstile_secret: draft.antibot_turnstile_secret, challenge_escalation_enabled: Boolean(draft.challenge_escalation_enabled),
+      antibot_turnstile_secret: draft.antibot_turnstile_secret, exclusion_rules: normalizeAntibotExclusionRules(draft.antibot_exclusion_rules), challenge_escalation_enabled: Boolean(draft.challenge_escalation_enabled),
       challenge_escalation_mode: String(draft.challenge_escalation_mode || "javascript").trim().toLowerCase() || "javascript", challenge_rules: normalizeAntibotChallengeRules(draft.antibot_challenge_rules)
     },
     security_auth_basic: { use_auth_basic: draft.use_auth_basic, auth_basic_location: "sitewide", auth_basic_user: firstUser.username, auth_basic_password: firstUser.password, auth_basic_text: authBasicText, users: authUsers, session_inactivity_minutes: authSessionTTLMinutes },

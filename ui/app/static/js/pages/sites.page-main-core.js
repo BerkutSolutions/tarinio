@@ -141,6 +141,7 @@ import {
   formatServiceProfile as formatServiceProfileFacade,
   isValidEmail as isValidEmailFacade,
   normalizeAPIPositiveEndpointPolicies as normalizeAPIPositiveEndpointPoliciesFacade,
+  normalizeAntibotExclusionRules as normalizeAntibotExclusionRulesFacade,
   normalizeAntibotChallengeRules as normalizeAntibotChallengeRulesFacade,
   normalizeAuthBasicUsers as normalizeAuthBasicUsersFacade,
   normalizeAuthSessionTTLMinutes as normalizeAuthSessionTTLMinutesFacade,
@@ -154,6 +155,7 @@ import {
   parseBanDurationSeconds as parseBanDurationSecondsFacade,
   parseIntListInput as parseIntListInputFacade,
   parseListInput as parseListInputFacade,
+  renderAntibotExclusionRulesEditor as renderAntibotExclusionRulesEditorFacade,
   renderAntibotChallengeRulesEditor as renderAntibotChallengeRulesEditorFacade,
   renderAuthPasswordToggleButton as renderAuthPasswordToggleButtonFacade,
   renderAuthSessionTtlOptions as renderAuthSessionTtlOptionsFacade,
@@ -239,6 +241,7 @@ const normalizeStringArray = (value) => normalizeStringArrayFacade(value, normal
 const parseListInput = parseListInputFacade;
 const parseIntListInput = parseIntListInputFacade;
 const normalizeCustomLimitRules = (value) => normalizeCustomLimitRulesFacade(value, normalizeArray);
+const normalizeAntibotExclusionRules = (value) => normalizeAntibotExclusionRulesFacade(value, normalizeArray);
 const normalizeAntibotChallengeRules = (value) => normalizeAntibotChallengeRulesFacade(value, normalizeArray);
 const normalizeAuthBasicUsers = (value) => normalizeAuthBasicUsersFacade(value, normalizeArray);
 const normalizeAuthSessionTTLMinutes = normalizeAuthSessionTTLMinutesFacade;
@@ -248,6 +251,7 @@ const syncAuthPasswordToggle = syncAuthPasswordToggleFacade;
 const renderAuthUsersEditor = (users, ctx) => renderAuthUsersEditorFacade(users, ctx, escapeHtml, normalizeArray);
 const renderAuthSessionTtlOptions = (ttlMinutes, ctx) => renderAuthSessionTtlOptionsFacade(ttlMinutes, ctx, escapeHtml);
 const renderCustomLimitRulesEditor = (rules, ctx) => renderCustomLimitRulesEditorFacade(rules, ctx, escapeHtml, normalizeArray);
+const renderAntibotExclusionRulesEditor = (rules, ctx) => renderAntibotExclusionRulesEditorFacade(rules, ctx, escapeHtml, normalizeArray);
 const renderAntibotChallengeRulesEditor = (rules, ctx) => renderAntibotChallengeRulesEditorFacade(rules, ctx, escapeHtml, normalizeArray);
 const normalizeHost = normalizeHostFacade;
 const normalizeSiteID = normalizeSiteIDFacade;
@@ -315,6 +319,7 @@ function applyEasyProfileToDraft(draft, profile) {
     BAN_SCOPE_VALUES,
     normalizeBanEscalationStages,
     normalizeCustomLimitRules,
+    normalizeAntibotExclusionRules,
     normalizeAntibotChallengeRules,
     normalizeAuthBasicUsers,
     normalizeAuthSessionTTLMinutes,
@@ -336,6 +341,7 @@ async function hydrateSiteDraft(ctx, site, upstream, tlsConfig, accessPolicy = n
     BAN_SCOPE_VALUES,
     normalizeBanEscalationStages,
     normalizeCustomLimitRules,
+    normalizeAntibotExclusionRules,
     normalizeAntibotChallengeRules,
     normalizeAuthBasicUsers,
     normalizeAuthSessionTTLMinutes,
@@ -353,6 +359,7 @@ function draftToEasyProfile(draft) {
     normalizeServiceProfile,
     normalizeEmail,
     normalizeCustomLimitRules,
+    normalizeAntibotExclusionRules,
     normalizeAntibotChallengeRules,
     normalizeAPIPositiveEndpointPolicies
   });
@@ -365,6 +372,7 @@ function validateDraft(draft, ctx) {
     BAN_SCOPE_VALUES,
     normalizeBanEscalationStages,
     normalizeCustomLimitRules,
+    normalizeAntibotExclusionRules,
     normalizeAntibotChallengeRules,
     normalizeAuthBasicUsers
   });
@@ -454,6 +462,7 @@ export {
   parseListInput,
   parseIntListInput,
   normalizeCustomLimitRules,
+  normalizeAntibotExclusionRules,
   normalizeAntibotChallengeRules,
   normalizeAuthBasicUsers,
   normalizeAuthSessionTTLMinutes,
@@ -463,6 +472,7 @@ export {
   renderAuthUsersEditor,
   renderAuthSessionTtlOptions,
   renderCustomLimitRulesEditor,
+  renderAntibotExclusionRulesEditor,
   renderAntibotChallengeRulesEditor,
   normalizeHost,
   normalizeSiteID,

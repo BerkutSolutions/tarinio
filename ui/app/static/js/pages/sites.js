@@ -19,6 +19,7 @@ import {
   applyServiceProfilePresetToDraft,
   formatServiceProfile,
   normalizeAPIPositiveEndpointPolicies,
+  normalizeAntibotExclusionRules,
   normalizeAntibotChallengeRules,
   normalizeCustomLimitRules,
   normalizeHost,
@@ -27,6 +28,9 @@ import {
   parseIntListInput,
   parseListInput,
 } from "./sites.normalize.js";
+import {
+  renderAntibotExclusionRulesEditor as renderAntibotExclusionRulesEditorModule,
+} from "./sites.antibot-exclusion-editors.js";
 import {
   normalizeAuthBasicUsers,
   normalizeAuthSessionTTLMinutes,
@@ -223,6 +227,13 @@ function renderAntibotChallengeRulesEditor(rules, ctx) {
         <button class="btn ghost btn-sm" type="button" data-antibot-rule-add>${escapeHtml(ctx.t("sites.easy.antibot.addChallengeRule"))}</button>
       </div>
     </div>`;
+}
+
+function renderAntibotExclusionRulesEditor(rules, ctx) {
+  return renderAntibotExclusionRulesEditorModule(rules, ctx, {
+    escapeHtml,
+    normalizeArray,
+  });
 }
 
 
@@ -751,6 +762,7 @@ function renderDetailView(state, ctx) {
                           <label for="service-antibot-turnstile-secret">${escapeHtml(ctx.t("sites.easy.antibot.turnstileSecret"))}</label>
                           <input id="service-antibot-turnstile-secret" type="password" value="${escapeHtml(draft.antibot_turnstile_secret)}">
                         </div>
+                        ${renderAntibotExclusionRulesEditor(draft.antibot_exclusion_rules, ctx)}
                         <label class="waf-checkbox waf-field full">
                           <input id="service-antibot-escalation-enabled" type="checkbox"${draft.challenge_escalation_enabled ? " checked" : ""}>
                           <span>${escapeHtml(ctx.t("sites.easy.antibot.twoLayerEscalation"))}</span>
@@ -1145,6 +1157,7 @@ export async function renderSites(container, ctx) {
       normalizeStringArray,
       normalizeArray,
       normalizeBanEscalationStages,
+      normalizeAntibotExclusionRules,
       normalizeAuthBasicUsers,
       normalizeAuthSessionTTLMinutes,
       normalizeAPIPositiveEndpointPolicies,
@@ -1193,6 +1206,7 @@ export async function renderSites(container, ctx) {
       getQuickListTemplates,
       normalizeStringArray,
       normalizeCustomLimitRules,
+      normalizeAntibotExclusionRules,
       normalizeAntibotChallengeRules,
       normalizeAuthBasicUsers,
       syncAuthPasswordToggle,

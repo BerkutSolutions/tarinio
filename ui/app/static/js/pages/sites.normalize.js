@@ -39,6 +39,31 @@ export function normalizeCustomLimitRules(value) {
     });
 }
 
+export function normalizeAntibotExclusionRules(value) {
+  const seen = new Set();
+  return normalizeArray(value)
+    .map((item) => {
+      const methods = normalizeStringArray(
+        Array.isArray(item?.methods)
+          ? item.methods
+          : String(item?.methods || "").split(/[\n,| ]+/)
+      ).map((entry) => entry.toUpperCase());
+      return {
+        path: String(item?.path || "").trim(),
+        methods: methods.length && !methods.includes("*") ? Array.from(new Set(methods)).sort() : ["*"]
+      };
+    })
+    .filter((item) => item.path)
+    .filter((item) => {
+      const key = item.path.toLowerCase() + "\u0000" + item.methods.join(",");
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+}
+
 export function normalizeAntibotChallengeRules(value) {
   const seen = new Set();
   return normalizeArray(value)

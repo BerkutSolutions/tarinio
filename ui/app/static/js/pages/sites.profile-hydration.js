@@ -1,6 +1,7 @@
 import { findEasyProfile, normalizeArray, tryGetJSON } from "./sites.routing-merge.js";
 import {
   normalizeAPIPositiveEndpointPolicies,
+  normalizeAntibotExclusionRules,
   normalizeAntibotChallengeRules,
   normalizeCustomLimitRules,
   normalizeServiceProfile,
@@ -106,6 +107,7 @@ export function applyEasyProfileToDraft(draft, profile) {
     antibot_hcaptcha_secret: antibot.antibot_hcaptcha_secret || draft.antibot_hcaptcha_secret,
     antibot_turnstile_sitekey: antibot.antibot_turnstile_sitekey || draft.antibot_turnstile_sitekey,
     antibot_turnstile_secret: antibot.antibot_turnstile_secret || draft.antibot_turnstile_secret,
+    antibot_exclusion_rules: normalizeAntibotExclusionRules(antibot.exclusion_rules || draft.antibot_exclusion_rules),
     challenge_escalation_enabled: Boolean(antibot.challenge_escalation_enabled ?? draft.challenge_escalation_enabled),
     challenge_escalation_mode: String(antibot.challenge_escalation_mode || draft.challenge_escalation_mode).trim().toLowerCase() || "javascript",
     antibot_challenge_rules: normalizeAntibotChallengeRules(antibot.challenge_rules || draft.antibot_challenge_rules),

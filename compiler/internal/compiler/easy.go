@@ -60,6 +60,7 @@ type easySiteData struct {
 	AntibotRecaptchaHint     string
 	AntibotHcaptchaHint      string
 	AntibotTurnstileHint     string
+	AntibotExclusionRules    []easyAntibotExclusionRuleData
 	AntibotRuleOverrides     []easyAntibotRuleData
 	AntibotScannerAutoBan    bool
 	AntibotScannerPattern    string
@@ -100,6 +101,10 @@ type easyAntibotRuleData struct {
 	GuardPattern string
 	Challenge    string
 	RedirectURI  string
+}
+
+type easyAntibotExclusionRuleData struct {
+	MatchPattern string
 }
 
 // RenderEasyArtifacts compiles Easy-mode site directives into per-site nginx snippets.

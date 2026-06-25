@@ -141,6 +141,7 @@ export function draftToEasyProfilePart2(draft, deps) {
       antibot_hcaptcha_secret: draft.antibot_hcaptcha_secret,
       antibot_turnstile_sitekey: draft.antibot_turnstile_sitekey,
       antibot_turnstile_secret: draft.antibot_turnstile_secret,
+      exclusion_rules: deps.normalizeAntibotExclusionRules(draft.antibot_exclusion_rules),
       challenge_escalation_enabled: Boolean(draft.challenge_escalation_enabled),
       challenge_escalation_mode: String(draft.challenge_escalation_mode || "javascript").trim().toLowerCase() || "javascript",
       challenge_rules: deps.normalizeAntibotChallengeRules(draft.antibot_challenge_rules)
@@ -234,6 +235,9 @@ export function validateDraftPart2(draft, ctx, deps) {
   if (deps.normalizeCustomLimitRules(draft.custom_limit_rules).length > 32) {
     return ctx.t("sites.validation.customLimitRulesLimit");
   }
+  if (draft.antibot_challenge === "no" && deps.normalizeAntibotExclusionRules(draft.antibot_exclusion_rules).length) {
+    return ctx.t("sites.validation.antibotExclusionsRequireEnabled");
+  }
   if (draft.hsts_enabled && (!Number.isFinite(draft.hsts_max_age_seconds) || Number(draft.hsts_max_age_seconds) <= 0)) {
     return ctx.t("sites.validation.hstsMaxAgePositive");
   }
@@ -255,6 +259,26 @@ export function validateDraftPart2(draft, ctx, deps) {
     }
     if (!/^\d+r\/s$/i.test(rule.rate)) {
       return ctx.t("sites.validation.customLimitRateFormat");
+    }
+  }
+  if (deps.normalizeAntibotExclusionRules(draft.antibot_exclusion_rules).length > 32) {
+    return ctx.t("sites.validation.antibotExclusionRulesLimit");
+  }
+  for (const rule of deps.normalizeAntibotExclusionRules(draft.antibot_exclusion_rules)) {
+    if (!rule.path.startsWith("/")) {
+      return ctx.t("sites.validation.antibotExclusionPathFormat");
+    }
+    const methods = Array.isArray(rule.methods) ? rule.methods : [];
+    if (!methods.length) {
+      return ctx.t("sites.validation.antibotExclusionMethodsInvalid");
+    }
+    if (methods.includes("*") && methods.length !== 1) {
+      return ctx.t("sites.validation.antibotExclusionMethodsInvalid");
+    }
+    for (const method of methods) {
+      if (!["*", "GET", "POST", "HEAD", "OPTIONS", "PUT", "DELETE", "PATCH"].includes(method)) {
+        return ctx.t("sites.validation.antibotExclusionMethodsInvalid");
+      }
     }
   }
   if (deps.normalizeAntibotChallengeRules(draft.antibot_challenge_rules).length > 32) {

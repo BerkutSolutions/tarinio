@@ -4,6 +4,7 @@ export function bindDetailListEditors(container, state, deps) {
     getQuickListTemplates,
     normalizeStringArray,
     normalizeCustomLimitRules,
+    normalizeAntibotExclusionRules,
     normalizeAntibotChallengeRules,
     normalizeAuthBasicUsers,
     syncAuthPasswordToggle,
@@ -146,6 +147,11 @@ export function bindDetailListEditors(container, state, deps) {
     state.draft.antibot_challenge_rules = [...normalizeAntibotChallengeRules(state.draft.antibot_challenge_rules), { path: "/", challenge: "javascript" }];
     render();
   });
+  container.querySelector("[data-antibot-exclusion-add]")?.addEventListener("click", () => {
+    syncStateDraftFromForm();
+    state.draft.antibot_exclusion_rules = [...normalizeAntibotExclusionRules(state.draft.antibot_exclusion_rules), { path: "/api/", methods: ["*"] }];
+    render();
+  });
   container.querySelectorAll("[data-antibot-rule-remove]").forEach((button) => {
     button.addEventListener("click", () => {
       const index = Number.parseInt(String(button.dataset.antibotRuleRemove || "-1"), 10);
@@ -155,6 +161,18 @@ export function bindDetailListEditors(container, state, deps) {
       if (index >= current.length) return;
       current.splice(index, 1);
       state.draft.antibot_challenge_rules = current;
+      render();
+    });
+  });
+  container.querySelectorAll("[data-antibot-exclusion-remove]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const index = Number.parseInt(String(button.dataset.antibotExclusionRemove || "-1"), 10);
+      if (!Number.isInteger(index) || index < 0) return;
+      syncStateDraftFromForm();
+      const current = normalizeAntibotExclusionRules(state.draft.antibot_exclusion_rules);
+      if (index >= current.length) return;
+      current.splice(index, 1);
+      state.draft.antibot_exclusion_rules = current;
       render();
     });
   });

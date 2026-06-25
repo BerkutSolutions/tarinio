@@ -89,6 +89,7 @@ export function defaultSiteDraft() {
     antibot_hcaptcha_secret: "",
     antibot_turnstile_sitekey: "",
     antibot_turnstile_secret: "",
+    antibot_exclusion_rules: [],
     challenge_escalation_enabled: false,
     challenge_escalation_mode: "javascript",
     antibot_challenge_rules: [],

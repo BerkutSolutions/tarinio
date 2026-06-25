@@ -49,6 +49,8 @@ func TestSiteSettings_FieldContract(t *testing.T) {
 		"security_antibot.antibot_turnstile_secret",
 		"security_antibot.antibot_turnstile_sitekey",
 		"security_antibot.antibot_uri",
+		"security_antibot.exclusion_rules.methods",
+		"security_antibot.exclusion_rules.path",
 		"security_antibot.challenge_escalation_enabled",
 		"security_antibot.challenge_escalation_mode",
 		"security_antibot.challenge_rules.challenge",
@@ -294,6 +296,10 @@ func allFieldsProfile(siteID string) EasySiteProfile {
 	profile.SecurityAntibot.AntibotHcaptchaSecret = "hcaptcha-secret"
 	profile.SecurityAntibot.AntibotTurnstileSitekey = "turnstile-site"
 	profile.SecurityAntibot.AntibotTurnstileSecret = "turnstile-secret"
+	profile.SecurityAntibot.ExclusionRules = []AntibotExclusionRule{
+		{Path: "/api/2/envelope/", Methods: []string{"POST"}},
+		{Path: "/healthz", Methods: []string{"GET", "HEAD"}},
+	}
 	profile.SecurityAntibot.ChallengeEscalationEnabled = true
 	profile.SecurityAntibot.ChallengeEscalationMode = AntibotChallengeTurnstile
 	profile.SecurityAntibot.ChallengeRules = []AntibotChallengeRule{

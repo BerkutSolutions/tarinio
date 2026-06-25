@@ -44,6 +44,7 @@ export function bindDetailRuntime(deps) {
     getQuickListTemplates,
     LIST_FIELD_SET,
     normalizeCustomLimitRules,
+    normalizeAntibotExclusionRules,
     normalizeAntibotChallengeRules,
     bindDetailSearchAndListEvents,
     bindDetailRuleEvents,
@@ -84,6 +85,7 @@ export function bindDetailRuntime(deps) {
     normalizeStringArray,
     normalizeArray,
     normalizeBanEscalationStages,
+    normalizeAntibotExclusionRules,
     normalizeAuthBasicUsers,
     normalizeAuthSessionTTLMinutes,
     normalizeAPIPositiveEndpointPolicies
@@ -186,6 +188,7 @@ export function bindDetailRuntime(deps) {
     LIST_FIELD_SET,
     normalizeStringArray,
     normalizeCustomLimitRules,
+    normalizeAntibotExclusionRules,
     normalizeAntibotChallengeRules,
     normalizeAuthBasicUsers,
   });

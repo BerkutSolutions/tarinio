@@ -104,6 +104,7 @@ func renderEasySiteArtifacts(site SiteInput, profile EasyProfileInput) ([]Artifa
 		AntibotRecaptchaHint:         strings.TrimSpace(profile.AntibotRecaptchaKey),
 		AntibotHcaptchaHint:          strings.TrimSpace(profile.AntibotHcaptchaKey),
 		AntibotTurnstileHint:         strings.TrimSpace(profile.AntibotTurnstileKey),
+		AntibotExclusionRules:        buildEasyAntibotExclusionRuleData(profile.AntibotExclusionRules),
 		AntibotRuleOverrides:         buildEasyAntibotRuleData(profile.AntibotChallengeRules, profile.AntibotURI),
 		AntibotScannerAutoBan:        profile.AntibotScannerAutoBan,
 		AntibotScannerPattern:        antibotScannerPattern(),

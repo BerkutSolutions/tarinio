@@ -1,5 +1,5 @@
 import { normalizeArray } from "./sites.routing-merge.js";
-import { normalizeAntibotChallengeRules, normalizeCustomLimitRules, normalizeStringArray } from "./sites.normalize.js";
+import { normalizeAntibotChallengeRules, normalizeAntibotExclusionRules, normalizeCustomLimitRules, normalizeStringArray } from "./sites.normalize.js";
 import { normalizeAuthBasicUsers } from "./sites.auth-geo.js";
 import { BAN_SCOPE_VALUES, normalizeBanEscalationStages } from "./sites.traffic-helpers.js";
 
@@ -26,6 +26,7 @@ export function validateDraft(draft, ctx) {
   if (draft.use_limit_req && !String(draft.limit_req_rate || "").trim()) return ctx.t("sites.validation.limitReqRateRequired");
   if (draft.use_limit_req && !/^\d+r\/s$/i.test(String(draft.limit_req_rate || "").trim().replace(/\s+/g, ""))) return ctx.t("sites.validation.limitReqRateFormat");
   if (normalizeCustomLimitRules(draft.custom_limit_rules).length > 32) return ctx.t("sites.validation.customLimitRulesLimit");
+  if (draft.antibot_challenge === "no" && normalizeAntibotExclusionRules(draft.antibot_exclusion_rules).length) return ctx.t("sites.validation.antibotExclusionsRequireEnabled");
   if (draft.hsts_enabled && (!Number.isFinite(draft.hsts_max_age_seconds) || Number(draft.hsts_max_age_seconds) <= 0)) return ctx.t("sites.validation.hstsMaxAgePositive");
   if (draft.hsts_preload && !draft.hsts_enabled) return ctx.t("sites.validation.hstsPreloadNeedsEnabled");
   if (draft.hsts_include_subdomains && !draft.hsts_enabled) return ctx.t("sites.validation.hstsPreloadNeedsEnabled");
@@ -34,6 +35,16 @@ export function validateDraft(draft, ctx) {
   for (const rule of normalizeCustomLimitRules(draft.custom_limit_rules)) {
     if (!rule.path.startsWith("/")) return ctx.t("sites.validation.customLimitPathFormat");
     if (!/^\d+r\/s$/i.test(rule.rate)) return ctx.t("sites.validation.customLimitRateFormat");
+  }
+  if (normalizeAntibotExclusionRules(draft.antibot_exclusion_rules).length > 32) return ctx.t("sites.validation.antibotExclusionRulesLimit");
+  for (const rule of normalizeAntibotExclusionRules(draft.antibot_exclusion_rules)) {
+    if (!rule.path.startsWith("/")) return ctx.t("sites.validation.antibotExclusionPathFormat");
+    const methods = Array.isArray(rule.methods) ? rule.methods : [];
+    if (!methods.length) return ctx.t("sites.validation.antibotExclusionMethodsInvalid");
+    if (methods.includes("*") && methods.length !== 1) return ctx.t("sites.validation.antibotExclusionMethodsInvalid");
+    for (const method of methods) {
+      if (!["*", "GET", "POST", "HEAD", "OPTIONS", "PUT", "DELETE", "PATCH"].includes(method)) return ctx.t("sites.validation.antibotExclusionMethodsInvalid");
+    }
   }
   if (normalizeAntibotChallengeRules(draft.antibot_challenge_rules).length > 32) return "Too many antibot challenge rules (max 32).";
   for (const rule of normalizeAntibotChallengeRules(draft.antibot_challenge_rules)) {

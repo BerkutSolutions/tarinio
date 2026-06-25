@@ -89,6 +89,7 @@ func normalizeProfile(profile EasySiteProfile) EasySiteProfile {
 	profile.SecurityAntibot.AntibotHcaptchaSecret = strings.TrimSpace(profile.SecurityAntibot.AntibotHcaptchaSecret)
 	profile.SecurityAntibot.AntibotTurnstileSitekey = strings.TrimSpace(profile.SecurityAntibot.AntibotTurnstileSitekey)
 	profile.SecurityAntibot.AntibotTurnstileSecret = strings.TrimSpace(profile.SecurityAntibot.AntibotTurnstileSecret)
+	profile.SecurityAntibot.ExclusionRules = normalizeAntibotExclusionRules(profile.SecurityAntibot.ExclusionRules)
 	profile.SecurityAntibot.ChallengeEscalationMode = strings.ToLower(strings.TrimSpace(profile.SecurityAntibot.ChallengeEscalationMode))
 	if profile.SecurityAntibot.ChallengeEscalationMode == "" {
 		profile.SecurityAntibot.ChallengeEscalationMode = AntibotChallengeJavascript
@@ -182,6 +183,7 @@ func applySecurityModePolicy(profile EasySiteProfile) EasySiteProfile {
 		profile.SecurityAntibot.ScannerAutoBanEnabled = false
 		profile.SecurityAntibot.ChallengeEscalationEnabled = false
 		profile.SecurityAntibot.ChallengeEscalationMode = AntibotChallengeNo
+		profile.SecurityAntibot.ExclusionRules = nil
 		profile.SecurityAntibot.ChallengeRules = nil
 		profile.SecurityAuthBasic.UseAuthBasic = false
 		profile.SecurityAPIPositive.UseAPIPositiveSecurity = false
@@ -208,6 +210,7 @@ func applySecurityModePolicy(profile EasySiteProfile) EasySiteProfile {
 		profile.SecurityAntibot.ScannerAutoBanEnabled = false
 		profile.SecurityAntibot.ChallengeEscalationEnabled = false
 		profile.SecurityAntibot.ChallengeEscalationMode = AntibotChallengeNo
+		profile.SecurityAntibot.ExclusionRules = nil
 		profile.SecurityAntibot.ChallengeRules = nil
 		profile.SecurityAuthBasic.UseAuthBasic = false
 		profile.SecurityAPIPositive.UseAPIPositiveSecurity = false
@@ -365,8 +368,8 @@ func validateProfile(profile EasySiteProfile) error {
 		if profile.SecurityAntibot.AntibotURI == "" || !strings.HasPrefix(profile.SecurityAntibot.AntibotURI, "/") {
 			return errors.New("easy site profile security_antibot.antibot_uri must start with / when antibot is enabled")
 		}
-	} else if len(profile.SecurityAntibot.ChallengeRules) > 0 {
-		return errors.New("easy site profile security_antibot.challenge_rules requires antibot enabled")
+	} else if len(profile.SecurityAntibot.ExclusionRules) > 0 || len(profile.SecurityAntibot.ChallengeRules) > 0 {
+		return errors.New("easy site profile security_antibot.exclusion_rules and challenge_rules require antibot enabled")
 	}
 	if profile.SecurityAntibot.AntibotRecaptchaScore < 0 || profile.SecurityAntibot.AntibotRecaptchaScore > 1 {
 		return errors.New("easy site profile security_antibot.antibot_recaptcha_score must be between 0 and 1")
@@ -384,6 +387,28 @@ func validateProfile(profile EasySiteProfile) error {
 	if profile.SecurityAntibot.AntibotChallenge == AntibotChallengeTurnstile {
 		if profile.SecurityAntibot.AntibotTurnstileSitekey == "" || profile.SecurityAntibot.AntibotTurnstileSecret == "" {
 			return errors.New("easy site profile security_antibot turnstile mode requires sitekey and secret")
+		}
+	}
+	if len(profile.SecurityAntibot.ExclusionRules) > 32 {
+		return errors.New("easy site profile security_antibot.exclusion_rules must not exceed 32 entries")
+	}
+	for _, rule := range profile.SecurityAntibot.ExclusionRules {
+		if rule.Path == "" || !strings.HasPrefix(rule.Path, "/") {
+			return errors.New("easy site profile security_antibot.exclusion_rules.path must start with /")
+		}
+		if len(rule.Methods) == 0 {
+			return errors.New("easy site profile security_antibot.exclusion_rules.methods must not be empty")
+		}
+		for _, method := range rule.Methods {
+			if method == "*" {
+				if len(rule.Methods) != 1 {
+					return errors.New("easy site profile security_antibot.exclusion_rules.methods wildcard must be used alone")
+				}
+				continue
+			}
+			if !slices.Contains(allowedMethods, method) {
+				return fmt.Errorf("easy site profile security_antibot.exclusion_rules.methods contains unsupported method %s", method)
+			}
 		}
 	}
 	if profile.SecurityAntibot.ChallengeEscalationEnabled {
@@ -706,6 +731,43 @@ func normalizeAntibotChallengeRules(values []AntibotChallengeRule) []AntibotChal
 	sort.Slice(items, func(i, j int) bool {
 		if items[i].Path == items[j].Path {
 			return items[i].Challenge < items[j].Challenge
+		}
+		return items[i].Path < items[j].Path
+	})
+	return items
+}
+
+func normalizeAntibotExclusionRules(values []AntibotExclusionRule) []AntibotExclusionRule {
+	if len(values) == 0 {
+		return nil
+	}
+	items := make([]AntibotExclusionRule, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		path := strings.TrimSpace(value.Path)
+		methods := normalizeUpperList(value.Methods)
+		if len(methods) == 0 {
+			methods = []string{"*"}
+		}
+		if slices.Contains(methods, "*") {
+			methods = []string{"*"}
+		}
+		if path == "" {
+			continue
+		}
+		key := strings.ToLower(path) + "\x00" + strings.Join(methods, ",")
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		items = append(items, AntibotExclusionRule{
+			Path:    path,
+			Methods: methods,
+		})
+	}
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].Path == items[j].Path {
+			return strings.Join(items[i].Methods, ",") < strings.Join(items[j].Methods, ",")
 		}
 		return items[i].Path < items[j].Path
 	})

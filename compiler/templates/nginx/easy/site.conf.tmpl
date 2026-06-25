@@ -164,6 +164,10 @@ if ($cookie_waf_session_boot != "") { set $waf_antibot_exception_guard 1; }
 {{- if .UseAuthBasic }}
 {{- end }}
 if (${{ .ExceptionVar }} = 1) { set $waf_antibot_exception_guard 1; }
+set $waf_antibot_exclusion_match "$request_method:$uri";
+{{- range .AntibotExclusionRules }}
+if ($waf_antibot_exclusion_match ~* "{{ .MatchPattern }}") { set $waf_antibot_exception_guard 1; }
+{{- end }}
 set $waf_antibot_effective_challenge "{{ .AntibotChallenge }}";
 set $waf_antibot_effective_redirect "{{ .AntibotRedirectURI }}";
 {{- range .AntibotRuleOverrides }}

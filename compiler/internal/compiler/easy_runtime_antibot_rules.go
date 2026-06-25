@@ -45,6 +45,48 @@ func normalizeCompilerAntibotRules(values []AntibotChallengeRuleInput) []Antibot
 	return items
 }
 
+func normalizeCompilerAntibotExclusionRules(values []AntibotExclusionRuleInput) []AntibotExclusionRuleInput {
+	if len(values) == 0 {
+		return nil
+	}
+	items := make([]AntibotExclusionRuleInput, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		path := strings.TrimSpace(value.Path)
+		if path == "" {
+			continue
+		}
+		methods := sortedUniqueUpper(value.Methods)
+		if len(methods) == 0 || hasWildcardMethod(methods) {
+			methods = []string{"*"}
+		}
+		key := strings.ToLower(path) + "\x00" + strings.Join(methods, ",")
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		items = append(items, AntibotExclusionRuleInput{
+			Path:    path,
+			Methods: methods,
+		})
+	}
+	sort.Slice(items, func(i, j int) bool {
+		leftPriority := customLimitPriority(items[i].Path)
+		rightPriority := customLimitPriority(items[j].Path)
+		if leftPriority != rightPriority {
+			return leftPriority > rightPriority
+		}
+		if len(items[i].Path) != len(items[j].Path) {
+			return len(items[i].Path) > len(items[j].Path)
+		}
+		if items[i].Path == items[j].Path {
+			return strings.Join(items[i].Methods, ",") < strings.Join(items[j].Methods, ",")
+		}
+		return items[i].Path < items[j].Path
+	})
+	return items
+}
+
 func buildEasyAntibotRuleData(rules []AntibotChallengeRuleInput, challengeURI string) []easyAntibotRuleData {
 	if len(rules) == 0 {
 		return nil
@@ -60,6 +102,21 @@ func buildEasyAntibotRuleData(rules []AntibotChallengeRuleInput, challengeURI st
 			Challenge:    rule.Challenge,
 			RedirectURI:  antibotRedirectURI(rule.Challenge, challengeURI),
 		})
+	}
+	return out
+}
+
+func buildEasyAntibotExclusionRuleData(rules []AntibotExclusionRuleInput) []easyAntibotExclusionRuleData {
+	if len(rules) == 0 {
+		return nil
+	}
+	out := make([]easyAntibotExclusionRuleData, 0, len(rules))
+	for _, rule := range rules {
+		pattern := antibotExclusionMatchPattern(rule.Path, rule.Methods)
+		if pattern == "" {
+			continue
+		}
+		out = append(out, easyAntibotExclusionRuleData{MatchPattern: pattern})
 	}
 	return out
 }
@@ -83,6 +140,45 @@ func antibotRuleGuardPattern(path string) string {
 		return "^" + regexp.QuoteMeta(trimmed)
 	}
 	return "^" + regexp.QuoteMeta(trimmed) + "$"
+}
+
+func antibotExclusionMatchPattern(path string, methods []string) string {
+	pathPattern := antibotRuleGuardPattern(path)
+	if pathPattern == "" {
+		return ""
+	}
+	methodPattern := antibotExclusionMethodPattern(methods)
+	if methodPattern == "" {
+		return ""
+	}
+	return "^" + methodPattern + ":" + strings.TrimPrefix(pathPattern, "^")
+}
+
+func antibotExclusionMethodPattern(methods []string) string {
+	if len(methods) == 0 || hasWildcardMethod(methods) {
+		return "[A-Z]+"
+	}
+	escaped := make([]string, 0, len(methods))
+	for _, method := range methods {
+		trimmed := strings.ToUpper(strings.TrimSpace(method))
+		if trimmed == "" {
+			continue
+		}
+		escaped = append(escaped, regexp.QuoteMeta(trimmed))
+	}
+	if len(escaped) == 0 {
+		return ""
+	}
+	return "(?:" + strings.Join(escaped, "|") + ")"
+}
+
+func hasWildcardMethod(methods []string) bool {
+	for _, method := range methods {
+		if strings.TrimSpace(method) == "*" {
+			return true
+		}
+	}
+	return false
 }
 
 func normalizeBlacklistURIPatterns(values []string) []string {
