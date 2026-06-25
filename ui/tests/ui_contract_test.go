@@ -88,6 +88,7 @@ func TestUIContract_OnboardingAndSidebarMarkers(t *testing.T) {
 			name: "sites modular markers",
 			files: []string{
 				filepath.Join("..", "app", "static", "js", "pages", "sites.js"),
+				filepath.Join("..", "app", "static", "js", "pages", "sites.access-upsert.js"),
 				filepath.Join("..", "app", "static", "js", "pages", "sites.service-policy-helpers.js"),
 				filepath.Join("..", "app", "static", "js", "pages", "sites.import-export.js"),
 				filepath.Join("..", "app", "static", "js", "pages", "sites.save-apply.js"),
@@ -106,6 +107,8 @@ func TestUIContract_OnboardingAndSidebarMarkers(t *testing.T) {
 				`data-mode-tab="raw"`,
 				`async function hydrateSiteDraft(ctx, site, upstream, tlsConfig, accessPolicy = null)`,
 				`"X-WAF-Auto-Apply-Disabled": "1"`,
+				`const requestOptions = options?.requestOptions || {};`,
+				`ctx.api.post("/api/access-policies/upsert", payload, requestOptions);`,
 				`/api/revisions/compile`,
 				`/apply`,
 				`id="services-select-all"`,
