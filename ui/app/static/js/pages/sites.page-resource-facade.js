@@ -22,8 +22,8 @@ export function isAlreadyExistsError(error) {
   return isAlreadyExistsErrorModule(error);
 }
 
-export function upsertAccessPolicy(draft, ctx, existingAccessPolicy, deps) {
-  return upsertAccessPolicyModule(draft, ctx, existingAccessPolicy, deps);
+export function upsertAccessPolicy(draft, ctx, existingAccessPolicy, options = {}, deps) {
+  return upsertAccessPolicyModule(draft, ctx, existingAccessPolicy, options, deps);
 }
 
 export function resolveACMEAccountEmail(draft, ctx) {

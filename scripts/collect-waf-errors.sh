@@ -142,6 +142,15 @@ run "runtime_access_recent.log" docker exec "$RUNTIME_CONTAINER" sh -lc "tail -n
 } >"$OUT/control_plane_requests_focus.txt" 2>&1
 
 {
+  echo "# revision and apply focus"
+  echo "since=$SINCE"
+  echo
+  grep -nEi '"route":"/api/revisions"|"/api/revisions/[^"]+/apply"|"/api/easy-site-profiles|"/api/access-policies' "$OUT/control_plane_logs_since.log" || true
+  echo
+  grep -nEi 'revision|apply' "$OUT/control_plane_logs_since.log" || true
+} >"$OUT/revision_apply_focus.txt" 2>&1
+
+{
   echo "# runtime request status summary"
   grep -Eo '\"status\":[0-9]+' "$OUT/runtime_access_recent.log" | sort | uniq -c | sort -nr || true
   echo
@@ -156,6 +165,10 @@ run "runtime_access_recent.log" docker exec "$RUNTIME_CONTAINER" sh -lc "tail -n
   acme_missing_count="$(grep -Eci "acme-challenge|open\\(" "$OUT/runtime_logs_since.log" || true)"
   hash_warn_count="$(grep -Eci "variables_hash" "$OUT/runtime_logs_since.log" || true)"
   collector_timeout_count="$(grep -Eci "runtime security collector failed|deadline exceeded" "$OUT/control_plane_logs_since.log" || true)"
+  revision_compile_count="$(grep -Eci '"route":"/api/revisions/compile"' "$OUT/control_plane_logs_since.log" || true)"
+  revision_apply_count="$(grep -Eci '"route":"/api/revisions/:id/apply"' "$OUT/control_plane_logs_since.log" || true)"
+  easy_profile_write_count="$(grep -Eci '"method":"(POST|PUT)".*"/api/easy-site-profiles' "$OUT/control_plane_logs_since.log" || true)"
+  access_policy_write_count="$(grep -Eci '"method":"(POST|PUT|DELETE)".*"/api/access-policies' "$OUT/control_plane_logs_since.log" || true)"
 
   echo "since=$SINCE"
   echo "runtime_container=$RUNTIME_CONTAINER"
@@ -166,6 +179,10 @@ run "runtime_access_recent.log" docker exec "$RUNTIME_CONTAINER" sh -lc "tail -n
   echo "runtime.acme_missing.count=$acme_missing_count"
   echo "runtime.variables_hash_warn.count=$hash_warn_count"
   echo "control_plane.collector_timeout.count=$collector_timeout_count"
+  echo "control_plane.revision_compile.count=$revision_compile_count"
+  echo "control_plane.revision_apply.count=$revision_apply_count"
+  echo "control_plane.easy_profile_write.count=$easy_profile_write_count"
+  echo "control_plane.access_policy_write.count=$access_policy_write_count"
 } >"$OUT/summary.txt" 2>&1
 
 tar -C "$OUT_BASE_DIR" -czf "${OUT}.tar.gz" "$(basename "$OUT")"

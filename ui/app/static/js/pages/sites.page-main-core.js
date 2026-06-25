@@ -431,8 +431,8 @@ function ensureControlPlaneAccessManagementMethods(draft) {
   return ensureControlPlaneAccessManagementMethodsFacade(draft);
 }
 
-function upsertAccessPolicy(draft, ctx, existingAccessPolicy) {
-  return upsertAccessPolicyFacade(draft, ctx, existingAccessPolicy, {
+function upsertAccessPolicy(draft, ctx, existingAccessPolicy, options = {}) {
+  return upsertAccessPolicyFacade(draft, ctx, existingAccessPolicy, options, {
     normalizeSiteID,
     normalizeArray
   });

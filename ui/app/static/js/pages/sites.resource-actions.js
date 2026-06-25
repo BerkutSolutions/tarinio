@@ -1,8 +1,9 @@
-export async function upsertAccessPolicy(draft, ctx, existingAccessPolicy, deps) {
+export async function upsertAccessPolicy(draft, ctx, existingAccessPolicy, options = {}, deps) {
   const siteID = deps.normalizeSiteID(draft.id);
   if (!siteID) {
     return;
   }
+  const requestOptions = options?.requestOptions || {};
   const allowlistSources = [];
   if (draft.use_allowlist || deps.normalizeStringArray(draft.access_allowlist).length) {
     allowlistSources.push(...deps.normalizeStringArray(draft.access_allowlist));
@@ -20,7 +21,7 @@ export async function upsertAccessPolicy(draft, ctx, existingAccessPolicy, deps)
     denylist
   };
   const resolvePolicyForSite = async () => {
-    const accessPolicies = deps.normalizeArray(await ctx.api.get("/api/access-policies"));
+    const accessPolicies = deps.normalizeArray(await ctx.api.get("/api/access-policies", requestOptions));
     return accessPolicies.find((item) => deps.normalizeSiteID(item?.site_id) === siteID) || null;
   };
   const normalizeListForCompare = (values) => deps.normalizeStringArray(values).slice().sort();
@@ -45,7 +46,7 @@ export async function upsertAccessPolicy(draft, ctx, existingAccessPolicy, deps)
         return false;
       }
       try {
-        await ctx.api.delete(`/api/access-policies/${encodeURIComponent(normalizedID)}`);
+        await ctx.api.delete(`/api/access-policies/${encodeURIComponent(normalizedID)}`, requestOptions);
       } catch (error) {
         const policyForSite = await resolvePolicyForSite();
         if (!policyForSite) {
@@ -85,7 +86,7 @@ export async function upsertAccessPolicy(draft, ctx, existingAccessPolicy, deps)
     return;
   }
   try {
-    await ctx.api.post("/api/access-policies/upsert", payload);
+    await ctx.api.post("/api/access-policies/upsert", payload, requestOptions);
   } catch (error) {
     if (deps.isAutoApplyFailureError(error)) {
       const policyForSite = await resolvePolicyForSite();
@@ -97,7 +98,7 @@ export async function upsertAccessPolicy(draft, ctx, existingAccessPolicy, deps)
       // Backward compatibility with older backend versions without upsert endpoint.
       if (existingAccessPolicy) {
         try {
-          await ctx.api.put(`/api/access-policies/${encodeURIComponent(payload.id)}`, payload);
+          await ctx.api.put(`/api/access-policies/${encodeURIComponent(payload.id)}`, payload, requestOptions);
           return;
         } catch (putError) {
           if (deps.isAutoApplyFailureError(putError)) {
@@ -112,7 +113,7 @@ export async function upsertAccessPolicy(draft, ctx, existingAccessPolicy, deps)
         }
       }
       try {
-        await ctx.api.post("/api/access-policies", payload);
+        await ctx.api.post("/api/access-policies", payload, requestOptions);
       } catch (postError) {
         if (deps.isAutoApplyFailureError(postError)) {
           const policyForSite = await resolvePolicyForSite();
@@ -130,7 +131,7 @@ export async function upsertAccessPolicy(draft, ctx, existingAccessPolicy, deps)
       if (policyForSite?.id) {
         const upsertPayload = { ...payload, id: String(policyForSite.id) };
         try {
-          await ctx.api.put(`/api/access-policies/${encodeURIComponent(String(policyForSite.id))}`, upsertPayload);
+          await ctx.api.put(`/api/access-policies/${encodeURIComponent(String(policyForSite.id))}`, upsertPayload, requestOptions);
         } catch (putError) {
           if (deps.isAutoApplyFailureError(putError)) {
             const persistedPolicy = await resolvePolicyForSite();

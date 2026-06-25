@@ -1,5 +1,6 @@
 import { setError, setLoading } from "../ui.js";
 import { normalizeSiteID, routeBase } from "./sites.routing-merge.js";
+import { compileAndApplySiteRevision, siteSaveNoAutoApplyOptions } from "./sites.save-apply.js";
 
 export function bindDetailSubmitDelete(container, state, ctx, deps) {
   const {
@@ -40,26 +41,18 @@ export function bindDetailSubmitDelete(container, state, ctx, deps) {
     }
     try {
       setLoading(feedback, ctx.t("sites.editor.saving"));
+      const saveOptions = { requestOptions: siteSaveNoAutoApplyOptions };
       const existingSite = state.sites.find((item) => normalizeSiteID(item?.id) === normalizeSiteID(state.route.siteID) || normalizeSiteID(item?.id) === normalizeSiteID(draft.id));
       const existingUpstream = state.upstreams.find((item) => item.id === draft.upstream_id);
       const existingTLSConfig = state.tlsBySite.get(draft.id) || null;
       const existingAccessPolicy = state.accessBySite.get(normalizeSiteID(draft.id)) || null;
       if (shouldUpsertBaseResources(draft, existingSite, existingUpstream, existingTLSConfig)) {
-        await upsertSiteResources(draft, ctx, existingSite, existingUpstream, existingTLSConfig);
+        await upsertSiteResources(draft, ctx, existingSite, existingUpstream, existingTLSConfig, saveOptions);
       }
-      await upsertAccessPolicy(draft, ctx, existingAccessPolicy);
+      await upsertAccessPolicy(draft, ctx, existingAccessPolicy, saveOptions);
       const easyProfilePath = `/api/easy-site-profiles/${encodeURIComponent(draft.id)}`;
-      await putWithPostFallback(ctx, easyProfilePath, draftToEasyProfile(draft), {
-        tolerateAutoApplyError: true,
-        verifyPersisted: async () => {
-          try {
-            const persisted = await ctx.api.get(easyProfilePath);
-            return normalizeSiteID(persisted?.site_id) === normalizeSiteID(draft.id);
-          } catch (_error) {
-            return false;
-          }
-        }
-      });
+      await putWithPostFallback(ctx, easyProfilePath, draftToEasyProfile(draft), saveOptions);
+      await compileAndApplySiteRevision(ctx);
       ctx.notify(ctx.t("toast.siteSaved"));
       go(`${routeBase()}/${encodeURIComponent(draft.id)}`);
     } catch (error) {
