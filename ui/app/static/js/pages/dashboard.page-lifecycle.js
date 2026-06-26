@@ -34,9 +34,27 @@ function queueContainersOverviewRefresh(deps) {
 
 function loadDashboardStats(silent, deps) {
   const options = silent ? { headers: { "X-Berkut-Background": "1" } } : {};
-  return deps.ctx.api.get("/api/dashboard/stats", options)
-    .then((stats) => {
-      deps.renderAllStats(stats);
+  const SYSTEM_SERVICES = new Set(["control-plane", "runtime"]);
+  return Promise.all([
+    deps.ctx.api.get("/api/dashboard/stats", options),
+    deps.ctx.api.get("/api/sites").catch(() => [])
+  ])
+    .then(([stats, sitesRaw]) => {
+      const sites = Array.isArray(sitesRaw) ? sitesRaw : [];
+      const checkedAt = new Date().toISOString();
+      const siteServices = sites.map((site) => ({
+        name: String(site?.id || ""),
+        up: Boolean(site?.enabled),
+        checked_at: checkedAt
+      }));
+      const mergedStats = {
+        ...stats,
+        services: [
+          ...(Array.isArray(stats?.services) ? stats.services.filter((s) => SYSTEM_SERVICES.has(String(s?.name || "").trim().toLowerCase())) : []),
+          ...siteServices
+        ]
+      };
+      deps.renderAllStats(mergedStats);
       if (!silent) {
         deps.applyAllGeometry(deps.boardNode, deps.layout);
       }
