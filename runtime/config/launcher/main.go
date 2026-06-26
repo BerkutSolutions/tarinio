@@ -366,6 +366,18 @@ func (s *runtimeStatus) handlers(process *runtimeProcess, securitySource *securi
 		}
 		writeJSON(w, http.StatusOK, items)
 	}))
+	mux.HandleFunc("/requests/count", requireRuntimeAccess(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		n, err := requestSource.count(r.URL.Query())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"count": n})
+	}))
 	mux.HandleFunc("/requests/probe", requireRuntimeAccess(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)

@@ -445,6 +445,34 @@ func (s *requestOpenSearchStore) exportDay(day string) ([]requestLogRecord, erro
 	return out, nil
 }
 
+func (s *requestOpenSearchStore) count(options requestQueryOptions) (int, error) {
+	cfg, err := s.currentConfig()
+	if err != nil {
+		return 0, err
+	}
+	if !cfg.Enabled {
+		return 0, errOpenSearchDisabled
+	}
+	if err := s.ensureIndex(cfg); err != nil {
+		return 0, err
+	}
+	query := map[string]any{
+		"size":  0,
+		"query": buildOpenSearchRequestQuery(options),
+	}
+	var payload struct {
+		Hits struct {
+			Total struct {
+				Value int `json:"value"`
+			} `json:"total"`
+		} `json:"hits"`
+	}
+	if err := s.doRequest(cfg, http.MethodPost, "/"+cfg.RequestsIndex+"/_search", query, &payload); err != nil {
+		return 0, err
+	}
+	return payload.Hits.Total.Value, nil
+}
+
 func (s *requestOpenSearchStore) containsDayRecords(day string, expected []requestLogRecord) error {
 	if s == nil || len(expected) == 0 {
 		return nil

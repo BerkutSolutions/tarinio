@@ -23,10 +23,25 @@ func (f *fakeDashboardEventReader) Probe() error { return f.err }
 type fakeDashboardRequestCollector struct {
 	items []map[string]any
 	err   error
+	count int
 }
 
 func (f *fakeDashboardRequestCollector) Collect() ([]map[string]any, error) {
 	return append([]map[string]any(nil), f.items...), f.err
+}
+
+func (f *fakeDashboardRequestCollector) CollectWithOptions(_ url.Values) ([]map[string]any, error) {
+	return append([]map[string]any(nil), f.items...), f.err
+}
+
+func (f *fakeDashboardRequestCollector) CollectCount(_ url.Values) (int, error) {
+	if f.err != nil {
+		return 0, f.err
+	}
+	if f.count > 0 {
+		return f.count, nil
+	}
+	return len(f.items), nil
 }
 
 func (f *fakeDashboardRequestCollector) Probe(_ url.Values) error { return f.err }

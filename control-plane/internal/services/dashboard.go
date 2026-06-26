@@ -21,6 +21,10 @@ type runtimeRequestCollectorWithOptions interface {
 	CollectWithOptions(query url.Values) ([]map[string]any, error)
 }
 
+type runtimeRequestCounter interface {
+	CollectCount(query url.Values) (int, error)
+}
+
 type DashboardService struct {
 	events       dashboardEventReader
 	requests     RuntimeRequestCollector
@@ -244,6 +248,24 @@ func (s *DashboardService) collectServiceStatus(now time.Time) []DashboardServic
 		})
 	}
 	return statuses
+}
+
+func (s *DashboardService) collectRequestsDay() (int, bool) {
+	if s.requests == nil {
+		return 0, false
+	}
+	counter, ok := s.requests.(runtimeRequestCounter)
+	if !ok {
+		return 0, false
+	}
+	q := make(url.Values)
+	since := time.Now().UTC().Add(-24 * time.Hour)
+	q.Set("since", since.Format(time.RFC3339))
+	n, err := counter.CollectCount(q)
+	if err != nil {
+		return 0, false
+	}
+	return n, true
 }
 
 func (s *DashboardService) collectRequests() ([]map[string]any, error) {

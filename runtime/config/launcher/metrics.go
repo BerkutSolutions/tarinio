@@ -282,6 +282,8 @@ func normalizeRuntimeRoute(path string) string {
 		return "/security-events/probe"
 	case "/security-events":
 		return "/security-events"
+	case "/requests/count":
+		return "/requests/count"
 	case "/requests/probe":
 		return "/requests/probe"
 	case "/requests/indexes":

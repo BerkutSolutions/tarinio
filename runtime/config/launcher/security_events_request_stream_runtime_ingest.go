@@ -44,6 +44,32 @@ func (s *requestStreamSource) latest(query url.Values) ([]map[string]any, error)
 	return items, nil
 }
 
+func (s *requestStreamSource) count(query url.Values) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	options := parseRequestQueryOptions(query, s.maxItems, s.defaultRetention)
+
+	if err := s.ensureArchiveRootLocked(); err != nil {
+		return 0, err
+	}
+
+	// Try OpenSearch first — accurate server-side count, zero document transfer.
+	if s.opensearch != nil {
+		n, err := s.opensearch.count(options)
+		if err == nil {
+			return n, nil
+		}
+		if !errors.Is(err, errOpenSearchDisabled) {
+			s.lastIngestError = err.Error()
+		}
+	}
+
+	// ClickHouse: fall back to local archive count (ClickHouse path uses file archive too).
+	// Archive is always the local copy; count it directly.
+	return s.countArchiveRowsLocked(options), nil
+}
+
 func (s *requestStreamSource) probe(query url.Values) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

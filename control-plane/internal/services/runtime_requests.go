@@ -43,6 +43,68 @@ func (c *HTTPRuntimeRequestCollector) Collect() ([]map[string]any, error) {
 	return c.CollectWithOptions(nil)
 }
 
+func (c *HTTPRuntimeRequestCollector) CollectCount(query url.Values) (int, error) {
+	if c == nil || strings.TrimSpace(c.URL) == "" {
+		return 0, nil
+	}
+	countURL := deriveRuntimeRequestsCountURL(c.URL)
+	var lastErr error
+	for _, baseURL := range runtimeEndpointCandidates(countURL, "http://127.0.0.1:8081/requests/count") {
+		targetURL := baseURL
+		if len(query) > 0 {
+			if parsed, err := url.Parse(targetURL); err == nil {
+				q := parsed.Query()
+				for _, key := range []string{"since", "day", "retention_days"} {
+					value := strings.TrimSpace(query.Get(key))
+					if value == "" {
+						continue
+					}
+					q.Set(key, value)
+				}
+				parsed.RawQuery = q.Encode()
+				targetURL = parsed.String()
+			}
+		}
+		reqCtx, cancel := context.WithTimeout(context.Background(), runtimeRequestsCollectAttemptTimeout)
+		req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, targetURL, nil)
+		if err != nil {
+			cancel()
+			lastErr = err
+			continue
+		}
+		setRuntimeAuthHeader(req, c.Token)
+		client := c.Client
+		if client == nil {
+			client = &http.Client{Timeout: runtimeRequestsHTTPTimeout}
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			cancel()
+			lastErr = err
+			continue
+		}
+		n, err := func() (int, error) {
+			defer cancel()
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				return 0, fmt.Errorf("runtime requests/count endpoint returned %d", resp.StatusCode)
+			}
+			var payload struct {
+				Count int `json:"count"`
+			}
+			if err := json.NewDecoder(io.LimitReader(resp.Body, 64*1024)).Decode(&payload); err != nil {
+				return 0, fmt.Errorf("decode runtime requests/count payload: %w", err)
+			}
+			return payload.Count, nil
+		}()
+		if err == nil {
+			return n, nil
+		}
+		lastErr = err
+	}
+	return 0, lastErr
+}
+
 func (c *HTTPRuntimeRequestCollector) CollectWithOptions(query url.Values) ([]map[string]any, error) {
 	if c == nil || strings.TrimSpace(c.URL) == "" {
 		return []map[string]any{}, nil
@@ -191,6 +253,17 @@ func deriveRuntimeRequestsProbeURL(targetURL string) string {
 		return strings.TrimSpace(targetURL)
 	}
 	parsed.Path = "/requests/probe"
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	return parsed.String()
+}
+
+func deriveRuntimeRequestsCountURL(targetURL string) string {
+	parsed, err := url.Parse(strings.TrimSpace(targetURL))
+	if err != nil {
+		return strings.TrimSpace(targetURL)
+	}
+	parsed.Path = "/requests/count"
 	parsed.RawQuery = ""
 	parsed.Fragment = ""
 	return parsed.String()

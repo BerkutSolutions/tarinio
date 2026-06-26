@@ -224,3 +224,40 @@ func (s *requestStreamSource) loadArchiveRowsLocked(options requestQueryOptions)
 	reverseRequestRows(out)
 	return out, nil
 }
+
+func (s *requestStreamSource) countArchiveRowsLocked(options requestQueryOptions) int {
+	days, err := s.listArchiveDaysLocked("")
+	if err != nil {
+		return 0
+	}
+	total := 0
+	for _, day := range days {
+		content, readErr := os.ReadFile(filepath.Join(s.archiveRoot, day+".jsonl"))
+		if readErr != nil {
+			continue
+		}
+		lines := strings.Split(string(content), "\n")
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			var row map[string]any
+			if err := json.Unmarshal([]byte(line), &row); err != nil {
+				continue
+			}
+			entry, _ := row["entry"].(map[string]any)
+			ts := ""
+			if entry != nil {
+				ts = strings.TrimSpace(asString(entry["timestamp"]))
+			}
+			if ts == "" {
+				ts = strings.TrimSpace(asString(row["ingested_at"]))
+			}
+			if requestTimestampMatchesOptions(ts, options) {
+				total++
+			}
+		}
+	}
+	return total
+}

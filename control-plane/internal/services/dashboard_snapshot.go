@@ -164,7 +164,17 @@ func (s *DashboardService) buildSnapshot() (DashboardStats, error) {
 	}
 
 	requestsDay, requestsSeries, blockedFromRequestsSeries, blockedFromRequestsDay, popularErrors := summarizeRequests(requestRows, cutoff, now)
-	out.RequestsDay = requestsDay
+	// If the local sample hit the collector limit, the summarized count is capped.
+	// Ask the backend for an exact server-side count so the widget shows the real number.
+	if len(requestRows) >= 50000 {
+		if exactDay, ok := s.collectRequestsDay(); ok {
+			out.RequestsDay = exactDay
+		} else {
+			out.RequestsDay = requestsDay
+		}
+	} else {
+		out.RequestsDay = requestsDay
+	}
 	out.RequestsSeries = requestsSeries
 	out.BlockedSeries = blockedFromRequestsSeries
 	out.PopularErrors = popularErrors
