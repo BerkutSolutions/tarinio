@@ -1,4 +1,5 @@
 import { t } from "./i18n.js";
+import { formatDateTimeInZone } from "./preferences.js";
 
 export function escapeHtml(value) {
   return String(value ?? "")
@@ -13,11 +14,7 @@ export function formatDate(value) {
   if (!value) {
     return "—";
   }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-  return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
+  return formatDateTimeInZone(value);
 }
 
 export function statusBadge(status) {

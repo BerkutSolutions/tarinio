@@ -38,13 +38,14 @@ function writeStoredPreferences(value) {
 }
 
 export function loadPreferences() {
-  if (!memoryPreferences) {
-    const stored = readStoredPreferences();
+  const stored = readStoredPreferences();
+  const currentLanguage = String(getLanguage() || stored?.language || defaults.language);
+  if (!memoryPreferences || memoryPreferences.language !== currentLanguage) {
     memoryPreferences = {
       ...defaults,
       ...(stored || {}),
       timeZone: detectTimeZone(),
-      language: String(stored?.language || getLanguage() || defaults.language),
+      language: currentLanguage,
       autoLogout: Boolean(stored?.autoLogout),
     };
   }
@@ -61,6 +62,19 @@ export function savePreferences(next) {
   return merged;
 }
 
+const localeByLanguage = {
+  ru: "ru-RU",
+  en: "en-US",
+  de: "de-DE",
+  sr: "sr-Cyrl-RS",
+  zh: "zh-CN",
+};
+
+function intlLocaleForLanguage(language) {
+  const normalized = String(language || "").toLowerCase();
+  return localeByLanguage[normalized] || normalized || "en-US";
+}
+
 export function formatDateTimeInZone(value, timeZone) {
   if (!value) {
     return "-";
@@ -69,14 +83,16 @@ export function formatDateTimeInZone(value, timeZone) {
   if (Number.isNaN(date.getTime())) {
     return String(value);
   }
+  const prefs = loadPreferences();
+  const locale = intlLocaleForLanguage(prefs.language || defaults.language);
   try {
-    return new Intl.DateTimeFormat(undefined, {
+    return new Intl.DateTimeFormat(locale, {
       dateStyle: "medium",
       timeStyle: "short",
-      timeZone: timeZone || loadPreferences().timeZone || defaults.timeZone,
+      timeZone: timeZone || prefs.timeZone || defaults.timeZone,
     }).format(date);
   } catch {
-    return date.toLocaleString();
+    return date.toLocaleString(locale);
   }
 }
 

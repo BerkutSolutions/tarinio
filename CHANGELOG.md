@@ -1,3 +1,14 @@
+## [1.3.4] - 26.06.2026
+
+### UI / i18n
+- Время во вкладке «События» и в TLS теперь форматируется через `formatDateTimeInZone`, который привязан к языку UI (`ru-RU` / `en-US` / `de-DE` / `sr-Cyrl-RS` / `zh-CN`) и часовому поясу пользователя. Раньше `events.js` рендерил сырое значение `occurred_at` (`2026-06-26T10:17:19.730832709Z`), а `ui.js` `formatDate` использовал `toLocaleDateString()` без явной локали, поэтому даты в TLS и других страницах отличались от языка UI.
+- В `preferences.js` `formatDateTimeInZone` теперь явно использует `Intl.DateTimeFormat(locale, ...)` с локалью, выведенной из активного языка приложения. `loadPreferences` пересобирает кеш при смене языка через `setLanguage`, иначе `formatDate` оставался залипшим на старой локали до перезагрузки страницы.
+- Во вкладке «События» сводки `apply started` / `apply succeeded` / `apply failed`, а также соответствующие типы `apply_started` / `apply_succeeded` / `apply_failed` / `reload_failed` / `health_check_failed` / `rollback_performed` теперь переведены на язык интерфейса. Раньше отсутствовали i18n-ключи, и UI показывал сырой английский токен из payload.
+
+### Локализация
+- Добавлены ключи `events.type.apply_*`, `events.type.reload_failed`, `events.type.health_check_failed`, `events.type.rollback_performed` и зеркальные `events.summary.*` во всех пяти локалях (`ru`, `en`, `de`, `sr`, `zh`).
+- Удалён случайный дубликат ключа `events.type.security_access` в `en.json`.
+
 ## [1.3.3] - 26.06.2026
 
 ### Healthcheck

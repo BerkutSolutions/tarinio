@@ -1,4 +1,5 @@
 import { escapeHtml, setError, setLoading } from "../ui.js";
+import { formatDateTimeInZone } from "../preferences.js";
 
 function normalizeList(value) {
   return Array.isArray(value) ? value : [];
@@ -198,7 +199,7 @@ export async function renderEvents(container, ctx) {
           <tbody>
             ${pageItems.map((item, index) => `
               <tr class="waf-table-row-clickable" data-event-row="${meta.start + index}" tabindex="0" role="button">
-                <td>${escapeHtml(String(item.occurred_at || ""))}</td>
+                <td>${escapeHtml(formatDateTimeInZone(item.occurred_at || ""))}</td>
                 <td>${escapeHtml(translateEventType(item.type, ctx))}</td>
                 <td>${escapeHtml(translateEventSeverity(item.severity, ctx))}</td>
                 <td>${escapeHtml(siteNamesByID.get(String(item.site_id || "")) || String(item.site_id || "-"))}</td>
@@ -250,7 +251,7 @@ export async function renderEvents(container, ctx) {
   const renderEventDetail = (item, siteNamesByID) => {
     const details = item?.details && typeof item.details === "object" ? item.details : {};
     const fields = [
-      ["events.detail.field.time", String(item?.occurred_at || "-")],
+      ["events.detail.field.time", formatDateTimeInZone(item?.occurred_at || "") || "-"],
       ["events.detail.field.type", translateEventType(item?.type, ctx) || "-"],
       ["events.detail.field.severity", translateEventSeverity(item?.severity, ctx) || "-"],
       ["events.detail.field.site", siteNamesByID.get(String(item?.site_id || "")) || String(item?.site_id || "-")],
