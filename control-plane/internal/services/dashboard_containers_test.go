@@ -28,6 +28,7 @@ func TestClassifyContainerLogIssue_IgnoresBenignOpenSearchStartupNoise(t *testin
 		`2026-06-24 14:10:15.280 UTC [432] FATAL: the database system is shutting down`,
 		`2026-06-24 14:10:15.154 UTC [233] FATAL: terminating connection due to administrator command`,
 		`2026/06/24 14:08:58 [warn] 31#31: *261 an upstream response is buffered to a temporary file /var/cache/nginx/proxy_temp/1/00/0000000001 while reading upstream`,
+		`2026/06/26 08:51:54 [warn] 66#66: *13 a client request body is buffered to a temporary file /var/lib/nginx/body/0000000001, client: 194.104.94.104, server: sentry.hantico.ru, request: "POST /api/2/envelope/?sentry_version=7&sentry_key=9b5b65904ce4c83885892449b76a465a&sentry_client=sentry.javascript.nuxt%2F10.40.0 HTTP/1.1", host: "sentry.hantico.ru", referrer: "https://tnm.hantico.ru/"`,
 		`control-plane bootstrap: failed to connect to user=waf database=waf: dial tcp 172.18.0.8:5432: connect: connection refused`,
 		`[2026-06-24T21:47:03,025][WARN ][o.o.m.j.JvmGcMonitorService] [7de753eb623f] [gc][13067] overhead, spent [836ms] collecting in the last [1.4s]`,
 		`2026/06/24 18:09:04 [error] event service runtime security collector failed: Get "http://localhost:8081/security-events": dial tcp [::1]:8081: connect: connection refused`,

@@ -1,3 +1,11 @@
+## [1.3.1] - 26.06.2026
+
+### Healthcheck
+- Healthcheck-классификатор контейнерных логов больше не помечает как warning штатные nginx-записи `a client request body is buffered to a temporary file` (POST-запросы вроде sentry envelope, тело которых превышает `client_body_buffer_size`). Раньше эти строки сыпались в healthcheck по сервису `sentry.hantico.ru`, хотя самим запросам они не мешают.
+
+### Тесты
+- Расширен `TestClassifyContainerLogIssue_IgnoresBenignOpenSearchStartupNoise` кейсом для строки `a client request body is buffered to a temporary file ... server: sentry.hantico.ru, request: "POST /api/2/envelope/..."`, чтобы этот паттерн больше не возвращался в healthcheck при следующих правках.
+
 ## [1.3.0] - 26.06.2026
 
 ### UI / Help-методички для редактора сервиса

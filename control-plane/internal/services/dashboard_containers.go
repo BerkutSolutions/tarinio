@@ -720,6 +720,7 @@ func classifyContainerLogIssue(message string) (string, bool) {
 		"the database system is shutting down",
 		"terminating connection due to administrator command",
 		"an upstream response is buffered to a temporary file",
+		"a client request body is buffered to a temporary file",
 		"control-plane bootstrap: failed to connect to",
 		"jvmgcmonitorservice",
 		"event service runtime security collector failed: get \"http://localhost:8081/security-events\": dial tcp [::1]:8081: connect: connection refused",
