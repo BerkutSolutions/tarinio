@@ -4,8 +4,14 @@ export const siteSaveNoAutoApplyOptions = {
   }
 };
 
-export async function compileAndApplySiteRevision(ctx) {
-  const compileResponse = await ctx.api.post("/api/revisions/compile", {}, siteSaveNoAutoApplyOptions);
+export async function compileAndApplySiteRevision(ctx, targetSiteIDs) {
+  const body = {};
+  if (Array.isArray(targetSiteIDs) && targetSiteIDs.length > 0) {
+    body.target_site_ids = targetSiteIDs
+      .map((id) => String(id || "").trim())
+      .filter(Boolean);
+  }
+  const compileResponse = await ctx.api.post("/api/revisions/compile", body, siteSaveNoAutoApplyOptions);
   const revisionID = String(compileResponse?.revision?.id || "").trim();
   if (!revisionID) {
     throw new Error("site revision compile failed");

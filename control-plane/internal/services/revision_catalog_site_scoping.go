@@ -3,6 +3,7 @@ package services
 import (
 	"encoding/json"
 	"sort"
+	"strings"
 
 	"waf/control-plane/internal/accesspolicies"
 	"waf/control-plane/internal/certificates"
@@ -89,6 +90,63 @@ func buildRevisionSiteScopes(
 	}
 
 	return scopes
+}
+
+// narrowScopeByTargets restricts the diff-derived scope to the sites the caller
+// explicitly targeted on compile (revision.TargetSiteIDs). When TargetSiteIDs
+// is empty the function returns the original fingerprint diff unchanged so
+// legacy bulk paths (import, onboarding) keep working.
+//
+// When TargetSiteIDs is non-empty we keep only listed sites both in the
+// displayed list and in the "active site IDs" subset. If the diff doesn't
+// have a site that the caller explicitly named (e.g. baseline revision where
+// every site looks new but the operator scoped the save to one), we still
+// add the named site to ChangedSites so the UI never claims "nothing was
+// touched" for a save the user just performed.
+func narrowScopeByTargets(scope revisionSiteScope, targetSiteIDs []string, siteRefByID map[string]RevisionCatalogSite) ([]RevisionCatalogSite, []string) {
+	if len(targetSiteIDs) == 0 {
+		return append([]RevisionCatalogSite(nil), scope.ChangedSites...), append([]string(nil), scope.ActiveSiteIDs...)
+	}
+	allowed := make(map[string]struct{}, len(targetSiteIDs))
+	for _, id := range targetSiteIDs {
+		token := strings.ToLower(strings.TrimSpace(id))
+		if token == "" {
+			continue
+		}
+		allowed[token] = struct{}{}
+	}
+	sites := make([]RevisionCatalogSite, 0, len(allowed))
+	added := make(map[string]struct{}, len(allowed))
+	for _, site := range scope.ChangedSites {
+		token := strings.ToLower(strings.TrimSpace(site.SiteID))
+		if _, ok := allowed[token]; !ok {
+			continue
+		}
+		sites = append(sites, site)
+		added[token] = struct{}{}
+	}
+	for token := range allowed {
+		if _, ok := added[token]; ok {
+			continue
+		}
+		ref, refOK := siteRefByID[token]
+		if !refOK {
+			ref = RevisionCatalogSite{SiteID: token}
+		}
+		sites = append(sites, ref)
+		added[token] = struct{}{}
+	}
+	sort.Slice(sites, func(i, j int) bool {
+		return sites[i].SiteID < sites[j].SiteID
+	})
+	active := make([]string, 0, len(scope.ActiveSiteIDs))
+	for _, id := range scope.ActiveSiteIDs {
+		token := strings.ToLower(strings.TrimSpace(id))
+		if _, ok := allowed[token]; ok {
+			active = append(active, id)
+		}
+	}
+	return sites, active
 }
 
 func buildSiteFingerprintMap(snapshot revisionsnapshots.Snapshot) map[string]string {

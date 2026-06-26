@@ -297,9 +297,10 @@ func (s *RevisionCatalogService) List(_ context.Context) (RevisionCatalogRespons
 		scope := siteScopes[revision.ID]
 		_, hasSnapshot := snapshotsByRevision[revision.ID]
 		if hasSnapshot {
-			card.Sites = append([]RevisionCatalogSite(nil), scope.ChangedSites...)
+			scopedSites, scopedActive := narrowScopeByTargets(scope, revision.TargetSiteIDs, siteRefByID)
+			card.Sites = append([]RevisionCatalogSite(nil), scopedSites...)
 			card.SiteCount = len(card.Sites)
-			card.ActiveSiteIDs = append([]string(nil), scope.ActiveSiteIDs...)
+			card.ActiveSiteIDs = append([]string(nil), scopedActive...)
 			for _, site := range card.Sites {
 				index, ok := serviceIndexByID[site.SiteID]
 				if !ok {

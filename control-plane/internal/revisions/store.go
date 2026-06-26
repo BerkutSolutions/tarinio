@@ -58,6 +58,10 @@ type Revision struct {
 	LastApplyStatus   string           `json:"last_apply_status,omitempty"`
 	LastApplyResult   string           `json:"last_apply_result,omitempty"`
 	LastApplyAt       string           `json:"last_apply_at,omitempty"`
+	// TargetSiteIDs lists the sites the caller explicitly intended to modify
+	// in this revision. When empty (legacy / bulk import paths) the catalog
+	// falls back to per-site fingerprint diffing.
+	TargetSiteIDs []string `json:"target_site_ids,omitempty"`
 }
 
 type state struct {

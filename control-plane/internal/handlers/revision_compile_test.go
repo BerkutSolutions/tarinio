@@ -20,6 +20,10 @@ func (f *fakeRevisionCompileService) Create(ctx context.Context) (services.Compi
 	}, nil
 }
 
+func (f *fakeRevisionCompileService) CreateWithTargets(ctx context.Context, targetSiteIDs []string) (services.CompileRequestResult, error) {
+	return f.Create(ctx)
+}
+
 func TestRevisionCompileHandler_Create(t *testing.T) {
 	handler := NewRevisionCompileHandler(&fakeRevisionCompileService{})
 

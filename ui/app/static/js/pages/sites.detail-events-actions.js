@@ -222,7 +222,7 @@ export function bindDetailActionEvents(params) {
       await upsertAccessPolicy(draft, ctx, existingAccessPolicy, saveOptions);
       const easyProfilePath = `/api/easy-site-profiles/${encodeURIComponent(draft.id)}`;
       await putWithPostFallback(ctx, easyProfilePath, draftToEasyProfile(draft), saveOptions);
-      await compileAndApplySiteRevision(ctx);
+      await compileAndApplySiteRevision(ctx, draft?.id ? [draft.id] : []);
       ctx.notify(ctx.t("toast.siteSaved"));
       go(`${routeBase()}/${encodeURIComponent(draft.id)}`);
     } catch (error) {

@@ -3,6 +3,8 @@ package services
 import (
 	"context"
 	"fmt"
+	"sort"
+	"strings"
 	"time"
 
 	"waf/control-plane/internal/accesspolicies"
@@ -133,11 +135,15 @@ func NewRevisionCompileService(
 }
 
 func (s *RevisionCompileService) Create(ctx context.Context) (result CompileRequestResult, err error) {
+	return s.CreateWithTargets(ctx, nil)
+}
+
+func (s *RevisionCompileService) CreateWithTargets(ctx context.Context, targetSiteIDs []string) (result CompileRequestResult, err error) {
 	if s.coord == nil {
 		s.coord = NewNoopDistributedCoordinator()
 	}
 	err = s.coord.WithLock(ctx, "ha:revision:compile", s.coord.OperationTTL(), func(lockCtx context.Context) error {
-		result, err = s.createUnlocked(lockCtx)
+		result, err = s.createUnlocked(lockCtx, targetSiteIDs)
 		return err
 	})
 	if err != nil {
@@ -156,7 +162,7 @@ func (s *RevisionCompileService) SetCoordinator(coord DistributedCoordinator) {
 	s.coord = coord
 }
 
-func (s *RevisionCompileService) createUnlocked(ctx context.Context) (result CompileRequestResult, err error) {
+func (s *RevisionCompileService) createUnlocked(ctx context.Context, targetSiteIDs []string) (result CompileRequestResult, err error) {
 	defer func() {
 		recordAudit(ctx, s.audits, audits.AuditEvent{
 			Action:            "revision.compile_request",
@@ -186,12 +192,13 @@ func (s *RevisionCompileService) createUnlocked(ctx context.Context) (result Com
 	}
 
 	revision := revisions.Revision{
-		ID:         revisionID,
-		Version:    version,
-		CreatedAt:  createdAt,
-		Checksum:   checksum,
-		BundlePath: snapshotPath,
-		Status:     revisions.StatusPending,
+		ID:            revisionID,
+		Version:       version,
+		CreatedAt:     createdAt,
+		Checksum:      checksum,
+		BundlePath:    snapshotPath,
+		Status:        revisions.StatusPending,
+		TargetSiteIDs: normalizeTargetSiteIDs(targetSiteIDs),
 	}
 	if s.governance != nil {
 		revision, err = s.governance.PrepareCompiledRevision(ctx, revision)
@@ -308,4 +315,29 @@ func (s *RevisionCompileService) SetGovernance(governance interface {
 	PrepareCompiledRevision(ctx context.Context, revision revisions.Revision) (revisions.Revision, error)
 }) {
 	s.governance = governance
+}
+
+// normalizeTargetSiteIDs trims, lowercases, deduplicates and stable-sorts the
+// site IDs supplied by the caller. Empty entries are dropped so the catalog
+// can rely on len(ids) > 0 meaning the caller intentionally scoped the
+// revision to specific sites.
+func normalizeTargetSiteIDs(ids []string) []string {
+	if len(ids) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(ids))
+	out := make([]string, 0, len(ids))
+	for _, raw := range ids {
+		token := strings.ToLower(strings.TrimSpace(raw))
+		if token == "" {
+			continue
+		}
+		if _, ok := seen[token]; ok {
+			continue
+		}
+		seen[token] = struct{}{}
+		out = append(out, token)
+	}
+	sort.Strings(out)
+	return out
 }
