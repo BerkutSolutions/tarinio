@@ -24,3 +24,4 @@
 - fixed dashboard 24-hour request totals from OpenSearch so counts above `10,000` are returned exactly instead of stopping at the default search hit threshold
 - fixed dashboard request detail widgets to load only the last 24 hours from `/api/requests`, and fixed the unique IP metric so it shows the real distinct count instead of the capped top-20 list
 - fixed dashboard attack detail widgets so attacked pages show the target site/host next to each URL
+- fixed the requests widget to serve its 24-hour site/page breakdown from `/api/dashboard/stats`, so a failing `/api/requests` no longer blanks the widget detail

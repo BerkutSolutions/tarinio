@@ -113,6 +113,15 @@ func TestDashboardService_StatsExposeCurrentWidgetData(t *testing.T) {
 	if stats.RequestsDay != 2 {
 		t.Fatalf("expected 2 requests, got %d", stats.RequestsDay)
 	}
+	if stats.RequestUniqueIPsDay != 2 {
+		t.Fatalf("expected 2 unique request IPs, got %d", stats.RequestUniqueIPsDay)
+	}
+	if len(stats.RequestTopSites) == 0 || stats.RequestTopSites[0].Key != "site-a" {
+		t.Fatalf("expected request top sites to be populated, got %#v", stats.RequestTopSites)
+	}
+	if len(stats.RequestTopURLs) == 0 || stats.RequestTopURLs[0].Key != "/checkout" {
+		t.Fatalf("expected request top urls to be populated, got %#v", stats.RequestTopURLs)
+	}
 	if stats.AttacksDay != 1 {
 		t.Fatalf("expected 1 attack, got %d", stats.AttacksDay)
 	}

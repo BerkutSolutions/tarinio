@@ -149,8 +149,10 @@ export async function renderDashboard(container, ctx) {
     if (pageState.detailModelPromise) {
       return pageState.detailModelPromise;
     }
-    pageState.detailModelPromise = Promise.all([fetchRequestsRows(), fetchEventsRows()])
-      .then(([requestsRows, eventsRows]) => {
+    pageState.detailModelPromise = Promise.allSettled([fetchRequestsRows(), fetchEventsRows()])
+      .then(([requestsResult, eventsResult]) => {
+        const requestsRows = requestsResult?.status === "fulfilled" ? requestsResult.value : [];
+        const eventsRows = eventsResult?.status === "fulfilled" ? eventsResult.value : [];
         pageState.detailModel = buildDetailModel(pageState.latestStats, requestsRows, eventsRows);
         pageState.detailModelGeneratedAt = generatedAt;
         pageState.detailModelBuiltAt = Date.now();

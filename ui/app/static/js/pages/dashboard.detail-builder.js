@@ -161,15 +161,22 @@ function buildWidgetDetail(action, payload, stats, detailModel, containersOvervi
   }
 
   if (action === "requests-day") {
+    const requestTopSites = Array.isArray(stats?.request_top_sites) && stats.request_top_sites.length
+      ? stats.request_top_sites
+      : (detailModel?.requestsBySite || []);
+    const requestTopURLs = Array.isArray(stats?.request_top_urls) && stats.request_top_urls.length
+      ? stats.request_top_urls
+      : (detailModel?.requestsByURL || []);
+    const uniqueRequestIPs = Number(stats?.request_unique_ips_day || 0) || Number(detailModel?.requestsUniqueIPs || 0);
     return {
       title:    ctx.t("dashboard.widget.requestsDay"),
       subtitle: ctx.t("dashboard.detail.requestsSubtitle"),
       body: renderSummaryMetrics([
         { labelKey: "dashboard.value.requestsDay", value: stats?.requests_day || 0              },
-        { labelKey: "dashboard.detail.uniqueIPs",  value: detailModel?.requestsUniqueIPs || 0 }
+        { labelKey: "dashboard.detail.uniqueIPs",  value: uniqueRequestIPs }
       ], ctx, deps) +
-      renderDetailTable(detailModel?.requestsBySite || [], ctx, ctx.t("dashboard.detail.site"), ctx.t("dashboard.detail.requests"), {}, deps) +
-      renderDetailTable(detailModel?.requestsByURL  || [], ctx, ctx.t("dashboard.detail.page"), ctx.t("dashboard.detail.requests"), {}, deps)
+      renderDetailTable(requestTopSites, ctx, ctx.t("dashboard.detail.site"), ctx.t("dashboard.detail.requests"), {}, deps) +
+      renderDetailTable(requestTopURLs,  ctx, ctx.t("dashboard.detail.page"), ctx.t("dashboard.detail.requests"), {}, deps)
     };
   }
 

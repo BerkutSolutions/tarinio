@@ -87,6 +87,9 @@ type DashboardStats struct {
 	ServicesUp             int                      `json:"services_up"`
 	ServicesDown           int                      `json:"services_down"`
 	RequestsDay            int                      `json:"requests_day"`
+	RequestUniqueIPsDay    int                      `json:"request_unique_ips_day"`
+	RequestTopSites        []DashboardKeyCount      `json:"request_top_sites"`
+	RequestTopURLs         []DashboardKeyCount      `json:"request_top_urls"`
 	RequestsSeries         []DashboardTimeCount     `json:"requests_series"`
 	BlockedSeries          []DashboardTimeCount     `json:"blocked_series"`
 	AttacksDay             int                      `json:"attacks_day"`

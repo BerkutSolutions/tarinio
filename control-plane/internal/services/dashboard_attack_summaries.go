@@ -8,12 +8,15 @@ import (
 	"waf/control-plane/internal/events"
 )
 
-func summarizeRequests(items []map[string]any, cutoff, now time.Time) (int, []DashboardTimeCount, []DashboardTimeCount, int, []DashboardKeyCount) {
+func summarizeRequests(items []map[string]any, cutoff, now time.Time) (int, int, []DashboardKeyCount, []DashboardKeyCount, []DashboardTimeCount, []DashboardTimeCount, int, []DashboardKeyCount) {
 	var total int
 	series := map[time.Time]int{}
 	blockedSeries := map[time.Time]int{}
 	var blockedTotal int
 	errorCounts := map[string]int{}
+	siteCounts := map[string]int{}
+	urlCounts := map[string]int{}
+	uniqueIPs := map[string]struct{}{}
 
 	for _, row := range items {
 		entry, ok := row["entry"].(map[string]any)
@@ -34,6 +37,20 @@ func summarizeRequests(items []map[string]any, cutoff, now time.Time) (int, []Da
 			continue
 		}
 		total++
+		if siteID != "" {
+			siteCounts[siteID]++
+		} else if host != "" {
+			siteCounts[host]++
+		} else {
+			siteCounts["-"]++
+		}
+		if uri != "" {
+			urlCounts[uri]++
+		}
+		clientIP := strings.TrimSpace(asString(entry["client_ip"]))
+		if clientIP != "" {
+			uniqueIPs[clientIP] = struct{}{}
+		}
 		bucket := when.UTC().Truncate(time.Hour)
 		series[bucket]++
 		statusCode := parseAnyInt(entry["status"])
@@ -48,7 +65,7 @@ func summarizeRequests(items []map[string]any, cutoff, now time.Time) (int, []Da
 
 	seriesOut := buildHourlySeries(series, now)
 	blockedOut := buildHourlySeries(blockedSeries, now)
-	return total, seriesOut, blockedOut, blockedTotal, topCounts(errorCounts, 7)
+	return total, len(uniqueIPs), topCounts(siteCounts, 20), topCounts(urlCounts, 20), seriesOut, blockedOut, blockedTotal, topCounts(errorCounts, 7)
 }
 
 func summarizeAttackEvents(items []events.Event, cutoff, now time.Time) (int, int, int, []DashboardKeyCount, []DashboardKeyCount, []DashboardKeyCount, []DashboardTimeCount, []DashboardKeyCount) {
