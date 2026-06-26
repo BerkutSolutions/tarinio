@@ -18,3 +18,7 @@
 - **Алерт «Хост недоступен» в модалке** — при ЛКМ на недоступном сервисе между строкой «Проверен» и метриками запросов/атак/заблокированных появляется жёлтый алерт «Хост недоступен».
 - **CSS** — добавлен класс `.alert.warning` (жёлтая рамка) рядом с существующим `.alert.success`.
 - **i18n** — добавлен ключ `dashboard.services.hostDown` во все 5 локалей (ru/en/de/sr/zh).
+# Unreleased
+
+## core
+- fixed dashboard 24-hour request totals from OpenSearch so counts above `10,000` are returned exactly instead of stopping at the default search hit threshold

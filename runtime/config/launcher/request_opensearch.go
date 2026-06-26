@@ -457,8 +457,9 @@ func (s *requestOpenSearchStore) count(options requestQueryOptions) (int, error)
 		return 0, err
 	}
 	query := map[string]any{
-		"size":  0,
-		"query": buildOpenSearchRequestQuery(options),
+		"size":             0,
+		"track_total_hits": true,
+		"query":            buildOpenSearchRequestQuery(options),
 	}
 	var payload struct {
 		Hits struct {

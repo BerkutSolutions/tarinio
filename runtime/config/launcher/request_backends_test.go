@@ -730,6 +730,19 @@ func (f *fakeOpenSearch) handleSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	f.mu.Unlock()
 	sort.Slice(records, func(i, j int) bool { return records[i].Timestamp > records[j].Timestamp })
+	if size, ok := body["size"].(float64); ok && int(size) == 0 {
+		total := len(records)
+		if enabled, _ := body["track_total_hits"].(bool); !enabled && total > 10000 {
+			total = 10000
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"hits": map[string]any{
+				"total": map[string]any{"value": total},
+				"hits":  []any{},
+			},
+		})
+		return
+	}
 	hits := make([]map[string]any, 0, len(records))
 	for _, record := range records {
 		hits = append(hits, map[string]any{"_source": record})
