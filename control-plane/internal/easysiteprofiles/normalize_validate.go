@@ -192,7 +192,9 @@ func applySecurityModePolicy(profile EasySiteProfile) EasySiteProfile {
 		profile.SecurityAuthBasic.UseAuthBasic = false
 		profile.SecurityAPIPositive.UseAPIPositiveSecurity = false
 	case SecurityModeMonitor:
-		profile.SecurityModSecurity.UseModSecurity = true
+		profile.SecurityModSecurity.UseModSecurity = false
+		profile.SecurityModSecurity.UseModSecurityCRSPlugins = false
+		profile.SecurityModSecurity.UseCustomConfiguration = false
 		profile.SecurityBehaviorAndLimits.UseLimitConn = false
 		profile.SecurityBehaviorAndLimits.UseLimitReq = false
 		profile.SecurityBehaviorAndLimits.CustomLimitRules = nil

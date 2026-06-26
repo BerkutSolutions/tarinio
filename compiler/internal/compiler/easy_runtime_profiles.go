@@ -156,8 +156,10 @@ func applySecurityModePolicy(profile EasyProfileInput) EasyProfileInput {
 		profile.AntibotChallengeRules = nil
 		profile.UseAuthBasic = false
 	case "monitor":
-		// Monitor mode keeps logging-only inspection (ModSecurity DetectionOnly) and disables blockers.
-		profile.UseModSecurity = true
+		// Monitor mode is passive: do not apply security policies, keep only generic request logging.
+		profile.UseModSecurity = false
+		profile.UseModSecurityCRSPlugins = false
+		profile.UseModSecurityCustomConfiguration = false
 		profile.UseLimitConn = false
 		profile.UseLimitReq = false
 		profile.CustomLimitRules = nil
