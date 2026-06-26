@@ -957,6 +957,7 @@
     "settings.logging.status.file":  "Локални резервни режим је активан без спољних нивоа складиштења.",
     "settings.logging.status.clickhouse":  "Хладно складиште је повезано: {{endpoint}} ({{database}}.{{table}}).",
     "settings.logging.status.opensearch":  "Врућа меморија: ОпенСеарцх на __ВАР_0__} са __ВАР_0__}-дневним задржавањем.",
+    "settings.logging.status.opensearch_full":  "Вруће и хладно складиште: ОпенСеарцх на {{endpoint}}, задржавање {{hotDays}}/{{coldDays}} дана (вруће/хладно).",
     "settings.logging.status.dual":  "Врући/хладни режим је активан: ОпенСеарцх + ЦлицкХоусе, задржавање __ВАР_0__}/__ВАР_0__} дана, тајне преко __ВАР_0__}.",
     "settings.storage.title":  "Задржавање складишта",
     "settings.storage.subtitle":  "Конфигуришите колико дуго се чувају оперативни подаци.",

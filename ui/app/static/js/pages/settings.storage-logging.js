@@ -151,9 +151,10 @@ export function renderLoggingStatusText(ctx, logging, summary) {
     });
   }
   if (hotBackend === "opensearch" && coldBackend === "opensearch") {
-    return ctx.t("settings.logging.status.opensearch", {
+    return ctx.t("settings.logging.status.opensearch_full", {
       endpoint: String(logging?.opensearch?.endpoint || "-"),
-      retention: coldRetention,
+      hotDays: hotRetention,
+      coldDays: coldRetention,
     });
   }
   if (hotBackend === "opensearch" || coldBackend === "opensearch") {

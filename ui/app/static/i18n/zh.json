@@ -957,6 +957,7 @@
     "settings.logging.status.file":  "本地回退模式处于活动状态，无需外部存储层。",
     "settings.logging.status.clickhouse":  "冷存储已连接：{{endpoint}} ({{database}}.{{table}})。",
     "settings.logging.status.opensearch":  "热存储：位于 {{retention}} 的 OpenSearch，保留 {{retention}} 天。",
+    "settings.logging.status.opensearch_full":  "热存储和冷存储：位于 {{endpoint}} 的 OpenSearch，保留 {{hotDays}}/{{coldDays}} 天（热/冷）。",
     "settings.logging.status.dual":  "热/冷模式已激活：OpenSearch + ClickHouse，保留 {{secretProvider}}/{{secretProvider}} 天，通过 {{secretProvider}} 保密。",
     "settings.storage.title":  "存储保留",
     "settings.storage.subtitle":  "配置操作数据的保留时间。",

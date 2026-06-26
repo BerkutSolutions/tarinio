@@ -957,6 +957,7 @@
   "settings.logging.status.file": "Local fallback mode is active without external storage tiers.",
   "settings.logging.status.clickhouse": "Cold storage connected at {{endpoint}} ({{database}}.{{table}}).",
   "settings.logging.status.opensearch": "Hot storage: OpenSearch at {{endpoint}} with {{retention}}-day retention.",
+  "settings.logging.status.opensearch_full": "Hot and cold storage: OpenSearch at {{endpoint}}, retention {{hotDays}}/{{coldDays}} days (hot/cold).",
   "settings.logging.status.dual": "Hot/cold mode is active: OpenSearch + ClickHouse, retention {{hotDays}}/{{coldDays}} days, secrets via {{secretProvider}}.",
   "settings.storage.title": "Storage retention",
   "settings.storage.subtitle": "Configure how long operational data is kept.",

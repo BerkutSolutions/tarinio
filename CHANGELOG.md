@@ -1,3 +1,18 @@
+## [1.3.2] - 26.06.2026
+
+### Хранилище логов
+- Реализована автоматическая чистка горячего OpenSearch-индекса по retention-настройкам из UI. Раньше дневные сегменты `waf-hot-requests` удалялись только когда холодное хранилище = ClickHouse (через `migrateHotToColdLocked`). При сценарии «и горячее, и холодное — OpenSearch» (типичный prod) старые дни накапливались бесконечно — мы наблюдали 65 дневных сегментов на проде при настройках 14/30 дней. Новый `pruneOpenSearchOldDaysLocked` запускается на каждом цикле фонового ingest и удаляет дни старше:
+  - `Retention.ColdDays`, если cold backend = OpenSearch (все данные хранятся в горячем индексе);
+  - `Retention.HotDays`, если cold backend = ClickHouse/file (страховка поверх миграции, чтобы OpenSearch никогда не держал данные дольше горячего окна).
+- Уточнён статус «Хранилище логов» в UI: для single-OpenSearch теперь показывается оба числа `{hotDays}/{coldDays}`, а не только cold. Раньше при настройках 14/30 строка отображала «срок хранения 30 дней», что путало.
+
+### Локализация
+- Во всех пяти локалях (`ru`, `en`, `de`, `sr`, `zh`) добавлен новый ключ `settings.logging.status.opensearch_full` для совмещённого hot+cold OpenSearch-режима. Старый ключ `settings.logging.status.opensearch` остаётся для смешанных сценариев.
+
+### Тесты
+- `TestRequestStreamPrunesOpenSearchWhenColdIsOpenSearch` проверяет, что при cold=OpenSearch старые дни (возраст > ColdDays) удаляются автоматически.
+- `TestRequestStreamPrunesOpenSearchByHotDaysWhenColdIsClickHouse` проверяет страховку: при cold=ClickHouse дни старше HotDays вычищаются из OpenSearch независимо от миграции.
+
 ## [1.3.1] - 26.06.2026
 
 ### Healthcheck

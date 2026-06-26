@@ -220,5 +220,8 @@ func (s *requestStreamSource) syncRequestBackendsLocked(retentionDays int) error
 	if err := s.migrateHotToColdLocked(retentionDays); err != nil {
 		s.lastIngestError = err.Error()
 	}
+	if err := s.pruneOpenSearchOldDaysLocked(retentionDays); err != nil {
+		s.lastIngestError = err.Error()
+	}
 	return nil
 }

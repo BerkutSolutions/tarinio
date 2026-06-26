@@ -957,6 +957,7 @@
     "settings.logging.status.file":  "Der lokale Fallback-Modus ist ohne externe Speicherebenen aktiv.",
     "settings.logging.status.clickhouse":  "Kaltspeicher verbunden: {{endpoint}} ({{database}}.{{table}}).",
     "settings.logging.status.opensearch":  "Hot Storage: OpenSearch bei {{retention}} mit {{retention}}-tägiger Aufbewahrung.",
+    "settings.logging.status.opensearch_full":  "Hot- und Cold-Storage: OpenSearch unter {{endpoint}}, Aufbewahrung {{hotDays}}/{{coldDays}} Tage (heiß/kalt).",
     "settings.logging.status.dual":  "Hot/Cold-Modus ist aktiv: OpenSearch + ClickHouse, Aufbewahrung {{secretProvider}}/{{secretProvider}} Tage, Geheimnisse über {{secretProvider}}.",
     "settings.storage.title":  "Speicheraufbewahrung",
     "settings.storage.subtitle":  "Konfigurieren Sie, wie lange Betriebsdaten aufbewahrt werden.",

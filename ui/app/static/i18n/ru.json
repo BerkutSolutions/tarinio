@@ -949,6 +949,7 @@
   "settings.logging.status.file": "Активен локальный резервный путь без внешних уровней хранения.",
   "settings.logging.status.clickhouse": "Холодное хранилище подключено: сервер {{endpoint}}, база {{database}}, таблица {{table}}.",
   "settings.logging.status.opensearch": "Горячее хранилище: OpenSearch {{endpoint}}, срок хранения {{retention}} дней.",
+  "settings.logging.status.opensearch_full": "Горячее и холодное хранилище: OpenSearch {{endpoint}}, хранение {{hotDays}}/{{coldDays}} дней (горячие/холодные).",
   "settings.logging.status.dual": "Активен двухуровневый режим: OpenSearch + ClickHouse, хранение {{hotDays}}/{{coldDays}} дней, секреты через {{secretProvider}}.",
   "settings.storage.title": "Сроки хранения",
   "settings.storage.subtitle": "Настройте, как долго хранить операционные данные.",
