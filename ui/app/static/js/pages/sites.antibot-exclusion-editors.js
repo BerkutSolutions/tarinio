@@ -1,3 +1,11 @@
+function fallbackNormalizeArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function resolveNormalizeArray(deps) {
+  return typeof deps.normalizeArray === "function" ? deps.normalizeArray : fallbackNormalizeArray;
+}
+
 function normalizeMethodsValue(value, normalizeArray) {
   const source = Array.isArray(value)
     ? value
@@ -15,7 +23,7 @@ function normalizeMethodsValue(value, normalizeArray) {
 }
 
 export function normalizeAntibotExclusionRules(value, deps = {}) {
-  const normalizeArray = deps.normalizeArray;
+  const normalizeArray = resolveNormalizeArray(deps);
   const seen = new Set();
   return normalizeArray(value)
     .map((item) => ({
@@ -33,9 +41,29 @@ export function normalizeAntibotExclusionRules(value, deps = {}) {
     });
 }
 
+export function normalizeAntibotExclusionDraftRows(value, deps = {}) {
+  const normalizeArray = resolveNormalizeArray(deps);
+  return normalizeArray(value).map((item) => ({
+    path: String(item?.path || "").trim(),
+    methods: normalizeMethodsValue(item?.methods, normalizeArray)
+  }));
+}
+
+export function readAntibotExclusionDraftRows(container, deps = {}) {
+  const normalizeArray = resolveNormalizeArray(deps);
+  return Array.from(container.querySelectorAll("[data-antibot-exclusion-path]")).map((input) => {
+    const index = String(input.getAttribute("data-antibot-exclusion-path") || "");
+    const methodsInput = container.querySelector(`[data-antibot-exclusion-methods="${index}"]`);
+    return {
+      path: String(input.value || "").trim(),
+      methods: normalizeMethodsValue(methodsInput?.value, normalizeArray)
+    };
+  });
+}
+
 export function renderAntibotExclusionRulesEditor(rules, ctx, deps = {}) {
   const escapeHtml = deps.escapeHtml;
-  const safeRules = normalizeAntibotExclusionRules(rules, deps);
+  const safeRules = normalizeAntibotExclusionDraftRows(rules, deps);
   return `
     <div class="waf-field full">
       <label>${escapeHtml(ctx.t("sites.easy.antibot.exclusionRulesByUrl"))}</label>

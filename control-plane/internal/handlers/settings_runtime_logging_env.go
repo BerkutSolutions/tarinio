@@ -123,6 +123,7 @@ func reconcileLoggingSettingsFromEnv(current loggingconfig.Settings, security Ru
 	opensearchPassword := strings.TrimSpace(os.Getenv("OPENSEARCH_PASSWORD"))
 	opensearchAPIKey := strings.TrimSpace(os.Getenv("OPENSEARCH_API_KEY"))
 	vaultToken := envSecretValue("VAULT_TOKEN", "VAULT_TOKEN_FILE")
+	opensearchConfigured := opensearchPassword != "" || opensearchAPIKey != "" || strings.TrimSpace(current.OpenSearch.PasswordEnc) != "" || strings.TrimSpace(current.OpenSearch.APIKeyEnc) != ""
 
 	if current.Cold.Backend == loggingconfig.BackendClickHouse && strings.TrimSpace(current.ClickHouse.PasswordEnc) == "" {
 		if clickhousePassword == "" {
@@ -139,19 +140,34 @@ func reconcileLoggingSettingsFromEnv(current loggingconfig.Settings, security Ru
 			}
 		}
 	}
-	if current.Hot.Backend == loggingconfig.BackendOpenSearch && strings.TrimSpace(current.OpenSearch.PasswordEnc) == "" && strings.TrimSpace(current.OpenSearch.APIKeyEnc) == "" {
-		if opensearchPassword == "" && opensearchAPIKey == "" {
+	if current.Hot.Backend == loggingconfig.BackendOpenSearch {
+		if !opensearchConfigured {
 			current.Hot.Backend = loggingconfig.BackendFile
 		} else {
-			if opensearchPassword != "" {
+			if strings.TrimSpace(current.OpenSearch.PasswordEnc) == "" && opensearchPassword != "" {
 				if encrypted, err := secretcrypto.Encrypt("waf:logging:opensearch:password", opensearchPassword, strings.TrimSpace(runtimeSettingsState.pepper)); err == nil {
 					current.OpenSearch.PasswordEnc = encrypted
 				}
 			}
-			if opensearchAPIKey != "" {
+			if strings.TrimSpace(current.OpenSearch.APIKeyEnc) == "" && opensearchAPIKey != "" {
 				if encrypted, err := secretcrypto.Encrypt("waf:logging:opensearch:api_key", opensearchAPIKey, strings.TrimSpace(runtimeSettingsState.pepper)); err == nil {
 					current.OpenSearch.APIKeyEnc = encrypted
 				}
+			}
+		}
+	}
+	if current.Cold.Backend == loggingconfig.BackendOpenSearch && !opensearchConfigured {
+		current.Cold.Backend = loggingconfig.BackendFile
+	}
+	if current.Cold.Backend == loggingconfig.BackendOpenSearch && opensearchConfigured {
+		if strings.TrimSpace(current.OpenSearch.PasswordEnc) == "" && opensearchPassword != "" {
+			if encrypted, err := secretcrypto.Encrypt("waf:logging:opensearch:password", opensearchPassword, strings.TrimSpace(runtimeSettingsState.pepper)); err == nil {
+				current.OpenSearch.PasswordEnc = encrypted
+			}
+		}
+		if strings.TrimSpace(current.OpenSearch.APIKeyEnc) == "" && opensearchAPIKey != "" {
+			if encrypted, err := secretcrypto.Encrypt("waf:logging:opensearch:api_key", opensearchAPIKey, strings.TrimSpace(runtimeSettingsState.pepper)); err == nil {
+				current.OpenSearch.APIKeyEnc = encrypted
 			}
 		}
 	}

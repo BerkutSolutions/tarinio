@@ -176,6 +176,43 @@ func TestReconcileLoggingSettingsFromEnvEncryptsSecretWhenAvailable(t *testing.T
 	}
 }
 
+func TestReconcileLoggingSettingsFromEnvDisablesOpenSearchWithoutSecrets(t *testing.T) {
+	t.Setenv("CLICKHOUSE_PASSWORD", "")
+	t.Setenv("CLICKHOUSE_USER", "")
+	t.Setenv("CLICKHOUSE_DB", "")
+	t.Setenv("CLICKHOUSE_ENDPOINT", "")
+	t.Setenv("OPENSEARCH_PASSWORD", "")
+	t.Setenv("OPENSEARCH_API_KEY", "")
+	t.Setenv("OPENSEARCH_ENDPOINT", "")
+	t.Setenv("OPENSEARCH_USERNAME", "")
+	t.Setenv("OPENSEARCH_USER", "")
+	runtimeSettingsState.pepper = "pepper-for-tests"
+
+	current := loggingconfig.Normalize(loggingconfig.Settings{
+		Backend: loggingconfig.BackendOpenSearch,
+		Hot: loggingconfig.HotSettings{
+			Backend: loggingconfig.BackendOpenSearch,
+		},
+		Cold: loggingconfig.ColdSettings{
+			Backend: loggingconfig.BackendOpenSearch,
+		},
+		OpenSearch: loggingconfig.OpenSearchSettings{
+			Endpoint: "http://opensearch:9200",
+		},
+	})
+
+	next := reconcileLoggingSettingsFromEnv(current, RuntimeSecuritySettings{AllowInsecureVaultTLS: true})
+	if next.Backend != loggingconfig.BackendFile {
+		t.Fatalf("expected backend to fall back to file, got %q", next.Backend)
+	}
+	if next.Hot.Backend != loggingconfig.BackendFile {
+		t.Fatalf("expected hot backend to fall back to file, got %q", next.Hot.Backend)
+	}
+	if next.Cold.Backend != loggingconfig.BackendFile {
+		t.Fatalf("expected cold backend to fall back to file, got %q", next.Cold.Backend)
+	}
+}
+
 func TestParseLoggingSettingsPreservesMaskedOpenSearchSecrets(t *testing.T) {
 	pepper := "pepper-for-tests"
 	currentPassword, err := secretcrypto.Encrypt("waf:logging:opensearch:password", "current-password", pepper)

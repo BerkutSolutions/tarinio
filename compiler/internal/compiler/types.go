@@ -110,12 +110,24 @@ type ServiceAuthUserInput struct {
 	LastLoginAt string
 }
 
+type ServiceAuthTokenInput struct {
+	ServiceName string
+	Token       string
+	Enabled     bool
+	LastUsedAt  string
+}
+
 type AntibotChallengeRuleInput struct {
 	Path      string
 	Challenge string
 }
 
 type AntibotExclusionRuleInput struct {
+	Path    string
+	Methods []string
+}
+
+type AuthExclusionRuleInput struct {
 	Path    string
 	Methods []string
 }
@@ -157,10 +169,14 @@ type EasyProfileInput struct {
 	SendXRealIP            bool
 
 	UseAuthBasic      bool
+	AuthMode          string
+	AuthOrder         string
 	AuthBasicUser     string
 	AuthBasicPassword string
 	AuthBasicText     string
 	AuthUsers         []ServiceAuthUserInput
+	AuthServiceTokens []ServiceAuthTokenInput
+	AuthExclusionRules []AuthExclusionRuleInput
 	AuthSessionTTLMin int
 
 	AntibotChallenge           string

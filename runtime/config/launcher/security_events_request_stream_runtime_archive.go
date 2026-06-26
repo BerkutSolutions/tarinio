@@ -12,55 +12,34 @@ import (
 	"waf/internal/loggingconfig"
 )
 
+func defaultLocalRequestLoggingSettings() loggingconfig.Settings {
+	return loggingconfig.Normalize(loggingconfig.Settings{
+		Backend: loggingconfig.BackendFile,
+		Hot:     loggingconfig.HotSettings{Backend: loggingconfig.BackendFile},
+		Cold:    loggingconfig.ColdSettings{Backend: loggingconfig.BackendFile},
+		Retention: loggingconfig.RetentionSettings{
+			HotDays:  loggingconfig.DefaultHotDays,
+			ColdDays: loggingconfig.DefaultColdDays,
+		},
+		Routing: loggingconfig.RoutingSettings{
+			KeepLocalFallback: true,
+		},
+	})
+}
+
 func (s *requestStreamSource) loadLoggingSettingsLocked() loggingconfig.Settings {
 	if strings.TrimSpace(s.settingsPath) == "" {
-		return loggingconfig.Normalize(loggingconfig.Settings{
-			Backend: loggingconfig.BackendOpenSearch,
-			Hot:     loggingconfig.HotSettings{Backend: loggingconfig.BackendOpenSearch},
-			Cold:    loggingconfig.ColdSettings{Backend: loggingconfig.BackendOpenSearch},
-			Retention: loggingconfig.RetentionSettings{
-				HotDays:  loggingconfig.DefaultHotDays,
-				ColdDays: loggingconfig.DefaultColdDays,
-			},
-			Routing: loggingconfig.RoutingSettings{
-				WriteRequestsToHot: true,
-				KeepLocalFallback:  true,
-			},
-		})
+		return defaultLocalRequestLoggingSettings()
 	}
 	content, err := os.ReadFile(s.settingsPath)
 	if err != nil {
-		return loggingconfig.Normalize(loggingconfig.Settings{
-			Backend: loggingconfig.BackendOpenSearch,
-			Hot:     loggingconfig.HotSettings{Backend: loggingconfig.BackendOpenSearch},
-			Cold:    loggingconfig.ColdSettings{Backend: loggingconfig.BackendOpenSearch},
-			Retention: loggingconfig.RetentionSettings{
-				HotDays:  loggingconfig.DefaultHotDays,
-				ColdDays: loggingconfig.DefaultColdDays,
-			},
-			Routing: loggingconfig.RoutingSettings{
-				WriteRequestsToHot: true,
-				KeepLocalFallback:  true,
-			},
-		})
+		return defaultLocalRequestLoggingSettings()
 	}
 	var payload struct {
 		Logging loggingconfig.Settings `json:"logging"`
 	}
 	if err := json.Unmarshal(content, &payload); err != nil {
-		return loggingconfig.Normalize(loggingconfig.Settings{
-			Backend: loggingconfig.BackendOpenSearch,
-			Hot:     loggingconfig.HotSettings{Backend: loggingconfig.BackendOpenSearch},
-			Cold:    loggingconfig.ColdSettings{Backend: loggingconfig.BackendOpenSearch},
-			Retention: loggingconfig.RetentionSettings{
-				HotDays:  loggingconfig.DefaultHotDays,
-				ColdDays: loggingconfig.DefaultColdDays,
-			},
-			Routing: loggingconfig.RoutingSettings{
-				WriteRequestsToHot: true,
-				KeepLocalFallback:  true,
-			},
-		})
+		return defaultLocalRequestLoggingSettings()
 	}
 	return loggingconfig.Normalize(payload.Logging)
 }

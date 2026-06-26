@@ -71,7 +71,10 @@ func TestRenderEasyArtifacts_GeneratesSiteAndAuthBasicFiles(t *testing.T) {
 	if !strings.Contains(siteConf, "client_max_body_size 50m;") {
 		t.Fatalf("expected max_client_size directive, got: %s", siteConf)
 	}
-	if !strings.Contains(siteConf, "set $waf_auth_gate_skip 0;") || !strings.Contains(siteConf, "if ($waf_auth_gate_redirect = 1) { return 302 /auth?return_uri=$uri&return_args=$args; }") {
+	if !strings.Contains(siteConf, "client_body_buffer_size 512k;") {
+		t.Fatalf("expected client body buffer directive, got: %s", siteConf)
+	}
+	if !strings.Contains(siteConf, "set $waf_auth_gate_skip 0;") || !strings.Contains(siteConf, "if ($waf_auth_gate_verified = 0) { return 302 /auth?return_uri=$uri&return_args=$args; }") {
 		t.Fatalf("expected auth gate redirect guard, got: %s", siteConf)
 	}
 	if !strings.Contains(siteConf, "if ($cookie_waf_antibot_") {
@@ -139,7 +142,7 @@ func TestRenderEasyArtifacts_GeneratesSiteAndAuthBasicFiles(t *testing.T) {
 	if !strings.Contains(challengePage, `var verifyURI = "/challenge/verify";`) {
 		t.Fatalf("expected antibot interstitial artifact with verify uri, got: %s", challengePage)
 	}
-	if !strings.Contains(authPage, `fetch("/auth/verify"`) {
+	if !strings.Contains(authPage, `request("/auth/verify/basic"`) {
 		t.Fatalf("expected auth gate page with verify endpoint, got: %s", authPage)
 	}
 }

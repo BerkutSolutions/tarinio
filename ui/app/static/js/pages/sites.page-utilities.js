@@ -130,18 +130,22 @@ export async function tryGetJSON(path) {
 export function mergeByID(primary, secondary) {
   const map = new Map();
   for (const item of normalizeArray(primary)) {
-    const id = String(item?.id || "");
-    if (!id) {
+    const id = String(item?.id || "").trim();
+    const loweredID = id.toLowerCase();
+    const normalizedID = loweredID === "localhost" || loweredID === "control-plane" || loweredID === "ui" ? "control-plane-access" : loweredID;
+    if (!normalizedID) {
       continue;
     }
-    map.set(id, { ...item, _origin: "primary" });
+    map.set(normalizedID, { ...item, _origin: "primary" });
   }
   for (const item of normalizeArray(secondary)) {
-    const id = String(item?.id || "");
-    if (!id || map.has(id)) {
+    const id = String(item?.id || "").trim();
+    const loweredID = id.toLowerCase();
+    const normalizedID = loweredID === "localhost" || loweredID === "control-plane" || loweredID === "ui" ? "control-plane-access" : loweredID;
+    if (!normalizedID || map.has(normalizedID)) {
       continue;
     }
-    map.set(id, { ...item, _origin: "secondary" });
+    map.set(normalizedID, { ...item, _origin: "secondary" });
   }
   return Array.from(map.values());
 }

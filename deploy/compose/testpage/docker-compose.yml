@@ -5,13 +5,15 @@ services:
     build:
       context: ../../..
       dockerfile: control-plane/Dockerfile
-    container_name: tarinio-test-control-plane-mgmt
+    container_name: tarinio-testpage-control-plane-mgmt
     restart: unless-stopped
     env_file:
       - .env
     environment:
       CONTROL_PLANE_HTTP_ADDR: 0.0.0.0:8080
       WAF_RUNTIME_ROOT: /var/lib/waf
+      WAF_MANAGEMENT_API_UPSTREAM_HOST: control-plane
+      CONTROL_PLANE_SECURITY_PEPPER: ${CONTROL_PLANE_SECURITY_PEPPER:-testpage-dev-security-pepper}
       CONTROL_PLANE_REDIS_ADDR: redis-mgmt:6379
       CONTROL_PLANE_ACME_USE_DEVELOPMENT_CLIENT: "true"
       WAF_RUNTIME_HEALTH_URL: http://runtime:8081/readyz
@@ -51,8 +53,6 @@ services:
         condition: service_healthy
       postgres-mgmt:
         condition: service_healthy
-      runtime:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
       interval: 10s
@@ -65,10 +65,11 @@ services:
     build:
       context: ../../..
       dockerfile: runtime/image/Dockerfile
-    container_name: tarinio-test-runtime-mgmt
+    container_name: tarinio-testpage-runtime-mgmt
     restart: unless-stopped
     environment:
       WAF_RUNTIME_ROOT: /var/lib/waf
+      WAF_MANAGEMENT_API_UPSTREAM_HOST: control-plane
       WAF_RUNTIME_HEALTH_ADDR: 0.0.0.0:8081
       WAF_RUNTIME_API_TOKEN: ${WAF_RUNTIME_API_TOKEN:-default-runtime-shared-token}
       # L4 thresholds are sourced from runtime bundle (/etc/waf/l4guard/config.json),
@@ -79,7 +80,7 @@ services:
       - NET_ADMIN
       - NET_RAW
     volumes:
-      - waf-test-mgmt-runtime-data:/var/lib/waf:ro
+      - waf-test-mgmt-runtime-data:/var/lib/waf
       - waf-test-mgmt-control-plane-data:/var/lib/waf/control-plane:ro
       - waf-test-mgmt-nginx-logs:/var/log/nginx
       - waf-test-mgmt-l4-adaptive:/etc/waf/l4guard-adaptive:ro
@@ -98,7 +99,7 @@ services:
 
   redis-mgmt:
     image: redis:7-alpine
-    container_name: tarinio-test-redis-mgmt
+    container_name: tarinio-testpage-redis-mgmt
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -110,7 +111,7 @@ services:
 
   postgres-mgmt:
     image: postgres:15
-    container_name: tarinio-test-postgres-mgmt
+    container_name: tarinio-testpage-postgres-mgmt
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${MGMT_POSTGRES_USER:-waf}
@@ -131,7 +132,7 @@ services:
     build:
       context: ../../..
       dockerfile: ui/Dockerfile
-    container_name: tarinio-test-ui
+    container_name: tarinio-testpage-ui
     restart: unless-stopped
     volumes:
       - ../../../ui/nginx.testpage.conf:/etc/nginx/conf.d/default.conf:ro
@@ -147,13 +148,15 @@ services:
     build:
       context: ../../..
       dockerfile: control-plane/Dockerfile
-    container_name: tarinio-test-control-plane-app
+    container_name: tarinio-testpage-control-plane-app
     restart: unless-stopped
     env_file:
       - .env
     environment:
       CONTROL_PLANE_HTTP_ADDR: 0.0.0.0:8080
       WAF_RUNTIME_ROOT: /var/lib/waf
+      WAF_MANAGEMENT_API_UPSTREAM_HOST: control-plane-test
+      CONTROL_PLANE_SECURITY_PEPPER: ${CONTROL_PLANE_SECURITY_PEPPER:-testpage-dev-security-pepper}
       CONTROL_PLANE_REDIS_ADDR: redis-mgmt:6379
       CONTROL_PLANE_ACME_USE_DEVELOPMENT_CLIENT: "true"
       WAF_RUNTIME_HEALTH_URL: http://runtime-test:8081/readyz
@@ -164,7 +167,6 @@ services:
       CONTROL_PLANE_SENTINEL_BAN_SYNC_POLL_SECONDS: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_POLL_SECONDS:-5}
       CONTROL_PLANE_SENTINEL_BAN_SYNC_MIN_SCORE: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_MIN_SCORE:-10}
       CONTROL_PLANE_SENTINEL_BAN_SYNC_MAX_PROMOTIONS_PER_TICK: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_MAX_PROMOTIONS_PER_TICK:-5}
-      POSTGRES_DSN: postgres://${TEST_POSTGRES_USER:-waf}:${TEST_POSTGRES_PASSWORD:-waf}@postgres-app:5432/${TEST_POSTGRES_DB:-waf}?sslmode=disable
       WAF_DEFAULT_LIMIT_REQ_RATE: ${TEST_WAF_DEFAULT_LIMIT_REQ_RATE:-5r/s}
       WAF_DEFAULT_BAD_BEHAVIOR_BAN_TIME_SECONDS: ${TEST_WAF_DEFAULT_BAD_BEHAVIOR_BAN_TIME_SECONDS:-10}
       CONTROL_PLANE_BOOTSTRAP_ADMIN_ENABLED: "true"
@@ -191,10 +193,6 @@ services:
     depends_on:
       redis-mgmt:
         condition: service_healthy
-      postgres-app:
-        condition: service_healthy
-      runtime-test:
-        condition: service_healthy
       test-login-app:
         condition: service_started
     healthcheck:
@@ -209,10 +207,11 @@ services:
     build:
       context: ../../..
       dockerfile: runtime/image/Dockerfile
-    container_name: tarinio-test-runtime-app
+    container_name: tarinio-testpage-runtime-app
     restart: unless-stopped
     environment:
       WAF_RUNTIME_ROOT: /var/lib/waf
+      WAF_MANAGEMENT_API_UPSTREAM_HOST: control-plane-test
       WAF_RUNTIME_HEALTH_ADDR: 0.0.0.0:8081
       WAF_RUNTIME_API_TOKEN: ${WAF_RUNTIME_API_TOKEN:-default-runtime-shared-token}
       # L4 thresholds are sourced from runtime bundle (/etc/waf/l4guard/config.json),
@@ -223,7 +222,7 @@ services:
       - NET_ADMIN
       - NET_RAW
     volumes:
-      - waf-test-app-runtime-data:/var/lib/waf:ro
+      - waf-test-app-runtime-data:/var/lib/waf
       - waf-test-app-control-plane-data:/var/lib/waf/control-plane:ro
       - waf-test-app-nginx-logs:/var/log/nginx
       - waf-test-app-l4-adaptive:/etc/waf/l4guard-adaptive:ro
@@ -240,30 +239,11 @@ services:
     networks:
       - waf-test-net
 
-  postgres-app:
-    image: postgres:15
-    container_name: tarinio-test-postgres-app
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${TEST_POSTGRES_USER:-waf}
-      POSTGRES_PASSWORD: ${TEST_POSTGRES_PASSWORD:-waf}
-      POSTGRES_DB: ${TEST_POSTGRES_DB:-waf}
-      POSTGRES_INITDB_ARGS: ${TEST_POSTGRES_INITDB_ARGS:---auth-local=scram-sha-256 --auth-host=scram-sha-256 --locale=C.UTF-8}
-    volumes:
-      - waf-test-app-postgres-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${TEST_POSTGRES_USER:-waf} -d ${TEST_POSTGRES_DB:-waf}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - waf-test-net
-
   cli:
     build:
       context: ../../..
       dockerfile: cli/Dockerfile
-    container_name: tarinio-test-cli
+    container_name: tarinio-testpage-cli
     profiles:
       - tools
     environment:
@@ -273,7 +253,7 @@ services:
 
   test-login-app:
     image: nginx:1.27-alpine
-    container_name: tarinio-test-login-app
+    container_name: tarinio-testpage-login-app
     restart: unless-stopped
     volumes:
       - ../../test-login-app/index.html:/usr/share/nginx/html/index.html:ro
@@ -287,7 +267,7 @@ services:
     build:
       context: ../../..
       dockerfile: deploy/compose/testpage/request-archive/Dockerfile
-    container_name: tarinio-test-request-archive
+    container_name: tarinio-testpage-request-archive
     restart: unless-stopped
     environment:
       REQUEST_ARCHIVE_MAX_FILE_SIZE_MB: ${REQUEST_ARCHIVE_MAX_FILE_SIZE_MB:-256}
@@ -309,7 +289,7 @@ services:
     build:
       context: ../../..
       dockerfile: deploy/compose/testpage/ddos-model/Dockerfile
-    container_name: tarinio-test-sentinel-mgmt
+    container_name: tarinio-testpage-sentinel-mgmt
     restart: unless-stopped
     environment:
       MODEL_ENABLED: ${DDOS_MODEL_ENABLED:-true}
@@ -352,7 +332,7 @@ services:
     build:
       context: ../../..
       dockerfile: deploy/compose/testpage/ddos-model/Dockerfile
-    container_name: tarinio-test-sentinel-app
+    container_name: tarinio-testpage-sentinel-app
     restart: unless-stopped
     environment:
       MODEL_ENABLED: ${DDOS_MODEL_ENABLED:-true}
@@ -427,5 +407,3 @@ volumes:
     name: waf-test-app-control-plane-data
   waf-test-app-certificates-data:
     name: waf-test-app-certificates-data
-  waf-test-app-postgres-data:
-    name: waf-test-app-postgres-data

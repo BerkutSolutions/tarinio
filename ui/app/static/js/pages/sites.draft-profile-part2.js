@@ -1,5 +1,5 @@
 export async function hydrateSiteDraftPart2(ctx, site, upstream, tlsConfig, accessPolicy = null, deps) {
-  let draft = site ? siteDraftFromData(site, upstream, tlsConfig, deps.defaultSiteDraft) : deps.defaultSiteDraft();
+  let draft = site ? deps.siteDraftFromData(site, upstream, tlsConfig, deps.defaultSiteDraft) : deps.defaultSiteDraft();
   if (site?.id) {
     try {
       const profile = await ctx.api.get(`/api/easy-site-profiles/${encodeURIComponent(site.id)}`);
@@ -37,6 +37,10 @@ export function draftToEasyProfilePart2(draft, deps) {
   const authBasicLocation = "sitewide";
   const authBasicText = String(draft.auth_basic_text || "").trim() || "Restricted area";
   const authUsers = deps.normalizeAuthBasicUsers(draft.auth_basic_users);
+  const authMode = deps.normalizeAuthMode(draft.auth_mode);
+  const authOrder = deps.normalizeAuthOrder(draft.auth_order);
+  const authExclusionRules = deps.normalizeAuthExclusionRules(draft.auth_exclusion_rules);
+  const authServiceTokens = deps.normalizeAuthServiceTokens(draft.auth_service_tokens);
   const firstUser = authUsers[0] || { username: "", password: "" };
   const authSessionTTLMinutes = deps.normalizeAuthSessionTTLMinutes(draft.auth_basic_session_inactivity_minutes);
   const customPath = String(draft.modsecurity_custom_path || "").trim() || "modsec/anomaly_score.conf";
@@ -148,11 +152,15 @@ export function draftToEasyProfilePart2(draft, deps) {
     },
     security_auth_basic: {
       use_auth_basic: draft.use_auth_basic,
+      auth_mode: authMode,
+      auth_order: authOrder,
       auth_basic_location: authBasicLocation,
       auth_basic_user: firstUser.username,
       auth_basic_password: firstUser.password,
       auth_basic_text: authBasicText,
       users: authUsers,
+      exclusion_rules: authExclusionRules,
+      service_tokens: authServiceTokens,
       session_inactivity_minutes: authSessionTTLMinutes
     },
     security_country_policy: {
@@ -295,12 +303,44 @@ export function validateDraftPart2(draft, ctx, deps) {
   if (draft.use_auth_basic) {
     const users = deps.normalizeAuthBasicUsers(draft.auth_basic_users);
     const enabledUsers = users.filter((item) => item.enabled);
-    if (!enabledUsers.length) {
+    const authMode = deps.normalizeAuthMode(draft.auth_mode);
+    const enabledTokens = deps.normalizeAuthServiceTokens(draft.auth_service_tokens).filter((item) => item.enabled && String(item.token || "").trim());
+    if (authMode !== "service_token" && !enabledUsers.length) {
       return ctx.t("sites.validation.authBasicUserRequired");
     }
-    for (const user of enabledUsers) {
-      if (!String(user.password || "").trim()) {
-        return ctx.t("sites.validation.authBasicPasswordRequired");
+    if (authMode !== "basic" && !enabledTokens.length) {
+      return ctx.t("sites.validation.authServiceTokenRequired");
+    }
+    if (authMode !== "service_token") {
+      for (const user of enabledUsers) {
+        if (!String(user.password || "").trim()) {
+          return ctx.t("sites.validation.authBasicPasswordRequired");
+        }
+      }
+    }
+    for (const token of deps.normalizeAuthServiceTokens(draft.auth_service_tokens)) {
+      if (token.enabled && !String(token.token || "").trim()) {
+        return ctx.t("sites.validation.authServiceTokenSecretRequired");
+      }
+    }
+  }
+  if (deps.normalizeAuthExclusionRules(draft.auth_exclusion_rules).length > 32) {
+    return ctx.t("sites.validation.authExclusionRulesLimit");
+  }
+  for (const rule of deps.normalizeAuthExclusionRules(draft.auth_exclusion_rules)) {
+    if (!rule.path.startsWith("/")) {
+      return ctx.t("sites.validation.authExclusionPathFormat");
+    }
+    const methods = Array.isArray(rule.methods) ? rule.methods : [];
+    if (!methods.length) {
+      return ctx.t("sites.validation.authExclusionMethodsInvalid");
+    }
+    if (methods.includes("*") && methods.length !== 1) {
+      return ctx.t("sites.validation.authExclusionMethodsInvalid");
+    }
+    for (const method of methods) {
+      if (!["*", "GET", "POST", "HEAD", "OPTIONS", "PUT", "DELETE", "PATCH"].includes(method)) {
+        return ctx.t("sites.validation.authExclusionMethodsInvalid");
       }
     }
   }

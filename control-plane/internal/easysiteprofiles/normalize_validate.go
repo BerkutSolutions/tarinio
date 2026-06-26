@@ -97,10 +97,14 @@ func normalizeProfile(profile EasySiteProfile) EasySiteProfile {
 	profile.SecurityAntibot.ChallengeRules = normalizeAntibotChallengeRules(profile.SecurityAntibot.ChallengeRules)
 
 	profile.SecurityAuthBasic.AuthBasicLocation = strings.ToLower(strings.TrimSpace(profile.SecurityAuthBasic.AuthBasicLocation))
+	profile.SecurityAuthBasic.AuthMode = normalizeAuthMode(profile.SecurityAuthBasic.AuthMode)
+	profile.SecurityAuthBasic.AuthOrder = normalizeAuthOrder(profile.SecurityAuthBasic.AuthOrder)
 	profile.SecurityAuthBasic.AuthBasicUser = strings.TrimSpace(profile.SecurityAuthBasic.AuthBasicUser)
 	profile.SecurityAuthBasic.AuthBasicPassword = strings.TrimSpace(profile.SecurityAuthBasic.AuthBasicPassword)
 	profile.SecurityAuthBasic.AuthBasicText = strings.TrimSpace(profile.SecurityAuthBasic.AuthBasicText)
 	profile.SecurityAuthBasic.Users = normalizeAuthUsers(profile.SecurityAuthBasic.Users)
+	profile.SecurityAuthBasic.ExclusionRules = normalizeAuthExclusionRules(profile.SecurityAuthBasic.ExclusionRules)
+	profile.SecurityAuthBasic.ServiceTokens = normalizeAuthServiceTokens(profile.SecurityAuthBasic.ServiceTokens)
 	if len(profile.SecurityAuthBasic.Users) == 0 && profile.SecurityAuthBasic.AuthBasicUser != "" {
 		profile.SecurityAuthBasic.Users = []SecurityAuthUser{
 			{
@@ -434,11 +438,17 @@ func validateProfile(profile EasySiteProfile) error {
 	if profile.SecurityAuthBasic.AuthBasicLocation != AuthBasicLocationSitewide {
 		return errors.New("easy site profile security_auth_basic.auth_basic_location must be sitewide")
 	}
-	if profile.SecurityAuthBasic.UseAuthBasic && profile.SecurityAuthBasic.AuthBasicUser == "" {
-		return errors.New("easy site profile security_auth_basic.auth_basic_user is required when auth basic is enabled")
+	if !slices.Contains(allowedAuthModes, profile.SecurityAuthBasic.AuthMode) {
+		return errors.New("easy site profile security_auth_basic.auth_mode has unsupported value")
 	}
-	if profile.SecurityAuthBasic.UseAuthBasic && profile.SecurityAuthBasic.AuthBasicPassword == "" {
-		return errors.New("easy site profile security_auth_basic.auth_basic_password is required when auth basic is enabled")
+	if !slices.Contains(allowedAuthOrders, profile.SecurityAuthBasic.AuthOrder) {
+		return errors.New("easy site profile security_auth_basic.auth_order has unsupported value")
+	}
+	if profile.SecurityAuthBasic.UseAuthBasic && profile.SecurityAuthBasic.AuthMode != AuthModeServiceToken && profile.SecurityAuthBasic.AuthBasicUser == "" {
+		return errors.New("easy site profile security_auth_basic.auth_basic_user is required when basic auth mode is enabled")
+	}
+	if profile.SecurityAuthBasic.UseAuthBasic && profile.SecurityAuthBasic.AuthMode != AuthModeServiceToken && profile.SecurityAuthBasic.AuthBasicPassword == "" {
+		return errors.New("easy site profile security_auth_basic.auth_basic_password is required when basic auth mode is enabled")
 	}
 	if profile.SecurityAuthBasic.AuthBasicText == "" {
 		return errors.New("easy site profile security_auth_basic.auth_basic_text is required")
@@ -448,6 +458,9 @@ func validateProfile(profile EasySiteProfile) error {
 	}
 	if len(profile.SecurityAuthBasic.Users) > 128 {
 		return errors.New("easy site profile security_auth_basic.users must not exceed 128 entries")
+	}
+	if len(profile.SecurityAuthBasic.ServiceTokens) > 128 {
+		return errors.New("easy site profile security_auth_basic.service_tokens must not exceed 128 entries")
 	}
 	if profile.SecurityAuthBasic.UseAuthBasic {
 		enabledUsers := 0
@@ -459,8 +472,47 @@ func validateProfile(profile EasySiteProfile) error {
 				}
 			}
 		}
-		if enabledUsers == 0 {
+		if profile.SecurityAuthBasic.AuthMode != AuthModeServiceToken && enabledUsers == 0 {
 			return errors.New("easy site profile security_auth_basic.users must include at least one enabled user")
+		}
+		if profile.SecurityAuthBasic.AuthMode != AuthModeBasic && !hasEnabledServiceToken(profile.SecurityAuthBasic.ServiceTokens) {
+			return errors.New("easy site profile security_auth_basic.service_tokens must include at least one enabled token")
+		}
+	}
+	if len(profile.SecurityAuthBasic.ExclusionRules) > 32 {
+		return errors.New("easy site profile security_auth_basic.exclusion_rules must not exceed 32 entries")
+	}
+	for _, rule := range profile.SecurityAuthBasic.ExclusionRules {
+		if rule.Path == "" || !strings.HasPrefix(rule.Path, "/") {
+			return errors.New("easy site profile security_auth_basic.exclusion_rules.path must start with /")
+		}
+		if len(rule.Methods) == 0 {
+			return errors.New("easy site profile security_auth_basic.exclusion_rules.methods must not be empty")
+		}
+		for _, method := range rule.Methods {
+			if method == "*" {
+				if len(rule.Methods) != 1 {
+					return errors.New("easy site profile security_auth_basic.exclusion_rules.methods wildcard must be used alone")
+				}
+				continue
+			}
+			if !slices.Contains(allowedMethods, method) {
+				return fmt.Errorf("easy site profile security_auth_basic.exclusion_rules.methods contains unsupported method %s", method)
+			}
+		}
+	}
+	for _, token := range profile.SecurityAuthBasic.ServiceTokens {
+		if !token.Enabled {
+			continue
+		}
+		if strings.TrimSpace(token.Token) == "" {
+			return errors.New("easy site profile security_auth_basic.service_tokens.token is required for enabled tokens")
+		}
+		if strings.ContainsAny(token.ServiceName, "|\r\n\t ") {
+			return errors.New("easy site profile security_auth_basic.service_tokens.service_name contains unsupported characters")
+		}
+		if strings.ContainsAny(token.Token, "|\r\n\t") {
+			return errors.New("easy site profile security_auth_basic.service_tokens.token contains unsupported characters")
 		}
 	}
 	if !isSafeHeaderValue(profile.SecurityAuthBasic.AuthBasicText) {

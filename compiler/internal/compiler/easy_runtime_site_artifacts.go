@@ -26,6 +26,8 @@ func defaultEasyProfileForSite(siteID string) EasyProfileInput {
 		UseBadBehavior:            true,
 		BadBehaviorStatusCodes:    []int{400, 401, 403, 404, 405, 429, 444},
 		BadBehaviorBanTimeSeconds: 30,
+		AuthMode:                  authModeBasic,
+		AuthOrder:                 authOrderAuthFirst,
 	}
 }
 
@@ -54,6 +56,19 @@ func renderEasySiteArtifacts(site SiteInput, profile EasyProfileInput) ([]Artifa
 		defaultChallenge = profile.ChallengeEscalationMode
 	}
 	authUsers := enabledAuthUsers(profile.AuthUsers)
+	if len(authUsers) == 0 && strings.TrimSpace(profile.AuthBasicUser) != "" && strings.TrimSpace(profile.AuthBasicPassword) != "" {
+		authUsers = []ServiceAuthUserInput{{
+			Username: strings.TrimSpace(profile.AuthBasicUser),
+			Password: strings.TrimSpace(profile.AuthBasicPassword),
+			Enabled:  true,
+		}}
+	}
+	authTokens := enabledAuthServiceTokens(profile.AuthServiceTokens)
+	authMode := normalizeCompilerAuthMode(profile.AuthMode)
+	authOrder := normalizeCompilerAuthOrder(profile.AuthOrder)
+	authEnabled := profile.UseAuthBasic && (len(authUsers) > 0 || len(authTokens) > 0)
+	authBasicEnabled := authEnabled && authMode != authModeServiceToken && len(authUsers) > 0
+	authTokenEnabled := authEnabled && authMode != authModeBasic && len(authTokens) > 0
 	data := easySiteData{
 		SiteID:                       site.ID,
 		RateLimitCookieVar:           rateLimitCookieVar(site.ID),
@@ -78,14 +93,22 @@ func renderEasySiteArtifacts(site SiteInput, profile EasyProfileInput) ([]Artifa
 		SendXRealIP:                  profile.SendXRealIP,
 		RateLimitBanSeconds:          rateLimitBanSeconds(profile),
 		AdminBypassPathPattern:       easyAdminBypassPathPatternForSite(site.ID),
-		UseAuthBasic:                 profile.UseAuthBasic && len(authUsers) > 0,
+		AuthEnabled:                  authEnabled,
+		AuthBasicEnabled:             authBasicEnabled,
+		AuthTokenEnabled:             authTokenEnabled,
+		AuthMode:                     authMode,
+		AuthOrder:                    authOrder,
+		AuthRunsBeforeAntibot:        authOrder == authOrderAuthFirst,
 		AuthBasicRealm:               profile.AuthBasicText,
 		AuthBasicUserFile:            fmt.Sprintf("/etc/waf/nginx/auth-basic/%s.htpasswd", site.ID),
 		AuthGateLoginURI:             authGateLoginURI(),
-		AuthGateVerifyURI:            authGateVerifyURI(),
+		AuthGateVerifyBasicURI:       authGateVerifyBasicURI(),
+		AuthGateVerifyTokenURI:       authGateVerifyTokenURI(),
 		AuthGateCookieKey:            authGateCookieName(site.ID),
 		AuthGateCookieVal:            authGateCookieValue(site.ID, profile),
 		AuthGateCookieTTL:            authGateCookieTTLSeconds(profile),
+		AuthExclusionRules:           buildEasyAuthExclusionRuleData(profile.AuthExclusionRules),
+		AuthTokenRules:               buildEasyAuthTokenRuleData(authTokens),
 		AntibotEnabled:               antibotEnabled,
 		AntibotTwoLayerEnabled:       antibotTwoLayer,
 		AntibotUsesInterstitial:      antibotUsesInterstitial(defaultChallenge),
@@ -145,7 +168,7 @@ func renderEasySiteArtifacts(site SiteInput, profile EasyProfileInput) ([]Artifa
 		),
 	}
 
-	if data.UseAuthBasic {
+	if data.AuthBasicEnabled {
 		lines := make([]string, 0, len(authUsers))
 		for _, user := range authUsers {
 			lines = append(lines, buildSHA1HTPasswdLine(user.Username, user.Password))
@@ -156,8 +179,13 @@ func renderEasySiteArtifacts(site SiteInput, profile EasyProfileInput) ([]Artifa
 			ArtifactKindNginxConfig,
 			htpasswd,
 		))
+	}
+	if data.AuthEnabled {
 		authPage, err := renderTemplate(filepath.Join(templatesRoot(), "..", "errors", "auth.html.tmpl"), authGatePageData{
-			VerifyURI: data.AuthGateVerifyURI,
+			BasicVerifyURI:  data.AuthGateVerifyBasicURI,
+			TokenVerifyURI:  data.AuthGateVerifyTokenURI,
+			UseBasic:        data.AuthBasicEnabled,
+			UseServiceToken: data.AuthTokenEnabled,
 		})
 		if err != nil {
 			return nil, false, 0, 0, fmt.Errorf("render auth gate page for %s: %w", site.ID, err)

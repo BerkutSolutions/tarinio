@@ -56,10 +56,18 @@ func TestSiteSettings_FieldContract(t *testing.T) {
 		"security_antibot.challenge_rules.challenge",
 		"security_antibot.challenge_rules.path",
 		"security_auth_basic.auth_basic_location",
+		"security_auth_basic.auth_mode",
+		"security_auth_basic.auth_order",
 		"security_auth_basic.auth_basic_password",
 		"security_auth_basic.auth_basic_text",
 		"security_auth_basic.auth_basic_user",
+		"security_auth_basic.exclusion_rules.methods",
+		"security_auth_basic.exclusion_rules.path",
 		"security_auth_basic.session_inactivity_minutes",
+		"security_auth_basic.service_tokens.enabled",
+		"security_auth_basic.service_tokens.last_used_at",
+		"security_auth_basic.service_tokens.service_name",
+		"security_auth_basic.service_tokens.token",
 		"security_auth_basic.use_auth_basic",
 		"security_auth_basic.users.enabled",
 		"security_auth_basic.users.last_login_at",
@@ -308,10 +316,22 @@ func allFieldsProfile(siteID string) EasySiteProfile {
 	}
 
 	profile.SecurityAuthBasic.UseAuthBasic = true
+	profile.SecurityAuthBasic.AuthMode = AuthModeBasicOrToken
+	profile.SecurityAuthBasic.AuthOrder = AuthOrderAntibotFirst
 	profile.SecurityAuthBasic.AuthBasicLocation = AuthBasicLocationSitewide
 	profile.SecurityAuthBasic.AuthBasicUser = "admin"
 	profile.SecurityAuthBasic.AuthBasicPassword = "super-secret"
 	profile.SecurityAuthBasic.AuthBasicText = "Private zone"
+	profile.SecurityAuthBasic.Users = []SecurityAuthUser{
+		{Username: "admin", Password: "super-secret", Enabled: true, LastLoginAt: "2026-06-24T10:00:00Z"},
+	}
+	profile.SecurityAuthBasic.ExclusionRules = []SecurityAuthExclusionRule{
+		{Path: "/api/public/", Methods: []string{"GET", "OPTIONS"}},
+	}
+	profile.SecurityAuthBasic.ServiceTokens = []SecurityAuthServiceToken{
+		{ServiceName: "sentry-ingest", Token: "service-token-1", Enabled: true, LastUsedAt: "2026-06-24T12:00:00Z"},
+	}
+	profile.SecurityAuthBasic.SessionInactivityMinutes = 90
 
 	profile.SecurityCountryPolicy.BlacklistCountry = []string{"RU", "APAC"}
 	profile.SecurityCountryPolicy.WhitelistCountry = []string{"US", "EMEA"}

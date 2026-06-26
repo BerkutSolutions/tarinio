@@ -7,12 +7,20 @@ export function rebuildIndexes(state, deps = {}) {
   state.accessBySite = new Map();
   state.easyProfilesBySite = new Map();
   for (const upstream of state.upstreams) {
-    const items = state.upstreamsBySite.get(upstream.site_id) || [];
+    const siteID = normalizeSiteID(upstream?.site_id);
+    if (!siteID) {
+      continue;
+    }
+    const items = state.upstreamsBySite.get(siteID) || [];
     items.push(upstream);
-    state.upstreamsBySite.set(upstream.site_id, items);
+    state.upstreamsBySite.set(siteID, items);
   }
   for (const tlsConfig of state.tlsConfigs) {
-    state.tlsBySite.set(tlsConfig.site_id, tlsConfig);
+    const siteID = normalizeSiteID(tlsConfig?.site_id);
+    if (!siteID || state.tlsBySite.has(siteID)) {
+      continue;
+    }
+    state.tlsBySite.set(siteID, tlsConfig);
   }
   for (const certificate of state.certificates) {
     const certificateID = String(certificate?.id || "").trim().toLowerCase();
@@ -105,10 +113,11 @@ export async function syncDraftFromRoute(state, ctx, deps = {}) {
     state.highlightedSelector = "";
     return;
   }
-  const site = state.sites.find((item) => item.id === state.route.siteID);
-  const upstream = state.upstreamsBySite.get(state.route.siteID)?.[0] || null;
-  const tlsConfig = state.tlsBySite.get(state.route.siteID) || null;
-  const accessPolicy = state.accessBySite.get(normalizeSiteID(state.route.siteID)) || null;
+  const normalizedRouteSiteID = normalizeSiteID(state.route.siteID);
+  const site = state.sites.find((item) => normalizeSiteID(item?.id) === normalizedRouteSiteID) || null;
+  const upstream = state.upstreamsBySite.get(normalizedRouteSiteID)?.[0] || null;
+  const tlsConfig = state.tlsBySite.get(normalizedRouteSiteID) || null;
+  const accessPolicy = state.accessBySite.get(normalizedRouteSiteID) || null;
   state.draft = await hydrateSiteDraft(ctx, site, upstream, tlsConfig, accessPolicy);
   state.listTemplateSelection.blacklist_user_agent = [];
   state.listTemplateSelection.blacklist_uri = [];

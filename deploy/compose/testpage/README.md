@@ -26,7 +26,6 @@ This profile runs two isolated WAF stacks in one compose project:
   - `control-plane-test`
   - `runtime-test` (`8081 -> 443`)
   - `test-login-app`
-  - `postgres-app`
 
 Additionally:
 - `request-archive` container collects request logs from both runtimes.
@@ -35,6 +34,8 @@ Additionally:
 Notes:
 - `test-login-app` has no host port mapping (traffic goes only through WAF on `8081`).
 - state and DB volumes are separated between management and test stacks.
+- only the management stack uses Postgres in this profile; the protected `8081` stack keeps bootstrap resources in file state so the UI can discover them instantly through `/api-app/*`.
+- `control-plane-test` stores bootstrap site metadata in local JSON state, so the Services page can immediately discover the protected `8081` stack through `/api-app/*` without registration or manual site creation.
 - upstream defaults use static IPs inside docker network (`172.30.0.0/24`) to show IPs in UI instead of container names.
 
 ## Request Archive Container (WAF Independence)

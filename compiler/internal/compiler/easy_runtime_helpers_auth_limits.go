@@ -37,8 +37,12 @@ func authGateLoginURI() string {
 	return "/auth"
 }
 
-func authGateVerifyURI() string {
-	return "/auth/verify"
+func authGateVerifyBasicURI() string {
+	return "/auth/verify/basic"
+}
+
+func authGateVerifyTokenURI() string {
+	return "/auth/verify/token"
 }
 
 func authGateCookieName(siteID string) string {
@@ -47,10 +51,14 @@ func authGateCookieName(siteID string) string {
 
 func authGateCookieValue(siteID string, profile EasyProfileInput) string {
 	enabled := enabledAuthUsers(profile.AuthUsers)
-	parts := make([]string, 0, len(enabled)+4)
-	parts = append(parts, siteID, profile.AuthBasicText, strconv.Itoa(profile.AuthSessionTTLMin))
+	tokens := enabledAuthServiceTokens(profile.AuthServiceTokens)
+	parts := make([]string, 0, len(enabled)+len(tokens)+6)
+	parts = append(parts, siteID, profile.AuthMode, profile.AuthOrder, profile.AuthBasicText, strconv.Itoa(profile.AuthSessionTTLMin))
 	for _, user := range enabled {
 		parts = append(parts, strings.TrimSpace(user.Username)+":"+strings.TrimSpace(user.Password))
+	}
+	for _, token := range tokens {
+		parts = append(parts, strings.TrimSpace(token.ServiceName)+":"+strings.TrimSpace(token.Token))
 	}
 	return shortStableHash(strings.Join(parts, "|"))
 }

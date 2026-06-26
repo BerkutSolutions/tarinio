@@ -48,6 +48,49 @@ func TestRenderSiteUpstreamArtifacts_ManagementSiteRoutesAPIToControlPlaneFromEn
 	}
 }
 
+func TestRenderSiteUpstreamArtifacts_ManagementSiteRoutesAPIToConfiguredManagementUpstream(t *testing.T) {
+	t.Setenv("WAF_MANAGEMENT_API_UPSTREAM_HOST", "control-plane-test")
+
+	artifacts, err := RenderSiteUpstreamArtifacts(
+		[]SiteInput{{
+			ID:                "control-plane-access",
+			Enabled:           true,
+			PrimaryHost:       "waf.hantico.ru",
+			ListenHTTP:        true,
+			ListenHTTPS:       true,
+			DefaultUpstreamID: "mgmt-upstream",
+		}},
+		[]UpstreamInput{{
+			ID:             "mgmt-upstream",
+			SiteID:         "control-plane-access",
+			Scheme:         "http",
+			Host:           "ui",
+			Port:           80,
+			PassHostHeader: true,
+		}},
+	)
+	if err != nil {
+		t.Fatalf("render failed: %v", err)
+	}
+
+	content := ""
+	for _, artifact := range artifacts {
+		if artifact.Path == "nginx/sites/control-plane-access.conf" {
+			content = string(artifact.Content)
+			break
+		}
+	}
+	if content == "" {
+		t.Fatal("expected site artifact for configured management site")
+	}
+	if !containsAll(content,
+		"location ^~ /api/ {",
+		"proxy_pass http://control-plane-test:8080;",
+	) {
+		t.Fatalf("expected configured management site to route /api to control-plane-test, got: %s", content)
+	}
+}
+
 func containsAll(content string, parts ...string) bool {
 	for _, part := range parts {
 		if !strings.Contains(content, part) {

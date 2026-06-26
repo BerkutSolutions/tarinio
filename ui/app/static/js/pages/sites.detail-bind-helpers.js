@@ -4,6 +4,8 @@ export function syncStateDraftFromForm(state, getDraft, deps = {}) {
     BAN_SCOPE_VALUES,
     normalizeBanEscalationStages,
     normalizeAuthBasicUsers,
+    normalizeAuthMode,
+    normalizeAuthOrder,
     normalizeAuthSessionTTLMinutes
   } = deps;
   state.draft = getDraft();
@@ -19,6 +21,13 @@ export function syncStateDraftFromForm(state, getDraft, deps = {}) {
     state.draft.bad_behavior_ban_time_seconds
   );
   state.draft.auth_basic_users = normalizeAuthBasicUsers(state.draft.auth_basic_users);
+  state.draft.auth_exclusion_rules = normalizeArray(state.draft.auth_exclusion_rules).map((item) => ({
+    path: String(item?.path || "").trim(),
+    methods: normalizeArray(item?.methods).map((method) => String(method || "").trim().toUpperCase()).filter(Boolean)
+  }));
+  state.draft.auth_service_tokens = deps.normalizeAuthServiceTokens(state.draft.auth_service_tokens);
+  state.draft.auth_mode = normalizeAuthMode(state.draft.auth_mode);
+  state.draft.auth_order = normalizeAuthOrder(state.draft.auth_order);
   state.draft.auth_basic_session_inactivity_minutes = normalizeAuthSessionTTLMinutes(
     state.draft.auth_basic_session_inactivity_minutes
   );

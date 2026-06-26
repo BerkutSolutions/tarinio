@@ -8,6 +8,9 @@ export function buildDetailDraftFromForm(container, state, deps = {}) {
     normalizeBanEscalationStages,
     normalizeAntibotExclusionRules,
     normalizeAuthBasicUsers,
+    normalizeAuthMode,
+    normalizeAuthOrder,
+    normalizeAuthServiceTokens,
     normalizeAuthSessionTTLMinutes,
     normalizeAPIPositiveEndpointPolicies
   } = deps;
@@ -135,6 +138,8 @@ export function buildDetailDraftFromForm(container, state, deps = {}) {
         };
       }),
     use_auth_basic: container.querySelector("#service-use-auth-basic").checked,
+    auth_mode: normalizeAuthMode(container.querySelector("#service-auth-mode")?.value || "basic"),
+    auth_order: normalizeAuthOrder(container.querySelector("#service-auth-order")?.value || "auth_first"),
     auth_basic_location: container.querySelector("#service-auth-basic-location").value.trim(),
     auth_basic_user: "",
     auth_basic_password: "",
@@ -152,6 +157,28 @@ export function buildDetailDraftFromForm(container, state, deps = {}) {
           last_login_at: String(lastLogin || "")
         };
       }),
+    auth_exclusion_rules: Array.from(container.querySelectorAll("[data-auth-exclusion-path]")).map((input) => {
+      const index = String(input.dataset.authExclusionPath || "");
+      const methodsInput = container.querySelector(`[data-auth-exclusion-methods="${index}"]`);
+      return {
+        path: String(input.value || "").trim(),
+        methods: String(methodsInput?.value || "").split(/[\s,|]+/).map((item) => item.trim()).filter(Boolean)
+      };
+    }),
+    auth_service_tokens: normalizeAuthServiceTokens(
+      Array.from(container.querySelectorAll("[data-auth-token-service-name]")).map((input) => {
+        const index = String(input.dataset.authTokenServiceName || "");
+        const tokenInput = container.querySelector(`[data-auth-token-secret="${index}"]`);
+        const enabledInput = container.querySelector(`[data-auth-token-enabled="${index}"]`);
+        const lastUsed = normalizeAuthServiceTokens(state.draft.auth_service_tokens)[Number.parseInt(index, 10)]?.last_used_at || "";
+        return {
+          service_name: String(input.value || "").trim(),
+          token: String(tokenInput?.value || "").trim(),
+          enabled: Boolean(enabledInput?.checked),
+          last_used_at: String(lastUsed || "")
+        };
+      })
+    ),
     auth_basic_session_inactivity_minutes: normalizeAuthSessionTTLMinutes(
       container.querySelector("#service-auth-basic-session-ttl")?.value
     ),

@@ -120,11 +120,15 @@ export function applyEasyProfileToDraft(draft, profile, deps) {
     challenge_escalation_mode: String(antibot.challenge_escalation_mode || draft.challenge_escalation_mode).trim().toLowerCase() || "javascript",
     antibot_challenge_rules: deps.normalizeAntibotChallengeRules(antibot.challenge_rules || draft.antibot_challenge_rules),
     use_auth_basic: Boolean(authBasic.use_auth_basic ?? draft.use_auth_basic),
+    auth_mode: deps.normalizeAuthMode(authBasic.auth_mode || draft.auth_mode),
+    auth_order: deps.normalizeAuthOrder(authBasic.auth_order || draft.auth_order),
     auth_basic_location: authBasic.auth_basic_location || draft.auth_basic_location,
     auth_basic_user: authBasic.auth_basic_user || draft.auth_basic_user,
     auth_basic_password: authBasic.auth_basic_password || draft.auth_basic_password,
     auth_basic_text: authBasic.auth_basic_text || draft.auth_basic_text,
     auth_basic_users: deps.normalizeAuthBasicUsers(authBasic.users),
+    auth_exclusion_rules: deps.normalizeAuthExclusionRules(authBasic.exclusion_rules || draft.auth_exclusion_rules),
+    auth_service_tokens: deps.normalizeAuthServiceTokens(authBasic.service_tokens || draft.auth_service_tokens),
     auth_basic_session_inactivity_minutes: deps.normalizeAuthSessionTTLMinutes(
       authBasic.session_inactivity_minutes ?? draft.auth_basic_session_inactivity_minutes
     ),

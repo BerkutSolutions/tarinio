@@ -1,8 +1,16 @@
 export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
-  const { escapeHtml, renderListEditor, getQuickListTemplates, normalizeStringArray, renderStatusCodesEditor, renderCustomLimitRulesEditor, renderAntibotExclusionRulesEditor, normalizeBanEscalationStages, formatBanDurationSeconds, renderAntibotChallengeRulesEditor, renderAuthSessionTtlOptions, renderAuthUsersEditor, renderCountryEditor } = deps;
+  const { escapeHtml, renderListEditor, getQuickListTemplates, normalizeStringArray, renderStatusCodesEditor, renderCustomLimitRulesEditor, renderAntibotExclusionRulesEditor, normalizeBanEscalationStages, formatBanDurationSeconds, renderAntibotChallengeRulesEditor, renderAuthSessionTtlOptions, renderAuthUsersEditor, renderCountryEditor, renderAuthExclusionRulesEditor, renderAuthServiceTokensEditor, renderAuthHelpModal, renderAntibotHelpModal, renderTrafficBadBehaviorHelpModal, renderTrafficLimitsHelpModal, renderTrafficDnsblHelpModal, renderHeadersChapterHelpModal, renderBlockingChapterHelpModal, renderAntibotChapterHelpModal, renderGeoChapterHelpModal, renderModsecChapterHelpModal, normalizeAuthMode } = deps;
+  const authMode = normalizeAuthMode(draft.auth_mode);
   return `
               <section class="waf-stack waf-service-compact-section${state.activeTab === "headers" ? "" : " waf-hidden"}" data-tab-panel="headers">
-                <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.headers.title"))}</div>
+                <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
+                  <div>
+                    <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.headers.title"))}</div>
+                    <div class="muted">${escapeHtml(ctx.t("sites.easy.tab.headers.subtitle"))}</div>
+                  </div>
+                  <button class="waf-help-icon-btn" type="button" id="service-headers-chapter-help-btn" title="${escapeHtml(ctx.t("sites.help.headers.open"))}" aria-label="${escapeHtml(ctx.t("sites.help.headers.open"))}">?</button>
+                </div>
+                ${renderHeadersChapterHelpModal(ctx, escapeHtml)}
                 <div class="waf-form-grid">
                   <div class="waf-field">
                     <label for="service-cookie-flags">${escapeHtml(ctx.t("sites.easy.headers.cookieFlags"))}</label>
@@ -43,11 +51,20 @@ export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
               </section>
 
               <section class="waf-stack waf-service-compact-section${state.activeTab === "traffic" ? "" : " waf-hidden"}" data-tab-panel="traffic">
-                <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.traffic.title"))}</div>
+                <div>
+                  <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.traffic.title"))}</div>
+                  <div class="muted">${escapeHtml(ctx.t("sites.easy.tab.traffic.subtitle"))}</div>
+                </div>
                 <div class="waf-traffic-layout">
                   <div class="waf-stack">
                     <div class="waf-subcard waf-stack waf-antiddos-frame">
-                    <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.traffic.frame.badBehavior"))}</div>
+                    <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
+                      <div>
+                        <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.traffic.frame.badBehavior"))}</div>
+                        <div class="muted">${escapeHtml(ctx.t("sites.easy.traffic.frame.badBehavior.subtitle"))}</div>
+                      </div>
+                      <button class="waf-help-icon-btn" type="button" id="service-traffic-badbehavior-help-btn" title="${escapeHtml(ctx.t("sites.easy.traffic.badBehavior.help.open"))}" aria-label="${escapeHtml(ctx.t("sites.easy.traffic.badBehavior.help.open"))}">?</button>
+                    </div>
                     <div class="waf-form-grid">
                       <label class="waf-checkbox waf-field full">
                         <input id="service-use-bad-behavior" type="checkbox"${draft.use_bad_behavior ? " checked" : ""}>
@@ -69,7 +86,13 @@ export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
                     </div>
                     </div>
                     <div class="waf-subcard waf-stack waf-antiddos-frame">
-                      <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.traffic.frame.limits"))}</div>
+                      <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
+                        <div>
+                          <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.traffic.frame.limits"))}</div>
+                          <div class="muted">${escapeHtml(ctx.t("sites.easy.traffic.frame.limits.subtitle"))}</div>
+                        </div>
+                        <button class="waf-help-icon-btn" type="button" id="service-traffic-limits-help-btn" title="${escapeHtml(ctx.t("sites.easy.traffic.limits.help.open"))}" aria-label="${escapeHtml(ctx.t("sites.easy.traffic.limits.help.open"))}">?</button>
+                      </div>
                       <div class="waf-form-grid">
                         <label class="waf-checkbox waf-field full">
                           <input id="service-use-limit-conn" type="checkbox"${draft.use_limit_conn ? " checked" : ""}>
@@ -104,7 +127,13 @@ export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
                     </div>
                   </div>
                   <div class="waf-subcard waf-stack waf-antiddos-frame">
-                    <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.traffic.frame.dnsbl"))}</div>
+                    <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
+                      <div>
+                        <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.traffic.frame.dnsbl"))}</div>
+                        <div class="muted">${escapeHtml(ctx.t("sites.easy.traffic.frame.dnsbl.subtitle"))}</div>
+                      </div>
+                      <button class="waf-help-icon-btn" type="button" id="service-traffic-dnsbl-help-btn" title="${escapeHtml(ctx.t("sites.easy.traffic.dnsbl.help.open"))}" aria-label="${escapeHtml(ctx.t("sites.easy.traffic.dnsbl.help.open"))}">?</button>
+                    </div>
                     <div class="waf-note">${escapeHtml(ctx.t("sites.lists.note"))}</div>
                     <div class="waf-form-grid">
                       <label class="waf-checkbox waf-field full">
@@ -142,10 +171,20 @@ export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
                     </div>
                   </div>
                 </div>
+                ${renderTrafficBadBehaviorHelpModal(ctx)}
+                ${renderTrafficLimitsHelpModal(ctx)}
+                ${renderTrafficDnsblHelpModal(ctx)}
               </section>
 
               <section class="waf-stack waf-service-compact-section${state.activeTab === "blocking" ? "" : " waf-hidden"}" data-tab-panel="blocking">
-                <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.blocking.title"))}</div>
+                <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
+                  <div>
+                    <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.blocking.title"))}</div>
+                    <div class="muted">${escapeHtml(ctx.t("sites.easy.tab.blocking.subtitle"))}</div>
+                  </div>
+                  <button class="waf-help-icon-btn" type="button" id="service-blocking-chapter-help-btn" title="${escapeHtml(ctx.t("sites.help.blocking.open"))}" aria-label="${escapeHtml(ctx.t("sites.help.blocking.open"))}">?</button>
+                </div>
+                ${renderBlockingChapterHelpModal(ctx, escapeHtml)}
                 <div class="waf-note">${escapeHtml(ctx.t("sites.easy.blocking.baseHint"))}</div>
                 <div class="waf-form-grid">
                   <label class="waf-checkbox waf-field full">
@@ -182,11 +221,21 @@ export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
               </section>
 
               <section class="waf-stack waf-service-compact-section${state.activeTab === "antibot" ? "" : " waf-hidden"}" data-tab-panel="antibot">
-                <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.antibot.title"))}</div>
+                <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
+                  <div>
+                    <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.antibot.title"))}</div>
+                    <div class="muted">${escapeHtml(ctx.t("sites.easy.tab.antibot.subtitle"))}</div>
+                  </div>
+                  <button class="waf-help-icon-btn" type="button" id="service-antibot-chapter-help-btn" title="${escapeHtml(ctx.t("sites.help.antibot.open"))}" aria-label="${escapeHtml(ctx.t("sites.help.antibot.open"))}">?</button>
+                </div>
+                ${renderAntibotChapterHelpModal(ctx, escapeHtml)}
                 <div class="waf-antibot-auth-grid">
                   <section class="waf-subcard waf-antibot-editor-frame">
                     <div class="waf-card-head">
-                      <h3>${escapeHtml(ctx.t("sites.easy.antibot.frameTitle"))}</h3>
+                      <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
+                        <h3>${escapeHtml(ctx.t("sites.easy.antibot.frameTitle"))}</h3>
+                        <button class="waf-help-icon-btn" type="button" id="service-antibot-help-btn" title="${escapeHtml(ctx.t("sites.easy.antibot.help.open"))}" aria-label="${escapeHtml(ctx.t("sites.easy.antibot.help.open"))}">?</button>
+                      </div>
                     </div>
                     <div class="waf-card-body">
                       <div class="waf-form-grid">
@@ -249,7 +298,10 @@ export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
                   </section>
                   <section class="waf-subcard waf-auth-editor-frame">
                     <div class="waf-card-head">
-                      <h3>${escapeHtml(ctx.t("sites.easy.antibot.authSectionTitle"))}</h3>
+                      <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
+                        <h3>${escapeHtml(ctx.t("sites.easy.antibot.authSectionTitle"))}</h3>
+                        <button class="waf-help-icon-btn" type="button" id="service-auth-help-btn" title="${escapeHtml(ctx.t("sites.easy.auth.help.open"))}" aria-label="${escapeHtml(ctx.t("sites.easy.auth.help.open"))}">?</button>
+                      </div>
                     </div>
                     <div class="waf-card-body">
                       <div class="waf-form-grid">
@@ -257,6 +309,21 @@ export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
                           <input id="service-use-auth-basic" type="checkbox"${draft.use_auth_basic ? " checked" : ""}>
                           <span>${escapeHtml(ctx.t("sites.easy.antibot.useAuthBasic"))}</span>
                         </label>
+                        <div class="waf-field">
+                          <label for="service-auth-mode">${escapeHtml(ctx.t("sites.easy.auth.mode"))}</label>
+                          <select id="service-auth-mode">
+                            <option value="basic"${authMode === "basic" ? " selected" : ""}>${escapeHtml(ctx.t("sites.easy.auth.mode.basic"))}</option>
+                            <option value="service_token"${authMode === "service_token" ? " selected" : ""}>${escapeHtml(ctx.t("sites.easy.auth.mode.serviceToken"))}</option>
+                            <option value="basic_or_token"${authMode === "basic_or_token" ? " selected" : ""}>${escapeHtml(ctx.t("sites.easy.auth.mode.basicOrToken"))}</option>
+                          </select>
+                        </div>
+                        <div class="waf-field">
+                          <label for="service-auth-order">${escapeHtml(ctx.t("sites.easy.auth.order"))}</label>
+                          <select id="service-auth-order">
+                            <option value="auth_first"${draft.auth_order === "auth_first" ? " selected" : ""}>${escapeHtml(ctx.t("sites.easy.auth.order.authFirst"))}</option>
+                            <option value="antibot_first"${draft.auth_order === "antibot_first" ? " selected" : ""}>${escapeHtml(ctx.t("sites.easy.auth.order.antibotFirst"))}</option>
+                          </select>
+                        </div>
                         <div class="waf-field">
                           <label for="service-auth-basic-location">${escapeHtml(ctx.t("sites.easy.antibot.authBasicLocation"))}</label>
                           <input id="service-auth-basic-location" value="${escapeHtml("sitewide")}" readonly>
@@ -274,15 +341,26 @@ export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
                         <div class="waf-field full">
                           <div class="waf-note">${escapeHtml(ctx.t("sites.easy.antibot.authSessionTtlHint"))}</div>
                         </div>
-                        ${renderAuthUsersEditor(draft.auth_basic_users, ctx)}
+                        ${renderAuthExclusionRulesEditor(draft.auth_exclusion_rules, ctx)}
+                        ${authMode === "service_token" ? "" : renderAuthUsersEditor(draft.auth_basic_users, ctx)}
+                        ${authMode === "basic" ? "" : renderAuthServiceTokensEditor(draft.auth_service_tokens, ctx)}
                       </div>
                     </div>
                   </section>
                 </div>
+                ${renderAntibotHelpModal(ctx)}
+                ${renderAuthHelpModal(ctx)}
               </section>
 
               <section class="waf-stack waf-service-compact-section${state.activeTab === "geo" ? "" : " waf-hidden"}" data-tab-panel="geo">
-                <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.geo.title"))}</div>
+                <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
+                  <div>
+                    <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.geo.title"))}</div>
+                    <div class="muted">${escapeHtml(ctx.t("sites.easy.tab.geo.subtitle"))}</div>
+                  </div>
+                  <button class="waf-help-icon-btn" type="button" id="service-geo-chapter-help-btn" title="${escapeHtml(ctx.t("sites.help.geo.open"))}" aria-label="${escapeHtml(ctx.t("sites.help.geo.open"))}">?</button>
+                </div>
+                ${renderGeoChapterHelpModal(ctx, escapeHtml)}
                 <div class="waf-form-grid">
                   ${renderCountryEditor("blacklist_country", ctx.t("sites.easy.geo.countryBlacklist"), draft.blacklist_country, state.geoCatalog, { full: false, emptyLabel: ctx.t("sites.easy.noValues"), search: state.countryFilters.blacklist_country, ctx })}
                   ${renderCountryEditor("whitelist_country", ctx.t("sites.easy.geo.countryWhitelist"), draft.whitelist_country, state.geoCatalog, { full: false, emptyLabel: ctx.t("sites.easy.noValues"), search: state.countryFilters.whitelist_country, ctx })}
@@ -290,7 +368,14 @@ export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
               </section>
 
               <section class="waf-stack waf-service-compact-section${state.activeTab === "modsec" ? "" : " waf-hidden"}" data-tab-panel="modsec">
-                <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.modsec.title"))}</div>
+                <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
+                  <div>
+                    <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.modsec.title"))}</div>
+                    <div class="muted">${escapeHtml(ctx.t("sites.easy.tab.modsec.subtitle"))}</div>
+                  </div>
+                  <button class="waf-help-icon-btn" type="button" id="service-modsec-chapter-help-btn" title="${escapeHtml(ctx.t("sites.help.modsec.open"))}" aria-label="${escapeHtml(ctx.t("sites.help.modsec.open"))}">?</button>
+                </div>
+                ${renderModsecChapterHelpModal(ctx, escapeHtml)}
                 <div class="waf-form-grid">
                   <label class="waf-checkbox">
                     <input id="service-use-modsecurity" type="checkbox"${draft.use_modsecurity ? " checked" : ""}>
@@ -328,7 +413,6 @@ export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
           </div>
         </section>
       </div>
-      `}
     </div>
   `;
 }

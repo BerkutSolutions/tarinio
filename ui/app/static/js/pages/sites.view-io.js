@@ -10,6 +10,14 @@ export function renderListView(state, ctx, deps) {
     resolvePublicServiceURL,
     formatServiceProfile
   } = deps;
+  const hostCounts = new Map();
+  for (const site of state.filteredSites) {
+    const hostKey = String(site?.primary_host || site?.id || "").trim().toLowerCase();
+    if (!hostKey) {
+      continue;
+    }
+    hostCounts.set(hostKey, Number(hostCounts.get(hostKey) || 0) + 1);
+  }
   return `
     <div class="waf-page-stack">
       <section class="waf-card waf-services-card">
@@ -61,13 +69,14 @@ export function renderListView(state, ctx, deps) {
               </thead>
               <tbody>
                 ${state.filteredSites.length ? state.filteredSites.map((site) => {
-                  const easyProfile = state.easyProfilesBySite.get(normalizeSiteID(site.id)) || null;
+                  const siteID = normalizeSiteID(site.id);
+                  const easyProfile = state.easyProfilesBySite.get(siteID) || null;
                   const serviceProfile = normalizeServiceProfile(easyProfile?.front_service?.profile);
-                  const upstream = state.upstreamsBySite.get(site.id)?.[0] || null;
-                  const tls = state.tlsBySite.get(site.id);
+                  const upstream = state.upstreamsBySite.get(siteID)?.[0] || null;
+                  const tls = state.tlsBySite.get(siteID);
                   const language = String(ctx.getLanguage?.() || "en").trim().toLowerCase();
                   const certificateFromID = state.certificates.find((item) => String(item?.id || "").trim().toLowerCase() === String(tls?.certificate_id || "").trim().toLowerCase());
-                  const certificateFallback = state.certificateBySiteID.get(site.id) || state.certificateByHost.get(normalizeHost(site.primary_host));
+                  const certificateFallback = state.certificateBySiteID.get(siteID) || state.certificateByHost.get(normalizeHost(site.primary_host));
                   const certificate = certificateFromID || certificateFallback || null;
                   const tlsState = tls
                     ? "managed"
@@ -77,6 +86,12 @@ export function renderListView(state, ctx, deps) {
                   const certificateExpiryDays = certificateDaysLeft(certificate?.not_after);
                   const certificateIsExpiring = typeof certificateExpiryDays === "number" && certificateExpiryDays < 30;
                   const serviceURL = resolvePublicServiceURL(site, tlsState);
+                  const displayHost = String(site.primary_host || site.id || "").trim();
+                  const hostKey = displayHost.toLowerCase();
+                  const showSiteIDMeta = Number(hostCounts.get(hostKey) || 0) > 1 || String(site?._origin || "") === "secondary";
+                  const siteIDMetaHTML = showSiteIDMeta
+                    ? `<div class="muted waf-services-site-id">${escapeHtml(site.id)}</div>`
+                    : "";
                   const tlsBadgeClass = tlsState === "missing"
                     ? "badge-neutral"
                     : (certificateIsExpiring ? "badge-danger" : "badge-success");
@@ -89,7 +104,8 @@ export function renderListView(state, ctx, deps) {
                         <input type="checkbox" data-select-site="${escapeHtml(site.id)}"${state.selectedSiteIDs.has(site.id) ? " checked" : ""}>
                       </td>
                       <td>
-                        <button class="waf-link-button" type="button" data-open-service="${escapeHtml(serviceURL)}" title="${escapeHtml(ctx.t("sites.action.openService"))}">${escapeHtml(site.primary_host || site.id)}</button>
+                        <button class="waf-link-button" type="button" data-open-service="${escapeHtml(serviceURL)}" title="${escapeHtml(ctx.t("sites.action.openService"))}">${escapeHtml(displayHost)}</button>
+                        ${siteIDMetaHTML}
                       </td>
                       <td>${escapeHtml(formatServiceProfile(serviceProfile, ctx))}</td>
                       <td>${upstream ? `${escapeHtml(upstream.host)}:${escapeHtml(String(upstream.port))}` : escapeHtml(ctx.t("common.notSet"))}</td>
@@ -279,9 +295,10 @@ export function shouldUpsertBaseResources(draft, existingSite, existingUpstream,
 export async function exportSelectedServicesEnv(ctx, sites, upstreamsBySite, tlsBySite, accessBySite, selectedSiteIDs, deps) {
   const targets = sites.filter((site) => selectedSiteIDs.has(site.id));
   for (const site of targets) {
-    const upstream = upstreamsBySite.get(site.id)?.[0] || null;
-    const tlsConfig = tlsBySite.get(site.id) || null;
-    const accessPolicy = accessBySite.get(deps.normalizeSiteID(site.id)) || null;
+    const siteID = deps.normalizeSiteID(site.id);
+    const upstream = upstreamsBySite.get(siteID)?.[0] || null;
+    const tlsConfig = tlsBySite.get(siteID) || null;
+    const accessPolicy = accessBySite.get(siteID) || null;
     const draft = await deps.hydrateSiteDraft(ctx, site, upstream, tlsConfig, accessPolicy);
     deps.downloadText(`${site.id}.env`, deps.draftToEnvText(draft));
   }

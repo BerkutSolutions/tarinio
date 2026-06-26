@@ -28,6 +28,11 @@ const (
 	AntibotChallengeMcaptcha   = "mcaptcha"
 
 	AuthBasicLocationSitewide = "sitewide"
+	AuthModeBasic             = "basic"
+	AuthModeServiceToken      = "service_token"
+	AuthModeBasicOrToken      = "basic_or_token"
+	AuthOrderAuthFirst        = "auth_first"
+	AuthOrderAntibotFirst     = "antibot_first"
 
 	APIPositiveEnforcementMonitor = "monitor"
 	APIPositiveEnforcementBlock   = "block"
@@ -154,11 +159,15 @@ type AntibotChallengeRule struct {
 
 type SecurityAuthBasicSettings struct {
 	UseAuthBasic      bool               `json:"use_auth_basic"`
+	AuthMode          string             `json:"auth_mode"`
+	AuthOrder         string             `json:"auth_order"`
 	AuthBasicLocation string             `json:"auth_basic_location"`
 	AuthBasicUser     string             `json:"auth_basic_user"`
 	AuthBasicPassword string             `json:"auth_basic_password"`
 	AuthBasicText     string             `json:"auth_basic_text"`
 	Users             []SecurityAuthUser `json:"users"`
+	ExclusionRules    []SecurityAuthExclusionRule `json:"exclusion_rules"`
+	ServiceTokens     []SecurityAuthServiceToken  `json:"service_tokens"`
 	// SessionInactivityMinutes controls auth session expiration for service-auth cookies.
 	// -1 means unlimited.
 	SessionInactivityMinutes int `json:"session_inactivity_minutes"`
@@ -169,6 +178,18 @@ type SecurityAuthUser struct {
 	Password    string `json:"password"`
 	Enabled     bool   `json:"enabled"`
 	LastLoginAt string `json:"last_login_at,omitempty"`
+}
+
+type SecurityAuthExclusionRule struct {
+	Path    string   `json:"path"`
+	Methods []string `json:"methods"`
+}
+
+type SecurityAuthServiceToken struct {
+	ServiceName string `json:"service_name"`
+	Token       string `json:"token"`
+	Enabled     bool   `json:"enabled"`
+	LastUsedAt  string `json:"last_used_at,omitempty"`
 }
 
 type SecurityCountryPolicySettings struct {
@@ -373,6 +394,8 @@ func DefaultProfile(siteID string) EasySiteProfile {
 		},
 		SecurityAuthBasic: SecurityAuthBasicSettings{
 			UseAuthBasic:      false,
+			AuthMode:          AuthModeBasic,
+			AuthOrder:         AuthOrderAuthFirst,
 			AuthBasicLocation: AuthBasicLocationSitewide,
 			AuthBasicUser:     "changeme",
 			AuthBasicPassword: "",
@@ -384,6 +407,8 @@ func DefaultProfile(siteID string) EasySiteProfile {
 					Enabled:  true,
 				},
 			},
+			ExclusionRules: []SecurityAuthExclusionRule{},
+			ServiceTokens:  []SecurityAuthServiceToken{},
 			SessionInactivityMinutes: 60,
 		},
 		SecurityCountryPolicy: SecurityCountryPolicySettings{

@@ -67,7 +67,7 @@ func TestRenderEasyRateLimitArtifacts_GeneratesRouteSpecificArtifacts(t *testing
 	if !strings.Contains(locationsConf, "location = /challenge") || !strings.Contains(locationsConf, "location = /challenge/verify") || !strings.Contains(locationsConf, "Set-Cookie \"waf_antibot_") {
 		t.Fatalf("expected antibot challenge location in easy locations conf, got: %s", locationsConf)
 	}
-	if !strings.Contains(locationsConf, "location = /auth {") || !strings.Contains(locationsConf, "location = /auth/verify {") {
+	if !strings.Contains(locationsConf, "location = /auth {") || !strings.Contains(locationsConf, "location = /auth/verify/basic {") {
 		t.Fatalf("expected auth gate locations in easy locations conf, got: %s", locationsConf)
 	}
 	if !strings.Contains(locationsConf, `auth_basic "Restricted area";`) {
@@ -108,6 +108,49 @@ func TestRenderEasyRateLimitArtifacts_GeneratesRouteSpecificArtifacts(t *testing
 	}
 	if strings.Contains(locationsConf, "location = /api/requests {\n    proxy_intercept_errors off;\n    modsecurity on;\n    modsecurity_rules_file /etc/waf/modsecurity/sites/control-plane-access.conf;\n    include /etc/waf/nginx/easy/control-plane-access.conf;\n    limit_req zone=easy_control_plane_access_req_v2_0 burst=80 nodelay;\n    limit_req_status 429;\n    proxy_set_header Host $http_host;\n    proxy_pass http://site_control-plane-access_upstream_control-plane-access-upstream;") {
 		t.Fatalf("did not expect /api/requests easy location to proxy to the UI upstream, got: %s", locationsConf)
+	}
+}
+
+func TestRenderEasyRateLimitArtifacts_UsesConfiguredManagementAPIUpstream(t *testing.T) {
+	t.Setenv("WAF_MANAGEMENT_API_UPSTREAM_HOST", "control-plane-test")
+
+	artifacts, err := RenderEasyRateLimitArtifacts(
+		[]SiteInput{{
+			ID:                "control-plane-access",
+			Enabled:           true,
+			PrimaryHost:       "waf.example.com",
+			ListenHTTP:        true,
+			DefaultUpstreamID: "control-plane-access-upstream",
+		}},
+		[]UpstreamInput{{
+			ID:             "control-plane-access-upstream",
+			SiteID:         "control-plane-access",
+			Name:           "control-plane-access-upstream",
+			Scheme:         "http",
+			Host:           "ui",
+			Port:           80,
+			BasePath:       "/",
+			PassHostHeader: true,
+		}},
+		[]EasyProfileInput{{
+			SiteID: "control-plane-access",
+			CustomLimitRules: []CustomRateLimitRuleInput{
+				{Path: "/api/requests", Rate: "80r/s"},
+			},
+		}},
+	)
+	if err != nil {
+		t.Fatalf("render easy rate limit artifacts: %v", err)
+	}
+
+	byPath := map[string]string{}
+	for _, item := range artifacts {
+		byPath[item.Path] = string(item.Content)
+	}
+
+	locationsConf := byPath["nginx/easy-locations/control-plane-access.conf"]
+	if !strings.Contains(locationsConf, "proxy_pass http://control-plane-test:8080;") {
+		t.Fatalf("expected management api easy locations to proxy to configured control-plane host, got: %s", locationsConf)
 	}
 }
 

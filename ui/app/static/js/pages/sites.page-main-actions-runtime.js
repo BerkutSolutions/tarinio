@@ -41,7 +41,12 @@ export function renderDetailViewRuntimeBridge(state, ctx, deps) {
     renderAntibotChallengeRulesEditor,
     renderAuthSessionTtlOptions,
     renderAuthUsersEditor,
-    renderCountryEditor
+    renderCountryEditor,
+    renderAuthExclusionRulesEditor,
+    renderAuthServiceTokensEditor,
+    renderAuthHelpModal,
+    renderAntibotHelpModal,
+    normalizeAuthMode
   } = deps;
   return renderDetailViewPart2(state, ctx, {
     SETTINGS_SEARCH_INDEX,
@@ -61,7 +66,12 @@ export function renderDetailViewRuntimeBridge(state, ctx, deps) {
     renderAntibotChallengeRulesEditor,
     renderAuthSessionTtlOptions,
     renderAuthUsersEditor,
-    renderCountryEditor
+    renderCountryEditor,
+    renderAuthExclusionRulesEditor,
+    renderAuthServiceTokensEditor,
+    renderAuthHelpModal,
+    renderAntibotHelpModal,
+    normalizeAuthMode
   });
 }
 

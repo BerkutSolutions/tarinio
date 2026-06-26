@@ -164,7 +164,10 @@ export async function renderRevisions(container, ctx) {
             <h3 id="revisions-detail-title">${escapeHtml(ctx.t("revisions.modal.title"))}</h3>
             <div class="muted" id="revisions-detail-subtitle">${escapeHtml(ctx.t("revisions.modal.subtitle"))}</div>
           </div>
-          <button class="btn ghost btn-sm" type="button" data-revisions-modal-close="true">${escapeHtml(ctx.t("ui.close"))}</button>
+          <div class="revisions-status-modal-actions">
+            <button class="btn danger btn-sm" type="button" id="revisions-delete-others">${escapeHtml(ctx.t("revisions.action.deleteOthers"))}</button>
+            <button class="btn ghost btn-sm" type="button" data-revisions-modal-close="true">${escapeHtml(ctx.t("ui.close"))}</button>
+          </div>
         </div>
         <div class="waf-card-body revisions-modal-body" id="revisions-detail-content"></div>
       </div>
@@ -198,6 +201,7 @@ export async function renderRevisions(container, ctx) {
     payload: null,
     selectedSiteID: "",
     pendingRevisionID: "",
+    pendingBulkDelete: false,
     expandedRevisionIDs: new Set(),
     selectedTimelineIndex: -1,
   };
@@ -211,6 +215,23 @@ export async function renderRevisions(container, ctx) {
   const closeStatusModal = () => {
     state.selectedTimelineIndex = -1;
     statusModalNode?.classList.add("waf-hidden");
+  };
+
+  const getSelectedServiceData = () => {
+    const services = normalizeList(state.payload?.services);
+    const revisions = normalizeList(state.payload?.revisions);
+    const service = services.find((item) => String(item?.site_id || "") === state.selectedSiteID) || null;
+    const filteredRevisions = revisions.filter((revision) => normalizeSites(revision?.sites).some((site) => site.site_id === state.selectedSiteID));
+    const activeRevisionIDs = new Set(
+      filteredRevisions
+        .filter((item) => normalizeSiteIDs(item?.active_site_ids).includes(state.selectedSiteID))
+        .map((item) => String(item?.id || "").trim())
+        .filter(Boolean)
+    );
+    const deletableRevisionIDs = filteredRevisions
+      .map((item) => String(item?.id || "").trim())
+      .filter((item) => item && !activeRevisionIDs.has(item));
+    return { service, filteredRevisions, activeRevisionIDs, deletableRevisionIDs };
   };
 
   const renderSidebar = () => {
@@ -358,14 +379,18 @@ export async function renderRevisions(container, ctx) {
     if (!state.selectedSiteID) {
       return;
     }
-    const services = normalizeList(state.payload?.services);
-    const revisions = normalizeList(state.payload?.revisions);
-    const service = services.find((item) => String(item?.site_id || "") === state.selectedSiteID);
+    const deleteOthersButton = container.querySelector("#revisions-delete-others");
+    const { service, filteredRevisions: filtered, deletableRevisionIDs } = getSelectedServiceData();
     if (!service) {
       closeModal();
       return;
     }
-    const filtered = revisions.filter((revision) => normalizeSites(revision?.sites).some((site) => site.site_id === state.selectedSiteID));
+    if (deleteOthersButton) {
+      deleteOthersButton.disabled = state.pendingBulkDelete || !deletableRevisionIDs.length;
+      deleteOthersButton.textContent = state.pendingBulkDelete
+        ? ctx.t("revisions.action.deletingOthers")
+        : ctx.t("revisions.action.deleteOthers");
+    }
     if (!state.expandedRevisionIDs.size && filtered.length) {
       state.expandedRevisionIDs = new Set([String(filtered[0].id || "")]);
     }
@@ -389,7 +414,7 @@ export async function renderRevisions(container, ctx) {
             const isExpanded = isServiceActive || state.expandedRevisionIDs.has(String(item?.id || ""));
             const approvalPending = String(item?.approval_status || "").trim().toLowerCase() === "pending";
             const applyDisabled = state.pendingRevisionID === item.id || isServiceActive || approvalPending;
-            const deleteDisabled = state.pendingRevisionID === item.id || Boolean(item?.is_active);
+            const deleteDisabled = state.pendingRevisionID === item.id || state.pendingBulkDelete || Boolean(item?.is_active);
             const visualStatus = revisionVisualStatus(item, state.selectedSiteID);
             return `
               <article class="revisions-modal-item ${isExpanded ? "is-expanded" : ""}">
@@ -541,6 +566,34 @@ export async function renderRevisions(container, ctx) {
     }
   };
 
+  const runDeleteOthers = async () => {
+    const { service, deletableRevisionIDs } = getSelectedServiceData();
+    if (!service) {
+      return;
+    }
+    if (!deletableRevisionIDs.length) {
+      ctx.notify(ctx.t("revisions.toast.deleteOthersEmpty", { service: service.site_id }), "info");
+      return;
+    }
+    if (!confirmAction(ctx.t("revisions.confirm.deleteOthers", { service: service.site_id, count: deletableRevisionIDs.length }))) {
+      return;
+    }
+    state.pendingBulkDelete = true;
+    renderModal();
+    try {
+      for (const revisionID of deletableRevisionIDs) {
+        await ctx.api.delete(`/api/revisions/${encodeURIComponent(revisionID)}`);
+      }
+      ctx.notify(ctx.t("revisions.toast.deleteOthersSucceeded", { service: service.site_id, count: deletableRevisionIDs.length }), "success");
+      await loadCatalog();
+    } catch (error) {
+      ctx.notify(error?.message || ctx.t("revisions.error.deleteOthers"), "error");
+    } finally {
+      state.pendingBulkDelete = false;
+      renderModal();
+    }
+  };
+
   const clearStatuses = async () => {
     if (!confirmAction(ctx.t("revisions.timeline.confirmClear"))) {
       return;
@@ -557,6 +610,7 @@ export async function renderRevisions(container, ctx) {
 
   container.querySelector("#revisions-refresh")?.addEventListener("click", loadCatalog);
   container.querySelector("#revisions-clear-statuses")?.addEventListener("click", clearStatuses);
+  container.querySelector("#revisions-delete-others")?.addEventListener("click", runDeleteOthers);
 
   servicesNode.addEventListener("click", (event) => {
     const tile = event.target.closest("[data-revision-site]");

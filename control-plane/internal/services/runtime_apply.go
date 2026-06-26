@@ -805,6 +805,43 @@ func mapAntibotExclusionRules(items []easysiteprofiles.AntibotExclusionRule) []p
 	return out
 }
 
+func mapAuthUsers(items []easysiteprofiles.SecurityAuthUser) []pipeline.ServiceAuthUserInput {
+	out := make([]pipeline.ServiceAuthUserInput, 0, len(items))
+	for _, item := range items {
+		out = append(out, pipeline.ServiceAuthUserInput{
+			Username:    item.Username,
+			Password:    item.Password,
+			Enabled:     item.Enabled,
+			LastLoginAt: item.LastLoginAt,
+		})
+	}
+	return out
+}
+
+func mapAuthExclusionRules(items []easysiteprofiles.SecurityAuthExclusionRule) []pipeline.AuthExclusionRuleInput {
+	out := make([]pipeline.AuthExclusionRuleInput, 0, len(items))
+	for _, item := range items {
+		out = append(out, pipeline.AuthExclusionRuleInput{
+			Path:    item.Path,
+			Methods: append([]string(nil), item.Methods...),
+		})
+	}
+	return out
+}
+
+func mapAuthServiceTokens(items []easysiteprofiles.SecurityAuthServiceToken) []pipeline.ServiceAuthTokenInput {
+	out := make([]pipeline.ServiceAuthTokenInput, 0, len(items))
+	for _, item := range items {
+		out = append(out, pipeline.ServiceAuthTokenInput{
+			ServiceName: item.ServiceName,
+			Token:       item.Token,
+			Enabled:     item.Enabled,
+			LastUsedAt:  item.LastUsedAt,
+		})
+	}
+	return out
+}
+
 func mapEasyInputs(items []easysiteprofiles.EasySiteProfile) []pipeline.EasyProfileInput {
 	sorted := append([]easysiteprofiles.EasySiteProfile(nil), items...)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].SiteID < sorted[j].SiteID })
@@ -838,10 +875,15 @@ func mapEasyInputs(items []easysiteprofiles.EasySiteProfile) []pipeline.EasyProf
 			SendXRealIP:            item.UpstreamRouting.EnableXRealIP,
 
 			UseAuthBasic:      item.SecurityAuthBasic.UseAuthBasic,
+			AuthMode:          item.SecurityAuthBasic.AuthMode,
+			AuthOrder:         item.SecurityAuthBasic.AuthOrder,
 			AuthBasicUser:     item.SecurityAuthBasic.AuthBasicUser,
 			AuthBasicPassword: item.SecurityAuthBasic.AuthBasicPassword,
 			AuthBasicText:     item.SecurityAuthBasic.AuthBasicText,
-
+			AuthUsers:         mapAuthUsers(item.SecurityAuthBasic.Users),
+			AuthServiceTokens: mapAuthServiceTokens(item.SecurityAuthBasic.ServiceTokens),
+			AuthExclusionRules: mapAuthExclusionRules(item.SecurityAuthBasic.ExclusionRules),
+			AuthSessionTTLMin: item.SecurityAuthBasic.SessionInactivityMinutes,
 			AntibotChallenge:           item.SecurityAntibot.AntibotChallenge,
 			AntibotURI:                 item.SecurityAntibot.AntibotURI,
 			AntibotScannerAutoBan:      item.SecurityAntibot.ScannerAutoBanEnabled,

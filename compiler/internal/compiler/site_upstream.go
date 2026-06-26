@@ -26,6 +26,7 @@ type nginxSiteData struct {
 	ListenHTTP                bool
 	ListenHTTPS               bool
 	IsManagementSite          bool
+	ManagementAPIProxyTarget  string
 	UpstreamName              string
 	UpstreamAddress           string
 	ProxyPassTarget           string
@@ -85,8 +86,9 @@ func RenderSiteUpstreamArtifacts(sites []SiteInput, upstreams []UpstreamInput) (
 	artifacts = append(artifacts, newArtifact("nginx/nginx.conf", ArtifactKindNginxConfig, mainContent))
 
 	baseContent, err := renderTemplate(filepath.Join(templatesRoot(), "conf.d", "base.conf.tmpl"), nginxBaseData{
-		ErrorStatusCodes: append([]int(nil), supportedErrorStatusCodes...),
-		HostMapEntries:   buildHostMapEntries(sortedSites),
+		ErrorStatusCodes:         append([]int(nil), supportedErrorStatusCodes...),
+		HostMapEntries:           buildHostMapEntries(sortedSites),
+		ManagementAPIProxyTarget: managementAPIProxyTarget(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("render nginx base template: %w", err)
@@ -112,6 +114,7 @@ func RenderSiteUpstreamArtifacts(sites []SiteInput, upstreams []UpstreamInput) (
 			ListenHTTP:                site.ListenHTTP,
 			ListenHTTPS:               site.ListenHTTPS,
 			IsManagementSite:          isManagementSiteID(site.ID),
+			ManagementAPIProxyTarget:  managementAPIProxyTarget(),
 			UpstreamName:              upstreamBlockName(site.ID, upstream.ID),
 			UpstreamAddress:           buildUpstreamAddress(upstream),
 			ProxyPassTarget:           "http://" + upstreamBlockName(site.ID, upstream.ID),
@@ -301,12 +304,27 @@ func renderSiteErrorArtifacts(siteID string) ([]ArtifactOutput, error) {
 }
 
 type nginxBaseData struct {
-	ErrorStatusCodes []int
-	HostMapEntries   []nginxHostMapEntry
+	ErrorStatusCodes         []int
+	HostMapEntries           []nginxHostMapEntry
+	ManagementAPIProxyTarget string
+}
+
+func managementAPIProxyTarget() string {
+	host := strings.TrimSpace(os.Getenv("WAF_MANAGEMENT_API_UPSTREAM_HOST"))
+	if host == "" {
+		host = "control-plane"
+	}
+	return "http://" + host + ":8080"
 }
 
 func buildHostMapEntries(sites []SiteInput) []nginxHostMapEntry {
 	var entries []nginxHostMapEntry
+	// nginx `map` directives reject duplicate keys with a fatal
+	// "conflicting parameter" error, which crash-loops the runtime. When more
+	// than one enabled site claims the same host, keep the first occurrence
+	// only. Iteration order follows the already-sorted site slice, so the
+	// winner is deterministic.
+	seenHosts := make(map[string]struct{})
 	for _, site := range sites {
 		if !site.Enabled {
 			continue
@@ -316,6 +334,10 @@ func buildHostMapEntries(sites []SiteInput) []nginxHostMapEntry {
 			if normalizedHost == "" {
 				continue
 			}
+			if _, ok := seenHosts[normalizedHost]; ok {
+				continue
+			}
+			seenHosts[normalizedHost] = struct{}{}
 			entries = append(entries, nginxHostMapEntry{
 				Host:   normalizedHost,
 				SiteID: site.ID,

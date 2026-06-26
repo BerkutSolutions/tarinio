@@ -130,24 +130,30 @@ export async function tryGetJSON(path) {
 export function mergeByID(primary, secondary) {
   const map = new Map();
   for (const item of normalizeArray(primary)) {
-    const id = String(item?.id || "");
-    if (!id) {
+    const id = String(item?.id || "").trim();
+    const normalizedID = normalizeSiteID(id);
+    if (!normalizedID) {
       continue;
     }
-    map.set(id, { ...item, _origin: "primary" });
+    map.set(normalizedID, { ...item, _origin: "primary" });
   }
   for (const item of normalizeArray(secondary)) {
-    const id = String(item?.id || "");
-    if (!id || map.has(id)) {
+    const id = String(item?.id || "").trim();
+    const normalizedID = normalizeSiteID(id);
+    if (!normalizedID || map.has(normalizedID)) {
       continue;
     }
-    map.set(id, { ...item, _origin: "secondary" });
+    map.set(normalizedID, { ...item, _origin: "secondary" });
   }
   return Array.from(map.values());
 }
 
 export function normalizeSiteID(value) {
-  return String(value || "").trim().toLowerCase();
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "localhost" || normalized === "control-plane" || normalized === "ui") {
+    return "control-plane-access";
+  }
+  return normalized;
 }
 
 export function mergeProfilesBySite(primary, secondaryPayload) {

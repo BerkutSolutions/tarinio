@@ -73,6 +73,7 @@ import {
   renderCustomLimitRulesEditor as renderCustomLimitRulesEditorModule,
   syncAuthPasswordToggle as syncAuthPasswordToggleModule
 } from "./sites.auth-rules-editors.js";
+import { renderAntibotHelpModal, renderAuthHelpModal } from "./sites.auth-help-modals.js";
 import {
   BAN_SCOPE_VALUES as BAN_SCOPE_VALUES_MODULE,
   applyServiceProfilePresetForMissingFields as applyServiceProfilePresetForMissingFieldsModule,
@@ -144,7 +145,11 @@ import {
   normalizeAntibotExclusionRules as normalizeAntibotExclusionRulesFacade,
   normalizeAntibotChallengeRules as normalizeAntibotChallengeRulesFacade,
   normalizeAuthBasicUsers as normalizeAuthBasicUsersFacade,
+  normalizeAuthExclusionRules as normalizeAuthExclusionRulesFacade,
+  normalizeAuthMode as normalizeAuthModeFacade,
+  normalizeAuthOrder as normalizeAuthOrderFacade,
   normalizeAuthSessionTTLMinutes as normalizeAuthSessionTTLMinutesFacade,
+  normalizeAuthServiceTokens as normalizeAuthServiceTokensFacade,
   normalizeCustomLimitRules as normalizeCustomLimitRulesFacade,
   normalizeEmail as normalizeEmailFacade,
   normalizeHost as normalizeHostFacade,
@@ -155,10 +160,13 @@ import {
   parseBanDurationSeconds as parseBanDurationSecondsFacade,
   parseIntListInput as parseIntListInputFacade,
   parseListInput as parseListInputFacade,
+  readAuthExclusionDraftRows as readAuthExclusionDraftRowsFacade,
   renderAntibotExclusionRulesEditor as renderAntibotExclusionRulesEditorFacade,
   renderAntibotChallengeRulesEditor as renderAntibotChallengeRulesEditorFacade,
+  renderAuthExclusionRulesEditor as renderAuthExclusionRulesEditorFacade,
   renderAuthPasswordToggleButton as renderAuthPasswordToggleButtonFacade,
   renderAuthSessionTtlOptions as renderAuthSessionTtlOptionsFacade,
+  renderAuthServiceTokensEditor as renderAuthServiceTokensEditorFacade,
   renderAuthUsersEditor as renderAuthUsersEditorFacade,
   renderCustomLimitRulesEditor as renderCustomLimitRulesEditorFacade,
   resolvePublicServiceURL as resolvePublicServiceURLFacade,
@@ -244,15 +252,24 @@ const normalizeCustomLimitRules = (value) => normalizeCustomLimitRulesFacade(val
 const normalizeAntibotExclusionRules = (value) => normalizeAntibotExclusionRulesFacade(value, normalizeArray);
 const normalizeAntibotChallengeRules = (value) => normalizeAntibotChallengeRulesFacade(value, normalizeArray);
 const normalizeAuthBasicUsers = (value) => normalizeAuthBasicUsersFacade(value, normalizeArray);
+const normalizeAuthExclusionRules = (value) => normalizeAuthExclusionRulesFacade(value, normalizeArray);
+const normalizeAuthServiceTokens = (value) => normalizeAuthServiceTokensFacade(value, normalizeArray);
+const normalizeAuthMode = normalizeAuthModeFacade;
+const normalizeAuthOrder = normalizeAuthOrderFacade;
+const readAuthExclusionDraftRows = readAuthExclusionDraftRowsFacade;
 const normalizeAuthSessionTTLMinutes = normalizeAuthSessionTTLMinutesFacade;
 const formatAuthLastLogin = formatAuthLastLoginFacade;
 const renderAuthPasswordToggleButton = (index, ctx) => renderAuthPasswordToggleButtonFacade(index, ctx, escapeHtml);
 const syncAuthPasswordToggle = syncAuthPasswordToggleFacade;
 const renderAuthUsersEditor = (users, ctx) => renderAuthUsersEditorFacade(users, ctx, escapeHtml, normalizeArray);
+const renderAuthExclusionRulesEditor = (rules, ctx) => renderAuthExclusionRulesEditorFacade(rules, ctx, escapeHtml, normalizeArray);
+const renderAuthServiceTokensEditor = (tokens, ctx) => renderAuthServiceTokensEditorFacade(tokens, ctx, escapeHtml, normalizeArray);
 const renderAuthSessionTtlOptions = (ttlMinutes, ctx) => renderAuthSessionTtlOptionsFacade(ttlMinutes, ctx, escapeHtml);
 const renderCustomLimitRulesEditor = (rules, ctx) => renderCustomLimitRulesEditorFacade(rules, ctx, escapeHtml, normalizeArray);
 const renderAntibotExclusionRulesEditor = (rules, ctx) => renderAntibotExclusionRulesEditorFacade(rules, ctx, escapeHtml, normalizeArray);
 const renderAntibotChallengeRulesEditor = (rules, ctx) => renderAntibotChallengeRulesEditorFacade(rules, ctx, escapeHtml, normalizeArray);
+const renderAuthHelpModalSafe = (ctx) => renderAuthHelpModal(ctx, { escapeHtml });
+const renderAntibotHelpModalSafe = (ctx) => renderAntibotHelpModal(ctx, { escapeHtml });
 const normalizeHost = normalizeHostFacade;
 const normalizeSiteID = normalizeSiteIDFacade;
 const BAN_SCOPE_VALUES = BAN_SCOPE_VALUES_FACADE;
@@ -301,6 +318,7 @@ const SETTINGS_SEARCH_INDEX = SETTINGS_SEARCH_INDEX_FACADE;
 const renderListEditor = renderListEditorFacade;
 const renderCountryEditor = renderCountryEditorFacade;
 const renderStatusCodesEditor = renderStatusCodesEditorFacade;
+const renderRawEditor = renderRawEditorFacade;
 function defaultSiteDraft() {
   return defaultSiteDraftFacade();
 }
@@ -322,6 +340,10 @@ function applyEasyProfileToDraft(draft, profile) {
     normalizeAntibotExclusionRules,
     normalizeAntibotChallengeRules,
     normalizeAuthBasicUsers,
+    normalizeAuthExclusionRules,
+    normalizeAuthMode,
+    normalizeAuthOrder,
+    normalizeAuthServiceTokens,
     normalizeAuthSessionTTLMinutes,
     normalizeAPIPositiveEndpointPolicies
   });
@@ -344,6 +366,10 @@ async function hydrateSiteDraft(ctx, site, upstream, tlsConfig, accessPolicy = n
     normalizeAntibotExclusionRules,
     normalizeAntibotChallengeRules,
     normalizeAuthBasicUsers,
+    normalizeAuthExclusionRules,
+    normalizeAuthMode,
+    normalizeAuthOrder,
+    normalizeAuthServiceTokens,
     normalizeAuthSessionTTLMinutes,
     normalizeAPIPositiveEndpointPolicies
   });
@@ -353,6 +379,10 @@ function draftToEasyProfile(draft) {
   return draftToEasyProfileFacade(draft, {
     resolveReverseProxyHost,
     normalizeAuthBasicUsers,
+    normalizeAuthExclusionRules,
+    normalizeAuthMode,
+    normalizeAuthOrder,
+    normalizeAuthServiceTokens,
     normalizeAuthSessionTTLMinutes,
     BAN_SCOPE_VALUES,
     normalizeBanEscalationStages,
@@ -374,7 +404,11 @@ function validateDraft(draft, ctx) {
     normalizeCustomLimitRules,
     normalizeAntibotExclusionRules,
     normalizeAntibotChallengeRules,
-    normalizeAuthBasicUsers
+    normalizeAuthBasicUsers,
+    normalizeAuthExclusionRules,
+    normalizeAuthServiceTokens,
+    normalizeAuthMode,
+    normalizeAuthOrder
   });
 }
 
@@ -465,15 +499,24 @@ export {
   normalizeAntibotExclusionRules,
   normalizeAntibotChallengeRules,
   normalizeAuthBasicUsers,
+  normalizeAuthExclusionRules,
+  normalizeAuthServiceTokens,
+  normalizeAuthMode,
+  normalizeAuthOrder,
+  readAuthExclusionDraftRows,
   normalizeAuthSessionTTLMinutes,
   formatAuthLastLogin,
   renderAuthPasswordToggleButton,
   syncAuthPasswordToggle,
   renderAuthUsersEditor,
+  renderAuthExclusionRulesEditor,
+  renderAuthServiceTokensEditor,
   renderAuthSessionTtlOptions,
   renderCustomLimitRulesEditor,
   renderAntibotExclusionRulesEditor,
   renderAntibotChallengeRulesEditor,
+  renderAuthHelpModalSafe as renderAuthHelpModal,
+  renderAntibotHelpModalSafe as renderAntibotHelpModal,
   normalizeHost,
   normalizeSiteID,
   BAN_SCOPE_VALUES,
@@ -491,6 +534,7 @@ export {
   resolveReverseProxyHost,
   isValidEmail,
   resolvePublicServiceURL,
+  computeUpstreamID,
   mergeProfilesBySite,
   regionDisplayName,
   isCountryCode,
@@ -514,6 +558,7 @@ export {
   requirePermissions,
   draftToEnvText,
   envToDraft,
+  renderRawEditor,
   buildImportPayloadFromDraft,
   buildImportInventory,
   loadImportInventory,

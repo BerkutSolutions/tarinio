@@ -1,3 +1,37 @@
+function formatRuntimeSitesError(error) {
+  if (!error) {
+    return "unknown error";
+  }
+  if (error instanceof Error) {
+    const message = String(error.message || error.name || "error");
+    const stack = String(error.stack || "").trim();
+    return stack ? `${message}\n${stack}` : message;
+  }
+  return String(error);
+}
+
+function logRuntimeSitesError(stage, error, details = {}) {
+  const payload = {
+    stage,
+    details,
+    error: formatRuntimeSitesError(error),
+    href: window.location.href,
+    at: new Date().toISOString(),
+  };
+  console.error("[sites-runtime]", payload);
+  return payload;
+}
+
+function renderRuntimeSitesErrorAlert(ctx, escapeHtml, payload) {
+  const detailsText = `${payload.stage}\n${payload.error}`;
+  return `
+    <div class="alert">
+      <div>${escapeHtml(ctx.t("sites.error.load"))}</div>
+      <pre class="waf-code" style="margin-top:8px;white-space:pre-wrap;">${escapeHtml(detailsText)}</pre>
+    </div>
+  `;
+}
+
 export async function loadSitesRuntime(state, ctx, container, deps = {}) {
   const {
     setLoading,
@@ -6,6 +40,7 @@ export async function loadSitesRuntime(state, ctx, container, deps = {}) {
     unwrapList,
     notifyExpiringCertificates,
     normalizeArray,
+    normalizeSiteID,
     normalizeGeoCatalogPayload,
     mergeProfilesBySite,
     tryGetJSON,
@@ -38,13 +73,17 @@ export async function loadSitesRuntime(state, ctx, container, deps = {}) {
     notifyExpiringCertificates(ctx, state.certificates);
     state.accessPolicies = normalizeArray(accessPoliciesResponse);
     state.easyProfiles = mergeProfilesBySite(easyProfilesResponse, secondaryEasyProfiles);
-    state.selectedSiteIDs = new Set(Array.from(state.selectedSiteIDs).filter((id) => state.sites.some((site) => site.id === id)));
+    state.selectedSiteIDs = new Set(Array.from(state.selectedSiteIDs).filter((id) => state.sites.some((site) => normalizeSiteID(site?.id) === normalizeSiteID(id))));
     state.geoCatalog = normalizeGeoCatalogPayload(geoCatalogResponse);
     rebuildIndexes();
     await syncDraftFromRoute();
     render();
   } catch (error) {
-    container.innerHTML = `<div class="alert">${escapeHtml(ctx.t("sites.error.load"))}</div>`;
+    const payload = logRuntimeSitesError("runtime-load-failed", error, {
+      routeMode: state?.route?.mode || "",
+      siteID: state?.route?.siteID || "",
+    });
+    container.innerHTML = renderRuntimeSitesErrorAlert(ctx, escapeHtml, payload);
   }
 }
 

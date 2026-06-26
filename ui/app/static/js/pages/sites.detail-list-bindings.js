@@ -1,3 +1,6 @@
+import { readAntibotExclusionDraftRows } from "./sites.antibot-exclusion-editors.js";
+import { readAuthExclusionDraftRows } from "./sites.auth-extended-editors.js";
+
 export function bindDetailListEditors(container, state, deps) {
   const {
     LIST_FIELD_SET,
@@ -7,6 +10,8 @@ export function bindDetailListEditors(container, state, deps) {
     normalizeAntibotExclusionRules,
     normalizeAntibotChallengeRules,
     normalizeAuthBasicUsers,
+    normalizeAuthExclusionRules,
+    normalizeAuthServiceTokens,
     syncAuthPasswordToggle,
     normalizeArray,
     parseBanDurationSeconds,
@@ -147,9 +152,14 @@ export function bindDetailListEditors(container, state, deps) {
     state.draft.antibot_challenge_rules = [...normalizeAntibotChallengeRules(state.draft.antibot_challenge_rules), { path: "/", challenge: "javascript" }];
     render();
   });
-  container.querySelector("[data-antibot-exclusion-add]")?.addEventListener("click", () => {
+  const syncAntibotExclusionDraftRows = () => {
     syncStateDraftFromForm();
-    state.draft.antibot_exclusion_rules = [...normalizeAntibotExclusionRules(state.draft.antibot_exclusion_rules), { path: "/api/", methods: ["*"] }];
+    state.draft.antibot_exclusion_rules = readAntibotExclusionDraftRows(container);
+    return state.draft.antibot_exclusion_rules;
+  };
+  container.querySelector("[data-antibot-exclusion-add]")?.addEventListener("click", () => {
+    const current = syncAntibotExclusionDraftRows();
+    state.draft.antibot_exclusion_rules = [...current, { path: "", methods: ["*"] }];
     render();
   });
   container.querySelectorAll("[data-antibot-rule-remove]").forEach((button) => {
@@ -168,11 +178,52 @@ export function bindDetailListEditors(container, state, deps) {
     button.addEventListener("click", () => {
       const index = Number.parseInt(String(button.dataset.antibotExclusionRemove || "-1"), 10);
       if (!Number.isInteger(index) || index < 0) return;
-      syncStateDraftFromForm();
-      const current = normalizeAntibotExclusionRules(state.draft.antibot_exclusion_rules);
+      const current = syncAntibotExclusionDraftRows();
       if (index >= current.length) return;
       current.splice(index, 1);
       state.draft.antibot_exclusion_rules = current;
+      render();
+    });
+  });
+
+  const syncAuthExclusionDraftRows = () => {
+    syncStateDraftFromForm();
+    state.draft.auth_exclusion_rules = readAuthExclusionDraftRows(container);
+    return state.draft.auth_exclusion_rules;
+  };
+  container.querySelector("[data-auth-exclusion-add]")?.addEventListener("click", () => {
+    const current = syncAuthExclusionDraftRows();
+    state.draft.auth_exclusion_rules = [...current, { path: "", methods: ["*"] }];
+    render();
+  });
+  container.querySelectorAll("[data-auth-exclusion-remove]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const index = Number.parseInt(String(button.dataset.authExclusionRemove || "-1"), 10);
+      if (!Number.isInteger(index) || index < 0) return;
+      const current = syncAuthExclusionDraftRows();
+      if (index >= current.length) return;
+      current.splice(index, 1);
+      state.draft.auth_exclusion_rules = current;
+      render();
+    });
+  });
+
+  container.querySelector("[data-auth-token-add]")?.addEventListener("click", () => {
+    syncStateDraftFromForm();
+    const current = normalizeAuthServiceTokens(state.draft.auth_service_tokens);
+    current.push({ service_name: `service${current.length + 1}`, token: "", enabled: true, last_used_at: "" });
+    state.draft.auth_service_tokens = current;
+    render();
+  });
+  container.querySelectorAll("[data-auth-token-remove]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const index = Number.parseInt(String(button.dataset.authTokenRemove || "-1"), 10);
+      if (!Number.isInteger(index) || index < 0) return;
+      syncStateDraftFromForm();
+      const current = normalizeAuthServiceTokens(state.draft.auth_service_tokens);
+      if (index >= current.length) return;
+      current.splice(index, 1);
+      state.draft.auth_service_tokens = current;
       render();
     });
   });

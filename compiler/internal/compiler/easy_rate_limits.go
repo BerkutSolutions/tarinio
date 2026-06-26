@@ -45,14 +45,18 @@ type easyLocationData struct {
 	AntibotStage1CookieValue string
 	AntibotCookieName        string
 	AntibotCookieValue       string
-	UseAuthBasic             bool
+	AuthEnabled              bool
+	AuthBasicEnabled         bool
+	AuthTokenEnabled         bool
 	AuthBasicRealm           string
 	AuthBasicUserFile        string
 	AuthGateLoginURI         string
-	AuthGateVerifyURI        string
+	AuthGateVerifyBasicURI   string
+	AuthGateVerifyTokenURI   string
 	AuthGateCookieKey        string
 	AuthGateCookieVal        string
 	AuthGateCookieTTL        int
+	AuthTokenRules           []easyAuthTokenRuleData
 	Rules                    []easyLocationRuleData
 }
 
@@ -127,6 +131,11 @@ func RenderEasyRateLimitArtifacts(sites []SiteInput, upstreams []UpstreamInput, 
 
 		upstream := upstreamByID[site.DefaultUpstreamID]
 		authUsers := enabledAuthUsers(profile.AuthUsers)
+		authTokens := enabledAuthServiceTokens(profile.AuthServiceTokens)
+		authMode := normalizeCompilerAuthMode(profile.AuthMode)
+		authEnabled := profile.UseAuthBasic && (len(authUsers) > 0 || len(authTokens) > 0)
+		authBasicEnabled := authEnabled && authMode != authModeServiceToken && len(authUsers) > 0
+		authTokenEnabled := authEnabled && authMode != authModeBasic && len(authTokens) > 0
 		locationData := easyLocationData{
 			SiteID:                   site.ID,
 			AntibotEnabled:           antibotEnabled,
@@ -140,14 +149,18 @@ func RenderEasyRateLimitArtifacts(sites []SiteInput, upstreams []UpstreamInput, 
 			AntibotStage1CookieValue: antibotStage1CookieValue(site.ID, profile),
 			AntibotCookieName:        antibotCookieName(site.ID),
 			AntibotCookieValue:       antibotCookieValue(site.ID, profile),
-			UseAuthBasic:             profile.UseAuthBasic && len(authUsers) > 0,
+			AuthEnabled:              authEnabled,
+			AuthBasicEnabled:         authBasicEnabled,
+			AuthTokenEnabled:         authTokenEnabled,
 			AuthBasicRealm:           profile.AuthBasicText,
 			AuthBasicUserFile:        fmt.Sprintf("/etc/waf/nginx/auth-basic/%s.htpasswd", site.ID),
 			AuthGateLoginURI:         authGateLoginURI(),
-			AuthGateVerifyURI:        authGateVerifyURI(),
+			AuthGateVerifyBasicURI:   authGateVerifyBasicURI(),
+			AuthGateVerifyTokenURI:   authGateVerifyTokenURI(),
 			AuthGateCookieKey:        authGateCookieName(site.ID),
 			AuthGateCookieVal:        authGateCookieValue(site.ID, profile),
 			AuthGateCookieTTL:        authGateCookieTTLSeconds(profile),
+			AuthTokenRules:           buildEasyAuthTokenRuleData(authTokens),
 			Rules:                    make([]easyLocationRuleData, 0, len(rules)),
 		}
 		for index, rule := range rules {
@@ -155,7 +168,7 @@ func RenderEasyRateLimitArtifacts(sites []SiteInput, upstreams []UpstreamInput, 
 			isAdminAPIPath := isManagementSiteID(site.ID) && strings.HasPrefix(canonicalPath, "/api/")
 			proxyPassTarget := "http://" + upstreamBlockName(site.ID, upstream.ID)
 			if isAdminAPIPath {
-				proxyPassTarget = "http://control-plane:8080"
+				proxyPassTarget = managementAPIProxyTarget()
 			}
 			locationData.Rules = append(locationData.Rules, easyLocationRuleData{
 				IsAdminAPIPath:              isAdminAPIPath,

@@ -19,6 +19,15 @@ import {
   syncAuthPasswordToggle as syncAuthPasswordToggleModule
 } from "./sites.auth-rules-editors.js";
 import {
+  normalizeAuthExclusionRules as normalizeAuthExclusionRulesModule,
+  normalizeAuthMode as normalizeAuthModeModule,
+  normalizeAuthOrder as normalizeAuthOrderModule,
+  normalizeAuthServiceTokens as normalizeAuthServiceTokensModule,
+  readAuthExclusionDraftRows as readAuthExclusionDraftRowsModule,
+  renderAuthExclusionRulesEditor as renderAuthExclusionRulesEditorModule,
+  renderAuthServiceTokensEditor as renderAuthServiceTokensEditorModule
+} from "./sites.auth-extended-editors.js";
+import {
   BAN_SCOPE_VALUES as BAN_SCOPE_VALUES_MODULE,
   applyServiceProfilePresetForMissingFields as applyServiceProfilePresetForMissingFieldsModule,
   applyServiceProfilePresetToDraft as applyServiceProfilePresetToDraftModule,
@@ -73,6 +82,26 @@ export function normalizeAuthSessionTTLMinutes(value) {
   return normalizeAuthSessionTTLMinutesModule(value);
 }
 
+export function normalizeAuthMode(value) {
+  return normalizeAuthModeModule(value);
+}
+
+export function normalizeAuthOrder(value) {
+  return normalizeAuthOrderModule(value);
+}
+
+export function normalizeAuthExclusionRules(value, normalizeArray) {
+  return normalizeAuthExclusionRulesModule(value, { normalizeArray });
+}
+
+export function readAuthExclusionDraftRows(container) {
+  return readAuthExclusionDraftRowsModule(container);
+}
+
+export function normalizeAuthServiceTokens(value, normalizeArray) {
+  return normalizeAuthServiceTokensModule(value, { normalizeArray });
+}
+
 export function formatAuthLastLogin(value, ctx) {
   return formatAuthLastLoginModule(value, ctx);
 }
@@ -87,6 +116,14 @@ export function syncAuthPasswordToggle(button, visible, ctx) {
 
 export function renderAuthUsersEditor(users, ctx, escapeHtml, normalizeArray) {
   return renderAuthUsersEditorModule(users, ctx, { escapeHtml, normalizeArray });
+}
+
+export function renderAuthExclusionRulesEditor(rules, ctx, escapeHtml, normalizeArray) {
+  return renderAuthExclusionRulesEditorModule(rules, ctx, { escapeHtml, normalizeArray });
+}
+
+export function renderAuthServiceTokensEditor(tokens, ctx, escapeHtml, normalizeArray) {
+  return renderAuthServiceTokensEditorModule(tokens, ctx, { escapeHtml, normalizeArray });
 }
 
 export function renderAuthSessionTtlOptions(ttlMinutes, ctx, escapeHtml) {

@@ -1,7 +1,7 @@
 import { renderDetailViewRuntimeTail } from "./sites.detail-render-view-part2.js";
 
 export function renderDetailViewRuntime(state, ctx, deps) {
-  const { SETTINGS_SEARCH_INDEX, escapeHtml, renderModeTabs, renderRawEditor, renderWizardNav, normalizeServiceProfile, renderListEditor, getQuickListTemplates, normalizeStringArray, renderStatusCodesEditor, renderCustomLimitRulesEditor, renderAntibotExclusionRulesEditor, normalizeBanEscalationStages, formatBanDurationSeconds, renderAntibotChallengeRulesEditor, renderAuthSessionTtlOptions, renderAuthUsersEditor, renderCountryEditor } = deps;
+  const { SETTINGS_SEARCH_INDEX, escapeHtml, renderModeTabs, renderRawEditor, renderWizardNav, normalizeServiceProfile, renderListEditor, getQuickListTemplates, normalizeStringArray, renderStatusCodesEditor, renderCustomLimitRulesEditor, renderAntibotExclusionRulesEditor, normalizeBanEscalationStages, formatBanDurationSeconds, renderAntibotChallengeRulesEditor, renderAuthSessionTtlOptions, renderAuthUsersEditor, renderCountryEditor, renderUpstreamHeadersHelpModal, renderFrontChapterHelpModal, renderUpstreamChapterHelpModal, renderHttpChapterHelpModal } = deps;
   const draft = state.draft;
   const isNew = state.route.mode === "create";
   const titleKey = isNew ? "sites.editor.newTitle" : "sites.editor.editTitle";
@@ -55,7 +55,14 @@ export function renderDetailViewRuntime(state, ctx, deps) {
             <div id="sites-feedback"></div>
             <form id="service-editor-form" class="waf-form waf-stack">
               <section class="waf-stack waf-service-compact-section${state.activeTab === "front" ? "" : " waf-hidden"}" data-tab-panel="front">
-                <div class="waf-list-title">${escapeHtml(ctx.t("sites.wizard.front.title"))}</div>
+                <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
+                  <div>
+                    <div class="waf-list-title">${escapeHtml(ctx.t("sites.wizard.front.title"))}</div>
+                    <div class="muted">${escapeHtml(ctx.t("sites.wizard.front.subtitle"))}</div>
+                  </div>
+                  <button class="waf-help-icon-btn" type="button" id="service-front-chapter-help-btn" title="${escapeHtml(ctx.t("sites.help.front.open"))}" aria-label="${escapeHtml(ctx.t("sites.help.front.open"))}">?</button>
+                </div>
+                ${renderFrontChapterHelpModal(ctx, escapeHtml)}
                 <div class="waf-form-grid">
                   <div class="waf-field">
                     <label for="service-host">${escapeHtml(ctx.t("sites.easy.front.serverName"))}</label>
@@ -149,7 +156,14 @@ export function renderDetailViewRuntime(state, ctx, deps) {
               </section>
 
               <section class="waf-stack${state.activeTab === "upstream" ? "" : " waf-hidden"}" data-tab-panel="upstream">
-                <div class="waf-list-title">${escapeHtml(ctx.t("sites.wizard.upstream.title"))}</div>
+                <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
+                  <div>
+                    <div class="waf-list-title">${escapeHtml(ctx.t("sites.wizard.upstream.title"))}</div>
+                    <div class="muted">${escapeHtml(ctx.t("sites.wizard.upstream.subtitle"))}</div>
+                  </div>
+                  <button class="waf-help-icon-btn" type="button" id="service-upstream-chapter-help-btn" title="${escapeHtml(ctx.t("sites.help.upstream.open"))}" aria-label="${escapeHtml(ctx.t("sites.help.upstream.open"))}">?</button>
+                </div>
+                ${renderUpstreamChapterHelpModal(ctx, escapeHtml)}
                 <input id="service-upstream-id" type="hidden" value="${escapeHtml(draft.upstream_id)}">
                 <div class="waf-form-grid three waf-upstream-toggle-row">
                   <label class="waf-checkbox">
@@ -199,8 +213,13 @@ export function renderDetailViewRuntime(state, ctx, deps) {
                   </div>
                 </div>
                 <div class="waf-subframe waf-upstream-headers-frame">
-                  <div class="waf-list-title-sm">${escapeHtml(ctx.t("sites.easy.upstream.headerForwardingTitle"))}</div>
-                  <div class="waf-note">${escapeHtml(ctx.t("sites.easy.upstream.headerForwardingHint"))}</div>
+                  <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
+                    <div>
+                      <div class="waf-list-title-sm">${escapeHtml(ctx.t("sites.easy.upstream.headerForwardingTitle"))}</div>
+                      <div class="muted">${escapeHtml(ctx.t("sites.easy.upstream.headerForwardingHint"))}</div>
+                    </div>
+                    <button class="waf-help-icon-btn" type="button" id="service-upstream-headers-help-btn" title="${escapeHtml(ctx.t("sites.easy.upstream.headers.help.open"))}" aria-label="${escapeHtml(ctx.t("sites.easy.upstream.headers.help.open"))}">?</button>
+                  </div>
                   <div class="waf-form-grid two">
                     <label class="waf-checkbox">
                       <input id="service-pass-host-header" type="checkbox"${draft.pass_host_header ? " checked" : ""}>
@@ -230,10 +249,18 @@ export function renderDetailViewRuntime(state, ctx, deps) {
                     <input id="service-reverse-proxy-ssl-sni-name" value="${escapeHtml(draft.reverse_proxy_ssl_sni_name)}">
                   </div>
                 </div>
+                ${renderUpstreamHeadersHelpModal(ctx)}
               </section>
 
               <section class="waf-stack waf-service-compact-section${state.activeTab === "http" ? "" : " waf-hidden"}" data-tab-panel="http">
-                <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.http.title"))}</div>
+                <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
+                  <div>
+                    <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.http.title"))}</div>
+                    <div class="muted">${escapeHtml(ctx.t("sites.easy.tab.http.subtitle"))}</div>
+                  </div>
+                  <button class="waf-help-icon-btn" type="button" id="service-http-chapter-help-btn" title="${escapeHtml(ctx.t("sites.help.http.open"))}" aria-label="${escapeHtml(ctx.t("sites.help.http.open"))}">?</button>
+                </div>
+                ${renderHttpChapterHelpModal(ctx, escapeHtml)}
                 <div class="waf-form-grid">
                   ${renderListEditor("allowed_methods", ctx.t("sites.easy.http.allowedMethods"), draft.allowed_methods, "GET", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
                   <div class="waf-field">
@@ -253,5 +280,6 @@ export function renderDetailViewRuntime(state, ctx, deps) {
               </section>
 
 ${renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew)}
+      `}
   `;
 }

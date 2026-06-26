@@ -33,14 +33,22 @@ type easySiteData struct {
 	RateLimitBanSeconds    int
 	AdminBypassPathPattern string
 
-	UseAuthBasic      bool
-	AuthBasicRealm    string
-	AuthBasicUserFile string
-	AuthGateLoginURI  string
-	AuthGateVerifyURI string
-	AuthGateCookieKey string
-	AuthGateCookieVal string
-	AuthGateCookieTTL int
+	AuthEnabled            bool
+	AuthBasicEnabled       bool
+	AuthTokenEnabled       bool
+	AuthMode               string
+	AuthOrder              string
+	AuthRunsBeforeAntibot  bool
+	AuthBasicRealm         string
+	AuthBasicUserFile      string
+	AuthGateLoginURI       string
+	AuthGateVerifyBasicURI string
+	AuthGateVerifyTokenURI string
+	AuthGateCookieKey      string
+	AuthGateCookieVal      string
+	AuthGateCookieTTL      int
+	AuthExclusionRules     []easyAuthExclusionRuleData
+	AuthTokenRules         []easyAuthTokenRuleData
 
 	AntibotEnabled           bool
 	AntibotTwoLayerEnabled   bool
@@ -94,7 +102,10 @@ type antibotChallengePageData struct {
 }
 
 type authGatePageData struct {
-	VerifyURI string
+	BasicVerifyURI string
+	TokenVerifyURI string
+	UseBasic       bool
+	UseServiceToken bool
 }
 
 type easyAntibotRuleData struct {
@@ -138,6 +149,8 @@ func RenderEasyArtifacts(sites []SiteInput, profiles []EasyProfileInput) ([]Arti
 				LimitConnMaxHTTP1:         200,
 				UseLimitReq:               true,
 				LimitReqRate:              "100r/s",
+				AuthMode:                  authModeBasic,
+				AuthOrder:                 authOrderAuthFirst,
 				PassHostHeader:            true,
 				SendXForwardedFor:         true,
 				SendXForwardedProto:       true,

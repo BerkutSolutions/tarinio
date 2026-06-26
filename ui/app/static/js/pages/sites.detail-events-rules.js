@@ -28,6 +28,61 @@ export function bindDetailRuleEvents(params) {
     });
   });
 
+  container.querySelectorAll("[data-auth-token-toggle]").forEach((button) => {
+    button.dataset.visible = "false";
+    button.setAttribute("title", ctx.t("common.show"));
+    button.setAttribute("aria-label", ctx.t("common.show"));
+    button.textContent = ctx.t("common.show");
+    button.addEventListener("click", () => {
+      const index = String(button.dataset.authTokenToggle || "");
+      const input = container.querySelector(`[data-auth-token-secret="${index}"]`);
+      if (!input) {
+        return;
+      }
+      const nextVisible = input.type !== "text";
+      input.type = nextVisible ? "text" : "password";
+      button.dataset.visible = nextVisible ? "true" : "false";
+      button.setAttribute("aria-pressed", nextVisible ? "true" : "false");
+      button.setAttribute("title", ctx.t(nextVisible ? "common.hide" : "common.show"));
+      button.setAttribute("aria-label", ctx.t(nextVisible ? "common.hide" : "common.show"));
+      button.textContent = ctx.t(nextVisible ? "common.hide" : "common.show");
+    });
+  });
+
+  container.querySelector("#service-auth-mode")?.addEventListener("change", () => {
+    syncStateDraftFromForm();
+    render();
+  });
+
+  function toggleHelpModal(modalID, open) {
+    const modal = container.querySelector(`#${modalID}`);
+    if (!modal) {
+      return;
+    }
+    modal.classList.toggle("waf-hidden", !open);
+    if (open) {
+      modal.focus();
+    }
+  }
+
+  container.querySelector("#service-auth-help-btn")?.addEventListener("click", () => toggleHelpModal("service-auth-help-modal", true));
+  container.querySelector("#service-antibot-help-btn")?.addEventListener("click", () => toggleHelpModal("service-antibot-help-modal", true));
+  container.querySelector("#service-traffic-badbehavior-help-btn")?.addEventListener("click", () => toggleHelpModal("service-traffic-badbehavior-help-modal", true));
+  container.querySelector("#service-traffic-limits-help-btn")?.addEventListener("click", () => toggleHelpModal("service-traffic-limits-help-modal", true));
+  container.querySelector("#service-traffic-dnsbl-help-btn")?.addEventListener("click", () => toggleHelpModal("service-traffic-dnsbl-help-modal", true));
+  container.querySelector("#service-upstream-headers-help-btn")?.addEventListener("click", () => toggleHelpModal("service-upstream-headers-help-modal", true));
+  container.querySelector("#service-front-chapter-help-btn")?.addEventListener("click", () => toggleHelpModal("service-front-chapter-help-modal", true));
+  container.querySelector("#service-upstream-chapter-help-btn")?.addEventListener("click", () => toggleHelpModal("service-upstream-chapter-help-modal", true));
+  container.querySelector("#service-http-chapter-help-btn")?.addEventListener("click", () => toggleHelpModal("service-http-chapter-help-modal", true));
+  container.querySelector("#service-headers-chapter-help-btn")?.addEventListener("click", () => toggleHelpModal("service-headers-chapter-help-modal", true));
+  container.querySelector("#service-blocking-chapter-help-btn")?.addEventListener("click", () => toggleHelpModal("service-blocking-chapter-help-modal", true));
+  container.querySelector("#service-antibot-chapter-help-btn")?.addEventListener("click", () => toggleHelpModal("service-antibot-chapter-help-modal", true));
+  container.querySelector("#service-geo-chapter-help-btn")?.addEventListener("click", () => toggleHelpModal("service-geo-chapter-help-modal", true));
+  container.querySelector("#service-modsec-chapter-help-btn")?.addEventListener("click", () => toggleHelpModal("service-modsec-chapter-help-modal", true));
+  container.querySelectorAll("[data-help-close]").forEach((button) => {
+    button.addEventListener("click", () => toggleHelpModal(String(button.dataset.helpClose || ""), false));
+  });
+
   container.querySelectorAll("[data-bad-code]").forEach((checkbox) => {
     checkbox.addEventListener("change", () => {
       const code = Number(checkbox.dataset.badCode || "0");

@@ -61,14 +61,15 @@ location = {{ .AntibotVerifyURI }} {
     return 302 $scheme://$host$waf_antibot_return_path$waf_antibot_return_query;
 }
 {{- end }}
-{{- if .UseAuthBasic }}
+{{- if .AuthEnabled }}
 location = {{ .AuthGateLoginURI }} {
     proxy_intercept_errors off;
     modsecurity off;
     default_type text/html;
     alias /etc/waf/errors/{{ .SiteID }}/auth.html;
 }
-location = {{ .AuthGateVerifyURI }} {
+{{- if .AuthBasicEnabled }}
+location = {{ .AuthGateVerifyBasicURI }} {
     proxy_intercept_errors off;
     modsecurity off;
     auth_basic "{{ .AuthBasicRealm }}";
@@ -81,6 +82,28 @@ location = {{ .AuthGateVerifyURI }} {
 {{- end }}
     return 204;
 }
+{{- end }}
+{{- if .AuthTokenEnabled }}
+location = {{ .AuthGateVerifyTokenURI }} {
+    proxy_intercept_errors off;
+    modsecurity off;
+    set $waf_auth_token_verified 0;
+    set $waf_auth_service_guard "$http_x_waf_service_name|$http_x_waf_service_token";
+    set $waf_auth_bearer_guard "$http_x_waf_service_name|$http_authorization";
+{{- range .AuthTokenRules }}
+    if ($waf_auth_service_guard = "{{ .ServiceGuard }}") { set $waf_auth_token_verified 1; }
+    if ($waf_auth_bearer_guard = "{{ .BearerGuard }}") { set $waf_auth_token_verified 1; }
+{{- end }}
+    if ($waf_auth_token_verified = 0) { return 401; }
+    add_header Cache-Control "no-store" always;
+{{- if ge .AuthGateCookieTTL 0 }}
+    add_header Set-Cookie "{{ .AuthGateCookieKey }}={{ .AuthGateCookieVal }}; Max-Age={{ .AuthGateCookieTTL }}; Path=/; SameSite=Lax; Secure; HttpOnly" always;
+{{- else }}
+    add_header Set-Cookie "{{ .AuthGateCookieKey }}={{ .AuthGateCookieVal }}; Path=/; SameSite=Lax; Secure; HttpOnly" always;
+{{- end }}
+    return 204;
+}
+{{- end }}
 {{- end }}
 {{- range .Rules }}
 location {{ .LocationModifier }} {{ .LocationPath }} {

@@ -15,6 +15,10 @@ export function bindDetailRuntime(deps) {
     normalizeArray,
     normalizeBanEscalationStages,
     normalizeAuthBasicUsers,
+    normalizeAuthExclusionRules,
+    normalizeAuthMode,
+    normalizeAuthOrder,
+    normalizeAuthServiceTokens,
     normalizeAuthSessionTTLMinutes,
     normalizeAPIPositiveEndpointPolicies,
     buildDetailDraftFromForm,
@@ -87,6 +91,10 @@ export function bindDetailRuntime(deps) {
     normalizeBanEscalationStages,
     normalizeAntibotExclusionRules,
     normalizeAuthBasicUsers,
+    normalizeAuthExclusionRules,
+    normalizeAuthMode,
+    normalizeAuthOrder,
+    normalizeAuthServiceTokens,
     normalizeAuthSessionTTLMinutes,
     normalizeAPIPositiveEndpointPolicies
   });
@@ -96,6 +104,10 @@ export function bindDetailRuntime(deps) {
     BAN_SCOPE_VALUES,
     normalizeBanEscalationStages,
     normalizeAuthBasicUsers,
+    normalizeAuthExclusionRules,
+    normalizeAuthMode,
+    normalizeAuthOrder,
+    normalizeAuthServiceTokens,
     normalizeAuthSessionTTLMinutes
   });
 
@@ -114,7 +126,7 @@ export function bindDetailRuntime(deps) {
   const certificateInput = container.querySelector("#service-certificate-id");
   const upstreamInput = container.querySelector("#service-upstream-id");
   const normalizeAutoSiteID = (value) => normalizeAutoSiteIDModule(value);
-  const syncDerivedFieldsFromID = () => syncDerivedFieldsFromIDModule(idInput, upstreamInput, certificateInput, computeUpstreamID);
+  const syncDerivedFieldsFromID = () => syncDerivedFieldsFromIDModule(idInput, certificateInput, upstreamInput, computeUpstreamID);
   if (state.route.mode !== "create") {
     if (idInput?.value?.trim()) {
       idInput.dataset.dirty = "true";
@@ -191,6 +203,8 @@ export function bindDetailRuntime(deps) {
     normalizeAntibotExclusionRules,
     normalizeAntibotChallengeRules,
     normalizeAuthBasicUsers,
+    normalizeAuthExclusionRules,
+    normalizeAuthServiceTokens,
   });
 
   bindDetailRuleEvents({

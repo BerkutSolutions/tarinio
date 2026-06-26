@@ -7,7 +7,7 @@ import { checkEntryAccess } from "./guard.js";
 import { escapeHtml, notify } from "./ui.js";
 
 let sidebarCollapsed = false;
-const PAGE_MODULE_VERSION = "20260517-10";
+const PAGE_MODULE_VERSION = "20260625-04";
 let lastGlobalScriptError = null;
 
 window.addEventListener("error", (event) => {
@@ -79,8 +79,23 @@ async function loadPageModule(name) {
 }
 
 async function loadSitesSectionRenderer() {
-  const module = await loadPageModule("sites.js");
-  return module.renderSites;
+  // Keep Services on the stable facade; do not wire the legacy-broken runtime bridge.
+  try {
+    const module = await loadPageModule("sites.js");
+    return module.renderSites;
+  } catch (error) {
+    const wrapped = new Error(`Services stable facade failed to load: ${String(error?.message || error)}`);
+    wrapped.name = "ServicesStableFacadeLoadError";
+    wrapped.details = {
+      entrypoint: "sites.js",
+      facadeTarget: "sites.stable-page.js",
+      brokenRuntimePath: "sites.page-main-runtime.js",
+      originalName: String(error?.name || ""),
+      originalMessage: String(error?.message || ""),
+      originalStack: String(error?.stack || ""),
+    };
+    throw wrapped;
+  }
 }
 
 const SITES_PREFLIGHT_MODULES = [];
