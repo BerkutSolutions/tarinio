@@ -263,19 +263,21 @@ export function renderDetailViewRuntime(state, ctx, deps) {
                 ${renderHttpChapterHelpModal(ctx, escapeHtml)}
                 <div class="waf-form-grid">
                   ${renderListEditor("allowed_methods", ctx.t("sites.easy.http.allowedMethods"), draft.allowed_methods, "GET", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
-                  <div class="waf-field">
+                  <div class="waf-field waf-http-max-size">
                     <label for="service-max-client-size">${escapeHtml(ctx.t("sites.easy.http.maxBodySize"))}</label>
                     <input id="service-max-client-size" value="${escapeHtml(draft.max_client_size)}">
                   </div>
                   ${renderListEditor("ssl_protocols", ctx.t("sites.easy.http.sslProtocols"), draft.ssl_protocols, "TLSv1.3", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
-                  <label class="waf-checkbox">
-                    <input id="service-http2" type="checkbox"${draft.http2 ? " checked" : ""}>
-                    <span>HTTP2</span>
-                  </label>
-                  <label class="waf-checkbox">
-                    <input id="service-http3" type="checkbox"${draft.http3 ? " checked" : ""}>
-                    <span>HTTP3</span>
-                  </label>
+                  <div class="waf-http-version-toggle">
+                    <label class="waf-checkbox">
+                      <input id="service-http2" type="checkbox"${draft.http2 ? " checked" : ""}>
+                      <span>HTTP2</span>
+                    </label>
+                    <label class="waf-checkbox">
+                      <input id="service-http3" type="checkbox"${draft.http3 ? " checked" : ""}>
+                      <span>HTTP3</span>
+                    </label>
+                  </div>
                 </div>
               </section>
 

@@ -1,7 +1,8 @@
 const DASHBOARD_CONTRACT_MARKER_CONTAINERS_OVERVIEW = "/api/dashboard/containers/overview";
-const DASHBOARD_CONTRACT_MARKER_WIDGET_SERVICES_UP = "dashboard.widget.servicesUp";
+const DASHBOARD_CONTRACT_MARKER_WIDGET_SERVICES_UP = "dashboard.widget.services";
 const DASHBOARD_CONTRACT_MARKERS_WIDGETS = [
-  "dashboard.widget.servicesDown",
+  "dashboard.widget.services",
+  "dashboard.widget.trafficSummary",
   "dashboard.widget.requestsDay",
   "dashboard.widget.attacksDay",
   "dashboard.widget.blockedAttacks",
@@ -16,8 +17,8 @@ const DASHBOARD_CONTRACT_MARKERS_WIDGETS = [
   "dashboard.widget.containersHealth"
 ];
 const DASHBOARD_CONTRACT_MARKERS_WIDGET_IDS = [
-  "services-up",
-  "services-down",
+  "services",
+  "traffic-summary",
   "requests-day",
   "attacks-day",
   "blocked-attacks",

@@ -1,26 +1,5 @@
 import { escapeHtml } from "../ui.js";
 
-function renderMetric(value, label, tone = "success", widgetAction = "", deps) {
-  const clickable = widgetAction ? "clickable" : "";
-  const actionAttr = widgetAction ? ` data-widget-action="${escapeHtml(widgetAction)}"` : "";
-  return `
-    <button type="button" class="dashboard-widget-content dashboard-stat dashboard-metric tone-${escapeHtml(tone)} ${clickable}"${actionAttr}>
-      <div class="dashboard-stat-value">${escapeHtml(deps.formatNumber(value))}</div>
-      <div class="dashboard-stat-label">${escapeHtml(label)}</div>
-    </button>
-  `;
-}
-
-function renderCountryBadge(code, deps) {
-  const normalized = deps.normalizeCountryCode(code);
-  if (normalized === "UNK") {
-    return `<span class="dashboard-ip-country">${escapeHtml(countryName(normalized, deps))}</span>`;
-  }
-  const flag = countryFlag(normalized, deps);
-  const name = countryName(normalized, deps);
-  return `<span class="dashboard-ip-country">${escapeHtml(name)}${flag ? ` (${escapeHtml(flag)})` : ""}</span>`;
-}
-
 function countryFlag(code, deps) {
   const token = deps.normalizeCountryCode(code);
   if (!/^[A-Z]{2}$/.test(token)) {
@@ -44,13 +23,129 @@ function countryName(code, deps) {
   }
 }
 
+function renderCountryBadge(code, deps) {
+  const normalized = deps.normalizeCountryCode(code);
+  if (normalized === "UNK") {
+    return `<span class="dashboard-ip-country">${escapeHtml(countryName(normalized, deps))}</span>`;
+  }
+  const flag = countryFlag(normalized, deps);
+  const name = countryName(normalized, deps);
+  return `<span class="dashboard-ip-country">${escapeHtml(name)}${flag ? ` ${flag}` : ""}</span>`;
+}
+
+// Форматирует строку даты/времени в локализованный вид браузера
+function formatCheckedAt(raw) {
+  const str = String(raw || "").trim();
+  if (!str) return "";
+  const ts = Date.parse(str);
+  if (Number.isNaN(ts)) return str;
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", hour12: false
+    }).format(new Date(ts));
+  } catch (_e) {
+    return str;
+  }
+}
+
+function renderMetric(value, label, tone, widgetAction, deps) {
+  const clickable = widgetAction ? "clickable" : "";
+  const actionAttr = widgetAction ? ` data-widget-action="${escapeHtml(widgetAction)}"` : "";
+  return `
+    <button type="button" class="dashboard-widget-content dashboard-stat dashboard-metric tone-${escapeHtml(tone)} ${clickable}"${actionAttr}>
+      <div class="dashboard-stat-value">${escapeHtml(deps.formatNumber(value))}</div>
+      <div class="dashboard-stat-label">${escapeHtml(label)}</div>
+    </button>
+  `;
+}
+
+// Виджет «Трафик и атаки» — три метрики в столбец с цветными рамками
+function renderTrafficSummaryWidget(stats, ctx, deps) {
+  const requests = Number(stats?.requests_day || 0);
+  const attacks  = Number(stats?.attacks_day || 0);
+  const blocked  = Number(stats?.blocked_attacks_day || 0);
+  return `
+    <div class="dashboard-widget-content dashboard-traffic-summary">
+      <button type="button" class="dashboard-traffic-row tone-success clickable" data-widget-action="requests-day">
+        <div class="dashboard-traffic-value">${escapeHtml(deps.formatNumber(requests))}</div>
+        <div class="dashboard-traffic-label">${escapeHtml(ctx.t("dashboard.value.requestsDay"))}</div>
+      </button>
+      <button type="button" class="dashboard-traffic-row tone-warning clickable" data-widget-action="attacks-day">
+        <div class="dashboard-traffic-value">${escapeHtml(deps.formatNumber(attacks))}</div>
+        <div class="dashboard-traffic-label">${escapeHtml(ctx.t("dashboard.value.attacksDay"))}</div>
+      </button>
+      <button type="button" class="dashboard-traffic-row tone-danger clickable" data-widget-action="blocked-attacks">
+        <div class="dashboard-traffic-value">${escapeHtml(deps.formatNumber(blocked))}</div>
+        <div class="dashboard-traffic-label">${escapeHtml(ctx.t("dashboard.value.blockedAttacksDay"))}</div>
+      </button>
+    </div>
+  `;
+}
+
+function renderServicesWidget(stats, ctx, deps) {
+  const services = Array.isArray(stats?.services) ? stats.services : [];
+  if (!services.length) {
+    return `<div class="dashboard-widget-content waf-empty">${escapeHtml(ctx.t("dashboard.services.empty"))}</div>`;
+  }
+  const upCount   = services.filter((s) => Boolean(s?.up)).length;
+  const downCount = services.length - upCount;
+  const sorted = services.slice().sort((a, b) => {
+    const aUp = Boolean(a?.up);
+    const bUp = Boolean(b?.up);
+    if (aUp !== bUp) return aUp ? 1 : -1;
+    return String(a?.name || "").localeCompare(String(b?.name || ""), undefined, { sensitivity: "base" });
+  });
+
+  return `
+    <div class="dashboard-widget-content dashboard-services-widget" data-widget-action="services">
+      <div class="dashboard-containers-system-row">
+        <div class="mini-metric">
+          <div class="mini-metric-value">${escapeHtml(String(upCount))}</div>
+          <div class="mini-metric-label">${escapeHtml(ctx.t("dashboard.services.up"))}</div>
+        </div>
+        <div class="mini-metric">
+          <div class="mini-metric-value">${escapeHtml(String(downCount))}</div>
+          <div class="mini-metric-label">${escapeHtml(ctx.t("dashboard.services.down"))}</div>
+        </div>
+        <div class="mini-metric mini-metric-running">
+          <div class="mini-metric-value">${escapeHtml(String(services.length))}</div>
+          <div class="mini-metric-label">${escapeHtml(ctx.t("dashboard.services.total"))}</div>
+        </div>
+      </div>
+      <div class="dashboard-containers-list-wrap">
+        <div class="dashboard-containers-list-title">${escapeHtml(ctx.t("dashboard.services.service"))}</div>
+        <div class="dashboard-list dashboard-containers-list">
+          ${sorted.map((item) => {
+            const isUp     = Boolean(item?.up);
+            const tone     = isUp ? "success" : "danger";
+            const statusLbl = isUp ? ctx.t("dashboard.services.statusUp") : ctx.t("dashboard.services.statusDown");
+            const checkedAt = formatCheckedAt(item?.checked_at);
+            return `
+              <button type="button" class="dashboard-list-row clickable container-status-${escapeHtml(tone)}" data-widget-action="service-detail" data-service-name="${escapeHtml(String(item?.name || ""))}">
+                <div class="dashboard-list-label">
+                  <strong>${escapeHtml(String(item?.name || "-"))}</strong>
+                  <div class="muted">${escapeHtml(statusLbl)}${checkedAt ? ` · ${escapeHtml(checkedAt)}` : ""}</div>
+                </div>
+                <div class="dashboard-list-meta">
+                  <span class="badge badge-${escapeHtml(isUp ? "success" : "danger")}">${escapeHtml(statusLbl)}</span>
+                </div>
+              </button>
+            `;
+          }).join("")}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function renderContainersHealthWidget(overview, ctx, deps) {
   if (!overview || !Array.isArray(overview?.containers)) {
     return `<div class="dashboard-widget-content waf-empty">${escapeHtml(ctx.t("dashboard.containers.empty"))}</div>`;
   }
   const containers = overview.containers
     .slice()
-    .sort((left, right) => String(left?.name || "").localeCompare(String(right?.name || ""), undefined, { sensitivity: "base" }))
+    .sort((l, r) => String(l?.name || "").localeCompare(String(r?.name || ""), undefined, { sensitivity: "base" }))
     .slice(0, 12);
   const uptimeText = deps.formatUptimeLocalized(overview?.host_uptime_seconds || 0, ctx);
   return `
@@ -96,10 +191,10 @@ function renderTopList(items, emptyText, options = {}, deps) {
   if (!Array.isArray(items) || !items.length) {
     return `<div class="dashboard-widget-content waf-empty">${escapeHtml(emptyText)}</div>`;
   }
-  const renderLabel = typeof options.renderLabel === "function" ? options.renderLabel : (item) => escapeHtml(String(item?.key || "-"));
+  const renderLabel    = typeof options.renderLabel    === "function" ? options.renderLabel    : (item) => escapeHtml(String(item?.key || "-"));
   const renderMetaRight = typeof options.renderMetaRight === "function" ? options.renderMetaRight : () => "";
-  const rowAttrs = typeof options.rowAttrs === "function" ? options.rowAttrs : () => "";
-  const containerAttr = options.containerAction ? ` data-widget-action="${escapeHtml(options.containerAction)}"` : "";
+  const rowAttrs       = typeof options.rowAttrs       === "function" ? options.rowAttrs       : () => "";
+  const containerAttr  = options.containerAction ? ` data-widget-action="${escapeHtml(options.containerAction)}"` : "";
   return `
     <div class="dashboard-widget-content dashboard-scroll-area"${containerAttr}>
       <div class="dashboard-list">
@@ -129,43 +224,43 @@ function renderIPTopList(items, emptyText, widgetAction = "", deps) {
     },
     rowAttrs: (item) => {
       const ip = String(item?.key || "").trim();
-      if (!ip) {
-        return widgetAction ? `data-widget-action="${escapeHtml(widgetAction)}"` : "";
-      }
+      if (!ip) return widgetAction ? `data-widget-action="${escapeHtml(widgetAction)}"` : "";
       return `data-widget-action="ip-detail" data-ip="${escapeHtml(ip)}"`;
     }
   }, deps);
 }
 
 function mergeWidgetData(stats, detailModel, containersOverview, ctx, deps) {
-  const statsTopIPs = Array.isArray(stats?.top_attacker_ips) ? stats.top_attacker_ips : [];
-  const statsTopCountries = Array.isArray(stats?.top_attacker_countries) ? stats.top_attacker_countries : [];
+  const statsTopIPs       = Array.isArray(stats?.top_attacker_ips)       ? stats.top_attacker_ips       : [];
+  const statsTopCountries = Array.isArray(stats?.top_attacker_countries)  ? stats.top_attacker_countries  : [];
   const fallbackTopCountries = Array.isArray(detailModel?.attacksByCountry) ? detailModel.attacksByCountry : [];
+
   const topCountryItems = (statsTopCountries.length ? statsTopCountries : fallbackTopCountries).map((item) => ({
-    key: item?.key,
-    count: item?.count,
-    countryCode: item?.key
+    key: item?.key, count: item?.count, countryCode: item?.key
   }));
+
   const topIPItems = statsTopIPs.map((item) => {
-    const key = String(item?.key || "").trim();
-    return {
-      key,
-      count: Number(item?.count || 0),
-      countryCode: detailModel?.ipCountryByIP?.get?.(key) || "UNK"
-    };
+    const key        = String(item?.key || "").trim();
+    const rawCountry = item?.country_code || item?.countryCode || "";
+    const countryCode = rawCountry
+      ? deps.normalizeCountryCode(rawCountry)
+      : (detailModel?.ipCountryByIP?.get?.(key) || "UNK");
+    return { key, count: Number(item?.count || 0), countryCode };
   });
 
   return {
-    "services-up": renderMetric(stats?.services_up, ctx.t("dashboard.value.servicesUp"), "success", "services-up", deps),
-    "services-down": renderMetric(stats?.services_down, ctx.t("dashboard.value.servicesDown"), "danger", "services-down", deps),
-    "requests-day": renderMetric(stats?.requests_day, ctx.t("dashboard.value.requestsDay"), "success", "requests-day", deps),
-    "attacks-day": renderMetric(stats?.attacks_day, ctx.t("dashboard.value.attacksDay"), "warning", "attacks-day", deps),
-    "blocked-attacks": renderMetric(stats?.blocked_attacks_day, ctx.t("dashboard.value.blockedAttacksDay"), "danger", "blocked-attacks", deps),
-    "unique-attackers": renderIPTopList(topIPItems.length ? topIPItems : (detailModel?.ipDetailsSummary || []).slice(0, 10).map((item) => ({
-      key: item.ip,
-      count: Math.max(item.attacks, item.requests),
-      countryCode: item.countryCode
-    })), ctx.t("dashboard.empty.topIPs"), "unique-attackers", deps),
+    "services":         renderServicesWidget(stats, ctx, deps),
+    "traffic-summary":  renderTrafficSummaryWidget(stats, ctx, deps),
+    // legacy single-metric widgets (hidden by default but kept for detail actions)
+    "requests-day":     renderMetric(stats?.requests_day,          ctx.t("dashboard.value.requestsDay"),       "success", "requests-day",    deps),
+    "attacks-day":      renderMetric(stats?.attacks_day,           ctx.t("dashboard.value.attacksDay"),        "warning", "attacks-day",     deps),
+    "blocked-attacks":  renderMetric(stats?.blocked_attacks_day,   ctx.t("dashboard.value.blockedAttacksDay"), "danger",  "blocked-attacks", deps),
+    "unique-attackers": renderIPTopList(
+      topIPItems.length ? topIPItems : (detailModel?.ipDetailsSummary || []).slice(0, 10).map((item) => ({
+        key: item.ip, count: Math.max(item.attacks, item.requests), countryCode: item.countryCode
+      })),
+      ctx.t("dashboard.empty.topIPs"), "unique-attackers", deps
+    ),
     "popular-errors": renderTopList(stats?.popular_errors || [], ctx.t("dashboard.empty.popularErrors"), {
       containerAction: "popular-errors",
       rowAttrs: (item) => {
@@ -179,20 +274,25 @@ function mergeWidgetData(stats, detailModel, containersOverview, ctx, deps) {
       renderLabel: (item) => renderCountryBadge(item?.countryCode || item?.key, deps),
       rowAttrs: (item) => `data-widget-action="country-detail" data-country-code="${escapeHtml(deps.normalizeCountryCode(item?.countryCode || item?.key))}"`
     }, deps),
-    "top-urls": renderTopList((Array.isArray(stats?.most_attacked_urls) && stats.most_attacked_urls.length ? stats.most_attacked_urls : (detailModel?.attacksByURL || [])), ctx.t("dashboard.empty.topURLs"), {
-      containerAction: "top-urls",
-      rowAttrs: (item) => {
-        const url = String(item?.key || "").trim();
-        return url ? `data-widget-action="url-detail" data-url="${escapeHtml(url)}"` : "";
-      }
-    }, deps),
+    "top-urls": renderTopList(
+      (Array.isArray(stats?.most_attacked_urls) && stats.most_attacked_urls.length ? stats.most_attacked_urls : (detailModel?.attacksByURL || [])),
+      ctx.t("dashboard.empty.topURLs"), {
+        containerAction: "top-urls",
+        rowAttrs: (item) => {
+          const url = String(item?.key || "").trim();
+          return url ? `data-widget-action="url-detail" data-url="${escapeHtml(url)}"` : "";
+        }
+      }, deps
+    ),
     memory: deps.renderSystemMemory(stats, ctx),
-    cpu: deps.renderSystemCPU(stats, ctx),
+    cpu:    deps.renderSystemCPU(stats, ctx),
     "containers-health": renderContainersHealthWidget(containersOverview, ctx, deps)
   };
 }
 
 export {
   renderCountryBadge,
+  renderServicesWidget,
+  renderTrafficSummaryWidget,
   mergeWidgetData
 };

@@ -96,6 +96,29 @@ export function formatDateTimeInZone(value, timeZone) {
   }
 }
 
+export function formatDateOnly(value) {
+  if (!value) {
+    return "-";
+  }
+  // Accept "YYYY-MM-DD" strings or Date objects
+  const date = value instanceof Date ? value : new Date(String(value) + "T00:00:00Z");
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+  const prefs = loadPreferences();
+  const locale = intlLocaleForLanguage(prefs.language || defaults.language);
+  try {
+    return new Intl.DateTimeFormat(locale, {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      timeZone: "UTC",
+    }).format(date);
+  } catch {
+    return String(value);
+  }
+}
+
 export function availableTimeZones() {
   if (typeof Intl?.supportedValuesOf === "function") {
     try {

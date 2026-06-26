@@ -159,6 +159,8 @@ export function shouldUpsertBaseResources(draft, existingSite, existingUpstream,
     const certificateID = (draft.certificate_id.trim() || `${siteID}-tls`).toLowerCase();
     if (String(existingTLSConfig.site_id || "").toLowerCase() !== siteID) return true;
     if (String(existingTLSConfig.certificate_id || "").toLowerCase() !== certificateID) return true;
+  } else if (existingTLSConfig) {
+    return true;
   }
   return false;
 }

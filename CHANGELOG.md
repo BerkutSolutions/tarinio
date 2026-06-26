@@ -1,35 +1,36 @@
-## [1.3.1] - 26.06.2026
+## [1.3.2] - 26.06.2026
 
-### Healthcheck
-- Healthcheck-классификатор контейнерных логов больше не помечает как warning штатные nginx-записи `a client request body is buffered to a temporary file` (POST-запросы вроде sentry envelope, тело которых превышает `client_body_buffer_size`). Раньше эти строки сыпались в healthcheck по сервису `sentry.hantico.ru`, хотя самим запросам они не мешают.
-- В whitelist `classifyContainerLogIssue` добавлен паттерн `querygroup _id can't be null, it should be set before accessing it`. Это известное benign-предупреждение OpenSearch 2.18 (cluster bug в плагине workload management), не влияющее на работу WAF, но сыпавшее в healthcheck сотни одинаковых записей при каждом старте кластера.
+### Исправления / UI — редактор сервисов
+- **Баг: настройка TLS не сохранялась (чекбокс сбрасывался)** — корневая причина: `GET /api/tls-configs` возвращает объекты с полем `site_id`, а не `id`. Функция `mergeByID` использует `item?.id` — все TLS-конфиги отбрасывались, `state.tlsBySite` всегда был пустым. При загрузке сервиса `tls_enabled: Boolean(null)` → `false`, чекбокс всегда выключен. Исправлено:
+  - `sites.routing-merge.js`: добавлена функция `mergeBySiteID` — слияние по полю `site_id`.
+  - `sites.stable-page.js`: `mergeByID` → `mergeBySiteID` для `tlsConfigsResponse`.
+  - `sites.runtime-load-list.js`: то же самое + добавлен `mergeBySiteID` в deps.
+  - `sites.page-render-runtime.js`: `mergeBySiteID` добавлен в деструктуризацию deps и передачу в `loadSitesRuntime`.
+- **Предыдущий фикс (tls_enabled=false не удалял конфиг)**: `sites.resource-pipeline.js`, `sites.resource-upsert.js` — добавлена ветка `else if (existingTLSConfig)` → `DELETE /api/tls-configs/:siteID`; `sites.access-upsert.js`, `sites.view-io.js` — `shouldUpsertBaseResources` возвращает `true` при `!draft.tls_enabled && existingTLSConfig`.
 
-### Хранилище логов
-- Реализована автоматическая чистка горячего OpenSearch-индекса по retention-настройкам из UI. Раньше дневные сегменты `waf-hot-requests` удалялись только когда холодное хранилище = ClickHouse (через `migrateHotToColdLocked`). При сценарии «и горячее, и холодное — OpenSearch» (типичный prod) старые дни накапливались бесконечно — мы наблюдали 65 дневных сегментов на проде при настройках 14/30 дней. Новый `pruneOpenSearchOldDaysLocked` запускается на каждом цикле фонового ingest и удаляет дни старше:
-  - `Retention.ColdDays`, если cold backend = OpenSearch (все данные хранятся в горячем индексе);
-  - `Retention.HotDays`, если cold backend = ClickHouse/file (страховка поверх миграции, чтобы OpenSearch никогда не держал данные дольше горячего окна).
-- Уточнён статус «Хранилище логов» в UI: для single-OpenSearch теперь показывается оба числа `{hotDays}/{coldDays}`, а не только cold. Раньше при настройках 14/30 строка отображала «срок хранения 30 дней», что путало.
+### UI / Дашборд
+- **Виджет «Трафик и атаки»** — объединяет «Количество запросов», «Количество атак» и «Заблокированные атаки» в один виджет. Три строки в столбец, каждая с цветной рамкой (зелёная / жёлтая / красная). Клик по строке открывает детальную статистику.
+- **Виджет «Сервисы»** — заменяет два отдельных виджета UP/DOWN. Список сервисов в стиле «Контейнеры» с цветовой рамкой по статусу. Клик → мини-дашборд сервиса.
+- **«Здоровье контейнеров»** переименован в «Контейнеры» во всех 5 локалях.
+- **Раскладка по умолчанию**: строка 1 — Сервисы, Трафик и атаки, Контейнеры, Топ IP, Топ стран; строка 2 — Запросы во времени, Самые атакуемые URL; строка 3 — Память, CPU. Виджеты «Популярные ошибки» и «Уникальные IP» скрыты по умолчанию.
+- **Время проверки сервисов** теперь отображается в локализованном формате браузера через `Intl.DateTimeFormat` (было: сырая ISO-строка на английском).
+- **Флаги стран** отображаются как emoji вместо текстового кода.
+- **Страна в топ IP** берётся из `country_code` ответа API.
+- i18n: добавлены ключи `dashboard.widget.trafficSummary` и `dashboard.services.*` во все 5 локалей.
 
-### UI / Хранилище логов
-- В таблице «Индексы хранилища логов» дни старше `Retention.HotDays` теперь подписываются как «холодные» (когда cold backend = OpenSearch и данные физически живут в одном индексе, но по возрасту уже относятся к cold-горизонту). Раньше все дни помечались как `opensearch:waf-hot-requests` независимо от возраста.
-- Колонка «Файл» теперь рендерит уровень хранилища через i18n-ключи (`OpenSearch (горячее)`, `OpenSearch (холодное)`, `ClickHouse (холодное)`) вместо сырого имени индекса.
-- Колонка «Размер» переведена с байтов в человекочитаемый формат (B / KB / MB / GB), что соответствует строкам в десятки и сотни мегабайт на дневной индекс.
+### UI / Сервисы / Вкладка "Общие HTTP"
+- Поля "Максимальный размер body" теперь получает класс `waf-http-max-size` — CSS уже задавал ему `grid-column: span 3`, но класс отсутствовал в HTML, из-за чего поле растягивалось на всю строку.
+- Чекбоксы HTTP2 и HTTP3 обёрнуты в `<div class="waf-http-version-toggle">` — CSS позиционирует их как вертикальную группу в конце строки вместо отдельных "плавающих" элементов.
 
-### UI / Локализация дат
-- Время во вкладке «События» и в TLS теперь форматируется через `formatDateTimeInZone`, который привязан к языку UI (`ru-RU` / `en-US` / `de-DE` / `sr-Cyrl-RS` / `zh-CN`) и часовому поясу пользователя. Раньше `events.js` рендерил сырое значение `occurred_at` (`2026-06-26T10:17:19.730832709Z`), а `ui.js` `formatDate` использовал `toLocaleDateString()` без явной локали, поэтому даты в TLS и других страницах отличались от языка UI.
-- В `preferences.js` `formatDateTimeInZone` теперь явно использует `Intl.DateTimeFormat(locale, ...)` с локалью, выведенной из активного языка приложения. `loadPreferences` пересобирает кеш при смене языка через `setLanguage`, иначе `formatDate` оставался залипшим на старой локали до перезагрузки страницы.
-- Во вкладке «События» сводки `apply started` / `apply succeeded` / `apply failed`, а также соответствующие типы `apply_started` / `apply_succeeded` / `apply_failed` / `reload_failed` / `health_check_failed` / `rollback_performed` теперь переведены на язык интерфейса. Раньше отсутствовали i18n-ключи, и UI показывал сырой английский токен из payload.
+### UI / Сервисы / Вкладка "HTTP-заголовки"
+- Исправлен перевод: все вхождения "ХСТС" заменены на правильное "HSTS" (8 строк в `ru.json`): метки полей, сообщения валидации.
 
-### Ревизии
-- Эндпоинт `/api/revisions/compile` теперь принимает опциональное поле `target_site_ids` в теле запроса. UI-форма редактора сервиса передаёт туда id текущего сохраняемого сервиса, поэтому ревизия помечает «затронут только этот сервис». Раньше `revision_catalog_site_scoping.go` восстанавливал список «затронутых сервисов» по diff между fingerprint текущей и предыдущей ревизии — для первой ревизии в свежей БД (`rev-000122`) предыдущей не существовало, поэтому в неё попадали ВСЕ сайты, и на проде сохранение одного сервиса показывало «затронуты: waf.hantico.ru, sentry.hantico.ru».
-- Когда `target_site_ids` не передан (legacy paths: import, onboarding, bulk), сохранён прежний fingerprint-diff алгоритм без изменений.
+### Backend / Dashboard / CPU процессов
+- Исправлено отображение CPU% в виджете "Нагрузка CPU" (топ процессов). Раньше `collectTopProcessStats` делала два сэмпла с паузой 120ms — за такой короткий интервал большинство процессов показывало 0.0%. Теперь используется persistent `processState` (аналогично `cpuUsageState`): первый сбор сохраняет сэмпл, каждый следующий вызов (каждые 15 секунд фонового обновления) вычисляет реальный `cpu_percent` за прошедший интервал.
 
-### Локализация
-- Во всех пяти локалях (`ru`, `en`, `de`, `sr`, `zh`) добавлены ключи `settings.storage.indexes.tier.opensearch_hot`, `settings.storage.indexes.tier.opensearch_cold`, `settings.storage.indexes.tier.clickhouse`, `settings.logging.status.opensearch_full`. Подпись колонки `settings.storage.indexes.col.size` приведена к виду без уточнения «(байт)», поскольку UI теперь сам выбирает единицы.
-- Добавлены ключи `events.type.apply_*`, `events.type.reload_failed`, `events.type.health_check_failed`, `events.type.rollback_performed` и зеркальные `events.summary.*`.
-- Удалён случайный дубликат ключа `events.type.security_access` в `en.json`.
 
-### Тесты
-- Расширен `TestClassifyContainerLogIssue_IgnoresBenignOpenSearchStartupNoise` кейсами для `a client request body is buffered to a temporary file` (sentry envelope POST) и `[WARN ][o.o.w.QueryGroupTask] QueryGroup _id can't be null`.
-- `TestRequestStreamPrunesOpenSearchWhenColdIsOpenSearch` проверяет, что при cold=OpenSearch старые дни (возраст > ColdDays) удаляются автоматически.
-- `TestRequestStreamPrunesOpenSearchByHotDaysWhenColdIsClickHouse` проверяет страховку: при cold=ClickHouse дни старше HotDays вычищаются из OpenSearch независимо от миграции.
+- Placeholder в полях «Действителен с» и «Действителен до» (RFC3339) теперь генерируется динамически в JS (`rfc3339Placeholder()`) с актуальным годом вместо захардкоженного значения из i18n. Поле всегда показывает корректный пример вида `2026-01-01T00:00:00Z` независимо от языка интерфейса.
+
+### UI / Настройки / Логирование
+- Колонка «Дата» в таблице индексов хранилища логов теперь форматируется через `formatDateOnly()` по текущей locale пользователя: для RU — `ДД.ММ.ГГГГ`, для DE/SR — `ДД.ММ.ГГГГ`, для ZH — `ГГГГ年MM月ДД日`, для EN — `MM/DD/YYYY`. Раньше всегда выводилась сырая строка `YYYY-MM-DD`.
+- Добавлена функция `formatDateOnly(value)` в `preferences.js` — форматирует строку `YYYY-MM-DD` или объект `Date` по Intl.DateTimeFormat с `timeZone: UTC`, без времени.

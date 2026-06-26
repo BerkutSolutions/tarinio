@@ -127,6 +127,21 @@ export async function tryGetJSON(path) {
   }
 }
 
+export function mergeBySiteID(primary, secondary) {
+  const map = new Map();
+  for (const item of normalizeArray(primary)) {
+    const id = normalizeSiteID(String(item?.site_id || "").trim());
+    if (!id) continue;
+    map.set(id, { ...item, _origin: "primary" });
+  }
+  for (const item of normalizeArray(secondary)) {
+    const id = normalizeSiteID(String(item?.site_id || "").trim());
+    if (!id || map.has(id)) continue;
+    map.set(id, { ...item, _origin: "secondary" });
+  }
+  return Array.from(map.values());
+}
+
 export function mergeByID(primary, secondary) {
   const map = new Map();
   for (const item of normalizeArray(primary)) {

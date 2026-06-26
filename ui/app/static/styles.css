@@ -5613,6 +5613,95 @@
   border-color: rgba(246, 91, 121, 0.5);
 }
 
+#dashboard-page .dashboard-services-widget {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+#dashboard-page .dashboard-traffic-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 100%;
+  min-height: 0;
+}
+
+#dashboard-page .dashboard-traffic-row {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex: 1;
+  min-height: 0;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid transparent;
+  background: linear-gradient(160deg, rgba(27, 38, 63, 0.8), rgba(16, 23, 39, 0.82));
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+#dashboard-page .dashboard-traffic-row:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+#dashboard-page .dashboard-traffic-row.tone-success {
+  border-color: rgba(62, 214, 137, 0.28);
+}
+
+#dashboard-page .dashboard-traffic-row.tone-warning {
+  border-color: rgba(255, 192, 92, 0.32);
+}
+
+#dashboard-page .dashboard-traffic-row.tone-danger {
+  border-color: rgba(246, 91, 121, 0.28);
+}
+
+#dashboard-page .dashboard-traffic-value {
+  font-size: clamp(22px, 2.8vw, 34px);
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+#dashboard-page .dashboard-traffic-label {
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.72);
+  margin-top: 4px;
+}
+
+#dashboard-page .dashboard-service-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+#dashboard-page .dashboard-service-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.badge-success {
+  background: rgba(62, 214, 137, 0.15);
+  border-color: rgba(62, 214, 137, 0.45);
+  color: rgba(62, 214, 137, 0.95);
+}
+
+.badge-danger {
+  background: rgba(246, 91, 121, 0.15);
+  border-color: rgba(246, 91, 121, 0.45);
+  color: rgba(246, 91, 121, 0.95);
+}
+
 #dashboard-page .waf-table-row-clickable[data-status-tone="success"] {
   box-shadow: inset 3px 0 0 rgba(76, 198, 139, 0.8);
 }

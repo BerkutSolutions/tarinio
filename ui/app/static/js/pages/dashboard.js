@@ -37,11 +37,11 @@ const DASHBOARD_CONTRACT_MARKER_STATS = "/api/dashboard/stats";
 const DASHBOARD_DETAIL_MODEL_TTL_MS = 60000;
 /* dashboard contract markers:
  "/api/dashboard/containers/overview"
- "dashboard.widget.servicesUp" "dashboard.widget.servicesDown" "dashboard.widget.requestsDay" "dashboard.widget.attacksDay"
+ "dashboard.widget.services" "dashboard.widget.requestsDay" "dashboard.widget.attacksDay"
  "dashboard.widget.blockedAttacks" "dashboard.widget.uniqueAttackers" "dashboard.widget.requestsSeries"
  "dashboard.widget.popularErrors" "dashboard.widget.topIPs" "dashboard.widget.topCountries" "dashboard.widget.topURLs"
  "dashboard.widget.memory" "dashboard.widget.cpu" "dashboard.widget.containersHealth"
- "services-up" "services-down" "requests-day" "attacks-day" "blocked-attacks" "unique-attackers"
+ "services" "requests-day" "attacks-day" "blocked-attacks" "unique-attackers"
  "requests-series" "popular-errors" "top-ips" "top-countries" "top-urls" "memory" "cpu" "containers-health"
  "frame-resize-handle" "resize-se" "resize-e" "resize-s" "resize-w" "resize-n" "dashboard-frame-header"
 */

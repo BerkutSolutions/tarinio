@@ -175,6 +175,8 @@ export async function upsertSiteResources(draft, ctx, resolveACMEAccountEmailFn,
         }
         rollbackable(async () => deleteIgnoreNotFound(`/api/tls-configs/${encodeURIComponent(sitePayload.id)}`));
       }
+    } else if (existingTLSConfig) {
+      await deleteIgnoreNotFound(`/api/tls-configs/${encodeURIComponent(sitePayload.id)}`);
     }
   } catch (error) {
     if (!shouldKeepStateOnApplyError(error)) await runCleanup();

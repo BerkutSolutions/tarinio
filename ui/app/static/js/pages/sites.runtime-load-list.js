@@ -37,6 +37,7 @@ export async function loadSitesRuntime(state, ctx, container, deps = {}) {
     setLoading,
     escapeHtml,
     mergeByID,
+    mergeBySiteID,
     unwrapList,
     notifyExpiringCertificates,
     normalizeArray,
@@ -68,7 +69,7 @@ export async function loadSitesRuntime(state, ctx, container, deps = {}) {
     ]);
     state.sites = mergeByID(sitesResponse, unwrapList(secondarySites, ["sites"]));
     state.upstreams = mergeByID(upstreamsResponse, unwrapList(secondaryUpstreams, ["upstreams"]));
-    state.tlsConfigs = mergeByID(tlsConfigsResponse, unwrapList(secondaryTLSConfigs, ["tls_configs", "tlsConfigs"]));
+    state.tlsConfigs = mergeBySiteID(tlsConfigsResponse, unwrapList(secondaryTLSConfigs, ["tls_configs", "tlsConfigs"]));
     state.certificates = mergeByID(certificatesResponse, unwrapList(secondaryCertificates, ["certificates"]));
     notifyExpiringCertificates(ctx, state.certificates);
     state.accessPolicies = normalizeArray(accessPoliciesResponse);

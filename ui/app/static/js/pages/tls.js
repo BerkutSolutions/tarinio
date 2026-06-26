@@ -1,5 +1,11 @@
 import { escapeHtml, formatDate, statusBadge } from "../ui.js";
 
+function rfc3339Placeholder() {
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  return `${year}-01-01T00:00:00Z`;
+}
+
 function normalizeList(value) {
   return Array.isArray(value) ? value : [];
 }
@@ -180,8 +186,8 @@ export async function renderTLS(container, ctx) {
                 <div class="waf-field"><label for="certificate-id">${escapeHtml(ctx.t("tls.field.id"))}</label><input id="certificate-id" required></div>
                 <div class="waf-field"><label for="certificate-common-name">${escapeHtml(ctx.t("tls.field.commonName"))}</label><input id="certificate-common-name" required></div>
                 <div class="waf-field full"><label for="certificate-san-list">${escapeHtml(ctx.t("tls.field.sanList"))}</label><textarea id="certificate-san-list" placeholder="${escapeHtml(ctx.t("tls.placeholder.sanList"))}"></textarea></div>
-                <div class="waf-field"><label for="certificate-not-before">${escapeHtml(ctx.t("tls.field.notBeforeRfc"))}</label><input id="certificate-not-before" placeholder="${escapeHtml(ctx.t("tls.placeholder.rfc3339"))}"></div>
-                <div class="waf-field"><label for="certificate-not-after">${escapeHtml(ctx.t("tls.field.notAfterRfc"))}</label><input id="certificate-not-after" placeholder="${escapeHtml(ctx.t("tls.placeholder.rfc3339"))}"></div>
+                <div class="waf-field"><label for="certificate-not-before">${escapeHtml(ctx.t("tls.field.notBeforeRfc"))}</label><input id="certificate-not-before" placeholder="${escapeHtml(rfc3339Placeholder())}"></div>
+                <div class="waf-field"><label for="certificate-not-after">${escapeHtml(ctx.t("tls.field.notAfterRfc"))}</label><input id="certificate-not-after" placeholder="${escapeHtml(rfc3339Placeholder())}"></div>
                 <div class="waf-field"><label for="certificate-status">${escapeHtml(ctx.t("tls.field.status"))}</label><select id="certificate-status"><option value="active">active</option><option value="inactive">inactive</option><option value="expired">expired</option><option value="revoked">revoked</option></select></div>
               </div>
               <div class="waf-actions">
@@ -243,8 +249,8 @@ export async function renderTLS(container, ctx) {
                 <div class="waf-field"><label for="upload-certificate-id">${escapeHtml(ctx.t("tls.field.certificateId"))}</label><input id="upload-certificate-id"></div>
                 <div class="waf-field"><label for="upload-common-name">${escapeHtml(ctx.t("tls.field.commonName"))}</label><input id="upload-common-name"></div>
                 <div class="waf-field full"><label for="upload-san-list">${escapeHtml(ctx.t("tls.field.sanList"))}</label><textarea id="upload-san-list"></textarea></div>
-                <div class="waf-field"><label for="upload-not-before">${escapeHtml(ctx.t("tls.field.notBefore"))}</label><input id="upload-not-before" placeholder="${escapeHtml(ctx.t("tls.placeholder.rfc3339"))}"></div>
-                <div class="waf-field"><label for="upload-not-after">${escapeHtml(ctx.t("tls.field.notAfter"))}</label><input id="upload-not-after" placeholder="${escapeHtml(ctx.t("tls.placeholder.rfc3339"))}"></div>
+                <div class="waf-field"><label for="upload-not-before">${escapeHtml(ctx.t("tls.field.notBefore"))}</label><input id="upload-not-before" placeholder="${escapeHtml(rfc3339Placeholder())}"></div>
+                <div class="waf-field"><label for="upload-not-after">${escapeHtml(ctx.t("tls.field.notAfter"))}</label><input id="upload-not-after" placeholder="${escapeHtml(rfc3339Placeholder())}"></div>
                 <div class="waf-field"><label for="upload-status">${escapeHtml(ctx.t("tls.field.status"))}</label><select id="upload-status"><option value="active">active</option><option value="inactive">inactive</option><option value="expired">expired</option><option value="revoked">revoked</option></select></div>
                 <div class="waf-field"><label for="certificate-file">${escapeHtml(ctx.t("tls.field.certificatePem"))}</label><input id="certificate-file" type="file" required></div>
                 <div class="waf-field"><label for="private-key-file">${escapeHtml(ctx.t("tls.field.privateKeyPem"))}</label><input id="private-key-file" type="file" required></div>

@@ -288,6 +288,8 @@ export function shouldUpsertBaseResources(draft, existingSite, existingUpstream,
     if (String(existingTLSConfig.certificate_id || "").toLowerCase() !== certificateID) {
       return true;
     }
+  } else if (existingTLSConfig) {
+    return true;
   }
   return false;
 }

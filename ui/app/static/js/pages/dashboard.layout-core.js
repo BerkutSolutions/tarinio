@@ -6,21 +6,23 @@ const visibleWidgetsByScope = new Map();
 const DASHBOARD_LAYOUT_STORAGE_KEY = "waf.dashboard.layout.v1";
 const DASHBOARD_WIDGETS_STORAGE_KEY = "waf.dashboard.widgets.v1";
 
+// Row 1: services(340) | traffic-summary(320) | containers-health(340) | top-ips(360, tall)
+//        top-countries under top-ips
+// Row 2: requests-series (width = 1060, same as 3 row-1 widgets)
+// Row 3: memory | cpu
+// Hidden by default: popular-errors, unique-attackers
 const WIDGETS = [
-  { id: "services-up", titleKey: "dashboard.widget.servicesUp", width: 280, height: 200, x: 20, y: 20 },
-  { id: "services-down", titleKey: "dashboard.widget.servicesDown", width: 280, height: 200, x: 320, y: 20 },
-  { id: "requests-day", titleKey: "dashboard.widget.requestsDay", width: 340, height: 220, x: 620, y: 20 },
-  { id: "attacks-day", titleKey: "dashboard.widget.attacksDay", width: 280, height: 220, x: 980, y: 20 },
-  { id: "blocked-attacks", titleKey: "dashboard.widget.blockedAttacks", width: 280, height: 220, x: 1280, y: 20 },
-  { id: "unique-attackers", titleKey: "dashboard.widget.uniqueAttackers", width: 300, height: 240, x: 1280, y: 260 },
-  { id: "requests-series", titleKey: "dashboard.widget.requestsSeries", width: 1240, height: 340, x: 20, y: 280 },
-  { id: "popular-errors", titleKey: "dashboard.widget.popularErrors", width: 360, height: 300, x: 20, y: 640 },
-  { id: "top-ips", titleKey: "dashboard.widget.topIPs", width: 360, height: 300, x: 400, y: 640 },
-  { id: "top-countries", titleKey: "dashboard.widget.topCountries", width: 360, height: 300, x: 780, y: 640 },
-  { id: "top-urls", titleKey: "dashboard.widget.topURLs", width: 360, height: 300, x: 1160, y: 640 },
-  { id: "memory", titleKey: "dashboard.widget.memory", width: 330, height: 260, x: 20, y: 960 },
-  { id: "cpu", titleKey: "dashboard.widget.cpu", width: 330, height: 260, x: 370, y: 960 },
-  { id: "containers-health", titleKey: "dashboard.widget.containersHealth", width: 360, height: 600, x: 1700, y: 20 }
+  { id: "services",          titleKey: "dashboard.widget.services",        width: 340,  height: 600, x: 20,   y: 20   },
+  { id: "traffic-summary",   titleKey: "dashboard.widget.trafficSummary",  width: 320,  height: 600, x: 380,  y: 20   },
+  { id: "containers-health", titleKey: "dashboard.widget.containersHealth", width: 340,  height: 600, x: 720,  y: 20   },
+  { id: "top-ips",           titleKey: "dashboard.widget.topIPs",          width: 360,  height: 300, x: 1080, y: 20   },
+  { id: "top-countries",     titleKey: "dashboard.widget.topCountries",    width: 360,  height: 300, x: 1080, y: 340  },
+  { id: "requests-series",   titleKey: "dashboard.widget.requestsSeries",  width: 1060, height: 340, x: 20,   y: 640  },
+  { id: "top-urls",          titleKey: "dashboard.widget.topURLs",         width: 360,  height: 240, x: 1080, y: 660  },
+  { id: "memory",            titleKey: "dashboard.widget.memory",          width: 330,  height: 260, x: 20,   y: 1000 },
+  { id: "cpu",               titleKey: "dashboard.widget.cpu",             width: 330,  height: 260, x: 370,  y: 1000 },
+  { id: "popular-errors",    titleKey: "dashboard.widget.popularErrors",   width: 360,  height: 260, x: 720,  y: 1000 },
+  { id: "unique-attackers",  titleKey: "dashboard.widget.uniqueAttackers", width: 360,  height: 260, x: 1100, y: 1000 },
 ];
 
 function clamp(value, min, max) {
@@ -67,8 +69,10 @@ function saveLayout(layout) {
   }
 }
 
+const WIDGETS_HIDDEN_BY_DEFAULT = new Set(["popular-errors", "unique-attackers"]);
+
 function loadVisibleWidgetIDs(scopeID = "") {
-  const fallback = WIDGETS.map((widget) => widget.id);
+  const fallback = WIDGETS.map((widget) => widget.id).filter((id) => !WIDGETS_HIDDEN_BY_DEFAULT.has(id));
   const scope = String(scopeID || "").trim().toLowerCase();
   let parsed = visibleWidgetsByScope.get(scope);
   if (!Array.isArray(parsed)) {

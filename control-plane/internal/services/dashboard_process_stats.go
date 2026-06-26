@@ -7,56 +7,61 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 )
 
+// collectTopProcessStats reads the current process snapshot from /proc and
+// computes CPU percentages relative to the previous call. On the very first
+// call there is no previous snapshot, so all cpu_percent values are 0; from
+// the second call onward (typically 15 s apart) the values are meaningful.
 func collectTopProcessStats(totalMemoryBytes uint64) ([]DashboardProcessStats, []DashboardProcessStats) {
 	if runtime.GOOS != "linux" {
 		return nil, nil
 	}
 
-	first, firstTotal, ok := readProcessSamples()
+	current, currentTotal, ok := readProcessSamples()
 	if !ok {
 		return nil, nil
 	}
 
-	time.Sleep(120 * time.Millisecond)
-
-	second, secondTotal, ok := readProcessSamples()
-	if !ok {
-		second = first
-		secondTotal = firstTotal
-	}
+	processState.mu.Lock()
+	previous := processState.lastSamples
+	previousTotal := processState.lastTotal
+	hadSample := processState.hasSample
+	processState.lastSamples = current
+	processState.lastTotal = currentTotal
+	processState.hasSample = true
+	processState.mu.Unlock()
 
 	totalDelta := uint64(0)
-	if secondTotal > firstTotal {
-		totalDelta = secondTotal - firstTotal
+	if hadSample && currentTotal > previousTotal {
+		totalDelta = currentTotal - previousTotal
 	}
 
-	items := make([]DashboardProcessStats, 0, len(second))
-	for pid, current := range second {
-		if current.name == "" {
+	items := make([]DashboardProcessStats, 0, len(current))
+	for pid, cur := range current {
+		if cur.name == "" {
 			continue
 		}
-		previous, hasPrevious := first[pid]
 		cpuPercent := 0.0
-		if hasPrevious && totalDelta > 0 && current.cpuJiffies >= previous.cpuJiffies {
-			cpuPercent = round1(float64(current.cpuJiffies-previous.cpuJiffies) * 100 / float64(totalDelta))
+		if hadSample && totalDelta > 0 {
+			if prev, ok := previous[pid]; ok && cur.cpuJiffies >= prev.cpuJiffies {
+				cpuPercent = round1(float64(cur.cpuJiffies-prev.cpuJiffies) * 100 / float64(totalDelta))
+			}
 		}
 
 		memoryPercent := 0.0
 		if totalMemoryBytes > 0 {
-			memoryPercent = round1(float64(current.rssBytes) * 100 / float64(totalMemoryBytes))
+			memoryPercent = round1(float64(cur.rssBytes) * 100 / float64(totalMemoryBytes))
 		}
 
 		items = append(items, DashboardProcessStats{
 			PID:            pid,
-			Name:           current.name,
-			Command:        current.command,
-			State:          current.state,
-			Threads:        current.threads,
+			Name:           cur.name,
+			Command:        cur.command,
+			State:          cur.state,
+			Threads:        cur.threads,
 			CPUPercent:     cpuPercent,
-			MemoryRSSBytes: current.rssBytes,
+			MemoryRSSBytes: cur.rssBytes,
 			MemoryPercent:  memoryPercent,
 		})
 	}

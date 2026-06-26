@@ -1,5 +1,5 @@
 import { escapeHtml } from "../ui.js";
-import { formatDateTimeInZone } from "../preferences.js";
+import { formatDateTimeInZone, formatDateOnly } from "../preferences.js";
 import { readSecretFieldValue } from "./settings.logging-form.js";
 
 function formatIndexUpdatedAt(value) {
@@ -106,7 +106,7 @@ export function renderStorageIndexes({
                 ${items.length
                   ? items.map((item) => `
                     <tr>
-                      <td>${escapeHtml(String(item?.date || "-"))}</td>
+                      <td>${escapeHtml(formatDateOnly(item?.date || ""))}</td>
                       <td>${escapeHtml(formatIndexFileLabel(ctx, item))}</td>
                       <td>${escapeHtml(String(item?.lines ?? 0))}</td>
                       <td>${escapeHtml(formatIndexSizeBytes(item?.size_bytes))}</td>

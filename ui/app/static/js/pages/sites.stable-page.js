@@ -2,6 +2,7 @@ import { setLoading } from "../ui.js";
 import {
   go,
   mergeByID,
+  mergeBySiteID,
   mergeProfilesBySite,
   normalizeArray,
   normalizeSiteID,
@@ -243,7 +244,7 @@ export async function renderSites(container, ctx) {
       ]);
       state.sites = mergeByID(sitesResponse, unwrapList(secondarySites, ["sites"]));
       state.upstreams = mergeByID(upstreamsResponse, unwrapList(secondaryUpstreams, ["upstreams"]));
-      state.tlsConfigs = mergeByID(tlsConfigsResponse, unwrapList(secondaryTLSConfigs, ["tls_configs", "tlsConfigs"]));
+      state.tlsConfigs = mergeBySiteID(tlsConfigsResponse, unwrapList(secondaryTLSConfigs, ["tls_configs", "tlsConfigs"]));
       state.certificates = mergeByID(certificatesResponse, unwrapList(secondaryCertificates, ["certificates"]));
       notifyExpiringCertificates(ctx, state.certificates);
       state.accessPolicies = normalizeArray(accessPoliciesResponse);

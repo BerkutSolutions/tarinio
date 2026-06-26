@@ -173,6 +173,13 @@ var cpuUsageState struct {
 	lastPercent float64
 }
 
+var processState struct {
+	mu          sync.Mutex
+	lastSamples map[int]processSample
+	lastTotal   uint64
+	hasSample   bool
+}
+
 func NewDashboardService(events dashboardEventReader, requests RuntimeRequestCollector, runtimeReady dashboardEventProber) *DashboardService {
 	return &DashboardService{
 		events:       events,
