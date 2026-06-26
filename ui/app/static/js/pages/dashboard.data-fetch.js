@@ -33,7 +33,10 @@ function normalizeRequestRowsPayload(payload) {
 }
 
 async function fetchRequestsRows() {
-  const response = await fetch("/api/requests", {
+  const since = new Date(Date.now() - (24 * 60 * 60 * 1000)).toISOString();
+  const params = new URLSearchParams();
+  params.set("since", since);
+  const response = await fetch(`/api/requests?${params.toString()}`, {
     method: "GET",
     credentials: "include",
     headers: { Accept: "application/json" }

@@ -209,6 +209,7 @@ export function buildDetailModel(stats, requestRows, eventRows) {
   ipDetailsSummary.sort((a, b) => (b.attacks - a.attacks) || (b.requests - a.requests) || a.ip.localeCompare(b.ip));
 
   return {
+    requestsUniqueIPs: requestsByIP.size,
     requestsBySite: topCounts(requestsBySite, 20),
     requestsByURL: topCounts(requestsByURL, 20),
     requestsByMethod: topCounts(requestsByMethod, 10),

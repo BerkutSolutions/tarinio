@@ -152,7 +152,7 @@ function buildWidgetDetail(action, payload, stats, detailModel, containersOvervi
       subtitle: ctx.t("dashboard.detail.requestsSubtitle"),
       body: renderSummaryMetrics([
         { labelKey: "dashboard.value.requestsDay", value: stats?.requests_day || 0              },
-        { labelKey: "dashboard.detail.uniqueIPs",  value: detailModel?.requestsByIP?.length || 0 }
+        { labelKey: "dashboard.detail.uniqueIPs",  value: detailModel?.requestsUniqueIPs || 0 }
       ], ctx, deps) +
       renderDetailTable(detailModel?.requestsBySite || [], ctx, ctx.t("dashboard.detail.site"), ctx.t("dashboard.detail.requests"), {}, deps) +
       renderDetailTable(detailModel?.requestsByURL  || [], ctx, ctx.t("dashboard.detail.page"), ctx.t("dashboard.detail.requests"), {}, deps)
