@@ -35,6 +35,18 @@ function formatCheckedAt(raw) {
   }
 }
 
+function formatAttackURLLabel(item) {
+  const url = escapeHtml(String(item?.key || "-"));
+  const sites = Array.isArray(item?.sites) ? item.sites : [];
+  if (!sites.length) {
+    return url;
+  }
+  return `
+    <div><strong>${url}</strong></div>
+    <div class="muted">${escapeHtml(sites.map((site) => String(site?.key || "-")).join(", "))}</div>
+  `;
+}
+
 function renderServiceMiniDashboard(service, stats, detailModel, ctx, deps) {
   const name           = String(service?.name || "");
   const isUp           = Boolean(service?.up);
@@ -80,7 +92,9 @@ function renderServiceMiniDashboard(service, stats, detailModel, ctx, deps) {
       ${renderDetailSection(
         ctx.t("dashboard.services.topURLs"),
         attacksByURL.length
-          ? renderDetailTable(attacksByURL, ctx, ctx.t("dashboard.detail.page"), ctx.t("dashboard.detail.attacks"), {}, deps)
+          ? renderDetailTable(attacksByURL, ctx, ctx.t("dashboard.detail.page"), ctx.t("dashboard.detail.attacks"), {
+              labelFormatter: (item) => formatAttackURLLabel(item)
+            }, deps)
           : `<div class="waf-empty">${escapeHtml(ctx.t("dashboard.empty.topURLs"))}</div>`
       )}
     </div>
@@ -168,7 +182,9 @@ function buildWidgetDetail(action, payload, stats, detailModel, containersOvervi
         { labelKey: "dashboard.value.blockedAttacksDay",  value: stats?.blocked_attacks_day || 0 }
       ], ctx, deps) +
       renderDetailTable(detailModel?.attacksBySite || [], ctx, ctx.t("dashboard.detail.site"), ctx.t("dashboard.detail.attacks"), {}, deps) +
-      renderDetailTable(detailModel?.attacksByURL  || [], ctx, ctx.t("dashboard.detail.page"), ctx.t("dashboard.detail.attacks"), {}, deps)
+      renderDetailTable(detailModel?.attacksByURL  || [], ctx, ctx.t("dashboard.detail.page"), ctx.t("dashboard.detail.attacks"), {
+        labelFormatter: (item) => formatAttackURLLabel(item)
+      }, deps)
     };
   }
 
@@ -283,7 +299,9 @@ function buildWidgetDetail(action, payload, stats, detailModel, containersOvervi
     return {
       title:    targetURL ? `${ctx.t("dashboard.detail.page")}: ${targetURL}` : ctx.t("dashboard.widget.topURLs"),
       subtitle: ctx.t("dashboard.detail.urlSubtitle"),
-      body: renderDetailTable(rows, ctx, ctx.t("dashboard.detail.page"), ctx.t("dashboard.detail.attacks"), {}, deps)
+      body: renderDetailTable(rows, ctx, ctx.t("dashboard.detail.page"), ctx.t("dashboard.detail.attacks"), {
+        labelFormatter: (item) => formatAttackURLLabel(item)
+      }, deps)
     };
   }
 
