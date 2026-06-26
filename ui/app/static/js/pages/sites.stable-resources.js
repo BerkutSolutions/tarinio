@@ -1,5 +1,4 @@
 import {
-  downloadJSON,
   downloadText,
   draftToEnvText as draftToEnvTextModule,
   envToDraft,
@@ -27,7 +26,6 @@ import {
 } from "./sites.service-lifecycle.js";
 
 export {
-  downloadJSON,
   ensureControlPlaneAccessManagementMethods,
   envToDraft,
   isAutoApplyFailureError,
@@ -75,8 +73,7 @@ export async function exportSelectedServicesEnv(ctx, sites, upstreamsBySite, tls
     accessBySite,
     selectedSiteIDs,
     hydrateSiteDraft,
-  downloadText,
-  downloadJSON,
+    downloadText,
     draftToEnvText
   );
 }

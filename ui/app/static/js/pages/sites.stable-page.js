@@ -20,12 +20,12 @@ import {
   normalizeGeoCatalogPayload,
 } from "./sites.geo-lists.js";
 import { bindList as bindListModule } from "./sites.list-view.js";
+import { downloadJSON } from "./sites.import-pipeline.js";
 import {
   defaultSiteDraft,
   bindStableDetail,
 } from "./sites.stable-detail-bind.js";
 import {
-  downloadJSON,
   draftToEnvText,
   ensureControlPlaneAccessManagementMethods,
   exportSelectedServicesEnv,
