@@ -17,6 +17,10 @@ type dashboardEventProber interface {
 	Probe() error
 }
 
+type runtimeRequestCollectorWithOptions interface {
+	CollectWithOptions(query url.Values) ([]map[string]any, error)
+}
+
 type DashboardService struct {
 	events       dashboardEventReader
 	requests     RuntimeRequestCollector
@@ -246,7 +250,21 @@ func (s *DashboardService) collectRequests() ([]map[string]any, error) {
 	if s.requests == nil {
 		return []map[string]any{}, nil
 	}
-	items, err := s.requests.Collect()
+	// Request only the last 25 hours from the storage backend so that
+	// OpenSearch/ClickHouse can apply a server-side time filter instead of
+	// returning up to maxItems rows and relying on in-process filtering.
+	// The extra hour gives a small buffer for clock skew and ensures we never
+	// under-count at the boundary of the 24-hour observation window.
+	var items []map[string]any
+	var err error
+	if withOpts, ok := s.requests.(runtimeRequestCollectorWithOptions); ok {
+		q := make(url.Values)
+		since := time.Now().UTC().Add(-25 * time.Hour)
+		q.Set("since", since.Format(time.RFC3339))
+		items, err = withOpts.CollectWithOptions(q)
+	} else {
+		items, err = s.requests.Collect()
+	}
 	if err != nil {
 		s.requestsCache.mu.Lock()
 		defer s.requestsCache.mu.Unlock()
