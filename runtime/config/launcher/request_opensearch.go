@@ -46,6 +46,23 @@ func newRequestOpenSearchStore(settingsPath string, pepper string) *requestOpenS
 	}
 }
 
+func (s *requestOpenSearchStore) currentLoggingSettings() loggingconfig.Settings {
+	if s == nil || strings.TrimSpace(s.settingsPath) == "" {
+		return loggingconfig.Normalize(loggingconfig.Settings{})
+	}
+	content, err := os.ReadFile(s.settingsPath)
+	if err != nil {
+		return loggingconfig.Normalize(loggingconfig.Settings{})
+	}
+	var payload struct {
+		Logging loggingconfig.Settings `json:"logging"`
+	}
+	if err := json.Unmarshal(content, &payload); err != nil {
+		return loggingconfig.Normalize(loggingconfig.Settings{})
+	}
+	return loggingconfig.Normalize(payload.Logging)
+}
+
 func (s *requestOpenSearchStore) currentConfig() (requestOpenSearchConfig, error) {
 	if s == nil || strings.TrimSpace(s.settingsPath) == "" {
 		return requestOpenSearchConfig{}, nil
@@ -274,6 +291,14 @@ func (s *requestOpenSearchStore) indexes(options requestQueryOptions, archiveRoo
 		totalSizeBytes = 0
 	}
 	items := make([]map[string]any, 0, len(payload.Aggregations.ByDay.Buckets))
+	settings := s.currentLoggingSettings()
+	hotDays := settings.Retention.HotDays
+	if hotDays <= 0 {
+		hotDays = loggingconfig.DefaultHotDays
+	}
+	coldBackendIsOpenSearch := settings.Cold.Backend == loggingconfig.BackendOpenSearch
+	now := time.Now().UTC()
+	hotCutoff := now.AddDate(0, 0, -hotDays)
 	for _, bucket := range payload.Aggregations.ByDay.Buckets {
 		date := bucket.KeyAsString
 		if len(date) >= 10 {
@@ -286,13 +311,21 @@ func (s *requestOpenSearchStore) indexes(options requestQueryOptions, archiveRoo
 				sizeBytes = 1
 			}
 		}
+		storageType := "opensearch-hot"
+		fileLabel := fmt.Sprintf("opensearch:%s", cfg.RequestsIndex)
+		if coldBackendIsOpenSearch {
+			if parsedDay, parseErr := time.Parse("2006-01-02", date); parseErr == nil && parsedDay.Before(hotCutoff) {
+				storageType = "opensearch-cold"
+				fileLabel = fmt.Sprintf("opensearch-cold:%s", cfg.RequestsIndex)
+			}
+		}
 		items = append(items, map[string]any{
 			"date":         date,
-			"file_name":    fmt.Sprintf("opensearch:%s", cfg.RequestsIndex),
+			"file_name":    fileLabel,
 			"lines":        bucket.DocCount,
 			"size_bytes":   sizeBytes,
 			"updated_at":   bucket.KeyAsString,
-			"storage_type": "opensearch",
+			"storage_type": storageType,
 		})
 	}
 	state, _ := loadRequestMigrationState(filepath.Join(archiveRoot, requestOpenSearchMigrationStateFile))

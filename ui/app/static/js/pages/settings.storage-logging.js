@@ -6,6 +6,42 @@ function formatIndexUpdatedAt(value) {
   return formatDateTimeInZone(value);
 }
 
+function formatIndexSizeBytes(value) {
+  const bytes = Number(value);
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return "0 MB";
+  }
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+  if (bytes < 1024 * 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+function formatIndexFileLabel(ctx, item) {
+  const rawType = String(item?.storage_type || "").trim().toLowerCase();
+  const rawName = String(item?.file_name || "").trim();
+  if (!rawName && !rawType) {
+    return "-";
+  }
+  switch (rawType) {
+    case "opensearch-cold":
+      return ctx.t("settings.storage.indexes.tier.opensearch_cold");
+    case "opensearch-hot":
+    case "opensearch":
+      return ctx.t("settings.storage.indexes.tier.opensearch_hot");
+    case "clickhouse":
+      return ctx.t("settings.storage.indexes.tier.clickhouse");
+    default:
+      return rawName || "-";
+  }
+}
+
 export function renderStorageIndexes({
   ctx,
   storageIndexesNode,
@@ -71,9 +107,9 @@ export function renderStorageIndexes({
                   ? items.map((item) => `
                     <tr>
                       <td>${escapeHtml(String(item?.date || "-"))}</td>
-                      <td>${escapeHtml(String(item?.file_name || "-"))}</td>
+                      <td>${escapeHtml(formatIndexFileLabel(ctx, item))}</td>
                       <td>${escapeHtml(String(item?.lines ?? 0))}</td>
-                      <td>${escapeHtml(String(item?.size_bytes ?? 0))}</td>
+                      <td>${escapeHtml(formatIndexSizeBytes(item?.size_bytes))}</td>
                       <td>${escapeHtml(formatIndexUpdatedAt(item?.updated_at || "-"))}</td>
                       <td>
                         <button

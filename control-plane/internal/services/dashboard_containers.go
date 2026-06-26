@@ -721,6 +721,7 @@ func classifyContainerLogIssue(message string) (string, bool) {
 		"terminating connection due to administrator command",
 		"an upstream response is buffered to a temporary file",
 		"a client request body is buffered to a temporary file",
+		"querygroup _id can't be null, it should be set before accessing it",
 		"control-plane bootstrap: failed to connect to",
 		"jvmgcmonitorservice",
 		"event service runtime security collector failed: get \"http://localhost:8081/security-events\": dial tcp [::1]:8081: connect: connection refused",

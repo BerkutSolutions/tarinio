@@ -1,3 +1,19 @@
+## [1.3.3] - 26.06.2026
+
+### Healthcheck
+- В whitelist `classifyContainerLogIssue` добавлен паттерн `querygroup _id can't be null, it should be set before accessing it`. Это известное benign-предупреждение OpenSearch 2.18 (cluster bug в плагине workload management), не влияющее на работу WAF, но сыпавшее в healthcheck сотни одинаковых записей при каждом старте кластера.
+
+### Хранилище логов / UI
+- В таблице «Индексы хранилища логов» дни старше `Retention.HotDays` теперь подписываются как «холодные» (когда cold backend = OpenSearch и данные физически живут в одном индексе, но по возрасту уже относятся к cold-горизонту). Раньше все дни помечались как `opensearch:waf-hot-requests` независимо от возраста.
+- Колонка «Файл» теперь рендерит уровень хранилища через i18n-ключи (`OpenSearch (горячее)`, `OpenSearch (холодное)`, `ClickHouse (холодное)`) вместо сырого имени индекса.
+- Колонка «Размер» переведена с байтов в человекочитаемый формат (B / KB / MB / GB), что соответствует строкам в десятки и сотни мегабайт на дневной индекс.
+
+### Локализация
+- Во всех пяти локалях (`ru`, `en`, `de`, `sr`, `zh`) добавлены ключи `settings.storage.indexes.tier.opensearch_hot`, `settings.storage.indexes.tier.opensearch_cold`, `settings.storage.indexes.tier.clickhouse`. Подпись колонки `settings.storage.indexes.col.size` приведена к виду без уточнения «(байт)», поскольку UI теперь сам выбирает единицы.
+
+### Тесты
+- Расширен `TestClassifyContainerLogIssue_IgnoresBenignOpenSearchStartupNoise` кейсом `[WARN ][o.o.w.QueryGroupTask] ... QueryGroup _id can't be null`, чтобы это предупреждение больше не выскакивало в healthcheck при следующих правках.
+
 ## [1.3.2] - 26.06.2026
 
 ### Хранилище логов
