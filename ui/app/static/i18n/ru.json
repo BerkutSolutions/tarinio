@@ -2018,6 +2018,7 @@
   "dashboard.services.statusUp": "Активен",
   "dashboard.services.statusDown": "Недоступен",
   "dashboard.services.checkedAt": "Проверен",
+  "dashboard.services.hostDown": "Хост недоступен",
   "dashboard.services.topAttackers": "Топ атакующих",
   "dashboard.services.topURLs": "Атакуемые адреса",
   "dashboard.widget.trafficSummary": "Трафик и атаки"

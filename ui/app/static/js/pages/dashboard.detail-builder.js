@@ -59,6 +59,7 @@ function renderServiceMiniDashboard(service, stats, detailModel, ctx, deps) {
         <span class="badge badge-${escapeHtml(tone)}">${escapeHtml(statusLabel)}</span>
         ${checkedAt ? `<span class="muted" style="font-size:12px">${escapeHtml(ctx.t("dashboard.services.checkedAt"))}: ${escapeHtml(checkedAt)}</span>` : ""}
       </div>
+      ${!isUp ? `<div class="alert warning" style="margin:8px 0 4px">${escapeHtml(ctx.t("dashboard.services.hostDown"))}</div>` : ""}
       ${renderSummaryMetrics([
         { labelKey: "dashboard.detail.requests", value: requestCount },
         { labelKey: "dashboard.detail.attacks",  value: attackCount  },
@@ -87,7 +88,9 @@ function renderServiceMiniDashboard(service, stats, detailModel, ctx, deps) {
 }
 
 function buildWidgetDetail(action, payload, stats, detailModel, containersOverview, ctx, deps) {
-  const services        = Array.isArray(stats?.services) ? stats.services : [];
+  const SYSTEM_SERVICES = new Set(["control-plane", "runtime"]);
+  const services        = (Array.isArray(stats?.services) ? stats.services : [])
+    .filter((s) => !SYSTEM_SERVICES.has(String(s?.name || "").trim().toLowerCase()));
   const attackBySiteMap = new Map((detailModel?.attacksBySite || []).map((item) => [item.key, item.count]));
 
   if (action === "traffic-summary") {
@@ -112,7 +115,7 @@ function buildWidgetDetail(action, payload, stats, detailModel, containersOvervi
         ctx.t("dashboard.detail.state"),
         {
           labelFormatter: (item) => {
-            const tone = item.up ? "success" : "danger";
+            const tone = item.up ? "success" : "warning";
             const lbl  = item.up ? ctx.t("dashboard.services.statusUp") : ctx.t("dashboard.services.statusDown");
             return `<strong>${escapeHtml(String(item?.key || "-"))}</strong> <span class="badge badge-${escapeHtml(tone)}">${escapeHtml(lbl)}</span>`;
           },

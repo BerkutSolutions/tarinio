@@ -2018,6 +2018,7 @@
   "dashboard.services.statusUp": "活跃",
   "dashboard.services.statusDown": "不可用",
   "dashboard.services.checkedAt": "检查时间",
+  "dashboard.services.hostDown": "主机不可达",
   "dashboard.services.topAttackers": "攻击者排行",
   "dashboard.services.topURLs": "被攻击地址",
   "dashboard.widget.trafficSummary": "流量与攻击"

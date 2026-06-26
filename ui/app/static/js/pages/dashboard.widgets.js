@@ -84,7 +84,9 @@ function renderTrafficSummaryWidget(stats, ctx, deps) {
 }
 
 function renderServicesWidget(stats, ctx, deps) {
-  const services = Array.isArray(stats?.services) ? stats.services : [];
+  const SYSTEM_SERVICES = new Set(["control-plane", "runtime"]);
+  const services = (Array.isArray(stats?.services) ? stats.services : [])
+    .filter((s) => !SYSTEM_SERVICES.has(String(s?.name || "").trim().toLowerCase()));
   if (!services.length) {
     return `<div class="dashboard-widget-content waf-empty">${escapeHtml(ctx.t("dashboard.services.empty"))}</div>`;
   }
@@ -118,7 +120,7 @@ function renderServicesWidget(stats, ctx, deps) {
         <div class="dashboard-list dashboard-containers-list">
           ${sorted.map((item) => {
             const isUp     = Boolean(item?.up);
-            const tone     = isUp ? "success" : "danger";
+            const tone     = isUp ? "success" : "warning";
             const statusLbl = isUp ? ctx.t("dashboard.services.statusUp") : ctx.t("dashboard.services.statusDown");
             const checkedAt = formatCheckedAt(item?.checked_at);
             return `
@@ -128,7 +130,7 @@ function renderServicesWidget(stats, ctx, deps) {
                   <div class="muted">${escapeHtml(statusLbl)}${checkedAt ? ` · ${escapeHtml(checkedAt)}` : ""}</div>
                 </div>
                 <div class="dashboard-list-meta">
-                  <span class="badge badge-${escapeHtml(isUp ? "success" : "danger")}">${escapeHtml(statusLbl)}</span>
+                  <span class="badge badge-${escapeHtml(isUp ? "success" : "warning")}">${escapeHtml(statusLbl)}</span>
                 </div>
               </button>
             `;

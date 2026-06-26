@@ -2018,6 +2018,7 @@
   "dashboard.services.statusUp": "Aktiv",
   "dashboard.services.statusDown": "Nicht verfügbar",
   "dashboard.services.checkedAt": "Geprüft am",
+  "dashboard.services.hostDown": "Host nicht erreichbar",
   "dashboard.services.topAttackers": "Top-Angreifer",
   "dashboard.services.topURLs": "Angegriffene Adressen",
   "dashboard.widget.trafficSummary": "Datenverkehr & Angriffe"

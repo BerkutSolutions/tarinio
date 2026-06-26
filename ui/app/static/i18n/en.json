@@ -2018,6 +2018,7 @@
   "dashboard.services.statusUp": "Active",
   "dashboard.services.statusDown": "Down",
   "dashboard.services.checkedAt": "Checked at",
+  "dashboard.services.hostDown": "Host unreachable",
   "dashboard.services.topAttackers": "Top attackers",
   "dashboard.services.topURLs": "Attacked URLs",
   "dashboard.widget.trafficSummary": "Traffic & Attacks"

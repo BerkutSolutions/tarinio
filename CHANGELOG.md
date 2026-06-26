@@ -2,9 +2,17 @@
 - **Баг: при экспорте выбранных сервисов скачивались два файла — пустой `.env` и `[object Object].json`** — корневая причина: в `sites.stable-resources.js` в вызов `exportSelectedServicesEnvModule` был ошибочно передан лишний аргумент `downloadJSON` между `downloadText` и `draftToEnvText`. Из-за этого `draftToEnvText` (позиция 3) получала функцию `downloadJSON`, а внутри цикла `draftToEnvText(draft)` вызывала `downloadJSON(draft)` — объект становился именем файла → `[object Object].json`. `downloadText` при этом получала `undefined` как контент → пустой `.env`. Исправлено: убран лишний аргумент `downloadJSON` из вызова; импорт `downloadJSON` перенесён из `sites.stable-resources.js` напрямую в `sites.stable-page.js` (из `sites.import-pipeline.js`).
 - Изменены файлы: `sites.stable-resources.js`, `sites.stable-page.js`.
 
-## [1.3.2] - 26.06.2026
+## [Unreleased]
 
-### Исправления / UI — редактор сервисов
+### Исправления / UI — виджет «Сервисы» на дашборде
+- **Фильтрация системных сервисов** — `control-plane` и `runtime` больше не отображаются в виджете «Сервисы»; показываются только пользовательские сайты из вкладки «Сервисы».
+- **Варны вместо ошибок** — недоступный сервис (`up: false`) теперь помечается жёлтым `warning` вместо красного `danger` и в виджете, и в модалке (это проблема соединения, а не реальное падение сайта).
+- **Алерт «Хост недоступен» в модалке** — при ЛКМ на недоступном сервисе между строкой «Проверен» и метриками запросов/атак/заблокированных появляется жёлтый алерт «Хост недоступен».
+- **CSS** — добавлен класс `.alert.warning` (жёлтая рамка) рядом с существующим `.alert.success`.
+- **i18n** — добавлен ключ `dashboard.services.hostDown` во все 5 локалей (ru/en/de/sr/zh).
+- Изменены файлы: `dashboard.widgets.js`, `dashboard.detail-builder.js`, `styles.css`, `i18n/ru.json`, `i18n/en.json`, `i18n/de.json`, `i18n/sr.json`, `i18n/zh.json`.
+
+
 - **Баг: настройка TLS не сохранялась (чекбокс сбрасывался)** — корневая причина: `GET /api/tls-configs` возвращает объекты с полем `site_id`, а не `id`. Функция `mergeByID` использует `item?.id` — все TLS-конфиги отбрасывались, `state.tlsBySite` всегда был пустым. При загрузке сервиса `tls_enabled: Boolean(null)` → `false`, чекбокс всегда выключен. Исправлено:
   - `sites.routing-merge.js`: добавлена функция `mergeBySiteID` — слияние по полю `site_id`.
   - `sites.stable-page.js`: `mergeByID` → `mergeBySiteID` для `tlsConfigsResponse`.
