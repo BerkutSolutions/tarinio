@@ -33,6 +33,8 @@ func TestClassifyContainerLogIssue_IgnoresBenignOpenSearchStartupNoise(t *testin
 		`control-plane bootstrap: failed to connect to user=waf database=waf: dial tcp 172.18.0.8:5432: connect: connection refused`,
 		`[2026-06-24T21:47:03,025][WARN ][o.o.m.j.JvmGcMonitorService] [7de753eb623f] [gc][13067] overhead, spent [836ms] collecting in the last [1.4s]`,
 		`2026/06/24 18:09:04 [error] event service runtime security collector failed: Get "http://localhost:8081/security-events": dial tcp [::1]:8081: connect: connection refused`,
+		`2026/06/27 01:53:12 [error] 69#69: *1395 directory index of "/var/lib/waf/control-plane/acme-challenges/" is forbidden, client: 195.178.110.199, server: n8n.hantico.com, request: "GET /.well-known/acme-challenge/ HTTP/1.1", host: "n8n.hantico.com"`,
+		`2026/06/27 01:55:18 [error] 69#69: *1407 open() "/var/lib/waf/control-plane/acme-challenges/random-probe" failed (2: No such file or directory), client: 203.0.113.40, server: n8n.hantico.com, request: "GET /.well-known/acme-challenge/random-probe HTTP/1.1", host: "n8n.hantico.com"`,
 	}
 
 	for _, message := range cases {

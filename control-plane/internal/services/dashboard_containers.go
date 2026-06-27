@@ -731,6 +731,11 @@ func classifyContainerLogIssue(message string) (string, bool) {
 			return "", false
 		}
 	}
+	if strings.Contains(lower, "/.well-known/acme-challenge/") {
+		if strings.Contains(lower, "directory index of") || strings.Contains(lower, "open()") {
+			return "", false
+		}
+	}
 	if strings.Contains(lower, "[notice]") {
 		return "", false
 	}

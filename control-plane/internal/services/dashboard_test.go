@@ -139,6 +139,38 @@ func TestDashboardService_StatsExposeCurrentWidgetData(t *testing.T) {
 	}
 }
 
+func TestDashboardService_PrefersExactRequestsDayCount(t *testing.T) {
+	now := time.Now().UTC()
+	requests := &fakeDashboardRequestCollector{
+		items: []map[string]any{
+			{
+				"ingested_at": now.Format(time.RFC3339),
+				"entry": map[string]any{
+					"timestamp": now.Format(time.RFC3339),
+					"site":      "site-a",
+					"uri":       "/checkout",
+					"status":    200,
+					"client_ip": "203.0.113.10",
+				},
+			},
+		},
+		count: 48780,
+	}
+
+	service := NewDashboardService(&fakeDashboardEventReader{}, requests, &fakeDashboardRuntimeProbe{})
+	stats, err := service.Stats()
+	if err != nil {
+		t.Fatalf("stats failed: %v", err)
+	}
+
+	if stats.RequestsDay != 48780 {
+		t.Fatalf("expected exact requests_day count, got %d", stats.RequestsDay)
+	}
+	if len(stats.RequestTopSites) != 1 || stats.RequestTopSites[0].Count != 1 {
+		t.Fatalf("expected sampled top-site breakdown to stay available, got %#v", stats.RequestTopSites)
+	}
+}
+
 func TestDashboardService_RuntimeProbeFailureMarksRuntimeDown(t *testing.T) {
 	service := NewDashboardService(
 		&fakeDashboardEventReader{},

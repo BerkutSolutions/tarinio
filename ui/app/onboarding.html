@@ -14,7 +14,122 @@
   </style>
   <script>
     (function () {
-      var messages = {"en":{"title403":"403 Access Restricted","title429":"429 Too Many Requests","text":"Protection is active. Please try again later."},"ru":{"title403":"403 \u0414\u043e\u0441\u0442\u0443\u043f \u043e\u0433\u0440\u0430\u043d\u0438\u0447\u0435\u043d","title429":"429 \u0421\u043b\u0438\u0448\u043a\u043e\u043c \u043c\u043d\u043e\u0433\u043e \u0437\u0430\u043f\u0440\u043e\u0441\u043e\u0432","text":"\u0417\u0430\u0449\u0438\u0442\u0430 \u0430\u043a\u0442\u0438\u0432\u043d\u0430. \u041f\u043e\u0432\u0442\u043e\u0440\u0438\u0442\u0435 \u043f\u043e\u043f\u044b\u0442\u043a\u0443 \u043f\u043e\u0437\u0436\u0435."},"de":{"title403":"403 Zugriff eingeschr\u00e4nkt","title429":"429 Zu viele Anfragen","text":"Schutz ist aktiv. Bitte versuchen Sie es sp\u00e4ter erneut."},"sr":{"title403":"403 \u041f\u0440\u0438\u0441\u0442\u0443\u043f \u0458\u0435 \u043e\u0433\u0440\u0430\u043d\u0438\u0447\u0435\u043d","title429":"429 \u041f\u0440\u0435\u0432\u0438\u0448\u0435 \u0437\u0430\u0445\u0442\u0435\u0432\u0430","text":"\u0417\u0430\u0448\u0442\u0438\u0442\u0430 \u0458\u0435 \u0430\u043a\u0442\u0438\u0432\u043d\u0430. \u041f\u043e\u043a\u0443\u0448\u0430\u0458\u0442\u0435 \u043f\u043e\u043d\u043e\u0432\u043e \u043a\u0430\u0441\u043d\u0438\u0458\u0435."},"zh":{"title403":"403 \u8bbf\u95ee\u53d7\u9650","title429":"429 \u8bf7\u6c42\u8fc7\u591a","text":"\u4fdd\u62a4\u5df2\u542f\u7528\u3002\u8bf7\u7a0d\u540e\u518d\u8bd5\u3002"}}
+      function escapeHTML(value) {
+        return String(value == null ? "" : value).replace(/[&<>"']/g, function (char) {
+          return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char] || char;
+        });
+      }
+      function parseServerTiming(rawHeader, metricName) {
+        var raw = String(rawHeader || "");
+        if (!raw) return "";
+        var items = raw.split(",");
+        for (var i = 0; i < items.length; i += 1) {
+          var item = String(items[i] || "").trim();
+          if (item.indexOf(metricName + ";") !== 0 && item !== metricName) continue;
+          var match = item.match(/(?:^|;)desc="?([^";,]+)"?/i);
+          if (match && match[1]) return match[1];
+        }
+        return "";
+      }
+      function headerValue(response, names) {
+        if (!response || !response.headers) return "";
+        for (var i = 0; i < names.length; i += 1) {
+          var value = response.headers.get(names[i]);
+          if (value) return value;
+        }
+        return "";
+      }
+      function readRateLimitMeta(meta) {
+        var response = meta && meta.response;
+        var timing = headerValue(response, ["server-timing"]);
+        return {
+          requestID: (meta && meta.requestID) || headerValue(response, ["x-request-id", "X-Request-Id", "x-correlation-id"]) || parseServerTiming(timing, "rid") || "n/a",
+          clientIP: (meta && meta.clientIP) || parseServerTiming(timing, "ip") || "n/a",
+          timestamp: (meta && meta.timestamp) || parseServerTiming(timing, "ts") || new Date().toISOString()
+        };
+      }
+      function formatTimestamp(rawValue) {
+        var raw = String(rawValue || "").trim();
+        if (!raw) return "n/a";
+        if (/^\d+(\.\d+)?$/.test(raw)) {
+          var seconds = Number(raw);
+          if (Number.isFinite(seconds)) {
+            var fromSeconds = new Date(seconds * 1000);
+            if (!Number.isNaN(fromSeconds.getTime())) return fromSeconds.toISOString();
+          }
+        }
+        var parsed = new Date(raw);
+        if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+        return raw;
+      }
+      function safeLang() {
+        var raw = String((navigator.language || "en")).toLowerCase();
+        if (raw.indexOf("ru") === 0) return "ru";
+        if (raw.indexOf("de") === 0) return "de";
+        if (raw.indexOf("sr") === 0) return "sr";
+        if (raw.indexOf("zh") === 0) return "zh";
+        return "en";
+      }
+      function renderForbiddenFallback(copy) {
+        document.body.className = "";
+        document.body.innerHTML =
+          '<div class="waf-fallback-wrap"><section class="waf-fallback-card">' +
+          '<h1 class="waf-fallback-title">' + copy.title403 + '</h1>' +
+          '<p class="waf-fallback-sub">' + copy.text + '</p>' +
+          '</section></div>';
+      }
+      function renderRateLimitedFallback(meta) {
+        var dict = (rateMessages[safeLang()] || rateMessages.en);
+        var rateMeta = readRateLimitMeta(meta);
+        document.body.className = "";
+        document.body.innerHTML =
+          '<div class="waf-fallback-wrap"><section class="waf-fallback-card" style="width:min(1080px,100%);padding:0;border-radius:24px;overflow:hidden">' +
+          '<div style="padding:28px 30px 18px;border-bottom:1px solid #294d7f">' +
+          '<div style="display:inline-flex;align-items:center;gap:10px;padding:8px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04);font-size:13px;color:#afc3e7"><strong style="color:#e8eefc;font-size:22px">429</strong><span>' + escapeHTML(dict.category) + '</span></div>' +
+          '<h1 class="waf-fallback-title" style="font-size:clamp(34px,5vw,56px);line-height:1;margin:18px 0 0">' + escapeHTML(dict.title) + '</h1>' +
+          '<p class="waf-fallback-sub" style="max-width:760px;font-size:17px;line-height:1.55">' + escapeHTML(dict.summary) + '</p>' +
+          '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">' +
+          '<div style="display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:#afc3e7;font-size:12px">' + escapeHTML(dict.requestID) + ' <strong style="color:#e8eefc">' + escapeHTML(rateMeta.requestID) + '</strong></div>' +
+          '<div style="display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:#afc3e7;font-size:12px">' + escapeHTML(dict.clientIP) + ' <strong style="color:#e8eefc">' + escapeHTML(rateMeta.clientIP) + '</strong></div>' +
+          '<div style="display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:#afc3e7;font-size:12px">' + escapeHTML(dict.timestamp) + ' <strong style="color:#e8eefc">' + escapeHTML(formatTimestamp(rateMeta.timestamp)) + '</strong></div>' +
+          '</div></div>' +
+          '<div style="padding:24px 30px 30px;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr);gap:18px">' +
+          '<article style="border:1px solid #294d7f;border-radius:18px;padding:18px;background:linear-gradient(135deg,rgba(255,127,127,.18),transparent)"><h2 style="margin:0 0 14px;font-size:15px;text-transform:uppercase;letter-spacing:.12em;color:#afc3e7">' + escapeHTML(dict.whatHappened) + '</h2>' +
+          '<div style="display:grid;gap:12px">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 15px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06)"><div><strong style="display:block;font-size:15px;margin-bottom:4px">' + escapeHTML(dict.clientTitle) + '</strong><span style="font-size:13px;line-height:1.45;color:#afc3e7">' + escapeHTML(dict.clientText) + '</span></div><span style="display:inline-flex;align-items:center;min-height:30px;padding:0 12px;border-radius:999px;font-size:13px;font-weight:700;color:#ffd4d4;background:rgba(255,127,127,.16);border:1px solid rgba(255,127,127,.28)">' + escapeHTML(dict.clientBadge) + '</span></div>' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 15px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06)"><div><strong style="display:block;font-size:15px;margin-bottom:4px">' + escapeHTML(dict.wafTitle) + '</strong><span style="font-size:13px;line-height:1.45;color:#afc3e7">' + escapeHTML(dict.wafText) + '</span></div><span style="display:inline-flex;align-items:center;min-height:30px;padding:0 12px;border-radius:999px;font-size:13px;font-weight:700;color:#d7f8ea;background:rgba(85,211,158,.16);border:1px solid rgba(85,211,158,.3)">' + escapeHTML(dict.wafBadge) + '</span></div>' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 15px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06)"><div><strong style="display:block;font-size:15px;margin-bottom:4px">' + escapeHTML(dict.upstreamTitle) + '</strong><span style="font-size:13px;line-height:1.45;color:#afc3e7">' + escapeHTML(dict.upstreamText) + '</span></div><span style="display:inline-flex;align-items:center;min-height:30px;padding:0 12px;border-radius:999px;font-size:13px;font-weight:700;color:#d7f8ea;background:rgba(85,211,158,.16);border:1px solid rgba(85,211,158,.3)">' + escapeHTML(dict.upstreamBadge) + '</span></div>' +
+          '</div></article>' +
+          '<article style="border:1px solid #294d7f;border-radius:18px;padding:18px;background:rgba(8,14,24,.56)"><h2 style="margin:0 0 14px;font-size:15px;text-transform:uppercase;letter-spacing:.12em;color:#afc3e7">' + escapeHTML(dict.whatNext) + '</h2><ol style="margin:0;padding-left:18px;color:#afc3e7;line-height:1.7"><li>' + escapeHTML(dict.step1) + '</li><li>' + escapeHTML(dict.step2) + '</li><li>' + escapeHTML(dict.step3) + '</li></ol><div class="waf-fallback-sub" style="margin-top:14px">' + escapeHTML(dict.footer) + '</div></article>' +
+          '</div></section></div>';
+      }
+      var messages = {"en":{"title403":"403 Access Restricted","text":"Protection is active. Please try again later."},"ru":{"title403":"403 \u0414\u043e\u0441\u0442\u0443\u043f \u043e\u0433\u0440\u0430\u043d\u0438\u0447\u0435\u043d","text":"\u0417\u0430\u0449\u0438\u0442\u0430 \u0430\u043a\u0442\u0438\u0432\u043d\u0430. \u041f\u043e\u0432\u0442\u043e\u0440\u0438\u0442\u0435 \u043f\u043e\u043f\u044b\u0442\u043a\u0443 \u043f\u043e\u0437\u0436\u0435."},"de":{"title403":"403 Zugriff eingeschr\u00e4nkt","text":"Schutz ist aktiv. Bitte versuchen Sie es sp\u00e4ter erneut."},"sr":{"title403":"403 \u041f\u0440\u0438\u0441\u0442\u0443\u043f \u0458\u0435 \u043e\u0433\u0440\u0430\u043d\u0438\u0447\u0435\u043d","text":"\u0417\u0430\u0448\u0442\u0438\u0442\u0430 \u0458\u0435 \u0430\u043a\u0442\u0438\u0432\u043d\u0430. \u041f\u043e\u043a\u0443\u0448\u0430\u0458\u0442\u0435 \u043f\u043e\u043d\u043e\u0432\u043e \u043a\u0430\u0441\u043d\u0438\u0458\u0435."},"zh":{"title403":"403 \u8bbf\u95ee\u53d7\u9650","text":"\u4fdd\u62a4\u5df2\u542f\u7528\u3002\u8bf7\u7a0d\u540e\u518d\u8bd5\u3002"}}
+      var rateMessages = {"en":{"category":"429 Rate limiting","title":"Too Many Requests","summary":"The WAF is online and intentionally slowed this client because the request volume crossed the configured threshold.","requestID":"Request ID","clientIP":"Client IP","timestamp":"Timestamp","whatHappened":"What happened","clientTitle":"Client request","clientText":"The current request rate is higher than the allowed burst or sustained quota.","clientBadge":"Rate limited","wafTitle":"WAF layer","wafText":"The WAF is active and defending the upstream from overload or abuse.","wafBadge":"Protecting","upstreamTitle":"Upstream service","upstreamText":"The upstream remains available behind the rate limit shield.","upstreamBadge":"Protected","whatNext":"What to do next","step1":"Wait briefly before retrying.","step2":"Reduce polling, retries, or bursty client behavior.","step3":"Tune per-site rate limits if this traffic is legitimate.","footer":"TARINIO handled this response with an internal fallback page so the failure mode stays readable."},"ru":{"category":"429 \u041e\u0433\u0440\u0430\u043d\u0438\u0447\u0435\u043d\u0438\u0435 \u0447\u0430\u0441\u0442\u043e\u0442\u044b","title":"\u0421\u043b\u0438\u0448\u043a\u043e\u043c \u043c\u043d\u043e\u0433\u043e \u0437\u0430\u043f\u0440\u043e\u0441\u043e\u0432","summary":"WAF \u0440\u0430\u0431\u043e\u0442\u0430\u0435\u0442 \u0438 \u0441\u043e\u0437\u043d\u0430\u0442\u0435\u043b\u044c\u043d\u043e \u0437\u0430\u043c\u0435\u0434\u043b\u0438\u043b \u044d\u0442\u043e\u0433\u043e \u043a\u043b\u0438\u0435\u043d\u0442\u0430, \u043f\u043e\u0442\u043e\u043c\u0443 \u0447\u0442\u043e \u043e\u0431\u044a\u0435\u043c \u0437\u0430\u043f\u0440\u043e\u0441\u043e\u0432 \u043f\u0440\u0435\u0432\u044b\u0441\u0438\u043b \u043d\u0430\u0441\u0442\u0440\u043e\u0435\u043d\u043d\u044b\u0439 \u043f\u043e\u0440\u043e\u0433.","requestID":"Request ID","clientIP":"Client IP","timestamp":"\u0412\u0440\u0435\u043c\u044f","whatHappened":"\u0427\u0442\u043e \u043f\u0440\u043e\u0438\u0437\u043e\u0448\u043b\u043e","clientTitle":"\u0417\u0430\u043f\u0440\u043e\u0441 \u043a\u043b\u0438\u0435\u043d\u0442\u0430","clientText":"\u0422\u0435\u043a\u0443\u0449\u0430\u044f \u0447\u0430\u0441\u0442\u043e\u0442\u0430 \u0437\u0430\u043f\u0440\u043e\u0441\u043e\u0432 \u0432\u044b\u0448\u0435 \u0434\u043e\u043f\u0443\u0441\u0442\u0438\u043c\u043e\u0433\u043e burst-\u043b\u0438\u043c\u0438\u0442\u0430 \u0438\u043b\u0438 \u0443\u0441\u0442\u043e\u0439\u0447\u0438\u0432\u043e\u0439 \u043a\u0432\u043e\u0442\u044b.","clientBadge":"\u041e\u0433\u0440\u0430\u043d\u0438\u0447\u0435\u043d","wafTitle":"\u0421\u043b\u043e\u0439 WAF","wafText":"WAF \u0430\u043a\u0442\u0438\u0432\u0435\u043d \u0438 \u0437\u0430\u0449\u0438\u0449\u0430\u0435\u0442 upstream \u043e\u0442 \u043f\u0435\u0440\u0435\u0433\u0440\u0443\u0437\u043a\u0438 \u0438\u043b\u0438 \u0437\u043b\u043e\u0443\u043f\u043e\u0442\u0440\u0435\u0431\u043b\u0435\u043d\u0438\u044f.","wafBadge":"\u0417\u0430\u0449\u0438\u0449\u0430\u0435\u0442","upstreamTitle":"Upstream-\u0441\u0435\u0440\u0432\u0438\u0441","upstreamText":"Upstream \u043e\u0441\u0442\u0430\u0435\u0442\u0441\u044f \u0434\u043e\u0441\u0442\u0443\u043f\u043d\u044b\u043c \u0437\u0430 \u0449\u0438\u0442\u043e\u043c rate limit.","upstreamBadge":"\u0417\u0430\u0449\u0438\u0449\u0435\u043d","whatNext":"\u0427\u0442\u043e \u0434\u0435\u043b\u0430\u0442\u044c \u0434\u0430\u043b\u044c\u0448\u0435","step1":"\u041d\u0435\u043c\u043d\u043e\u0433\u043e \u043f\u043e\u0434\u043e\u0436\u0434\u0438\u0442\u0435 \u043f\u0435\u0440\u0435\u0434 \u043f\u043e\u0432\u0442\u043e\u0440\u043d\u043e\u0439 \u043f\u043e\u043f\u044b\u0442\u043a\u043e\u0439.","step2":"\u0421\u043d\u0438\u0437\u044c\u0442\u0435 polling, \u043f\u043e\u0432\u0442\u043e\u0440\u044b \u0438\u043b\u0438 burst-\u043f\u043e\u0432\u0435\u0434\u0435\u043d\u0438\u0435 \u043a\u043b\u0438\u0435\u043d\u0442\u0430.","step3":"\u041f\u043e\u0434\u0441\u0442\u0440\u043e\u0439\u0442\u0435 \u043b\u0438\u043c\u0438\u0442\u044b \u0434\u043b\u044f \u0441\u0430\u0439\u0442\u0430, \u0435\u0441\u043b\u0438 \u044d\u0442\u043e\u0442 \u0442\u0440\u0430\u0444\u0438\u043a \u043b\u0435\u0433\u0438\u0442\u0438\u043c\u0435\u043d.","footer":"TARINIO \u043f\u043e\u043a\u0430\u0437\u0430\u043b \u0432\u043d\u0443\u0442\u0440\u0435\u043d\u043d\u044e\u044e fallback-\u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0443, \u0447\u0442\u043e\u0431\u044b \u0441\u0446\u0435\u043d\u0430\u0440\u0438\u0439 \u043e\u0448\u0438\u0431\u043a\u0438 \u043e\u0441\u0442\u0430\u0432\u0430\u043b\u0441\u044f \u0447\u0438\u0442\u0430\u0435\u043c\u044b\u043c."},"de":{"category":"429 Ratenbegrenzung","title":"Zu viele Anfragen","summary":"Die WAF ist online und hat diesen Client absichtlich verlangsamt, weil das Anfragevolumen den konfigurierten Schwellenwert \u00fcberschritten hat.","requestID":"Request ID","clientIP":"Client-IP","timestamp":"Zeitstempel","whatHappened":"Was ist passiert","clientTitle":"Client-Anfrage","clientText":"Die aktuelle Anfragerate liegt \u00fcber dem erlaubten Burst oder der dauerhaften Quote.","clientBadge":"Begrenzt","wafTitle":"WAF-Schicht","wafText":"Die WAF ist aktiv und sch\u00fctzt das Upstream-System vor \u00dcberlastung oder Missbrauch.","wafBadge":"Sch\u00fctzt","upstreamTitle":"Upstream-Dienst","upstreamText":"Das Upstream-System bleibt hinter dem Rate-Limit-Schutz erreichbar.","upstreamBadge":"Gesch\u00fctzt","whatNext":"Was als N\u00e4chstes zu tun ist","step1":"Warten Sie kurz, bevor Sie es erneut versuchen.","step2":"Reduzieren Sie Polling, Wiederholungen oder burstartiges Client-Verhalten.","step3":"Passen Sie die site-spezifischen Limits an, wenn dieser Traffic legitim ist.","footer":"TARINIO hat diese Antwort mit einer internen Fallback-Seite abgefangen, damit der Fehlerfall lesbar bleibt."},"sr":{"category":"429 \u041e\u0433\u0440\u0430\u043d\u0438\u0447\u0435\u045a\u0435 \u043f\u0440\u043e\u0442\u043e\u043a\u0430","title":"\u041f\u0440\u0435\u0432\u0438\u0448\u0435 \u0437\u0430\u0445\u0442\u0435\u0432\u0430","summary":"WAF \u0458\u0435 \u0430\u043a\u0442\u0438\u0432\u0430\u043d \u0438 \u043d\u0430\u043c\u0435\u0440\u043d\u043e \u0458\u0435 \u0443\u0441\u043f\u043e\u0440\u0438\u043e \u043e\u0432\u043e\u0433 \u043a\u043b\u0438\u0458\u0435\u043d\u0442\u0430 \u0458\u0435\u0440 \u0458\u0435 \u043e\u0431\u0438\u043c \u0437\u0430\u0445\u0442\u0435\u0432\u0430 \u043f\u0440\u0435\u0448\u0430\u043e \u043f\u043e\u0434\u0435\u0448\u0435\u043d\u0438 \u043f\u0440\u0430\u0433.","requestID":"Request ID","clientIP":"Client IP","timestamp":"\u0412\u0440\u0435\u043c\u0435","whatHappened":"\u0428\u0442\u0430 \u0441\u0435 \u0434\u043e\u0433\u043e\u0434\u0438\u043b\u043e","clientTitle":"\u0417\u0430\u0445\u0442\u0435\u0432 \u043a\u043b\u0438\u0458\u0435\u043d\u0442\u0430","clientText":"\u0422\u0440\u0435\u043d\u0443\u0442\u043d\u0430 \u0431\u0440\u0437\u0438\u043d\u0430 \u0437\u0430\u0445\u0442\u0435\u0432\u0430 \u0458\u0435 \u0432\u0435\u045b\u0430 \u043e\u0434 \u0434\u043e\u0437\u0432\u043e\u0459\u0435\u043d\u043e\u0433 burst-\u0430 \u0438\u043b\u0438 \u0442\u0440\u0430\u0458\u043d\u0435 \u043a\u0432\u043e\u0442\u0435.","clientBadge":"\u041e\u0433\u0440\u0430\u043d\u0438\u0447\u0435\u043d","wafTitle":"WAF \u0441\u043b\u043e\u0458","wafText":"WAF \u0458\u0435 \u0430\u043a\u0442\u0438\u0432\u0430\u043d \u0438 \u0448\u0442\u0438\u0442\u0438 upstream \u043e\u0434 \u043f\u0440\u0435\u043e\u043f\u0442\u0435\u0440\u0435\u045b\u0435\u045a\u0430 \u0438\u043b\u0438 \u0437\u043b\u043e\u0443\u043f\u043e\u0442\u0440\u0435\u0431\u0435.","wafBadge":"\u0428\u0442\u0438\u0442\u0438","upstreamTitle":"Upstream \u0441\u0435\u0440\u0432\u0438\u0441","upstreamText":"Upstream \u043e\u0441\u0442\u0430\u0458\u0435 \u0434\u043e\u0441\u0442\u0443\u043f\u0430\u043d \u0438\u0437\u0430 \u0437\u0430\u0448\u0442\u0438\u0442\u0435 rate limit-\u0430.","upstreamBadge":"\u0417\u0430\u0448\u0442\u0438\u045b\u0435\u043d","whatNext":"\u0428\u0442\u0430 \u0434\u0430\u0459\u0435","step1":"\u0421\u0430\u0447\u0435\u043a\u0430\u0458\u0442\u0435 \u043a\u0440\u0430\u0442\u043a\u043e \u043f\u0440\u0435 \u043f\u043e\u043d\u043e\u0432\u043d\u043e\u0433 \u043f\u043e\u043a\u0443\u0448\u0430\u0458\u0430.","step2":"\u0421\u043c\u0430\u045a\u0438\u0442\u0435 polling, \u043f\u043e\u043d\u0430\u0432\u0459\u0430\u045a\u0430 \u0438\u043b\u0438 burst \u043f\u043e\u043d\u0430\u0448\u0430\u045a\u0435 \u043a\u043b\u0438\u0458\u0435\u043d\u0442\u0430.","step3":"\u041f\u043e\u0434\u0435\u0441\u0438\u0442\u0435 \u043b\u0438\u043c\u0438\u0442\u0435 \u043f\u043e \u0441\u0430\u0458\u0442\u0443 \u0430\u043a\u043e \u0458\u0435 \u043e\u0432\u0430\u0458 \u0441\u0430\u043e\u0431\u0440\u0430\u045b\u0430\u0458 \u043b\u0435\u0433\u0438\u0442\u0438\u043c\u0430\u043d.","footer":"TARINIO \u0458\u0435 \u043f\u0440\u0438\u043a\u0430\u0437\u0430\u043e \u0438\u043d\u0442\u0435\u0440\u043d\u0443 fallback \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0443 \u0434\u0430 \u0431\u0438 \u0441\u0446\u0435\u043d\u0430\u0440\u0438\u043e \u0433\u0440\u0435\u0448\u043a\u0435 \u043e\u0441\u0442\u0430\u043e \u0447\u0438\u0442\u0459\u0438\u0432."},"zh":{"category":"429 \u9650\u901f","title":"\u8bf7\u6c42\u8fc7\u591a","summary":"WAF \u5f53\u524d\u5728\u7ebf\uff0c\u5e76\u4e14\u6709\u610f\u964d\u4f4e\u4e86\u8be5\u5ba2\u6237\u7aef\u7684\u901f\u5ea6\uff0c\u56e0\u4e3a\u8bf7\u6c42\u91cf\u5df2\u8d85\u8fc7\u914d\u7f6e\u9608\u503c\u3002","requestID":"Request ID","clientIP":"Client IP","timestamp":"\u65f6\u95f4","whatHappened":"\u53d1\u751f\u4e86\u4ec0\u4e48","clientTitle":"\u5ba2\u6237\u7aef\u8bf7\u6c42","clientText":"\u5f53\u524d\u8bf7\u6c42\u9891\u7387\u9ad8\u4e8e\u5141\u8bb8\u7684 burst \u6216\u6301\u7eed\u914d\u989d\u3002","clientBadge":"\u5df2\u9650\u6d41","wafTitle":"WAF \u5c42","wafText":"WAF \u5904\u4e8e\u6d3b\u8dc3\u72b6\u6001\uff0c\u6b63\u5728\u4fdd\u62a4 upstream \u514d\u53d7\u8fc7\u8f7d\u6216\u6ee5\u7528\u5f71\u54cd\u3002","wafBadge":"\u4fdd\u62a4\u4e2d","upstreamTitle":"Upstream \u670d\u52a1","upstreamText":"Upstream \u670d\u52a1\u5728 rate limit \u4fdd\u62a4\u540e\u4ecd\u7136\u53ef\u7528\u3002","upstreamBadge":"\u5df2\u4fdd\u62a4","whatNext":"\u63a5\u4e0b\u6765\u600e\u4e48\u505a","step1":"\u7a0d\u7b49\u7247\u523b\u540e\u518d\u91cd\u8bd5\u3002","step2":"\u964d\u4f4e polling\u3001\u91cd\u8bd5\u6216 burst \u5f0f\u5ba2\u6237\u7aef\u884c\u4e3a\u3002","step3":"\u5982\u679c\u8fd9\u662f\u5408\u6cd5\u6d41\u91cf\uff0c\u8bf7\u8c03\u6574\u7ad9\u70b9\u7684 rate limit \u8bbe\u7f6e\u3002","footer":"TARINIO \u4f7f\u7528\u5185\u90e8 fallback \u9875\u9762\u5904\u7406\u4e86\u8be5\u54cd\u5e94\uff0c\u4ee5\u4fdd\u6301\u6545\u969c\u72b6\u6001\u6e05\u6670\u53ef\u8bfb\u3002"}};
+      window.__wafRenderBlocked = function (meta) {
+        var code = Number((meta && meta.code) || 429);
+        if (code === 429) {
+          renderRateLimitedFallback(meta);
+          return;
+        }
+        renderForbiddenFallback(messages[safeLang()] || messages.en);
+      };
+      window.addEventListener("error", function (event) {
+        var target = event && event.target;
+        if (!target) return;
+        var tag = String(target.tagName || "").toLowerCase();
+        if (tag !== "link" && tag !== "script" && tag !== "img") return;
+        var source = String(target.href || target.src || "");
+        if (source.indexOf("/static/") >= 0) {
+          window.__wafRenderBlocked({ code: 429 });
+        }
+      }, true);
+      fetch("/api/auth/me", { credentials: "include", cache: "no-store", headers: { Accept: "application/json" } })
+        .then(function (response) {
+          if (response.status === 403 || response.status === 429) {
+            window.__wafRenderBlocked({ code: response.status, response: response });
+          }
+        })
+        .catch(function () {});
     })();
   </script>
   <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon16.png">

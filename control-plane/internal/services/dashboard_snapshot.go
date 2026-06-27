@@ -164,14 +164,16 @@ func (s *DashboardService) buildSnapshot() (DashboardStats, error) {
 	}
 
 	requestsDay, requestUniqueIPsDay, requestTopSites, requestTopURLs, requestsSeries, blockedFromRequestsSeries, blockedFromRequestsDay, popularErrors := summarizeRequests(requestRows, cutoff, now)
-	// If the local sample hit the collector limit, the summarized count is capped.
-	// Ask the backend for an exact server-side count so the widget shows the real number.
-	if len(requestRows) >= 50000 {
-		if exactDay, ok := s.collectRequestsDay(); ok {
-			out.RequestsDay = exactDay
-		} else {
-			out.RequestsDay = requestsDay
-		}
+	// collectRequestsDay() fetches an exact server-side count (size:0, no
+	// document transfer). We prefer it whenever the backend reports more
+	// events than the collector actually returned — this covers both the
+	// classic cap case (len >= 50 000) and partial-sync situations where
+	// the collector returned fewer rows than really exist. When exactDay <=
+	// len(requestRows) the windows are aligned and the summarised count is
+	// already accurate, so we keep it (avoids overwriting filtered counts in
+	// tests and low-traffic scenarios).
+	if exactDay, ok := s.collectRequestsDay(); ok && exactDay > len(requestRows) {
+		out.RequestsDay = exactDay
 	} else {
 		out.RequestsDay = requestsDay
 	}

@@ -1,27 +1,24 @@
-## [1.3.4] - 26.06.2026
+## [1.3.5] - 27.06.2026
 
-### Исправления / Security Modes
-- `monitor` больше не применяет security-политики: отключаются ModSecurity, CRS plugins, custom ModSecurity configuration, rate limiting, connection limiting, bad-behavior, blacklist/geo rules, antibot, basic auth и API positive security; в этом режиме остается только обычный сбор логов запросов.
-- `transparent` сохраняет полностью прозрачное поведение: runtime не получает security-конфигурацию и не применяет политики.
-- Компилятор runtime больше не генерирует `modsecurity`-артефакты и `limit_req`/custom rate-limit зоны для `monitor` и `transparent`.
+### UI
+- `compiler/templates/errors/status.html.tmpl`: полная локализация на 5 языков (ru/en/de/sr/zh)
+  - Убран хак `ruPhrases` (только ru, только 401)
+  - Добавлен словарь `phrases` со всеми строками каталога ошибок (400/401/403/404/405/408/421/429/500/502/503/504 + generic) на ru/de/sr/zh
+  - Заголовки секций (Client request / WAF layer / Upstream service) переведены через словарь `copy` на все 5 локалей
+  - Время форматируется через `Intl.DateTimeFormat(locale, {dateStyle:'medium', timeStyle:'medium'})` вместо `.toISOString()` — показывается в локальном формате языка браузера
+  - Язык определяется по `navigator.languages` / `navigator.language` с fallback на `en`
 
-### Исправления / Backend — дашборд, точный счётчик запросов за сутки
-- **Баг: «Запросов за 24 часа» показывал ровно 50 000 при высоком трафике** — корневая причина: если локальный архив или OpenSearch возвращал ровно 50 000 строк (лимит `maxItems`), `summarizeRequests` считал их все и выдавал 50 000 вместо реального числа. Исправлено: добавлен endpoint `GET /requests/count` в runtime, который делает запрос к OpenSearch с `size:0` (нулевая передача документов, только `hits.total.value`) и возвращает точный count. Добавлен интерфейс `runtimeRequestCounter` и метод `collectRequestsDay` в `DashboardService`. При достижении лимита (≥50 000 строк в выборке) `RequestsDay` заменяется точным серверным count; при меньшем трафике используется прежняя логика `summarizeRequests`.
-- Fallback: если OpenSearch недоступен — count берётся из локального `.jsonl` архива путём прямого подсчёта строк с фильтром по `since`.
+### Ядро
+- Исправлен счётчик запросов за 24 часа на дашборде: теперь берётся точный server-side count из OpenSearch (`size:0`, без передачи документов) когда бэкенд сообщает о большем трафике, чем вернул коллектор — покрывает как классический cap на 50 000, так и частичную синхронизацию
+- Исправлены виджеты деталей запросов: загружают только последние 24 часа из `/api/requests`, уникальные IP теперь показывают реальное число вместо ограниченного топ-20
+- Исправлены виджеты атак: рядом с каждым URL теперь отображается атакуемый сайт/хост
+- Исправлен виджет запросов: разбивка по сайтам и страницам за 24 часа теперь берётся из `/api/dashboard/stats`, недоступный `/api/requests` больше не обнуляет детали
 
-### Исправления / UI — экспорт сервисов
-- **Баг: при экспорте выбранных сервисов скачивались два файла — пустой `.env` и `[object Object].json`** — корневая причина: в `sites.stable-resources.js` в вызов `exportSelectedServicesEnvModule` был ошибочно передан лишний аргумент `downloadJSON` между `downloadText` и `draftToEnvText`. Из-за этого `draftToEnvText` (позиция 3) получала функцию `downloadJSON`, а внутри цикла `draftToEnvText(draft)` вызывала `downloadJSON(draft)` — объект становился именем файла → `[object Object].json`. `downloadText` при этом получала `undefined` как контент → пустой `.env`. Исправлено: убран лишний аргумент `downloadJSON` из вызова; импорт `downloadJSON` перенесён из `sites.stable-resources.js` напрямую в `sites.stable-page.js` (из `sites.import-pipeline.js`).
+### Healthcheck
+- Ложные ошибки nginx вида `directory index of "/acme-challenges/" is forbidden` и `open() ... No such file or directory` по пути `/.well-known/acme-challenge/` теперь не классифицируются как ошибки — это нормальные зондирования ACME/атаки, а не сбои сервиса
+- Добавлены тест-кейсы для новых шаблонов фильтрации в `dashboard_containers_test.go`
 
-### Исправления / UI — виджет «Сервисы» на дашборде
-- **Фильтрация системных сервисов** — `control-plane` и `runtime` больше не отображаются в виджете «Сервисы»; показываются только пользовательские сайты из вкладки «Сервисы», загруженные из `/api/sites`.
-- **Варны вместо ошибок** — недоступный сервис (`up: false`) теперь помечается жёлтым `warning` вместо красного `danger` и в виджете, и в модалке.
-- **Алерт «Хост недоступен» в модалке** — при ЛКМ на недоступном сервисе между строкой «Проверен» и метриками запросов/атак/заблокированных появляется жёлтый алерт «Хост недоступен».
-- **CSS** — добавлен класс `.alert.warning` (жёлтая рамка) рядом с существующим `.alert.success`.
-- **i18n** — добавлен ключ `dashboard.services.hostDown` во все 5 локалей (ru/en/de/sr/zh).
-# Unreleased
-
-## core
-- fixed dashboard 24-hour request totals from OpenSearch so counts above `10,000` are returned exactly instead of stopping at the default search hit threshold
-- fixed dashboard request detail widgets to load only the last 24 hours from `/api/requests`, and fixed the unique IP metric so it shows the real distinct count instead of the capped top-20 list
-- fixed dashboard attack detail widgets so attacked pages show the target site/host next to each URL
-- fixed the requests widget to serve its 24-hour site/page breakdown from `/api/dashboard/stats`, so a failing `/api/requests` no longer blanks the widget detail
+### UI
+- Встроенный fallback при 429 в `index.html` и `onboarding.html` заменён на подробный экран в стиле существующих статус-страниц (405, 502 и др.): показывает Request ID, Client IP, время, три секции состояния, что произошло и что делать дальше — на всех 5 локалях (ru/en/de/sr/zh)
+- Шаблон `compiler/templates/errors/429.html.tmpl` обновлён до подробного формата аналогично другим error pages; устаревшая карточка-заглушка убрана
+- Удалён файл `ui/app/rate-limit.html` (отдельная страница не нужна, fallback встроен напрямую)
