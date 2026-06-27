@@ -23,7 +23,7 @@ It defines:
 
 ## Scope (Current Batch)
 
-Included groups:
+Included groups (original T2-01 batch):
 1. Web Service Front
 2. Upstream Routing
 3. HTTP Behavior
@@ -33,6 +33,16 @@ Included groups:
 7. Security Auth Basic
 8. Security Country Policy
 9. Security ModSecurity
+
+Extended in v1.3.x (Stage 1 extensions):
+10. Mutual TLS (incoming + outgoing)
+11. WebSocket Inspection
+12. Virtual Patching
+13. Geo Time Windows
+14. JA3/JA4 Fingerprint Policy
+15. Credential Stuffing Detection
+16. API Positive Security
+17. Upstream Health Check
 
 ## Canonical Easy Payload (API Contract Target)
 
@@ -130,6 +140,42 @@ Included groups:
       "path": "modsec/anomaly_score.conf",
       "content": ""
     }
+  },
+  "security_mtls": {
+    "use_mtls": false,
+    "mtls_vault_path": "",
+    "mtls_require_client_cert": false,
+    "use_upstream_mtls": false,
+    "upstream_mtls_cert_vault_path": "",
+    "upstream_mtls_key_vault_path": ""
+  },
+  "security_websocket": {
+    "use_websocket_inspection": false,
+    "max_frame_size": 65536,
+    "max_message_size": 1048576,
+    "blocked_patterns": []
+  },
+  "virtual_patches": [],
+  "geo_time_windows": [],
+  "ja3_policy": {
+    "use_ja3_blacklist": false,
+    "ja3_blacklist": [],
+    "use_ja4_blacklist": false,
+    "ja4_blacklist": []
+  },
+  "credential_stuffing": {
+    "use_credential_stuffing_detection": false,
+    "auth_endpoint_path": "/login",
+    "auth_failure_threshold": 10,
+    "auth_failure_window_seconds": 60,
+    "auth_failure_ban_seconds": 3600
+  },
+  "upstream_health_check": {
+    "use_health_check": false,
+    "health_check_path": "/healthz",
+    "health_check_interval_seconds": 10,
+    "health_check_timeout_seconds": 3,
+    "health_check_fail_threshold": 3
   }
 }
 ```

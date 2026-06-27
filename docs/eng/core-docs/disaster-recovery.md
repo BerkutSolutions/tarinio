@@ -1,7 +1,5 @@
 ﻿# Disaster Recovery Guide
 
-This page belongs to the current documentation branch.
-
 ## Scope
 
 This guide covers recovery planning for node loss, service loss, and restoration from backups.
@@ -47,6 +45,15 @@ Primary actions:
 - verify lock and leader behavior resumes cleanly;
 - confirm no split-brain compile/apply activity occurred.
 
+## Vault Loss
+
+Primary actions:
+
+- restore Vault from backup or snapshot;
+- confirm that mTLS certificate paths (`mtls/<site_id>/client_ca`, `upstream_cert`, `upstream_key`) and logging secret paths are accessible;
+- verify that control-plane successfully resolves secrets after restore;
+- if Vault was unavailable, confirm that mTLS-enabled sites resume correctly after reconnection.
+
 ## Full Host Rebuild
 
 Recommended order:
@@ -54,9 +61,10 @@ Recommended order:
 1. restore deployment artifacts;
 2. restore PostgreSQL;
 3. restore Redis if used;
-4. restore runtime and certificate volumes if needed;
-5. start services;
-6. run smoke validation.
+4. restore Vault with mTLS certificates and logging secrets;
+5. restore runtime and certificate volumes if needed;
+6. start services;
+7. run smoke validation.
 
 ## DR Drill Expectations
 
@@ -66,4 +74,3 @@ Enterprise-style operation should include:
 - documented recovery timings;
 - documented operator sequence;
 - confirmation that backups are actually usable.
-

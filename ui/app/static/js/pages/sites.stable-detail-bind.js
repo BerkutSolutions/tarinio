@@ -7,6 +7,8 @@ import {
   normalizeAntibotChallengeRules,
   normalizeAntibotExclusionRules,
   normalizeCustomLimitRules,
+  normalizeGeoTimeWindows,
+  normalizeWSBlockPatterns,
   normalizeServiceProfile,
   normalizeStringArray,
 } from "./sites.normalize.js";
@@ -83,6 +85,8 @@ export function bindStableDetail(container, state, ctx, deps) {
     normalizeAuthServiceTokens,
     normalizeAuthSessionTTLMinutes,
     normalizeAPIPositiveEndpointPolicies,
+    normalizeGeoTimeWindows,
+    normalizeWSBlockPatterns,
   });
   const syncStateDraftFromForm = () => syncStateDraftFromFormModule(state, getDraft, {
     normalizeArray,
@@ -134,6 +138,8 @@ export function bindStableDetail(container, state, ctx, deps) {
     normalizeArray,
     parseBanDurationSeconds,
     normalizeBanEscalationStages,
+    normalizeGeoTimeWindows,
+    normalizeWSBlockPatterns,
     setError,
     render,
     syncStateDraftFromForm,

@@ -115,7 +115,7 @@ export function createRenderRows({
                 return `
                   <tr class="waf-table-row-clickable" data-ban-row="${meta.start + index}" tabindex="0" role="button">
                     <td>${escapeHtml(row.ip)}</td>
-                    <td>${escapeHtml(countryFlagEmoji(row.country))}</td>
+                    <td>${countryFlagEmoji(row.country)}</td>
                     <td>${escapeHtml(row.occurredAt ? formatDate(row.occurredAt.toISOString()) : "-")}</td>
                     <td>${escapeHtml(formatRemaining(row.expiresAt, now, ctx.t))}</td>
                     <td>${escapeHtml(siteLabel)}</td>

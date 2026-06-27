@@ -1,6 +1,6 @@
 # Secret Management
 
-This document explains how TARINIO `current release` handles secrets, what `Vault` is responsible for, which data is allowed to stay local, and what operators should verify after a fresh install or upgrade.
+This document explains how TARINIO `1.3.5` handles secrets, what `Vault` is responsible for, which data is allowed to stay local, and what operators should verify after a fresh install or upgrade.
 
 ## Why This Matters
 
@@ -9,7 +9,7 @@ For production and enterprise deployments, two questions always matter:
 - where secrets physically live;
 - whether unsafe legacy copies remain after a migration.
 
-In `current release`, the product should no longer look like a stack where backend passwords simply live in `.env` and spread across containers without a controlled secret flow.
+In `1.3.5`, the product should no longer look like a stack where backend passwords simply live in `.env` and spread across containers without a controlled secret flow.
 
 ## Secret Classes
 
@@ -52,7 +52,7 @@ This is safer than plain local storage, but it is the fallback mode rather than 
 
 ### `vault`
 
-This is the default and preferred `current release` mode:
+This is the default and preferred `1.3.5` mode:
 
 - backend integration secrets are written to `HashiCorp Vault`;
 - runtime resolves them at read time;
@@ -70,6 +70,17 @@ Typical fields include:
 
 - `password`
 - `api_key`
+
+For mTLS (from v1.3.x), the paths are:
+
+- `secret/<path_prefix>/mtls/<site_id>/client_ca` — ClientCA for incoming mTLS
+- `secret/<path_prefix>/mtls/<site_id>/upstream_cert` — client certificate for upstream mTLS
+- `secret/<path_prefix>/mtls/<site_id>/upstream_key` — client key for upstream mTLS
+
+Typical mTLS secret fields:
+
+- `cert` — PEM certificate content
+- `key` — PEM key content
 
 If more logging backends are added later, they should join this same managed secret flow instead of creating separate ad hoc secret storage.
 
@@ -123,7 +134,7 @@ The following should be treated as unsafe:
 - leaving old local copies after a successful Vault migration;
 - maintaining multiple conflicting sources of truth for the same credential.
 
-## What Counts As Normal In `current release`
+## What Counts As Normal In `1.3.5`
 
 The intended release posture is:
 

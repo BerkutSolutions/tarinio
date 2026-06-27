@@ -4,9 +4,8 @@ import { renderSummaryMetrics, renderDetailTable, renderDetailSection } from "./
 function countryFlag(code, deps) {
   const token = deps.normalizeCountryCode(code);
   if (!/^[A-Z]{2}$/.test(token)) return "";
-  const first  = 127397 + token.charCodeAt(0);
-  const second = 127397 + token.charCodeAt(1);
-  return String.fromCodePoint(first, second);
+  const cc = token.toLowerCase();
+  return `<img class="country-flag-img" src="https://flagcdn.com/16x12/${cc}.png" srcset="https://flagcdn.com/32x24/${cc}.png 2x" width="16" height="12" alt="${token}" loading="lazy" onerror="this.style.display='none';this.nextSibling&&(this.nextSibling.style.display='')"><span class="country-flag-fallback" style="display:none">${token}</span>`;
 }
 
 function countryName(code, deps) {
@@ -176,7 +175,18 @@ function buildWidgetDetail(action, payload, stats, detailModel, containersOvervi
         { labelKey: "dashboard.detail.uniqueIPs",  value: uniqueRequestIPs }
       ], ctx, deps) +
       renderDetailTable(requestTopSites, ctx, ctx.t("dashboard.detail.site"), ctx.t("dashboard.detail.requests"), {}, deps) +
-      renderDetailTable(requestTopURLs,  ctx, ctx.t("dashboard.detail.page"), ctx.t("dashboard.detail.requests"), {}, deps)
+      renderDetailTable(requestTopURLs,  ctx, ctx.t("dashboard.detail.page"), ctx.t("dashboard.detail.requests"), {
+        labelFormatter: (item) => {
+          const url = escapeHtml(String(item?.key || "-"));
+          const sites = Array.isArray(item?.sites) ? item.sites : [];
+          if (!sites.length) return `<strong>${url}</strong>`;
+          return `<div><strong>${url}</strong></div><div class="muted">${escapeHtml(sites.map((s) => String(s?.key || "-")).join(", "))}</div>`;
+        },
+        rowAttrs: (item) => {
+          const url = String(item?.key || "").trim();
+          return url ? `data-widget-action="url-detail" data-url="${escapeHtml(url)}"` : "";
+        }
+      }, deps)
     };
   }
 
@@ -284,31 +294,85 @@ function buildWidgetDetail(action, payload, stats, detailModel, containersOvervi
 
   if (action === "top-countries" || action === "country-detail") {
     const code = deps.normalizeCountryCode(payload?.countryCode || "");
-    const rows = code && code !== "UNK"
-      ? (detailModel?.attacksByCountry || []).filter((item) => deps.normalizeCountryCode(item.key) === code)
-      : (detailModel?.attacksByCountry || []);
+    const countryRow = code && code !== "UNK"
+      ? (detailModel?.attacksByCountry || []).find((item) => deps.normalizeCountryCode(item.key) === code)
+      : null;
+    const totalAttacks = countryRow?.count || 0;
+
+    // IP из этой страны
+    const ipRows = code && code !== "UNK"
+      ? (detailModel?.ipDetailsSummary || [])
+          .filter((item) => deps.normalizeCountryCode(item.countryCode || "") === code)
+          .sort((a, b) => (b.attacks || 0) - (a.attacks || 0))
+          .slice(0, 20)
+          .map((item) => ({ key: item.ip, count: item.attacks || item.requests || 0 }))
+      : (detailModel?.attacksByCountry || []).map((item) => ({ key: item.key, count: item.count }));
+
+    const flag = code && code !== "UNK" ? countryFlag(code, deps) : "";
+    const name = code && code !== "UNK" ? countryName(code, deps) : ctx.t("dashboard.widget.topCountries");
+    const titleHtml = flag
+      ? `${escapeHtml(ctx.t("dashboard.detail.country"))} ${escapeHtml(name)} ${flag}`
+      : escapeHtml(code && code !== "UNK" ? `${ctx.t("dashboard.detail.country")} ${name}` : ctx.t("dashboard.widget.topCountries"));
+
+    const totalHtml = code && code !== "UNK" && totalAttacks
+      ? `<div class="dashboard-detail-total">${escapeHtml(ctx.t("dashboard.detail.attacks"))}: <strong>${escapeHtml(String(deps.formatNumber(totalAttacks)))}</strong></div>`
+      : "";
+
+    const ipTable = renderDetailTable(ipRows, ctx, "IP", ctx.t("dashboard.detail.attacks"), {
+      labelFormatter: (item) => escapeHtml(String(item?.key || "-"))
+    }, deps);
+
     return {
-      title: code && code !== "UNK"
-        ? `${ctx.t("dashboard.detail.country")} ${countryName(code, deps)}${countryFlag(code, deps) ? ` ${countryFlag(code, deps)}` : ""}`
-        : ctx.t("dashboard.widget.topCountries"),
+      title:    `${ctx.t("dashboard.detail.country")} ${name}`,
+      titleHtml,
       subtitle: ctx.t("dashboard.detail.countrySubtitle"),
-      body: renderDetailTable(rows, ctx, ctx.t("dashboard.detail.country"), ctx.t("dashboard.detail.attacks"), {
-        labelFormatter: (item) => deps.renderCountryBadge(item.key)
-      }, deps)
+      body:     totalHtml + ipTable
     };
   }
 
   if (action === "top-urls" || action === "url-detail") {
     const targetURL = String(payload?.url || "").trim();
+    const urlRow = targetURL
+      ? (detailModel?.attacksByURL || []).find((item) => item.key === targetURL)
+      : null;
+
+    // IP которые ломились на этот URL
+    const ipRows = (urlRow?.ips || []).map((item) => {
+      const ipDetail = detailModel?.ipDetailsByIP?.get?.(item.key);
+      const countryCode = ipDetail?.countryCode || "";
+      const sites = (ipDetail?.sites || [])
+        .filter((s) => !targetURL || true)
+        .slice(0, 3)
+        .map((s) => s.key)
+        .join(", ");
+      return { key: item.key, count: item.count, countryCode, sites };
+    });
+
     const rows = targetURL
       ? (detailModel?.attacksByURL || []).filter((item) => item.key === targetURL)
       : (detailModel?.attacksByURL || []);
+
+    const urlTable = renderDetailTable(rows, ctx, ctx.t("dashboard.detail.page"), ctx.t("dashboard.detail.attacks"), {
+      labelFormatter: (item) => formatAttackURLLabel(item)
+    }, deps);
+
+    const ipTable = ipRows.length
+      ? renderDetailSection(
+          ctx.t("dashboard.widget.topIPs"),
+          renderDetailTable(ipRows, ctx, "IP", ctx.t("dashboard.detail.attacks"), {
+            labelFormatter: (item) => {
+              const flag = item.countryCode ? countryFlag(item.countryCode, deps) : "";
+              const sitesHtml = item.sites ? `<br><span class="dashboard-detail-sub">${escapeHtml(item.sites)}</span>` : "";
+              return `${escapeHtml(String(item?.key || "-"))}${flag ? " " + flag : ""}${sitesHtml}`;
+            }
+          }, deps)
+        )
+      : "";
+
     return {
       title:    targetURL ? `${ctx.t("dashboard.detail.page")}: ${targetURL}` : ctx.t("dashboard.widget.topURLs"),
       subtitle: ctx.t("dashboard.detail.urlSubtitle"),
-      body: renderDetailTable(rows, ctx, ctx.t("dashboard.detail.page"), ctx.t("dashboard.detail.attacks"), {
-        labelFormatter: (item) => formatAttackURLLabel(item)
-      }, deps)
+      body:     (targetURL ? "" : urlTable) + ipTable
     };
   }
 

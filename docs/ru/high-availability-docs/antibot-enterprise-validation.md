@@ -2,7 +2,7 @@
 
 Последний полный прогон профиля: 2026-04-24.
 
-Документ фиксирует выделенный enterprise-срез валидации поведения anti-bot challenge в TARINIO `current release`.
+Документ фиксирует выделенный enterprise-срез валидации поведения anti-bot challenge в TARINIO `1.3.5`.
 
 ## Цель проверки
 
@@ -45,4 +45,4 @@ Anti-bot слой проходит enterprise-проверку на раздел
 - bot-трафик без сохранения cookie не получает устойчивого обхода;
 - challenge-контракт и cookie-persistence ведут себя предсказуемо.
 
-Это подтверждает production-like пригодность anti-bot контроля в составе TARINIO `current release`.
+Это подтверждает production-like пригодность anti-bot контроля в составе TARINIO `1.3.5`.

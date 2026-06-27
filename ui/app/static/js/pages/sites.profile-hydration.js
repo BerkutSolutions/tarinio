@@ -6,6 +6,8 @@ import {
   normalizeCustomLimitRules,
   normalizeServiceProfile,
   normalizeStringArray,
+  normalizeGeoTimeWindows,
+  normalizeWSBlockPatterns,
 } from "./sites.normalize.js";
 import { normalizeAuthBasicUsers, normalizeAuthSessionTTLMinutes } from "./sites.auth-geo.js";
 import {
@@ -47,6 +49,10 @@ export function applyEasyProfileToDraft(draft, profile) {
     reverse_proxy_ssl_sni_name: upstream.reverse_proxy_ssl_sni_name || draft.reverse_proxy_ssl_sni_name,
     reverse_proxy_websocket: Boolean(upstream.reverse_proxy_websocket ?? draft.reverse_proxy_websocket),
     reverse_proxy_keepalive: Boolean(upstream.reverse_proxy_keepalive ?? draft.reverse_proxy_keepalive),
+    health_check_enabled: Boolean(upstream.health_check_enabled ?? draft.health_check_enabled),
+    health_check_path: upstream.health_check_path || draft.health_check_path || "/health",
+    health_check_interval_seconds: Number(upstream.health_check_interval_seconds ?? draft.health_check_interval_seconds ?? 10),
+    health_check_fail_threshold: Number(upstream.health_check_fail_threshold ?? draft.health_check_fail_threshold ?? 3),
     pass_host_header: !(Boolean(upstream.disable_host_header ?? !draft.pass_host_header)),
     send_x_forwarded_for: !(Boolean(upstream.disable_x_forwarded_for ?? !draft.send_x_forwarded_for)),
     send_x_forwarded_proto: !(Boolean(upstream.disable_x_forwarded_proto ?? !draft.send_x_forwarded_proto)),
@@ -55,6 +61,7 @@ export function applyEasyProfileToDraft(draft, profile) {
     max_client_size: httpBehavior.max_client_size || draft.max_client_size,
     http2: Boolean(httpBehavior.http2 ?? draft.http2),
     http3: Boolean(httpBehavior.http3 ?? draft.http3),
+    http_strict_parsing: Boolean(httpBehavior.http_strict_parsing ?? draft.http_strict_parsing),
     ssl_protocols: normalizeStringArray(httpBehavior.ssl_protocols).length ? normalizeStringArray(httpBehavior.ssl_protocols) : draft.ssl_protocols,
     cookie_flags: httpHeaders.cookie_flags || draft.cookie_flags,
     content_security_policy: httpHeaders.content_security_policy || draft.content_security_policy,
@@ -84,11 +91,13 @@ export function applyEasyProfileToDraft(draft, profile) {
     blacklist_asn: normalizeStringArray(security.blacklist_asn),
     blacklist_user_agent: normalizeStringArray(security.blacklist_user_agent),
     blacklist_uri: normalizeStringArray(security.blacklist_uri),
+    blacklist_ja3: normalizeStringArray(security.blacklist_ja3),
     blacklist_ip_urls: normalizeStringArray(security.blacklist_ip_urls),
     blacklist_rdns_urls: normalizeStringArray(security.blacklist_rdns_urls),
     blacklist_asn_urls: normalizeStringArray(security.blacklist_asn_urls),
     blacklist_user_agent_urls: normalizeStringArray(security.blacklist_user_agent_urls),
     blacklist_uri_urls: normalizeStringArray(security.blacklist_uri_urls),
+    blacklist_ja3_urls: normalizeStringArray(security.blacklist_ja3_urls),
     use_limit_conn: Boolean(security.use_limit_conn ?? draft.use_limit_conn),
     limit_conn_max_http1: Number(security.limit_conn_max_http1 ?? draft.limit_conn_max_http1),
     limit_conn_max_http2: Number(security.limit_conn_max_http2 ?? draft.limit_conn_max_http2),
@@ -120,6 +129,7 @@ export function applyEasyProfileToDraft(draft, profile) {
     auth_basic_session_inactivity_minutes: normalizeAuthSessionTTLMinutes(authBasic.session_inactivity_minutes ?? draft.auth_basic_session_inactivity_minutes),
     blacklist_country: normalizeStringArray(country.blacklist_country),
     whitelist_country: normalizeStringArray(country.whitelist_country),
+    geo_time_windows: normalizeGeoTimeWindows(country.geo_time_windows || draft.geo_time_windows),
     api_positive_security_enabled: Boolean(apiPositive.use_api_positive_security ?? draft.api_positive_security_enabled),
     api_positive_openapi_schema_ref: String(apiPositive.openapi_schema_ref || draft.api_positive_openapi_schema_ref),
     api_positive_enforcement_mode: String(apiPositive.enforcement_mode || draft.api_positive_enforcement_mode).trim().toLowerCase() || "monitor",
@@ -131,7 +141,20 @@ export function applyEasyProfileToDraft(draft, profile) {
     modsecurity_crs_version: String(modsecurity.modsecurity_crs_version || draft.modsecurity_crs_version),
     modsecurity_crs_plugins: normalizeStringArray(modsecurity.modsecurity_crs_plugins),
     modsecurity_custom_path: modsecurity.custom_configuration?.path || draft.modsecurity_custom_path,
-    modsecurity_custom_content: modsecurity.custom_configuration?.content || draft.modsecurity_custom_content
+    modsecurity_custom_content: modsecurity.custom_configuration?.content || draft.modsecurity_custom_content,
+    use_ws_inspection: Boolean(profile?.security_websocket?.use_ws_inspection ?? draft.use_ws_inspection),
+    ws_block_patterns: normalizeWSBlockPatterns(profile?.security_websocket?.ws_block_patterns ?? draft.ws_block_patterns),
+    ws_max_message_bytes: Math.max(0, Number.parseInt(String(profile?.security_websocket?.ws_max_message_bytes ?? draft.ws_max_message_bytes ?? "0"), 10) || 0),
+    ws_rate_msg_per_sec: Math.max(0, Number.parseInt(String(profile?.security_websocket?.ws_rate_msg_per_sec ?? draft.ws_rate_msg_per_sec ?? "0"), 10) || 0),
+    mtls_enabled: Boolean(profile?.front_service?.mtls_enabled ?? draft.mtls_enabled),
+    mtls_optional: Boolean(profile?.front_service?.mtls_optional ?? draft.mtls_optional),
+    mtls_verify_depth: Math.max(0, Number.parseInt(String(profile?.front_service?.mtls_verify_depth ?? draft.mtls_verify_depth ?? "2"), 10) || 2),
+    mtls_client_ca_ref: String(profile?.front_service?.mtls_client_ca_ref ?? draft.mtls_client_ca_ref ?? "").trim(),
+    mtls_pass_headers: Boolean(profile?.front_service?.mtls_pass_headers ?? draft.mtls_pass_headers),
+    upstream_mtls_enabled: Boolean(profile?.upstream_routing?.upstream_mtls_enabled ?? draft.upstream_mtls_enabled),
+    upstream_mtls_cert_ref: String(profile?.upstream_routing?.upstream_mtls_cert_ref ?? draft.upstream_mtls_cert_ref ?? "").trim(),
+    upstream_mtls_key_ref: String(profile?.upstream_routing?.upstream_mtls_key_ref ?? draft.upstream_mtls_key_ref ?? "").trim(),
+    upstream_mtls_ca_ref: String(profile?.upstream_routing?.upstream_mtls_ca_ref ?? draft.upstream_mtls_ca_ref ?? "").trim()
   };
 }
 

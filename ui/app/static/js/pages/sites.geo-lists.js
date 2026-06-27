@@ -40,6 +40,11 @@ const QUICK_LIST_TEMPLATES = {
     { id: "framework_debug", labelKey: "sites.easy.traffic.template.blacklistUri.framework_debug", items: ["/_profiler", "/_debugbar", "/debug/default/view", "/console", "/app_dev\\.php", "/server-info"] },
     { id: "api_docs_admin", labelKey: "sites.easy.traffic.template.blacklistUri.api_docs_admin", items: ["/swagger", "/swagger-ui", "/v2/api-docs", "/v3/api-docs", "/openapi\\.json", "/graphql$"] },
     { id: "common_shells", labelKey: "sites.easy.traffic.template.blacklistUri.common_shells", items: ["/shell\\.php", "/cmd\\.php", "/r57\\.php", "/c99\\.php", "/wso\\.php", "/mini\\.php"] }
+  ],
+  blacklist_ja3: [
+    { id: "shodan_masscan", labelKey: "sites.easy.traffic.template.blacklistJa3.shodan_masscan", items: ["c9b8c8c8c8c8c8c8c8c8c8c8c8c8c8c8", "6bea65473a4ae23c37fcaef4c3eb5b6a", "7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d", "3b5074b1b5d032e5620f69f9f700ff0e", "2a1a0cf3b09a95a3c3db069e3a7a4e66"] },
+    { id: "exploit_tools", labelKey: "sites.easy.traffic.template.blacklistJa3.exploit_tools", items: ["c12f54a3f91dc7bafd92cb59fe009a35", "bc6c386f480f5a8b9c9bcf632e57e517", "6734f37431670b3ab4292b8f60f29984", "72a589da586844d7f0818ce684948eea"] },
+    { id: "c2_frameworks", labelKey: "sites.easy.traffic.template.blacklistJa3.c2_frameworks", items: ["a0e9f5d64349fb13191bc781f81f42e1", "805d704c2ea8dc4c5f30a1e7dd31c2b6", "de9f2c7fd25e1b3afad3e85a0bd17d9b"] }
   ]
 };
 
@@ -110,8 +115,8 @@ export function getQuickListTemplates(field) {
 export const LIST_FIELD_SET = new Set([
   "allowed_methods", "ssl_protocols", "permissions_policy", "keep_upstream_headers", "cors_allowed_origins",
   "access_allowlist", "exceptions_ip", "access_denylist", "blacklist_ip", "blacklist_rdns", "blacklist_asn",
-  "blacklist_user_agent", "blacklist_uri", "blacklist_ip_urls", "blacklist_rdns_urls", "blacklist_asn_urls",
-  "blacklist_user_agent_urls", "blacklist_uri_urls", "blacklist_country", "whitelist_country", "modsecurity_crs_plugins"
+  "blacklist_user_agent", "blacklist_uri", "blacklist_ja3", "blacklist_ip_urls", "blacklist_rdns_urls", "blacklist_asn_urls",
+  "blacklist_user_agent_urls", "blacklist_uri_urls", "blacklist_ja3_urls", "blacklist_country", "whitelist_country", "modsecurity_crs_plugins"
 ]);
 
 export const SETTINGS_SEARCH_INDEX = [
@@ -140,6 +145,7 @@ export const SETTINGS_SEARCH_INDEX = [
   { id: "exceptions_ip", tab: "traffic", selector: "#list-input-exceptions_ip", labelKey: "sites.easy.traffic.exceptions" },
   { id: "access_denylist", tab: "traffic", selector: "#list-input-access_denylist", labelKey: "sites.lists.denylist" },
   { id: "use_blacklist", tab: "traffic", selector: "#service-use-blacklist", labelKey: "sites.easy.traffic.activateBlacklisting" },
+  { id: "blacklist_ja3", tab: "traffic", selector: "#list-input-blacklist_ja3", labelKey: "sites.easy.traffic.blacklistJa3" },
   { id: "use_limit_req", tab: "traffic", selector: "#service-use-limit-req", labelKey: "sites.easy.traffic.activateLimitRequests" },
   { id: "ban_escalation_enabled", tab: "blocking", selector: "#service-ban-escalation-enabled", labelKey: "sites.easy.blocking.enabled" },
   { id: "ban_escalation_scope", tab: "blocking", selector: "#service-ban-escalation-scope", labelKey: "sites.easy.blocking.scope" },

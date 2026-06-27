@@ -34,16 +34,11 @@ export function normalizeCountryCode(value) {
 
 export function countryFlagEmoji(value) {
   const code = normalizeCountryCode(value);
-  if (!code) {
+  if (!code || !/^[A-Z]{2}$/.test(code)) {
     return "-";
   }
-  const base = 0x1f1e6;
-  const first = code.charCodeAt(0) - 65;
-  const second = code.charCodeAt(1) - 65;
-  if (first < 0 || first > 25 || second < 0 || second > 25) {
-    return "-";
-  }
-  return String.fromCodePoint(base + first, base + second);
+  const cc = code.toLowerCase();
+  return `<img class="country-flag-img" src="https://flagcdn.com/16x12/${cc}.png" srcset="https://flagcdn.com/32x24/${cc}.png 2x" width="16" height="12" alt="${code}" loading="lazy" onerror="this.style.display='none';this.nextSibling&&(this.nextSibling.style.display='')"><span class="country-flag-fallback" style="display:none">${code}</span>`;
 }
 
 export function deriveModuleFromEvent(item) {

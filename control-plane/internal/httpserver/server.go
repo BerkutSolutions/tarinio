@@ -67,6 +67,7 @@ func New(
 	accessPolicyService *services.AccessPolicyService,
 	rateLimitPolicyService *services.RateLimitPolicyService,
 	easySiteProfileService *services.EasySiteProfileService,
+	virtualPatchService *services.VirtualPatchService,
 	antiDDoSService *services.AntiDDoSService,
 	antiDDoSRuleSuggestionsService *services.AntiDDoSRuleSuggestionsService,
 	eventService *services.EventService,
@@ -235,6 +236,11 @@ func New(
 	mux.Handle("/api/easy-site-profiles/catalog/countries", withMethodPermissions(authService, map[string]rbac.Permission{
 		http.MethodGet: rbac.PermissionSitesRead,
 	}, handlers.NewEasySiteProfileCatalogHandler()))
+	mux.Handle("/api/virtual-patches/", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodGet:    {rbac.PermissionSitesRead},
+		http.MethodPost:   {rbac.PermissionSitesWrite},
+		http.MethodDelete: {rbac.PermissionSitesWrite},
+	}, handlers.NewVirtualPatchesHandler(virtualPatchService)))
 	mux.Handle("/api/anti-ddos/settings", withMethodAllPermissions(authService, map[string][]rbac.Permission{
 		http.MethodGet:  {rbac.PermissionAntiDDoSRead, rbac.PermissionPoliciesRead},
 		http.MethodPut:  {rbac.PermissionAntiDDoSWrite, rbac.PermissionPoliciesWrite},

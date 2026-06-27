@@ -228,6 +228,24 @@ export async function renderDashboard(container, ctx) {
       bindRequestsChartHover
     });
     pageState.latestStats = refs.latestStats;
+    // Если detailModel ещё не построена — запускаем фоновую сборку и перерисовываем виджеты
+    if (!pageState.detailModel) {
+      Promise.resolve(ensureDetailModel()).then((model) => {
+        if (model && pageState.latestStats) {
+          refs.detailModel = model;
+          renderStats(pageState.latestStats, refs, {
+            boardNode,
+            WIDGETS,
+            ctx,
+            mergeWidgetData,
+            ensureDetailModel,
+            prepareSeriesRows,
+            renderRequestsSeries,
+            bindRequestsChartHover
+          });
+        }
+      }).catch(() => {});
+    }
   };
 
   WIDGETS.filter((widget) => visibleWidgetIDs.has(widget.id)).forEach((widget) => {

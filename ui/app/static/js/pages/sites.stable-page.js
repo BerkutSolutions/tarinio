@@ -200,6 +200,7 @@ export async function renderSites(container, ctx) {
     state.draft = await hydrateSiteDraft(ctx, site, upstream, tlsConfig, accessPolicy);
     state.listTemplateSelection.blacklist_user_agent = [];
     state.listTemplateSelection.blacklist_uri = [];
+    state.listTemplateSelection.blacklist_ja3 = [];
     state.rawEnvText = draftToEnvText(state.draft);
     state.rawMissingFields = [];
     state.editorMode = "easy";

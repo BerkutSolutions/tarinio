@@ -1,8 +1,8 @@
 # Logging Architecture
 
-This document describes the real request-log behavior in TARINIO `current release`.
+This document describes the real request-log behavior in TARINIO `1.3.5`.
 
-Release baseline for this revision: `3.0.6`.
+Release baseline for this revision: `1.3.5`.
 
 ## Overview
 
@@ -93,7 +93,7 @@ In this mode:
 
 ## What Operators Should Expect
 
-Healthy `current release` behavior looks like this:
+Healthy `1.3.5` behavior looks like this:
 
 1. fresh requests appear in `Requests` through the API without direct file reads;
 2. `OpenSearch` receives recent traffic;

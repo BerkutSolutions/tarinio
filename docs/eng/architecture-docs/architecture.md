@@ -1,7 +1,5 @@
 # Architecture
 
-This page belongs to the current documentation branch.
-
 TARINIO is a self-hosted web traffic protection and control platform where the control-plane defines the desired state and the runtime executes only compiled and applied configuration artifacts.
 
 ## Architectural Model
@@ -21,9 +19,9 @@ In practical terms, the product consists of four main layers:
 - Rollout and rollback are normal lifecycle operations, not emergency exceptions.
 - Permissions are checked server-side on every endpoint.
 
-## Key Domains In current release
+## Key Domains In v1.3.5
 
-The main architectural domains in version `current release` are:
+The main architectural domains in version `1.3.5` are:
 
 - sites and upstreams;
 - TLS and certificate materials;
@@ -32,7 +30,13 @@ The main architectural domains in version `current release` are:
 - Anti-DDoS;
 - revisions, snapshots, and apply jobs;
 - audit and observability data;
-- runtime settings and retention policy.
+- runtime settings and retention policy;
+- mTLS (incoming and outgoing) — managed via Vault;
+- WebSocket traffic inspection;
+- Virtual Patching (ModSecurity SecRule);
+- Geo Time Windows (geo-based policies with time constraints);
+- JA3/JA4 TLS fingerprint blacklist;
+- credential stuffing detection via auth-endpoint monitoring.
 
 ## Change Lifecycle
 
@@ -48,13 +52,13 @@ This is why the `Revisions` section is a central product capability rather than 
 
 ## Why Revisions Matter
 
-In `current release`, the revision subsystem includes:
+In `1.3.5`, the revision subsystem includes:
 
 - an aggregated revision catalog by service;
 - active, pending, and failed classification;
 - a status/event timeline for rollout;
 - deletion of inactive revisions;
-- persistence of the revision' last apply result even after timeline cleanup.
+- persistence of the revision's last apply result even after timeline cleanup.
 
 That makes change management reproducible and operationally useful.
 
@@ -78,13 +82,14 @@ Control-plane is responsible for:
 
 ## The UI As An Architectural Layer
 
-In `current release`, the UI is not a thin shell over a few backend objects. It reflects multiple operational layers:
+In `1.3.5`, the UI is not a thin shell over a few backend objects. It reflects multiple operational layers:
 
 - operational overview through `Dashboard`;
 - configuration through `Sites`, `TLS`, `Anti-DDoS`, and `OWASP CRS`;
 - observability through `Requests`, `Events`, `Bans`, and `Activity`;
 - change management through `Revisions`;
-- platform-level workflows through `Settings`, `Profile`, and `Administration`.
+- platform-level workflows through `Settings`, `Profile`, and `Administration`;
+- new site profile tabs: `WebSocket`, `mTLS`, `Geo Time Windows`, `Virtual Patches`.
 
 ## Stage 0 Source Of Truth
 
@@ -97,5 +102,4 @@ The mandatory architecture foundation remains in:
 - `docs/architecture/mvp-deployment-topology.md`
 - `docs/architecture/mvp-ui-information-architecture.md`
 
-Those documents define the foundation, while this wiki maps that foundation to the real product surface in `current release`.
-
+Those documents define the foundation, while this wiki maps that foundation to the real product surface in `1.3.5`.

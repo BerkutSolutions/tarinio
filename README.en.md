@@ -8,7 +8,7 @@
 
 Berkut Solutions - TARINIO is a self-hosted web traffic protection and control platform (WAF/CRS + L4/L7 Anti-DDoS) with centralized change management through revisions.
 
-Current version: `current release`
+Current version: `1.3.5`
 
 ## Product Overview
 
@@ -38,6 +38,13 @@ This provides reproducible changes, auditable operations, and one control loop f
 - Management of sites, upstreams, certificates, and TLS configurations.
 - Events, request logs, audit stream, and revision reports.
 - UI + API + CLI (`waf-cli`) for operator workflows.
+- Mutual TLS: client certificate verification (incoming) and mTLS to upstream (outgoing).
+- JA3/JA4 TLS fingerprinting with blacklist-based blocking.
+- Geo/Time Windows: access restriction by country and schedule.
+- WebSocket inspection: frame-level inspection with pattern-based blocking.
+- Virtual Patching: temporary blocking rules with TTL, no restart required.
+- Upstream Health Check with automatic degradation detection.
+- Credential stuffing detection and extended Sentinel signals.
 
 ## Security by Design
 

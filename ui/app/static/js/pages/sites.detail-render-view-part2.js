@@ -1,5 +1,5 @@
 export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
-  const { escapeHtml, renderListEditor, getQuickListTemplates, normalizeStringArray, renderStatusCodesEditor, renderCustomLimitRulesEditor, renderAntibotExclusionRulesEditor, normalizeBanEscalationStages, formatBanDurationSeconds, renderAntibotChallengeRulesEditor, renderAuthSessionTtlOptions, renderAuthUsersEditor, renderCountryEditor, renderAuthExclusionRulesEditor, renderAuthServiceTokensEditor, renderAuthHelpModal, renderAntibotHelpModal, renderTrafficBadBehaviorHelpModal, renderTrafficLimitsHelpModal, renderTrafficDnsblHelpModal, renderHeadersChapterHelpModal, renderBlockingChapterHelpModal, renderAntibotChapterHelpModal, renderGeoChapterHelpModal, renderModsecChapterHelpModal, normalizeAuthMode } = deps;
+  const { escapeHtml, renderListEditor, getQuickListTemplates, normalizeStringArray, renderStatusCodesEditor, renderCustomLimitRulesEditor, renderAntibotExclusionRulesEditor, normalizeBanEscalationStages, formatBanDurationSeconds, renderAntibotChallengeRulesEditor, renderAuthSessionTtlOptions, renderAuthUsersEditor, renderCountryEditor, renderAuthExclusionRulesEditor, renderAuthServiceTokensEditor, renderAuthHelpModal, renderAntibotHelpModal, renderTrafficBadBehaviorHelpModal, renderTrafficLimitsHelpModal, renderTrafficDnsblHelpModal, renderHeadersChapterHelpModal, renderBlockingChapterHelpModal, renderAntibotChapterHelpModal, renderGeoChapterHelpModal, renderModsecChapterHelpModal, renderGeoTimeWindowsEditor, normalizeAuthMode, renderVirtualPatchesEditor } = deps;
   const authMode = normalizeAuthMode(draft.auth_mode);
   return `
               <section class="waf-stack waf-service-compact-section${state.activeTab === "headers" ? "" : " waf-hidden"}" data-tab-panel="headers">
@@ -163,11 +163,13 @@ export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
                       ${renderListEditor("blacklist_asn", ctx.t("sites.easy.traffic.blacklistAsn"), draft.blacklist_asn, "AS13335", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
                       ${renderListEditor("blacklist_user_agent", ctx.t("sites.easy.traffic.blacklistUserAgent"), draft.blacklist_user_agent, "curl/*", { full: false, emptyLabel: ctx.t("sites.easy.noValues"), presets: getQuickListTemplates("blacklist_user_agent"), selectedTemplates: state.listTemplateSelection.blacklist_user_agent, ctx })}
                       ${renderListEditor("blacklist_uri", ctx.t("sites.easy.traffic.blacklistUri"), draft.blacklist_uri, "/admin", { full: false, emptyLabel: ctx.t("sites.easy.noValues"), presets: getQuickListTemplates("blacklist_uri"), selectedTemplates: state.listTemplateSelection.blacklist_uri, ctx })}
+                      ${renderListEditor("blacklist_ja3", ctx.t("sites.easy.traffic.blacklistJa3"), draft.blacklist_ja3, "abc123...", { full: false, emptyLabel: ctx.t("sites.easy.noValues"), presets: getQuickListTemplates("blacklist_ja3"), selectedTemplates: state.listTemplateSelection.blacklist_ja3, ctx })}
                       ${renderListEditor("blacklist_ip_urls", ctx.t("sites.easy.traffic.blacklistIpUrls"), draft.blacklist_ip_urls, "https://example.com/ip.txt", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
                       ${renderListEditor("blacklist_rdns_urls", ctx.t("sites.easy.traffic.blacklistRdnsUrls"), draft.blacklist_rdns_urls, "https://example.com/rdns.txt", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
                       ${renderListEditor("blacklist_asn_urls", ctx.t("sites.easy.traffic.blacklistAsnUrls"), draft.blacklist_asn_urls, "https://example.com/asn.txt", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
                       ${renderListEditor("blacklist_user_agent_urls", ctx.t("sites.easy.traffic.blacklistUserAgentUrls"), draft.blacklist_user_agent_urls, "https://example.com/ua.txt", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
                       ${renderListEditor("blacklist_uri_urls", ctx.t("sites.easy.traffic.blacklistUriUrls"), draft.blacklist_uri_urls, "https://example.com/uri.txt", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
+                      ${renderListEditor("blacklist_ja3_urls", ctx.t("sites.easy.traffic.blacklistJa3Urls"), draft.blacklist_ja3_urls, "https://example.com/ja3.txt", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
                     </div>
                   </div>
                 </div>
@@ -364,6 +366,7 @@ export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
                 <div class="waf-form-grid">
                   ${renderCountryEditor("blacklist_country", ctx.t("sites.easy.geo.countryBlacklist"), draft.blacklist_country, state.geoCatalog, { full: false, emptyLabel: ctx.t("sites.easy.noValues"), search: state.countryFilters.blacklist_country, ctx })}
                   ${renderCountryEditor("whitelist_country", ctx.t("sites.easy.geo.countryWhitelist"), draft.whitelist_country, state.geoCatalog, { full: false, emptyLabel: ctx.t("sites.easy.noValues"), search: state.countryFilters.whitelist_country, ctx })}
+                  ${renderGeoTimeWindowsEditor(draft.geo_time_windows, state.geoCatalog, ctx)}
                 </div>
               </section>
 
@@ -402,6 +405,45 @@ export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
                     <label for="service-modsecurity-custom-content">${escapeHtml(ctx.t("sites.easy.modsec.customContent"))}</label>
                     <textarea id="service-modsecurity-custom-content" rows="6">${escapeHtml(draft.modsecurity_custom_content)}</textarea>
                   </div>
+                </div>
+              </section>
+
+              <section class="waf-stack waf-service-compact-section${state.activeTab === "websocket" ? "" : " waf-hidden"}" data-tab-panel="websocket">
+                <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
+                  <div>
+                    <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.websocket.title"))}</div>
+                    <div class="muted">${escapeHtml(ctx.t("sites.easy.tab.websocket.subtitle"))}</div>
+                  </div>
+                </div>
+                <div class="waf-form-grid">
+                  <label class="waf-checkbox">
+                    <input id="service-use-ws-inspection" type="checkbox"${draft.use_ws_inspection ? " checked" : ""}${!draft.reverse_proxy_websocket ? " disabled" : ""}>
+                    <span>${escapeHtml(ctx.t("sites.easy.ws.useInspection"))}</span>
+                  </label>
+                  <div class="waf-field">
+                    <label for="service-ws-max-message-bytes">${escapeHtml(ctx.t("sites.easy.ws.maxMessageBytes"))}</label>
+                    <input id="service-ws-max-message-bytes" type="number" min="0" value="${escapeHtml(String(draft.ws_max_message_bytes || 0))}">
+                  </div>
+                  <div class="waf-field">
+                    <label for="service-ws-rate-msg-per-sec">${escapeHtml(ctx.t("sites.easy.ws.rateMsgPerSec"))}</label>
+                    <input id="service-ws-rate-msg-per-sec" type="number" min="0" value="${escapeHtml(String(draft.ws_rate_msg_per_sec || 0))}">
+                  </div>
+                  ${renderListEditor("ws_block_patterns", ctx.t("sites.easy.ws.blockPatterns"), draft.ws_block_patterns, ctx.t("sites.easy.ws.blockPatternPlaceholder"), { full: true, emptyLabel: ctx.t("sites.easy.noValues") })}
+                </div>
+              </section>
+
+              <section class="waf-stack waf-service-compact-section${state.activeTab === "virtualpatches" ? "" : " waf-hidden"}" data-tab-panel="virtualpatches">
+                <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
+                  <div>
+                    <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.virtualpatches.title"))}</div>
+                    <div class="muted">${escapeHtml(ctx.t("sites.easy.tab.virtualpatches.subtitle"))}</div>
+                  </div>
+                </div>
+                <div class="waf-form-grid">
+                  <div class="full">
+                    <p class="muted" style="margin:0 0 8px;">${escapeHtml(ctx.t("sites.easy.virtualpatches.hint"))}</p>
+                  </div>
+                  ${renderVirtualPatchesEditor(state, ctx, escapeHtml)}
                 </div>
               </section>
 

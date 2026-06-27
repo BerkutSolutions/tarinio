@@ -142,6 +142,28 @@ export function renderAntibotChallengeRulesEditor(rules, ctx, escapeHtml, normal
   return renderAntibotChallengeRulesEditorModule(rules, ctx, { escapeHtml, normalizeArray });
 }
 
+// normalizeGeoTimeWindows sanitises a raw geo_time_windows value from the draft
+// or the server response. Each window must have countries[], action, hours_start,
+// hours_end. Invalid items are dropped rather than throwing.
+export function normalizeGeoTimeWindows(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((w) => ({
+      countries: Array.isArray(w?.countries)
+        ? w.countries.map((c) => String(c || "").trim().toUpperCase()).filter(Boolean)
+        : [],
+      action: ["block", "allow"].includes(String(w?.action || "").trim().toLowerCase())
+        ? String(w.action).trim().toLowerCase()
+        : "block",
+      days_of_week: Array.isArray(w?.days_of_week)
+        ? w.days_of_week.map(Number).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6)
+        : [],
+      hours_start: Number.isInteger(Number(w?.hours_start)) ? Math.max(0, Math.min(23, Number(w.hours_start))) : 0,
+      hours_end: Number.isInteger(Number(w?.hours_end)) ? Math.max(0, Math.min(23, Number(w.hours_end))) : 0
+    }))
+    .filter((w) => w.countries.length > 0 && w.hours_start < w.hours_end);
+}
+
 export function normalizeHost(value) {
   return normalizeHostModule(value);
 }
@@ -208,4 +230,15 @@ export function resolvePublicServiceURL(site, tlsState) {
 
 export function computeUpstreamID(siteID) {
   return computeUpstreamIDModule(siteID);
+}
+
+export function normalizeWSBlockPatterns(value) {
+  const seen = new Set();
+  return (Array.isArray(value) ? value : [])
+    .map((p) => String(p || "").trim())
+    .filter((p) => {
+      if (!p || seen.has(p)) return false;
+      seen.add(p);
+      return true;
+    });
 }

@@ -168,7 +168,9 @@ export function renderWizardNav(activeTab, ctx) {
     { id: "blocking", title: ctx.t("sites.easy.tab.blocking.title"), subtitle: ctx.t("sites.easy.tab.blocking.subtitle") },
     { id: "antibot", title: ctx.t("sites.easy.tab.antibot.title"), subtitle: ctx.t("sites.easy.tab.antibot.subtitle") },
     { id: "geo", title: ctx.t("sites.easy.tab.geo.title"), subtitle: ctx.t("sites.easy.tab.geo.subtitle") },
-    { id: "modsec", title: ctx.t("sites.easy.tab.modsec.title"), subtitle: ctx.t("sites.easy.tab.modsec.subtitle") }
+    { id: "modsec", title: ctx.t("sites.easy.tab.modsec.title"), subtitle: ctx.t("sites.easy.tab.modsec.subtitle") },
+    { id: "websocket", title: ctx.t("sites.easy.tab.websocket.title"), subtitle: ctx.t("sites.easy.tab.websocket.subtitle") },
+    { id: "virtualpatches", title: ctx.t("sites.easy.tab.virtualpatches.title"), subtitle: ctx.t("sites.easy.tab.virtualpatches.subtitle") }
   ];
   return `
     <aside class="waf-service-wizard-nav" role="tablist" aria-label="${escapeHtml(ctx.t("sites.wizard.aria"))}">

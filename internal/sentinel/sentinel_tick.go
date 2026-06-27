@@ -110,6 +110,31 @@ func processTick(cfg Config, current State, now time.Time) (State, bool, error) 
 		if isSuspiciousUserAgent(item.userAgent) {
 			ipStats.SuspiciousUAHits++
 		}
+		if item.ja3 != "" {
+			ipStats.JA3Hits++
+			if isJA3Blacklisted(item.ja3, cfg) {
+				ipStats.JA3BlacklistHits++
+			}
+		}
+		// credential stuffing: 401 on auth paths
+		authPaths := effectiveAuthPaths(cfg)
+		if item.status == 401 && isAuthPath(item.path, authPaths) {
+			ipStats.AuthFailures++
+			if ipStats.AuthPaths == nil {
+				ipStats.AuthPaths = map[string]struct{}{}
+			}
+			if p := normalizePath(item.path); p != "" {
+				ipStats.AuthPaths[p] = struct{}{}
+			}
+		}
+		// antibot fail
+		if item.antibotFail {
+			ipStats.AntibotFails++
+		}
+		// bad behavior: 429 from bad-behavior zone
+		if isBadBehaviorHit(item.status) {
+			ipStats.BadBehaviorHits++
+		}
 		if path := normalizePath(item.path); path != "" {
 			if len(ipStats.UniquePaths) < cfg.MaxUniquePathsPerIP {
 				ipStats.UniquePaths[path] = struct{}{}

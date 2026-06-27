@@ -1,8 +1,6 @@
 # Практический тюнинг WAF
 
-Эта страница относится к текущей ветке документации.
-
-Релизный baseline для этой ревизии документа: `3.0.7`.
+Релизный baseline для этой ревизии документа: `1.3.5`.
 
 Руководство ориентировано на оператора, у которого уже:
 
@@ -130,6 +128,56 @@ control-plane -> policy changes -> compile -> revision bundle -> apply -> runtim
 - вносить одно осмысленное изменение за раз;
 - не смешивать несвязанные правки в одной ревизии;
 - валидировать эффект сразу после apply.
+
+## Настройка mTLS (v1.3.5+)
+
+### Входящий mTLS (client certificate)
+
+1. Загрузить CA-сертификат клиента в Vault по пути `pki/client_ca`.
+2. В профиле сайта включить `security_mtls.use_mtls = true`.
+3. Указать `mtls_vault_path` — Vault-путь к ClientCA.
+4. При необходимости включить `mtls_require_client_cert`.
+5. Compile + apply ревизию.
+
+### Исходящий mTLS (upstream)
+
+1. Загрузить cert и key в Vault (`pki/upstream_cert`, `pki/upstream_key`).
+2. Включить `security_mtls.use_upstream_mtls = true`.
+3. Указать `upstream_mtls_cert_vault_path` и `upstream_mtls_key_vault_path`.
+4. Compile + apply.
+
+## Настройка инспекции WebSocket (v1.3.5+)
+
+1. В профиле сайта открыть вкладку `WebSocket`.
+2. Включить `security_websocket.use_websocket_inspection = true`.
+3. Задать `max_frame_size` и `max_message_size` по требованиям приложения.
+4. При необходимости добавить `blocked_patterns` — регулярные выражения.
+5. Compile + apply.
+
+Рекомендация: начинайте с Detection-mode WAF на том же сайте, чтобы выявить false positives на WebSocket-трафике.
+
+## Virtual Patching (v1.3.5+)
+
+Virtual Patch — это per-site SecRule, которое активируется сразу после compile+apply, не требуя изменений в CRS.
+
+1. Открыть вкладку `Virtual Patches` в профиле сайта.
+2. Добавить SecRule-строку, например:
+   ```
+   SecRule REQUEST_URI "@contains /vulnerable-path" "id:9001,phase:1,deny,status:403,msg:'Virtual patch'"
+   ```
+3. Compile + apply.
+
+Правило: виртуальные патчи — временная мера до выпуска кода. Удаляйте их после устранения уязвимости в приложении.
+
+## Geo Time Windows (v1.3.5+)
+
+Geo Time Window позволяет блокировать или ограничивать трафик из страны в определённое время суток.
+
+1. Открыть вкладку `Geo Time Windows` в профиле сайта.
+2. Добавить запись: страна, время начала, время окончания, действие (`block`/`rate_limit`).
+3. Compile + apply.
+
+Типичный сценарий: заблокировать трафик из определённых регионов в ночные часы по местному времени.
 
 ## Наблюдаемость без внешнего SIEM
 

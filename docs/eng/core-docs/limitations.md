@@ -1,8 +1,6 @@
 # Known Limitations and Product Boundaries
 
-This page belongs to the current documentation branch.
-
-Release baseline for this revision: `3.0.6`.
+Release baseline for this revision: `1.3.5`.
 
 ## Why This Page Exists
 

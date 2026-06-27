@@ -127,6 +127,31 @@ export function renderDetailViewRuntime(state, ctx, deps) {
                     <input id="service-tls-self-signed" type="checkbox"${draft.tls_self_signed ? " checked" : ""}>
                     <span>${escapeHtml(ctx.t("sites.easy.front.tlsSelfSigned"))}</span>
                   </label>
+                  <div class="waf-subframe full" style="margin-top:8px;">
+                    <div class="waf-list-title-sm">${escapeHtml(ctx.t("sites.easy.mtls.title"))}</div>
+                    <div class="waf-form-grid">
+                      <label class="waf-checkbox">
+                        <input id="service-mtls-enabled" type="checkbox"${draft.mtls_enabled ? " checked" : ""}>
+                        <span>${escapeHtml(ctx.t("sites.easy.mtls.enabled"))}</span>
+                      </label>
+                      <label class="waf-checkbox">
+                        <input id="service-mtls-optional" type="checkbox"${draft.mtls_optional ? " checked" : ""}${!draft.mtls_enabled ? " disabled" : ""}>
+                        <span>${escapeHtml(ctx.t("sites.easy.mtls.optional"))}</span>
+                      </label>
+                      <label class="waf-checkbox">
+                        <input id="service-mtls-pass-headers" type="checkbox"${draft.mtls_pass_headers ? " checked" : ""}${!draft.mtls_enabled ? " disabled" : ""}>
+                        <span>${escapeHtml(ctx.t("sites.easy.mtls.passHeaders"))}</span>
+                      </label>
+                      <div class="waf-field">
+                        <label for="service-mtls-verify-depth">${escapeHtml(ctx.t("sites.easy.mtls.verifyDepth"))}</label>
+                        <input id="service-mtls-verify-depth" type="number" min="0" max="10" value="${escapeHtml(String(draft.mtls_verify_depth || 2))}"${!draft.mtls_enabled ? " disabled" : ""}>
+                      </div>
+                      <div class="waf-field full">
+                        <label for="service-mtls-client-ca-ref">${escapeHtml(ctx.t("sites.easy.mtls.clientCaRef"))}</label>
+                        <input id="service-mtls-client-ca-ref" value="${escapeHtml(draft.mtls_client_ca_ref || "")}" placeholder="${escapeHtml(ctx.t("sites.easy.mtls.clientCaRefPlaceholder"))}"${!draft.mtls_enabled ? " disabled" : ""}>
+                      </div>
+                    </div>
+                  </div>
                   <div class="waf-field waf-field-cert-id">
                     <label for="service-certificate-id">${escapeHtml(ctx.t("sites.tls.certificateId"))}</label>
                     <input id="service-certificate-id" value="${escapeHtml(draft.certificate_id)}" placeholder="${escapeHtml(ctx.t("sites.tls.certificatePlaceholder"))}">
@@ -178,6 +203,20 @@ export function renderDetailViewRuntime(state, ctx, deps) {
                     <input id="service-reverse-proxy-websocket" type="checkbox"${draft.reverse_proxy_websocket ? " checked" : ""}>
                     <span>${escapeHtml(ctx.t("sites.easy.upstream.websocket"))}</span>
                   </label>
+                </div>
+                <div class="waf-form-grid three">
+                  <label class="waf-checkbox">
+                    <input id="service-health-check-enabled" type="checkbox"${draft.health_check_enabled ? " checked" : ""}>
+                    <span>${escapeHtml(ctx.t("sites.easy.upstream.healthCheckEnabled"))}</span>
+                  </label>
+                  <div class="waf-field">
+                    <label for="service-health-check-path">${escapeHtml(ctx.t("sites.easy.upstream.healthCheckPath"))}</label>
+                    <input id="service-health-check-path" value="${escapeHtml(draft.health_check_path || "/health")}"${draft.health_check_enabled ? "" : " disabled"}>
+                  </div>
+                  <div class="waf-field">
+                    <label for="service-health-check-interval">${escapeHtml(ctx.t("sites.easy.upstream.healthCheckInterval"))}</label>
+                    <input id="service-health-check-interval" type="number" min="1" max="300" value="${escapeHtml(String(draft.health_check_interval_seconds || 10))}"${draft.health_check_enabled ? "" : " disabled"}>
+                  </div>
                 </div>
                 <div class="waf-upstream-layout">
                   <div class="waf-form-grid three">
@@ -250,6 +289,27 @@ export function renderDetailViewRuntime(state, ctx, deps) {
                   </div>
                 </div>
                 ${renderUpstreamHeadersHelpModal(ctx)}
+                <div class="waf-subframe full" style="margin-top:8px;">
+                  <div class="waf-list-title-sm">${escapeHtml(ctx.t("sites.easy.upstream_mtls.title"))}</div>
+                  <div class="waf-form-grid">
+                    <label class="waf-checkbox">
+                      <input id="service-upstream-mtls-enabled" type="checkbox"${draft.upstream_mtls_enabled ? " checked" : ""}>
+                      <span>${escapeHtml(ctx.t("sites.easy.upstream_mtls.enabled"))}</span>
+                    </label>
+                    <div class="waf-field">
+                      <label for="service-upstream-mtls-cert-ref">${escapeHtml(ctx.t("sites.easy.upstream_mtls.certRef"))}</label>
+                      <input id="service-upstream-mtls-cert-ref" value="${escapeHtml(draft.upstream_mtls_cert_ref || "")}" placeholder="/etc/ssl/waf-client.crt"${!draft.upstream_mtls_enabled ? " disabled" : ""}>
+                    </div>
+                    <div class="waf-field">
+                      <label for="service-upstream-mtls-key-ref">${escapeHtml(ctx.t("sites.easy.upstream_mtls.keyRef"))}</label>
+                      <input id="service-upstream-mtls-key-ref" value="${escapeHtml(draft.upstream_mtls_key_ref || "")}" placeholder="/etc/ssl/waf-client.key"${!draft.upstream_mtls_enabled ? " disabled" : ""}>
+                    </div>
+                    <div class="waf-field">
+                      <label for="service-upstream-mtls-ca-ref">${escapeHtml(ctx.t("sites.easy.upstream_mtls.caRef"))}</label>
+                      <input id="service-upstream-mtls-ca-ref" value="${escapeHtml(draft.upstream_mtls_ca_ref || "")}" placeholder="/etc/ssl/upstream-ca.crt"${!draft.upstream_mtls_enabled ? " disabled" : ""}>
+                    </div>
+                  </div>
+                </div>
               </section>
 
               <section class="waf-stack waf-service-compact-section${state.activeTab === "http" ? "" : " waf-hidden"}" data-tab-panel="http">
@@ -276,6 +336,10 @@ export function renderDetailViewRuntime(state, ctx, deps) {
                     <label class="waf-checkbox">
                       <input id="service-http3" type="checkbox"${draft.http3 ? " checked" : ""}>
                       <span>HTTP3</span>
+                    </label>
+                    <label class="waf-checkbox">
+                      <input id="service-http-strict-parsing" type="checkbox"${draft.http_strict_parsing ? " checked" : ""}>
+                      <span>${escapeHtml(ctx.t("sites.easy.http.strictParsing"))}</span>
                     </label>
                   </div>
                 </div>

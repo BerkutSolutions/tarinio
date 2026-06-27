@@ -5,9 +5,8 @@ function countryFlag(code, deps) {
   if (!/^[A-Z]{2}$/.test(token)) {
     return "";
   }
-  const first = 127397 + token.charCodeAt(0);
-  const second = 127397 + token.charCodeAt(1);
-  return String.fromCodePoint(first, second);
+  const cc = token.toLowerCase();
+  return `<img class="country-flag-img" src="https://flagcdn.com/16x12/${cc}.png" srcset="https://flagcdn.com/32x24/${cc}.png 2x" width="16" height="12" alt="${token}" loading="lazy" onerror="this.style.display='none';this.nextSibling&&(this.nextSibling.style.display='')"><span class="country-flag-fallback" style="display:none">${token}</span>`;
 }
 
 function countryName(code, deps) {
@@ -30,7 +29,7 @@ function renderCountryBadge(code, deps) {
   }
   const flag = countryFlag(normalized, deps);
   const name = countryName(normalized, deps);
-  return `<span class="dashboard-ip-country">${escapeHtml(name)}${flag ? ` ${flag}` : ""}</span>`;
+  return `<span class="dashboard-ip-country">${escapeHtml(name)}${flag ? " " + flag : ""}</span>`;
 }
 
 // Форматирует строку даты/времени в локализованный вид браузера
@@ -244,11 +243,24 @@ function mergeWidgetData(stats, detailModel, containersOverview, ctx, deps) {
   const topIPItems = statsTopIPs.map((item) => {
     const key        = String(item?.key || "").trim();
     const rawCountry = item?.country_code || item?.countryCode || "";
+    // Приоритет: поле из stats → detailModel по IP → UNK
     const countryCode = rawCountry
       ? deps.normalizeCountryCode(rawCountry)
-      : (detailModel?.ipCountryByIP?.get?.(key) || "UNK");
+      : (detailModel?.ipCountryByIP?.get?.(key) || detailModel?.ipDetailsByIP?.get?.(key)?.countryCode || "UNK");
     return { key, count: Number(item?.count || 0), countryCode };
   });
+
+  // Если stats не содержат top_attacker_ips — берём из detailModel
+  const effectiveTopIPItems = topIPItems.length
+    ? topIPItems
+    : (detailModel?.ipDetailsSummary || []).slice(0, 10).map((item) => ({
+        key: item.ip, count: Math.max(item.attacks, item.requests), countryCode: item.countryCode
+      }));
+
+  // Топ стран: stats → detailModel.attacksByCountry (тот же источник что и остальные виджеты)
+  const effectiveTopCountryItems = (statsTopCountries.length ? statsTopCountries : fallbackTopCountries).map((item) => ({
+    key: item?.key, count: item?.count, countryCode: item?.key
+  }));
 
   return {
     "services":         renderServicesWidget(stats, ctx, deps),
@@ -258,7 +270,7 @@ function mergeWidgetData(stats, detailModel, containersOverview, ctx, deps) {
     "attacks-day":      renderMetric(stats?.attacks_day,           ctx.t("dashboard.value.attacksDay"),        "warning", "attacks-day",     deps),
     "blocked-attacks":  renderMetric(stats?.blocked_attacks_day,   ctx.t("dashboard.value.blockedAttacksDay"), "danger",  "blocked-attacks", deps),
     "unique-attackers": renderIPTopList(
-      topIPItems.length ? topIPItems : (detailModel?.ipDetailsSummary || []).slice(0, 10).map((item) => ({
+      effectiveTopIPItems.length ? effectiveTopIPItems : (detailModel?.ipDetailsSummary || []).slice(0, 10).map((item) => ({
         key: item.ip, count: Math.max(item.attacks, item.requests), countryCode: item.countryCode
       })),
       ctx.t("dashboard.empty.topIPs"), "unique-attackers", deps
@@ -270,8 +282,8 @@ function mergeWidgetData(stats, detailModel, containersOverview, ctx, deps) {
         return code ? `data-widget-action="error-detail" data-error-code="${escapeHtml(code)}"` : "";
       }
     }, deps),
-    "top-ips": renderIPTopList(topIPItems, ctx.t("dashboard.empty.topIPs"), "top-ips", deps),
-    "top-countries": renderTopList(topCountryItems, ctx.t("dashboard.empty.topCountries"), {
+    "top-ips": renderIPTopList(effectiveTopIPItems, ctx.t("dashboard.empty.topIPs"), "top-ips", deps),
+    "top-countries": renderTopList(effectiveTopCountryItems, ctx.t("dashboard.empty.topCountries"), {
       containerAction: "top-countries",
       renderLabel: (item) => renderCountryBadge(item?.countryCode || item?.key, deps),
       rowAttrs: (item) => `data-widget-action="country-detail" data-country-code="${escapeHtml(deps.normalizeCountryCode(item?.countryCode || item?.key))}"`

@@ -207,9 +207,13 @@ type EasyProfileInput struct {
 	BlacklistIP        []string
 	BlacklistUserAgent []string
 	BlacklistURI       []string
+	BlacklistJA3       []string
+	BlacklistJA3URLs   []string
 
 	BlacklistCountry []string
 	WhitelistCountry []string
+	// GeoTimeWindows defines time-based geo-fencing rules compiled into nginx.
+	GeoTimeWindows []GeoTimeWindowInput
 
 	UseModSecurity                    bool
 	UseModSecurityCRSPlugins          bool
@@ -224,4 +228,33 @@ type EasyProfileInput struct {
 	APIEnforcementMode     string
 	APIDefaultAction       string
 	APIEndpointPolicies    []APIPositiveEndpointPolicyInput
+
+	HttpStrictParsing bool
+
+	// HealthCheckEnabled enables passive upstream health checking.
+	// When true, nginx uses proxy_next_upstream to retry on 502/503.
+	HealthCheckEnabled         bool
+	HealthCheckPath            string
+	HealthCheckIntervalSeconds int
+	HealthCheckFailThreshold   int
+
+	// WSInspection holds WebSocket frame inspection settings.
+	// Active only when UseWSInspection=true and ReverseProxyWebsocket=true.
+	WSInspection WSInspectionInput
+
+	// MTLS holds incoming mTLS client certificate verification settings (TASK-8.1).
+	MTLS MTLSInput
+
+	// UpstreamMTLS holds outgoing mTLS client certificate settings (TASK-8.2).
+	UpstreamMTLS UpstreamMTLSInput
+
+	VirtualPatches []VirtualPatchInput
+}
+
+// VirtualPatchInput is the compiler input slice for a single virtual patch rule.
+type VirtualPatchInput struct {
+	ID      string
+	Pattern string // regex
+	Target  string // "uri" | "body" | "header"
+	Action  string // "block" | "monitor"
 }

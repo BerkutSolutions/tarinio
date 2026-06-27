@@ -50,6 +50,7 @@ import {
   renderStatusCodesEditor,
 } from "./sites.list-renderers.js";
 import { renderDetailViewRuntime } from "./sites.detail-render-view.js";
+import { renderVirtualPatchesEditor as renderVirtualPatchesEditorModule } from "./sites.virtual-patches-editor.js";
 import {
   renderModeTabs as renderModeTabsModule,
   renderRawEditor as renderRawEditorModule,
@@ -95,6 +96,43 @@ function renderAntibotChallengeRulesEditor(rules, ctx) {
         `).join("")}
         ${safeRules.length ? "" : `<span class="waf-note">${escapeHtml(ctx.t("sites.easy.noValues"))}</span>`}
         <button class="btn ghost btn-sm" type="button" data-antibot-rule-add>${escapeHtml(ctx.t("sites.easy.antibot.addChallengeRule"))}</button>
+      </div>
+    </div>`;
+}
+
+function renderGeoTimeWindowsEditor(windows, geoCatalog, ctx) {
+  const safeWindows = Array.isArray(windows) ? windows : [];
+  const days = [
+    ctx.t("sites.easy.geo.timeWindow.sun"),
+    ctx.t("sites.easy.geo.timeWindow.mon"),
+    ctx.t("sites.easy.geo.timeWindow.tue"),
+    ctx.t("sites.easy.geo.timeWindow.wed"),
+    ctx.t("sites.easy.geo.timeWindow.thu"),
+    ctx.t("sites.easy.geo.timeWindow.fri"),
+    ctx.t("sites.easy.geo.timeWindow.sat"),
+  ];
+  return `
+    <div class="waf-field full">
+      <label>${escapeHtml(ctx.t("sites.easy.geo.timeWindows"))}</label>
+      <div class="waf-stack">
+        ${safeWindows.map((w, index) => `
+          <div class="waf-inline waf-custom-limit-row" style="flex-wrap:wrap;gap:4px;">
+            <input data-geo-tw-countries="${index}" placeholder="RU,CN" value="${escapeHtml((w.countries || []).join(","))}" style="width:120px;" title="${escapeHtml(ctx.t("sites.easy.geo.timeWindow.countries"))}">
+            <select data-geo-tw-action="${index}">
+              <option value="block"${w.action === "block" ? " selected" : ""}>${escapeHtml(ctx.t("sites.easy.geo.timeWindow.actionBlock"))}</option>
+              <option value="allow"${w.action === "allow" ? " selected" : ""}>${escapeHtml(ctx.t("sites.easy.geo.timeWindow.actionAllow"))}</option>
+            </select>
+            <input data-geo-tw-hours-start="${index}" type="number" min="0" max="23" value="${Number(w.hours_start) || 0}" style="width:56px;" title="${escapeHtml(ctx.t("sites.easy.geo.timeWindow.hoursStart"))}">
+            <span>–</span>
+            <input data-geo-tw-hours-end="${index}" type="number" min="0" max="23" value="${Number(w.hours_end) || 0}" style="width:56px;" title="${escapeHtml(ctx.t("sites.easy.geo.timeWindow.hoursEnd"))}">
+            <span class="muted" style="font-size:0.85em;">UTC</span>
+            <span>${escapeHtml(ctx.t("sites.easy.geo.timeWindow.days"))}</span>
+            ${days.map((d, di) => `<label class="waf-checkbox" style="font-size:0.85em;"><input type="checkbox" data-geo-tw-day="${index}-${di}"${(w.days_of_week || []).includes(di) ? " checked" : ""}><span>${escapeHtml(d)}</span></label>`).join("")}
+            <button class="btn ghost btn-sm" type="button" data-geo-tw-remove="${index}">x</button>
+          </div>
+        `).join("")}
+        ${safeWindows.length ? "" : `<span class="waf-note">${escapeHtml(ctx.t("sites.easy.noValues"))}</span>`}
+        <button class="btn ghost btn-sm" type="button" data-geo-tw-add>${escapeHtml(ctx.t("sites.easy.geo.timeWindow.add"))}</button>
       </div>
     </div>`;
 }
@@ -164,9 +202,11 @@ export function renderDetailView(state, ctx) {
     renderAntibotChapterHelpModal,
     renderGeoChapterHelpModal,
     renderModsecChapterHelpModal,
+    renderGeoTimeWindowsEditor,
     normalizeAuthMode,
     normalizeAuthOrder,
     normalizeAuthExclusionRules,
     normalizeAuthServiceTokens,
+    renderVirtualPatchesEditor: (vpState, vpCtx) => renderVirtualPatchesEditorModule(vpState, vpCtx),
   });
 }

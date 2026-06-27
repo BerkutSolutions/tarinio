@@ -33,6 +33,9 @@ type nginxSiteData struct {
 	PassHostHeader            bool
 	RateLimitCookie           string
 	RateLimitEscalationCookie string
+	// HealthCheckEnabled adds keepalive to the upstream block and
+	// proxy_next_upstream directives to the location blocks.
+	HealthCheckEnabled bool
 }
 
 type nginxHostMapEntry struct {

@@ -1,6 +1,6 @@
 # Контракт Runtime Filesystem
 
-Статус: Stage 1 runtime contract для single-node развертывания.
+Статус: Stage 1 runtime contract для shared runtime root — используется в single-node и High Availability развёртываниях.
 
 ## Назначение
 
@@ -119,7 +119,7 @@ Runtime не владеет:
 
 ## Итоговое правило
 
-Для single-node MVP:
+Для single-node и HA развёртываний:
 - `active/current.json` — authoritative;
 - `/etc/waf/current` — derived;
 - относительные пути артефактов не должны меняться между compile, stage и runtime;

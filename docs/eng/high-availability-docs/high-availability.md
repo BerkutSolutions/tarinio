@@ -1,10 +1,8 @@
 # High Availability and Multi-Node
 
-This page belongs to the current documentation branch.
-
 ## Scope
 
-TARINIO `current release` now supports a practical multi-node control-plane topology on one Docker host:
+TARINIO `1.3.5` supports a practical multi-node control-plane topology on one Docker host:
 
 - shared PostgreSQL state;
 - shared Redis coordination;
@@ -16,7 +14,7 @@ This closes the earlier gap where the product was documented as PostgreSQL-backe
 
 ## What Is High Availability Today
 
-The supported High Availability shape in `current release` is:
+The supported High Availability shape in `1.3.5` is:
 
 ```text
 ui -> api-lb -> control-plane-a / control-plane-b
@@ -129,7 +127,7 @@ Certificate renewal checks run under leader election so that only one node submi
 
 Use:
 
-- `deploy/compose/High Availability-lab`
+- `deploy/compose/ha-lab`
 
 This profile includes:
 
@@ -157,7 +155,7 @@ Validated High Availability lab resource envelope:
 1. Start the lab:
 
 ```powershell
-cd deploy/compose/High Availability-lab
+cd deploy/compose/ha-lab
 docker compose --profile tools --profile observability up -d --build
 ```
 
@@ -225,6 +223,3 @@ For production:
 - keep PostgreSQL and Redis on persistent storage;
 - monitor lock contention, runtime health, and revision apply results;
 - use the High Availability lab as the operator rehearsal environment before promotion.
-
-
-

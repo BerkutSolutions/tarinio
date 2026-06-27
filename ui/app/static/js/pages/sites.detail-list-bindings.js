@@ -16,6 +16,7 @@ export function bindDetailListEditors(container, state, deps) {
     normalizeArray,
     parseBanDurationSeconds,
     normalizeBanEscalationStages,
+    normalizeGeoTimeWindows,
     setError,
     render,
     syncStateDraftFromForm,
@@ -293,6 +294,24 @@ export function bindDetailListEditors(container, state, deps) {
       if (index >= current.length) return;
       current.splice(index, 1);
       state.draft.ban_escalation_stages_seconds = normalizeBanEscalationStages(current, state.draft.bad_behavior_ban_time_seconds);
+      render();
+    });
+  });
+
+  container.querySelector("[data-geo-tw-add]")?.addEventListener("click", () => {
+    syncStateDraftFromForm();
+    state.draft.geo_time_windows = [...normalizeGeoTimeWindows(state.draft.geo_time_windows), { countries: [], action: "block", days_of_week: [], hours_start: 9, hours_end: 17 }];
+    render();
+  });
+  container.querySelectorAll("[data-geo-tw-remove]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const index = Number.parseInt(String(button.dataset.geoTwRemove || "-1"), 10);
+      if (!Number.isInteger(index) || index < 0) return;
+      syncStateDraftFromForm();
+      const current = normalizeGeoTimeWindows(state.draft.geo_time_windows);
+      if (index >= current.length) return;
+      current.splice(index, 1);
+      state.draft.geo_time_windows = current;
       render();
     });
   });

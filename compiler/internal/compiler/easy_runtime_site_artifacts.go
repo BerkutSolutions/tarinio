@@ -134,8 +134,13 @@ func renderEasySiteArtifacts(site SiteInput, profile EasyProfileInput) ([]Artifa
 		BlacklistIP:                  profile.BlacklistIP,
 		BlacklistUserAgent:           profile.BlacklistUserAgent,
 		BlacklistURI:                 profile.BlacklistURI,
+		BlacklistJA3:                 profile.BlacklistJA3,
 		BlacklistCountryGuardPattern: blacklistCountryGuardPattern(profile.BlacklistCountry),
 		WhitelistCountryGuardPattern: whitelistCountryGuardPattern(profile.WhitelistCountry),
+		GeoTimeWindowSnippet:         buildGeoTimeWindowServerSnippet(site.ID, profile.GeoTimeWindows, "$"+siteExceptionVar(site.ID)),
+		WSInspectionSnippet:          buildWSInspectionServerSnippet(site.ID, profile.WSInspection),
+		MTLSSnippet:                  buildMTLSServerSnippet(profile.MTLS),
+		UpstreamMTLSSnippet:          buildUpstreamMTLSSnippet(profile.UpstreamMTLS),
 		UseModSecurity:               profile.UseModSecurity,
 		UseModSecurityEasyFile:       profile.UseModSecurity,
 		ModSecurityEasyRulesOn:       profile.UseModSecurity,
@@ -153,7 +158,13 @@ func renderEasySiteArtifacts(site SiteInput, profile EasyProfileInput) ([]Artifa
 			profile.APIEnforcementMode,
 			profile.APIDefaultAction,
 			profile.APIEndpointPolicies,
+			profile.VirtualPatches,
 		),
+		HttpStrictParsing: profile.HttpStrictParsing,
+		HealthCheckEnabled:         profile.HealthCheckEnabled,
+		HealthCheckPath:            profile.HealthCheckPath,
+		HealthCheckIntervalSeconds: profile.HealthCheckIntervalSeconds,
+		HealthCheckFailThreshold:   profile.HealthCheckFailThreshold,
 	}
 
 	content, err := renderTemplate(filepath.Join(templatesRoot(), "easy", "site.conf.tmpl"), data)
@@ -201,6 +212,14 @@ func renderEasySiteArtifacts(site SiteInput, profile EasyProfileInput) ([]Artifa
 			fmt.Sprintf("modsecurity/easy/%s.conf", site.ID),
 			ArtifactKindModSecurity,
 			[]byte(data.ModSecurityEasyRules),
+		))
+	}
+	// geo time-window http-context maps (must be included from http block)
+	if geoConf := buildGeoTimeWindowHttpConf(site.ID, profile.GeoTimeWindows); geoConf != "" {
+		artifacts = append(artifacts, newArtifact(
+			fmt.Sprintf("nginx/geo-timewindow/%s.conf", site.ID),
+			ArtifactKindNginxConfig,
+			[]byte(geoConf),
 		))
 	}
 	if data.AntibotUsesInterstitial {

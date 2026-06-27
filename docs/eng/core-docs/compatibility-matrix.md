@@ -4,7 +4,7 @@ This page belongs to the current documentation branch.
 
 ## Scope
 
-This matrix defines the deployment combinations TARINIO `current release` is designed, tested, and supported for.
+This matrix defines the deployment combinations TARINIO `1.3.5` is designed, tested, and supported for.
 
 ## Runtime Platform
 
@@ -14,6 +14,18 @@ Supported baseline:
 - Docker Engine with Docker Compose plugin;
 - Debian-based container images for `control-plane` and bundled PostgreSQL;
 - NGINX + ModSecurity runtime.
+
+## Stack Components (v1.3.5+)
+
+| Component | Role | Required |
+|---|---|---|
+| `control-plane` | API, UI, revision engine | yes |
+| `postgresql` | state store | yes |
+| `vault` | mTLS certs + logging secrets | yes |
+| `opensearch` | request/event logging backend | standalone default |
+| `redis` | HA coordination | HA only |
+| `clickhouse` | cold analytics tier | enterprise optional |
+| `tarinio-sentinel` | anomaly detection | enterprise optional |
 
 ## Data Services
 

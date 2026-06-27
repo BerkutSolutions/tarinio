@@ -2,7 +2,7 @@
 
 Эта страница относится к текущей ветке документации.
 
-Документ описывает актуальный HTTP API control-plane для версии `3.0.6`. Каталог собран по реально зарегистрированным маршрутам из `control-plane/internal/httpserver/server.go`.
+Документ описывает актуальный HTTP API control-plane для версии `1.3.5`. Каталог собран по реально зарегистрированным маршрутам из `control-plane/internal/httpserver/server.go`.
 
 ## Общие правила
 
@@ -319,6 +319,13 @@
 - `GET /core-docs/api/administration/scripts`
 - `POST /core-docs/api/administration/scripts/{scriptID}/run`
 - `GET /core-docs/api/administration/scripts/runs/{runID}/download`
+
+### Virtual Patches
+
+- `GET /api/virtual-patches/{siteID}`
+- `POST /api/virtual-patches/{siteID}`
+- `PUT /api/virtual-patches/{siteID}/{patchID}`
+- `DELETE /api/virtual-patches/{siteID}/{patchID}`
 
 ## Связь разделов интерфейса с API
 

@@ -15,7 +15,7 @@ This document defines the minimum production baseline and the main secure-operat
 
 ## Authentication And Access
 
-In version `current release`, the platform supports:
+In version `1.3.5`, the platform supports:
 
 - session-based login;
 - enterprise login through `OIDC`;

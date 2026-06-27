@@ -102,6 +102,8 @@
 - `Antibot`
 - `Geo`
 - `ModSecurity`
+- `WebSocket`
+- `Lists`
 
 Также поддерживается выбор профиля сервиса:
 
@@ -134,6 +136,36 @@
 - черный список стран.
 
 Если страна находится в черном списке или не входит в белый список (когда белый список задан), запрос получает `403`.
+
+### Вкладка WebSocket
+
+Во вкладке `WebSocket` настраивается инспекция WS-фреймов:
+
+- включение/выключение инспекции (`use_ws_inspection`);
+- список regex-паттернов для блокировки содержимого фреймов;
+- максимальный размер фрейма (`ws_max_message_bytes`);
+- ограничение частоты фреймов (`ws_rate_msg_per_sec`).
+
+Инспекция активна только при включённом `reverse_proxy_websocket` и `use_ws_inspection = true`.
+
+### Вкладка Front — mTLS
+
+В блоке TLS вкладки `Front` доступны настройки клиентских сертификатов (Mutual TLS):
+
+- `mtls_enabled` — требовать клиентский сертификат на incoming-соединениях;
+- `mtls_optional` — опциональный режим;
+- `mtls_verify_depth` — глубина проверки цепочки;
+- `mtls_client_ca_ref` — путь к CA-файлу клиентских сертификатов;
+- `mtls_pass_headers` — передавать `X-Client-Verify` / `X-Client-DN` в upstream.
+
+### Вкладка Upstream — mTLS
+
+В блоке `Upstream mTLS` вкладки `Upstream` настраивается исходящий mTLS:
+
+- `upstream_mtls_enabled` — предъявлять клиентский сертификат при проксировании;
+- `upstream_mtls_cert_ref` — путь к сертификату WAF как клиента;
+- `upstream_mtls_key_ref` — путь к приватному ключу;
+- `upstream_mtls_ca_ref` — CA для верификации upstream-сервера.
 
 ## Anti-Bot
 

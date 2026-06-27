@@ -101,6 +101,7 @@ type DashboardStats struct {
 	MostAttackedURLs       []DashboardKeyCount      `json:"most_attacked_urls"`
 	System                 DashboardSystemStats     `json:"system"`
 	ObservationWindowHours int                      `json:"observation_window_hours"`
+	UpstreamHealth         []DashboardUpstreamHealth `json:"upstream_health,omitempty"`
 }
 
 type cpuTimesSample struct {

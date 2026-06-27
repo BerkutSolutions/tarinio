@@ -66,7 +66,12 @@ export function draftToEasyProfilePart2(draft, deps) {
       use_lets_encrypt_staging: draft.use_lets_encrypt_staging,
       use_lets_encrypt_wildcard: draft.use_lets_encrypt_wildcard,
       certificate_authority_server: draft.certificate_authority_server,
-      acme_account_email: deps.normalizeEmail(draft.acme_account_email)
+      acme_account_email: deps.normalizeEmail(draft.acme_account_email),
+      mtls_enabled: Boolean(draft.mtls_enabled),
+      mtls_optional: Boolean(draft.mtls_optional),
+      mtls_verify_depth: Math.max(0, Number.parseInt(String(draft.mtls_verify_depth || "2"), 10) || 2),
+      mtls_client_ca_ref: String(draft.mtls_client_ca_ref || "").trim(),
+      mtls_pass_headers: Boolean(draft.mtls_pass_headers)
     },
     upstream_routing: {
       use_reverse_proxy: draft.use_reverse_proxy,
@@ -80,7 +85,15 @@ export function draftToEasyProfilePart2(draft, deps) {
       disable_host_header: !draft.pass_host_header,
       disable_x_forwarded_for: !draft.send_x_forwarded_for,
       disable_x_forwarded_proto: !draft.send_x_forwarded_proto,
-      enable_x_real_ip: draft.send_x_real_ip
+      enable_x_real_ip: draft.send_x_real_ip,
+      health_check_enabled: Boolean(draft.health_check_enabled),
+      health_check_path: String(draft.health_check_path || "/health").trim(),
+      health_check_interval_seconds: Number(draft.health_check_interval_seconds || 10),
+      health_check_fail_threshold: Number(draft.health_check_fail_threshold || 3),
+      upstream_mtls_enabled: Boolean(draft.upstream_mtls_enabled),
+      upstream_mtls_cert_ref: String(draft.upstream_mtls_cert_ref || "").trim(),
+      upstream_mtls_key_ref: String(draft.upstream_mtls_key_ref || "").trim(),
+      upstream_mtls_ca_ref: String(draft.upstream_mtls_ca_ref || "").trim()
     },
     http_behavior: {
       allowed_methods: draft.allowed_methods,
@@ -120,11 +133,13 @@ export function draftToEasyProfilePart2(draft, deps) {
       blacklist_asn: draft.blacklist_asn,
       blacklist_user_agent: draft.blacklist_user_agent,
       blacklist_uri: draft.blacklist_uri,
+      blacklist_ja3: draft.blacklist_ja3,
       blacklist_ip_urls: draft.blacklist_ip_urls,
       blacklist_rdns_urls: draft.blacklist_rdns_urls,
       blacklist_asn_urls: draft.blacklist_asn_urls,
       blacklist_user_agent_urls: draft.blacklist_user_agent_urls,
       blacklist_uri_urls: draft.blacklist_uri_urls,
+      blacklist_ja3_urls: draft.blacklist_ja3_urls,
       use_limit_conn: draft.use_limit_conn,
       limit_conn_max_http1: draft.limit_conn_max_http1,
       limit_conn_max_http2: draft.limit_conn_max_http2,
@@ -165,7 +180,8 @@ export function draftToEasyProfilePart2(draft, deps) {
     },
     security_country_policy: {
       blacklist_country: draft.blacklist_country,
-      whitelist_country: draft.whitelist_country
+      whitelist_country: draft.whitelist_country,
+      geo_time_windows: deps.normalizeGeoTimeWindows(draft.geo_time_windows)
     },
     security_api_positive: {
       use_api_positive_security: Boolean(draft.api_positive_security_enabled),
@@ -184,6 +200,12 @@ export function draftToEasyProfilePart2(draft, deps) {
         path: customPath,
         content: draft.modsecurity_custom_content
       }
+    },
+    security_websocket: {
+      use_ws_inspection: Boolean(draft.use_ws_inspection),
+      ws_block_patterns: deps.normalizeWSBlockPatterns(draft.ws_block_patterns),
+      ws_max_message_bytes: Math.max(0, Number.parseInt(String(draft.ws_max_message_bytes || "0"), 10) || 0),
+      ws_rate_msg_per_sec: Math.max(0, Number.parseInt(String(draft.ws_rate_msg_per_sec || "0"), 10) || 0)
     }
   };
 }

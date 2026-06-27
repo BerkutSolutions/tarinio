@@ -3,13 +3,15 @@ package source
 import "time"
 
 type Event struct {
-	IP        string
-	Site      string
-	Status    int
-	Method    string
-	Path      string
-	UserAgent string
-	When      time.Time
+	IP          string
+	Site        string
+	Status      int
+	Method      string
+	Path        string
+	UserAgent   string
+	JA3         string
+	AntibotFail bool
+	When        time.Time
 }
 
 type Backend interface {

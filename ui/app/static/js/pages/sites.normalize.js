@@ -227,3 +227,36 @@ export function applyServiceProfilePresetForMissingFields(draft, missingFields) 
 // legacy-transfer-padding-23
 // legacy-transfer-padding-24
 // legacy-transfer-padding-25
+
+// normalizeGeoTimeWindows sanitises geo_time_windows from draft or server response.
+// Invalid windows (hours_start >= hours_end, empty countries) are silently dropped.
+export function normalizeGeoTimeWindows(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((w) => ({
+      countries: Array.isArray(w?.countries)
+        ? w.countries.map((c) => String(c || "").trim().toUpperCase()).filter(Boolean)
+        : [],
+      action: ["block", "allow"].includes(String(w?.action || "").trim().toLowerCase())
+        ? String(w.action).trim().toLowerCase()
+        : "block",
+      days_of_week: Array.isArray(w?.days_of_week)
+        ? w.days_of_week.map(Number).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6)
+        : [],
+      hours_start: Number.isInteger(Number(w?.hours_start)) ? Math.max(0, Math.min(23, Number(w.hours_start))) : 0,
+      hours_end: Number.isInteger(Number(w?.hours_end)) ? Math.max(0, Math.min(23, Number(w.hours_end))) : 0
+    }))
+    .filter((w) => w.countries.length > 0 && w.hours_start < w.hours_end);
+}
+
+// normalizeWSBlockPatterns deduplicates and trims WebSocket block patterns.
+export function normalizeWSBlockPatterns(value) {
+  const seen = new Set();
+  return (Array.isArray(value) ? value : [])
+    .map((p) => String(p || "").trim())
+    .filter((p) => {
+      if (!p || seen.has(p)) return false;
+      seen.add(p);
+      return true;
+    });
+}

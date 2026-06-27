@@ -1,7 +1,5 @@
 ﻿# Release Notes Policy
 
-This page belongs to the current documentation branch.
-
 ## Purpose
 
 Release notes should help operators understand not only what changed, but what they must do next.
@@ -22,7 +20,8 @@ Release notes should help operators understand not only what changed, but what t
 - compose or image changes;
 - High Availability behavior changes;
 - benchmark or resource-profile changes;
-- new operational checks.
+- new operational checks;
+- new mandatory stack components (e.g., Vault added in v1.3.x).
 
 ## Upgrade Expectation
 

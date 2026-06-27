@@ -26,6 +26,7 @@ import (
 	"waf/control-plane/internal/telemetry"
 	"waf/control-plane/internal/tlsconfigs"
 	"waf/control-plane/internal/upstreams"
+	"waf/control-plane/internal/virtualpatches"
 	"waf/control-plane/internal/wafpolicies"
 )
 
@@ -341,7 +342,7 @@ func (s *ApplyService) compileBundle(revision revisions.Revision, snapshot revis
 	wafInputs := mapWAFInputs(snapshot.WAFPolicies)
 	accessInputs := mapAccessInputs(snapshot.AccessPolicies)
 	rateInputs := mapRateLimitInputs(snapshot.RateLimitPolicies)
-	easyInputs := mapEasyInputs(snapshot.EasySiteProfiles)
+	easyInputs := mapEasyInputs(snapshot.EasySiteProfiles, snapshot.VirtualPatches)
 	easyInputs = applyAntiDDoSDefaultEasyProfiles(siteInputs, easyInputs)
 	rateInputs = applyAntiDDoSRateOverrides(siteInputs, rateInputs, antiDDoSSettings)
 
@@ -514,6 +515,7 @@ func upsertAdaptiveModelArtifact(items []pipeline.ArtifactOutput, settings antid
 		return nil, err
 	}
 	modelEnabled, enabledSites := adaptiveModelScope(normalized.ModelEnabled, profiles)
+	ja3Fingerprints := aggregateJA3Blacklist(profiles)
 	payload := map[string]any{
 		"model_enabled":                  modelEnabled,
 		"model_enabled_sites":            enabledSites,
@@ -540,6 +542,9 @@ func upsertAdaptiveModelArtifact(items []pipeline.ArtifactOutput, settings antid
 		"model_weight_emergency_botnet":  normalized.ModelWeightEmergencyBotnet,
 		"model_weight_emergency_single":  normalized.ModelWeightEmergencySingle,
 	}
+	if len(ja3Fingerprints) > 0 {
+		payload["ja3_blacklist_fingerprints"] = ja3Fingerprints
+	}
 	raw, err := json.MarshalIndent(payload, "", "  ")
 	if err != nil {
 		return nil, err
@@ -560,6 +565,31 @@ func upsertAdaptiveModelArtifact(items []pipeline.ArtifactOutput, settings antid
 		out = append(out, artifact)
 	}
 	return out, nil
+}
+
+// aggregateJA3Blacklist collects all JA3 fingerprints from all site profiles
+// into a deduplicated sorted slice. The result is written to ddos-model/config.json
+// so sentinel can activate signal_ja3_risk only when the operator has explicitly
+// configured JA3 blacklists on at least one site (opt-in behaviour).
+func aggregateJA3Blacklist(profiles []easysiteprofiles.EasySiteProfile) []string {
+	seen := map[string]struct{}{}
+	for _, p := range profiles {
+		for _, fp := range p.SecurityBehaviorAndLimits.BlacklistJA3 {
+			fp = strings.ToLower(strings.TrimSpace(fp))
+			if fp != "" {
+				seen[fp] = struct{}{}
+			}
+		}
+	}
+	if len(seen) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(seen))
+	for fp := range seen {
+		out = append(out, fp)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func adaptiveModelScope(globalEnabled bool, profiles []easysiteprofiles.EasySiteProfile) (bool, []string) {
@@ -842,7 +872,7 @@ func mapAuthServiceTokens(items []easysiteprofiles.SecurityAuthServiceToken) []p
 	return out
 }
 
-func mapEasyInputs(items []easysiteprofiles.EasySiteProfile) []pipeline.EasyProfileInput {
+func mapEasyInputs(items []easysiteprofiles.EasySiteProfile, virtualPatches []virtualpatches.VirtualPatch) []pipeline.EasyProfileInput {
 	sorted := append([]easysiteprofiles.EasySiteProfile(nil), items...)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].SiteID < sorted[j].SiteID })
 	out := make([]pipeline.EasyProfileInput, 0, len(sorted))
@@ -873,6 +903,11 @@ func mapEasyInputs(items []easysiteprofiles.EasySiteProfile) []pipeline.EasyProf
 			SendXForwardedFor:      !item.UpstreamRouting.DisableXForwardedFor,
 			SendXForwardedProto:    !item.UpstreamRouting.DisableXForwardedProto,
 			SendXRealIP:            item.UpstreamRouting.EnableXRealIP,
+
+			HealthCheckEnabled:         item.UpstreamRouting.HealthCheckEnabled,
+			HealthCheckPath:            item.UpstreamRouting.HealthCheckPath,
+			HealthCheckIntervalSeconds: item.UpstreamRouting.HealthCheckIntervalSeconds,
+			HealthCheckFailThreshold:   item.UpstreamRouting.HealthCheckFailThreshold,
 
 			UseAuthBasic:      item.SecurityAuthBasic.UseAuthBasic,
 			AuthMode:          item.SecurityAuthBasic.AuthMode,
@@ -913,6 +948,29 @@ func mapEasyInputs(items []easysiteprofiles.EasySiteProfile) []pipeline.EasyProf
 
 			BlacklistCountry: item.SecurityCountryPolicy.BlacklistCountry,
 			WhitelistCountry: item.SecurityCountryPolicy.WhitelistCountry,
+			GeoTimeWindows:   mapGeoTimeWindows(item.SecurityCountryPolicy.GeoTimeWindows),
+
+			WSInspection: pipeline.WSInspectionInput{
+				UseWSInspection:   item.SecurityWebSocket.UseWSInspection,
+				WSBlockPatterns:   append([]string(nil), item.SecurityWebSocket.WSBlockPatterns...),
+				WSMaxMessageBytes: item.SecurityWebSocket.WSMaxMessageBytes,
+				WSRateMsgPerSec:   item.SecurityWebSocket.WSRateMsgPerSec,
+			},
+
+			MTLS: pipeline.MTLSInput{
+				MTLSEnabled:     item.FrontService.MTLSEnabled,
+				MTLSOptional:    item.FrontService.MTLSOptional,
+				MTLSVerifyDepth: item.FrontService.MTLSVerifyDepth,
+				MTLSClientCARef: item.FrontService.MTLSClientCARef,
+				MTLSPassHeaders: item.FrontService.MTLSPassHeaders,
+			},
+
+			UpstreamMTLS: pipeline.UpstreamMTLSInput{
+				UpstreamMTLSEnabled: item.UpstreamRouting.UpstreamMTLSEnabled,
+				UpstreamMTLSCertRef: item.UpstreamRouting.UpstreamMTLSCertRef,
+				UpstreamMTLSKeyRef:  item.UpstreamRouting.UpstreamMTLSKeyRef,
+				UpstreamMTLSCARef:   item.UpstreamRouting.UpstreamMTLSCARef,
+			},
 
 			UseModSecurity:                    item.SecurityModSecurity.UseModSecurity,
 			UseModSecurityCRSPlugins:          item.SecurityModSecurity.UseModSecurityCRSPlugins,
@@ -927,6 +985,10 @@ func mapEasyInputs(items []easysiteprofiles.EasySiteProfile) []pipeline.EasyProf
 			APIEnforcementMode:     item.SecurityAPIPositive.EnforcementMode,
 			APIDefaultAction:       item.SecurityAPIPositive.DefaultAction,
 			APIEndpointPolicies:    mapAPIPositiveEndpointPolicies(item.SecurityAPIPositive.EndpointPolicies),
+
+			HttpStrictParsing: item.HTTPBehavior.HttpStrictParsing,
+
+			VirtualPatches: mapVirtualPatches(virtualPatches, item.SiteID),
 		})
 	}
 	return out
@@ -989,4 +1051,39 @@ func (h HTTPHealthChecker) Check(active *pipeline.ActivePointer) error {
 		return lastErr
 	}
 	return fmt.Errorf("runtime health endpoint is not reachable")
+}
+
+// mapVirtualPatches filters virtual patches by siteID and converts to pipeline input.
+func mapVirtualPatches(patches []virtualpatches.VirtualPatch, siteID string) []pipeline.VirtualPatchInput {
+	out := make([]pipeline.VirtualPatchInput, 0)
+	for _, p := range patches {
+		if p.SiteID != siteID {
+			continue
+		}
+		out = append(out, pipeline.VirtualPatchInput{
+			ID:      p.ID,
+			Pattern: p.Pattern,
+			Target:  p.Target,
+			Action:  p.Action,
+		})
+	}
+	return out
+}
+
+// mapGeoTimeWindows converts easysiteprofiles.GeoTimeWindow to pipeline.GeoTimeWindowInput.
+func mapGeoTimeWindows(windows []easysiteprofiles.GeoTimeWindow) []pipeline.GeoTimeWindowInput {
+	if len(windows) == 0 {
+		return nil
+	}
+	out := make([]pipeline.GeoTimeWindowInput, 0, len(windows))
+	for _, w := range windows {
+		out = append(out, pipeline.GeoTimeWindowInput{
+			Countries:  append([]string(nil), w.Countries...),
+			Action:     w.Action,
+			DaysOfWeek: append([]int(nil), w.DaysOfWeek...),
+			HoursStart: w.HoursStart,
+			HoursEnd:   w.HoursEnd,
+		})
+	}
+	return out
 }

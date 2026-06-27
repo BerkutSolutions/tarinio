@@ -70,6 +70,14 @@ type Config struct {
 	SuggestShadowMaxFPRate      float64
 	SuggestTemporaryHoldSeconds int
 	SuggestPermanentMinLifetime time.Duration
+	// JA3BlacklistFingerprints is the operator-configured set of JA3 hashes
+	// aggregated from all sites. When non-empty, sentinel activates
+	// signal_ja3_risk for traffic matching these hashes OR known-bad hashes.
+	JA3BlacklistFingerprints []string
+	// AuthPaths is the operator-configured list of authentication endpoint
+	// prefixes used by signal_credential_stuffing. Defaults to built-in list
+	// when empty.
+	AuthPaths []string
 }
 
 // Record is per (site,ip) adaptive state.
@@ -163,23 +171,27 @@ type scannerPathStat struct {
 }
 
 type parsedAccess struct {
-	ip        string
-	site      string
-	status    int
-	method    string
-	path      string
-	userAgent string
-	when      time.Time
+	ip          string
+	site        string
+	status      int
+	method      string
+	path        string
+	userAgent   string
+	ja3         string
+	antibotFail bool
+	when        time.Time
 }
 
 type jsonAccess struct {
-	Timestamp string `json:"timestamp"`
-	ClientIP  string `json:"client_ip"`
-	Site      string `json:"site"`
-	Status    int    `json:"status"`
-	Method    string `json:"method"`
-	URI       string `json:"uri"`
-	UserAgent string `json:"user_agent"`
+	Timestamp   string `json:"timestamp"`
+	ClientIP    string `json:"client_ip"`
+	Site        string `json:"site"`
+	Status      int    `json:"status"`
+	Method      string `json:"method"`
+	URI         string `json:"uri"`
+	UserAgent   string `json:"user_agent"`
+	JA3         string `json:"ja3,omitempty"`
+	AntibotFail bool   `json:"antibot_fail,omitempty"`
 }
 
 type secondStat struct {
@@ -193,6 +205,12 @@ type ipStat struct {
 	Blocked          int
 	ScannerHits      int
 	SuspiciousUAHits int
+	JA3Hits          int
+	JA3BlacklistHits int
+	AuthFailures     int
+	AuthPaths        map[string]struct{}
+	AntibotFails     int
+	BadBehaviorHits  int
 	UniquePaths      map[string]struct{}
 	Sites            map[string]struct{}
 	Site             string
@@ -228,4 +246,8 @@ type RuntimeProfile struct {
 	ModelEmergencyPerIPRPS     int      `json:"model_emergency_per_ip_rps"`
 	ModelWeightEmergencyBotnet float64  `json:"model_weight_emergency_botnet"`
 	ModelWeightEmergencySingle float64  `json:"model_weight_emergency_single"`
+	// JA3BlacklistFingerprints is the aggregated set of JA3 hashes from all
+	// sites that have blacklist_ja3 configured. When non-empty, sentinel
+	// activates signal_ja3_risk for matching traffic.
+	JA3BlacklistFingerprints []string `json:"ja3_blacklist_fingerprints,omitempty"`
 }

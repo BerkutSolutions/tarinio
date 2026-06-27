@@ -29,7 +29,9 @@ type RequestsHandler struct {
 }
 
 func NewRequestsHandler(collector requestCollector) *RequestsHandler {
-	return &RequestsHandler{collector: collector}
+	h := &RequestsHandler{collector: collector}
+	h.cache.rows = []map[string]any{}
+	return h
 }
 
 func (h *RequestsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -85,7 +87,7 @@ func (h *RequestsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (h *RequestsHandler) cachedRows() ([]map[string]any, bool) {
 	h.cache.mu.Lock()
 	defer h.cache.mu.Unlock()
-	if len(h.cache.rows) == 0 {
+	if h.cache.rows == nil {
 		return nil, false
 	}
 	return append([]map[string]any(nil), h.cache.rows...), true

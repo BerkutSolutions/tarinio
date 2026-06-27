@@ -222,5 +222,6 @@ func (s *DashboardService) buildSnapshot() (DashboardStats, error) {
 	}
 	out.PopularErrors = mergeKeyCountsSum(out.PopularErrors, eventErrors, 7)
 	out.System = collectSystemStats()
+	out.UpstreamHealth = summarizeUpstreamHealth(requestRows, now)
 	return out, nil
 }

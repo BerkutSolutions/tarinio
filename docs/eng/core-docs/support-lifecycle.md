@@ -2,7 +2,7 @@
 
 This page belongs to the current documentation branch.
 
-TARINIO `current release` uses explicit support channels so enterprise operations are not based on implicit assumptions.
+TARINIO `1.3.5` uses explicit support channels so enterprise operations are not based on implicit assumptions.
 
 ## Release Channels
 

@@ -38,6 +38,7 @@ import (
 	"waf/control-plane/internal/tlsconfigs"
 	"waf/control-plane/internal/upstreams"
 	"waf/control-plane/internal/users"
+	"waf/control-plane/internal/virtualpatches"
 	"waf/control-plane/internal/wafpolicies"
 )
 
@@ -90,6 +91,8 @@ type App struct {
 	RateLimitPolicyService         *services.RateLimitPolicyService
 	EasySiteProfileStore           *easysiteprofiles.Store
 	EasySiteProfileService         *services.EasySiteProfileService
+	VirtualPatchStore              *virtualpatches.Store
+	VirtualPatchService            *services.VirtualPatchService
 	AntiDDoSStore                  *antiddos.Store
 	AntiDDoSService                *services.AntiDDoSService
 	AntiDDoSRuleSuggestionsStore   *antiddossuggestions.Store
@@ -165,6 +168,7 @@ func New(cfg config.Config) (*App, error) {
 	accessPoliciesRoot := filepath.Join(cfg.RevisionStoreDir, "accesspolicies")
 	rateLimitPoliciesRoot := filepath.Join(cfg.RevisionStoreDir, "ratelimitpolicies")
 	easySiteProfilesRoot := filepath.Join(cfg.RevisionStoreDir, "easysiteprofiles")
+	virtualPatchesRoot := filepath.Join(cfg.RevisionStoreDir, "virtualpatches")
 	antiDDoSRoot := filepath.Join(cfg.RevisionStoreDir, "antiddos")
 	antiDDoSSuggestionsRoot := filepath.Join(cfg.RevisionStoreDir, "antiddos")
 	enterpriseRoot := filepath.Join(cfg.RevisionStoreDir, "enterprise")
@@ -189,6 +193,7 @@ func New(cfg config.Config) (*App, error) {
 		accessPolicyStore            *accesspolicies.Store
 		rateLimitPolicyStore         *ratelimitpolicies.Store
 		easySiteProfileStore         *easysiteprofiles.Store
+		virtualPatchStore            *virtualpatches.Store
 		antiDDoSStore                *antiddos.Store
 		antiDDoSRuleSuggestionsStore *antiddossuggestions.Store
 		enterpriseStore              *enterprise.Store
@@ -273,6 +278,10 @@ func New(cfg config.Config) (*App, error) {
 			return nil, err
 		}
 		easySiteProfileStore, err = easysiteprofiles.NewPostgresStore(easySiteProfilesRoot, postgresBackend)
+		if err != nil {
+			return nil, err
+		}
+		virtualPatchStore, err = virtualpatches.NewPostgresStore(virtualPatchesRoot, postgresBackend)
 		if err != nil {
 			return nil, err
 		}
@@ -361,6 +370,10 @@ func New(cfg config.Config) (*App, error) {
 		if err != nil {
 			return nil, err
 		}
+		virtualPatchStore, err = virtualpatches.NewStore(virtualPatchesRoot)
+		if err != nil {
+			return nil, err
+		}
 		antiDDoSStore, err = antiddos.NewStore(antiDDoSRoot)
 		if err != nil {
 			return nil, err
@@ -380,6 +393,7 @@ func New(cfg config.Config) (*App, error) {
 	auditService := services.NewAuditService(auditStore)
 	revisionCompileService := services.NewRevisionCompileService(revisionStore, revisionSnapshotStore, jobStore, siteStore, upstreamStore, certificateStore, tlsConfigStore, wafPolicyStore, accessPolicyStore, rateLimitPolicyStore, easySiteProfileStore, antiDDoSStore, certificateMaterialStore, auditService)
 	revisionCompileService.SetCoordinator(coord)
+	revisionCompileService.SetVirtualPatchStore(virtualPatchStore)
 	revisionCatalogService := services.NewRevisionCatalogService(revisionStore, revisionSnapshotStore, jobStore, eventStore, siteStore)
 	runtimeSecurityCollector := services.NewHTTPRuntimeSecurityEventCollector(cfg.RuntimeHealthURL, cfg.RuntimeAPIToken)
 	eventService := services.NewEventService(
@@ -464,6 +478,7 @@ func New(cfg config.Config) (*App, error) {
 	applyService.SetCoordinator(coord)
 	applyService.SetGovernance(enterpriseService)
 	easySiteProfileService := services.NewEasySiteProfileService(easySiteProfileStore, siteStore, wafPolicyStore, accessPolicyStore, rateLimitPolicyStore, revisionCompileService, applyService, auditService)
+	virtualPatchService := services.NewVirtualPatchService(virtualPatchStore)
 	antiDDoSService := services.NewAntiDDoSService(antiDDoSStore, revisionCompileService, applyService, auditService)
 	antiDDoSRuleSuggestionsService := services.NewAntiDDoSRuleSuggestionsService(antiDDoSRuleSuggestionsStore, auditService)
 	services.ConfigureAutoApply(revisionCompileService, applyService, coord)
@@ -475,7 +490,7 @@ func New(cfg config.Config) (*App, error) {
 	runtimeCRSService := services.NewRuntimeCRSService(services.RuntimeBaseURLFromHealthURL(cfg.RuntimeHealthURL), cfg.RuntimeAPIToken)
 	containerRuntimeService := services.NewContainerRuntimeService()
 	adminScriptService := services.NewAdminScriptService(cfg.RevisionStoreDir, detectScriptsRoot())
-	httpServer := httpserver.New(cfg.HTTPAddr, cfg.RuntimeRoot, cfg.RevisionStoreDir, cfg.RuntimeHealthURL, coord.Enabled(), coord.NodeID(), cfg.Metrics.Token, postgresBackend, setupService, revisionService, authService, enterpriseService, sessionStore, userStore, roleStore, siteService, manualBanService, upstreamService, certificateService, tlsConfigService, tlsAutoRenewService, certificateUploadService, certificateMaterialStore, letsEncryptService, selfSignedCertificateService, wafPolicyService, accessPolicyService, rateLimitPolicyService, easySiteProfileService, antiDDoSService, antiDDoSRuleSuggestionsService, eventService, revisionCompileService, applyService, revisionCatalogService, auditService, reportService, dashboardService, containerRuntimeService, runtimeCRSService, runtimeRequestCollector, runtimeReadyProbe, runtimeSecurityCollector, runtimeRequestCollector, adminScriptService)
+	httpServer := httpserver.New(cfg.HTTPAddr, cfg.RuntimeRoot, cfg.RevisionStoreDir, cfg.RuntimeHealthURL, coord.Enabled(), coord.NodeID(), cfg.Metrics.Token, postgresBackend, setupService, revisionService, authService, enterpriseService, sessionStore, userStore, roleStore, siteService, manualBanService, upstreamService, certificateService, tlsConfigService, tlsAutoRenewService, certificateUploadService, certificateMaterialStore, letsEncryptService, selfSignedCertificateService, wafPolicyService, accessPolicyService, rateLimitPolicyService, easySiteProfileService, virtualPatchService, antiDDoSService, antiDDoSRuleSuggestionsService, eventService, revisionCompileService, applyService, revisionCatalogService, auditService, reportService, dashboardService, containerRuntimeService, runtimeCRSService, runtimeRequestCollector, runtimeReadyProbe, runtimeSecurityCollector, runtimeRequestCollector, adminScriptService)
 	var devFastStartBootstrapper *services.DevFastStartBootstrapper
 	if cfg.DevFastStart.Enabled {
 		devFastStartCertificateIssuer := letsEncryptService

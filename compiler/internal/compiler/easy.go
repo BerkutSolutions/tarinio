@@ -76,14 +76,27 @@ type easySiteData struct {
 	BlacklistIP        []string
 	BlacklistUserAgent []string
 	BlacklistURI       []string
+	BlacklistJA3       []string
 
 	BlacklistCountryGuardPattern string
 	WhitelistCountryGuardPattern string
+	GeoTimeWindowSnippet         string // server-context if-guards
+	WSInspectionSnippet          string // server-context WS inspection Lua block
+	MTLSSnippet                  string // server-context mTLS directives (TASK-8.1)
+	UpstreamMTLSSnippet          string // location-context upstream mTLS directives (TASK-8.2)
 
 	UseModSecurity         bool
 	UseModSecurityEasyFile bool
 	ModSecurityEasyRules   string
 	ModSecurityEasyRulesOn bool
+
+	HttpStrictParsing bool
+
+	// HealthCheckEnabled enables passive upstream health checking via proxy_next_upstream.
+	HealthCheckEnabled         bool
+	HealthCheckPath            string
+	HealthCheckIntervalSeconds int
+	HealthCheckFailThreshold   int
 }
 
 type l4GuardConfigData struct {

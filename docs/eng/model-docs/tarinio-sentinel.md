@@ -1,6 +1,6 @@
 # TARINIO Sentinel
 
-`tarinio-sentinel` is the adaptive security engine for TARINIO current release. It replaces the old `ddos-model` runtime process while keeping the legacy `ddos-model/config.json` artifact and `MODEL_*` environment contract compatible for existing deployments.
+`tarinio-sentinel` is the adaptive security engine for TARINIO `1.3.5`. It replaces the old `ddos-model` runtime process while keeping the legacy `ddos-model/config.json` artifact and `MODEL_*` environment contract compatible for existing deployments.
 
 ## Runtime Role
 

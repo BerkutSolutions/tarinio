@@ -1,8 +1,8 @@
 # Migration And Compatibility Contract
 
-This document defines the `current release` compatibility contract for logging, secret handling, and standalone-to-enterprise cutover.
+This document defines the `1.3.5` compatibility contract for logging, secret handling, and standalone-to-enterprise cutover.
 
-Release baseline for this revision: `3.0.6`.
+Release baseline for this revision: `1.3.5`.
 
 ## Backward Compatibility
 

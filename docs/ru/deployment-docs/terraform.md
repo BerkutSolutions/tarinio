@@ -4,7 +4,7 @@ sidebar_position: 4
 
 # Развертывание через Terraform
 
-Шпаргалка по production-оркестрации TARINIO через Terraform.
+Шпаргалка по production-оркестрации TARINIO v1.3.5+ через Terraform.
 
 ## Что должно быть в Terraform-слое
 
@@ -12,7 +12,19 @@ sidebar_position: 4
 - кластер Kubernetes и сетевые зависимости;
 - секреты и конфигурация окружения;
 - применение Kubernetes/Helm ресурсов;
-- управляемый lifecycle: `plan`/`apply`/`destroy`.
+- управляемый lifecycle: `plan`/`apply`/`destroy`;
+- ресурсы Vault (политики, mount-точки) для хранения mTLS-сертификатов.
+
+## Компоненты, управляемые Terraform
+
+| Компонент | Примечание |
+|---|---|
+| `control-plane` | Deployment + Service |
+| `runtime` | DaemonSet / Deployment, NET_ADMIN capabilities |
+| `tarinio-sentinel` | Deployment, читает nginx access.log |
+| `postgres` | Managed DB или StatefulSet |
+| `opensearch` | Managed или StatefulSet |
+| `vault` | Managed Vault или StatefulSet, обязателен для mTLS |
 
 ## Рекомендуемый pipeline
 
@@ -49,11 +61,14 @@ terraform apply tfplan.bin
 - хранить state в удаленном backend с блокировкой;
 - использовать разделение окружений (`dev/stage/prod`) через переменные и workspace;
 - не хранить секреты в открытом виде в `tfvars`;
-- использовать короткоживущие учетные данные для CI/CD.
+- использовать короткоживущие учетные данные для CI/CD;
+- mTLS-сертификаты и CA — управлять через Vault Terraform provider, не хранить в state.
 
 ## Пост-проверка после apply
 
 - доступность `/healthz` и `/login`;
 - корректная версия в `/core-docs/api/app/meta`;
 - успешный compile/apply в UI/API;
-- наличие telemetry/events после подачи трафика.
+- наличие telemetry/events после подачи трафика;
+- sentinel опубликовал `adaptive.json` (не пустой);
+- Vault unsealed и политики применены.

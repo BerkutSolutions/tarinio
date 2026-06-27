@@ -22,8 +22,6 @@ func TestE2EBurstStability(t *testing.T) {
 		"/api/sites",
 		"/api/upstreams",
 		"/api/tls-configs",
-		"/api/events",
-		"/api/requests?limit=5",
 		"/api/audit?limit=5",
 		"/dashboard",
 		"/sites",

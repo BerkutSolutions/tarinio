@@ -1,6 +1,6 @@
 # Security Profiles
 
-TARINIO current release includes 5 built-in service security profiles:
+TARINIO `1.3.5` includes 5 built-in service security profiles:
 
 1. `strict`
 2. `balanced`
@@ -110,6 +110,39 @@ Key preset values:
 - Choose `compat` for fragile legacy apps during migration/hardening.
 - Choose `api` for REST/gRPC gateway style traffic with API schema controls.
 - Choose `public-edge` for high-risk edge endpoints (marketing/public landing/login edge).
+
+## Additional Profile Settings (v1.3.x)
+
+Beyond baseline preset values, all profiles support the following extended setting groups:
+
+### Incoming mTLS
+- `front_service.mtls_enabled` — require a client certificate.
+- `front_service.mtls_optional` — optional mode (pass status without blocking).
+- `front_service.mtls_verify_depth` — chain verification depth (default `1`).
+- `front_service.mtls_client_ca_ref` — path to the client CA file.
+- `front_service.mtls_pass_headers` — forward `X-Client-Verify` / `X-Client-DN` headers to upstream.
+
+### Upstream mTLS (Outgoing)
+- `upstream_routing.upstream_mtls_enabled` — present a client certificate when proxying.
+- `upstream_routing.upstream_mtls_cert_ref` — WAF client certificate path.
+- `upstream_routing.upstream_mtls_key_ref` — WAF client key path.
+- `upstream_routing.upstream_mtls_ca_ref` — CA for upstream server verification.
+
+### JA3/JA4 Fingerprinting
+- `security_behavior_and_limits.blacklist_ja3` — JA3 fingerprint block list.
+- `security_behavior_and_limits.blacklist_ja3_urls` — URL sources for JA3 blacklists.
+
+### Virtual Patching
+- `virtual_patches[]` — temporary blocking rules with TTL: `match_uri`, `match_header`, `match_body`, `action`, `expires_at`.
+
+### Geo/Time Windows
+- `geo_time_windows[]` — GeoIP and schedule restrictions: `countries`, `weekdays`, `time_from`, `time_to`, `action`.
+
+### WebSocket Inspection
+- `security_websocket.use_ws_inspection` — enable WS frame inspection.
+- `security_websocket.ws_block_patterns` — regex patterns for frame blocking.
+- `security_websocket.ws_max_message_bytes` — frame size limit.
+- `security_websocket.ws_rate_msg_per_sec` — frame rate limit.
 
 ## Operator Notes
 

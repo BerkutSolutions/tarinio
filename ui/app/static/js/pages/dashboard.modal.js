@@ -24,7 +24,10 @@ function createModalState(container, ctx) {
       if (!modalNode || !modalTitleNode || !modalSubtitleNode || !modalBodyNode) {
         return;
       }
-      modalTitleNode.textContent = String(detail?.title || ctx.t("dashboard.detail.title"));
+      modalTitleNode.innerHTML = escapeHtml(String(detail?.title || ctx.t("dashboard.detail.title")));
+      if (detail?.titleHtml) {
+        modalTitleNode.innerHTML = detail.titleHtml;
+      }
       modalSubtitleNode.textContent = String(detail?.subtitle || "");
       modalBodyNode.innerHTML = detail?.body || `<div class="waf-empty">${escapeHtml(ctx.t("common.none"))}</div>`;
       modalNode.classList.remove("waf-hidden");

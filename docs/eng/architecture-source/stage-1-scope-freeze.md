@@ -253,6 +253,23 @@ No Stage 1 feature may assume:
 - SCC dependency
 - Kubernetes-first deployment
 
+## Stage 1 Extension Note
+
+Stage 1 MVP was completed. The following capabilities were implemented as Stage 1 extensions in v1.3.x, beyond the original scope freeze:
+
+- mutual TLS (incoming ClientCA via Vault + outgoing upstream cert/key via Vault);
+- WebSocket traffic inspection (frame size limits, blocked patterns);
+- Virtual Patching (per-site ModSecurity SecRule entries);
+- Geo Time Windows (country + time-range + action policies);
+- JA3/JA4 TLS fingerprint blacklist;
+- credential stuffing detection via auth-endpoint monitoring;
+- API positive security (OpenAPI schema enforcement);
+- upstream health checks;
+- tarinio-sentinel adaptive engine (replaces ddos-model process);
+- Vault integration for secret management (mTLS keys, upstream certs).
+
+These extensions required new domain entities and new compiler mappings beyond the original Stage 1 backlog. They were implemented after the Stage 1 MVP acceptance criteria were met.
+
 ## Resulting Rule
 
 If a proposed Stage 1 feature is not clearly inside `In Scope`, it is out of scope until explicitly approved.

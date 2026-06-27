@@ -1,5 +1,8 @@
 upstream {{ .UpstreamName }} {
     server {{ .UpstreamAddress }};
+{{- if .HealthCheckEnabled }}
+    keepalive 32;
+{{- end }}
 }
 
 server {
@@ -163,6 +166,10 @@ server {
         include /etc/waf/nginx/ratelimits/{{ .SiteID }}.conf;
 {{- if .PassHostHeader }}
         proxy_set_header Host $http_host;
+{{- end }}
+{{- if .HealthCheckEnabled }}
+        proxy_next_upstream error timeout http_502 http_503;
+        proxy_next_upstream_tries 2;
 {{- end }}
         include /etc/waf/nginx/easy/{{ .SiteID }}.conf;
         proxy_pass {{ .ProxyPassTarget }};

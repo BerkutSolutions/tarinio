@@ -4,7 +4,7 @@ sidebar_position: 3
 
 # Развертывание в Kubernetes
 
-Шпаргалка для production-развертывания TARINIO в Kubernetes-кластере.
+Шпаргалка для production-развертывания TARINIO v1.3.5+ в Kubernetes-кластере.
 
 ## Минимальные требования
 
@@ -12,7 +12,19 @@ sidebar_position: 3
 - `kubectl` с доступом к production context;
 - выделенный namespace (например, `tarinio`);
 - отдельные `Secret` для production;
-- внешний PostgreSQL или устойчивый stateful-контур данных.
+- внешний PostgreSQL или устойчивый stateful-контур данных;
+- Vault (или Kubernetes Secrets) для хранения mTLS-сертификатов.
+
+## Компоненты для деплоя
+
+| Компонент | Тип | Примечание |
+|---|---|---|
+| `control-plane` | Deployment | API + компилятор |
+| `runtime` | DaemonSet / Deployment | nginx/OpenResty, требует NET_ADMIN |
+| `tarinio-sentinel` | Deployment | DDoS-модель, читает nginx access.log |
+| `postgres` | StatefulSet / внешний | Основная БД |
+| `opensearch` | StatefulSet / внешний | Индекс запросов |
+| `vault` | StatefulSet / внешний | Обязателен для mTLS |
 
 ## Базовый порядок работ
 
@@ -50,11 +62,14 @@ kubectl -n tarinio get pods,svc,ingress
 - доступен `/login`;
 - `GET /core-docs/api/app/meta` возвращает ожидаемую версию;
 - compile/apply проходит без ошибок;
-- в UI появляются events/requests/audit сигналы.
+- в UI появляются events/requests/audit сигналы;
+- sentinel pod запущен и публикует `/out/adaptive.json`.
 
 ## Production рекомендации
 
 - не использовать значения `CHANGE_ME` и дефолтные секреты;
 - ограничить доступ к control-plane сетевыми политиками;
 - вынести TLS-терминацию и сертификаты в управляемый контур;
+- mTLS-сертификаты хранить в Vault или Kubernetes Secrets с ограниченным RBAC;
+- runtime требует `NET_ADMIN` + `NET_RAW` capabilities — учитывать в PodSecurityPolicy/PodSecurityAdmission;
 - регулярно проверять backup/restore сценарий.

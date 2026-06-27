@@ -4,7 +4,7 @@ This page belongs to the current documentation branch.
 
 This is the main English index for TARINIO documentation. It is structured as an operator wiki for the real `current release` product and is meant to complement the Russian branch, not lag behind it.
 
-Documentation cycle baseline: `3.0.7`.
+Documentation cycle baseline: `1.3.5`.
 
 ## Start Here
 
@@ -70,9 +70,18 @@ Documentation cycle baseline: `3.0.7`.
 - Kubernetes/Terraform lab runbook: `deploy/lab-k8s-terraform/docs/RUNBOOK.en.md`
 - [External production site behind WAF](integration-docs/external-prod-site-via-waf.md)
 
-## What Matters In current release
+## What Matters In 1.3.x
 
-- Documentation is aligned with the application version from `control-plane/internal/appmeta/meta.go`.
+- Mutual TLS (mTLS): client certificate verification on incoming connections (`ssl_verify_client`) and mTLS to upstream (`proxy_ssl_certificate`).
+- JA3/JA4 TLS fingerprinting: fingerprint collection via nginx, blacklist-based blocking, `signal_ja3_risk` Sentinel signal.
+- Virtual Patching: temporary blocking rules (URI/Header/Body) with TTL via API, no nginx restart required.
+- Credential Stuffing Detection: auth failure counters in Sentinel, auto-ban on threshold.
+- Extended Sentinel signals: `antibot_fail`, `bad_behavior_hits`, JA3 correlation.
+- Upstream Health Check: nginx active health checks with auto-degradation on failure.
+- Geo/Time Windows: access restriction by GeoIP and schedule (weekdays / hours).
+- WebSocket Inspection: WS frame inspection with regex pattern blocking, rate and size limits.
+- HTTP Request Smuggling hardening: `request_id`, `chunked_transfer_encoding off`, strict header validation.
+- Documentation is aligned with the application version `1.3.5`.
 - The wiki covers the real UI sections: `Dashboard`, `Sites`, `Anti-DDoS`, `OWASP CRS`, `TLS`, `Requests`, `Revisions`, `Events`, `Bans`, `Administration`, `Activity`, `Settings`, and `Profile`.
 - The High Availability, observability, and PostgreSQL-backed storage changes are documented as first-class product capabilities.
 - Onboarding, login, `2FA`, passkeys, and healthcheck are covered as operator flows.

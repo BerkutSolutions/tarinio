@@ -6,7 +6,7 @@ This runbook describes daily operator checks, standard change flow, triage, and 
 
 ## Release Context
 
-Current validated documentation cycle: `3.0.7`.
+Current validated documentation cycle: `1.3.5`.
 
 For Kubernetes/Terraform lab operations and promotion criteria:
 

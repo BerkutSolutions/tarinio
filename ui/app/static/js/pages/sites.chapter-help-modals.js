@@ -59,6 +59,7 @@ export const renderHttpChapterHelpModal = makeChapterRenderer({
     "sslProtocols",
     "http2",
     "http3",
+    "strictParsing",
   ],
 });
 
@@ -106,6 +107,7 @@ export const renderGeoChapterHelpModal = makeChapterRenderer({
     "blacklist",
     "whitelist",
     "groups",
+    "timeWindows",
   ],
 });
 

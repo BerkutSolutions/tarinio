@@ -1,7 +1,5 @@
 ﻿# Backups and Restore
 
-This page belongs to the current documentation branch.
-
 This document describes what must be backed up and how restore readiness should be validated for TARINIO.
 
 ## What Counts As Critical Data
@@ -10,9 +8,10 @@ Critical data includes:
 
 - PostgreSQL data;
 - runtime state and revision store data;
-- TLS and certificate materials;
+- TLS and certificate materials (including mTLS ClientCA and upstream keys from Vault);
 - `.env`, secrets, and external override configuration;
-- the recorded application version and active revision context.
+- the recorded application version and active revision context;
+- Vault backup or snapshot (mTLS certificates and logging secrets).
 
 ## What Must Be Backed Up
 

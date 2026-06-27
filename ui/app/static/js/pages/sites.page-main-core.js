@@ -146,6 +146,8 @@ import {
   normalizeAntibotChallengeRules as normalizeAntibotChallengeRulesFacade,
   normalizeAuthBasicUsers as normalizeAuthBasicUsersFacade,
   normalizeAuthExclusionRules as normalizeAuthExclusionRulesFacade,
+  normalizeGeoTimeWindows as normalizeGeoTimeWindowsFacade,
+  normalizeWSBlockPatterns as normalizeWSBlockPatternsFacade,
   normalizeAuthMode as normalizeAuthModeFacade,
   normalizeAuthOrder as normalizeAuthOrderFacade,
   normalizeAuthSessionTTLMinutes as normalizeAuthSessionTTLMinutesFacade,
@@ -253,6 +255,8 @@ const normalizeAntibotExclusionRules = (value) => normalizeAntibotExclusionRules
 const normalizeAntibotChallengeRules = (value) => normalizeAntibotChallengeRulesFacade(value, normalizeArray);
 const normalizeAuthBasicUsers = (value) => normalizeAuthBasicUsersFacade(value, normalizeArray);
 const normalizeAuthExclusionRules = (value) => normalizeAuthExclusionRulesFacade(value, normalizeArray);
+const normalizeGeoTimeWindows = (value) => normalizeGeoTimeWindowsFacade(value);
+const normalizeWSBlockPatterns = (value) => normalizeWSBlockPatternsFacade(value);
 const normalizeAuthServiceTokens = (value) => normalizeAuthServiceTokensFacade(value, normalizeArray);
 const normalizeAuthMode = normalizeAuthModeFacade;
 const normalizeAuthOrder = normalizeAuthOrderFacade;
@@ -345,7 +349,9 @@ function applyEasyProfileToDraft(draft, profile) {
     normalizeAuthOrder,
     normalizeAuthServiceTokens,
     normalizeAuthSessionTTLMinutes,
-    normalizeAPIPositiveEndpointPolicies
+    normalizeAPIPositiveEndpointPolicies,
+    normalizeGeoTimeWindows,
+    normalizeWSBlockPatterns
   });
 }
 
@@ -371,7 +377,9 @@ async function hydrateSiteDraft(ctx, site, upstream, tlsConfig, accessPolicy = n
     normalizeAuthOrder,
     normalizeAuthServiceTokens,
     normalizeAuthSessionTTLMinutes,
-    normalizeAPIPositiveEndpointPolicies
+    normalizeAPIPositiveEndpointPolicies,
+    normalizeGeoTimeWindows,
+    normalizeWSBlockPatterns
   });
 }
 
@@ -391,7 +399,9 @@ function draftToEasyProfile(draft) {
     normalizeCustomLimitRules,
     normalizeAntibotExclusionRules,
     normalizeAntibotChallengeRules,
-    normalizeAPIPositiveEndpointPolicies
+    normalizeAPIPositiveEndpointPolicies,
+    normalizeGeoTimeWindows,
+    normalizeWSBlockPatterns
   });
 }
 
@@ -523,6 +533,8 @@ export {
   normalizeServiceProfile,
   formatServiceProfile,
   normalizeAPIPositiveEndpointPolicies,
+  normalizeGeoTimeWindows,
+  normalizeWSBlockPatterns,
   applyServiceProfilePresetToDraft,
   applyServiceProfilePresetForMissingFields,
   normalizeEmail,

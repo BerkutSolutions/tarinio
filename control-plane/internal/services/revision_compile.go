@@ -21,6 +21,7 @@ import (
 	"waf/control-plane/internal/telemetry"
 	"waf/control-plane/internal/tlsconfigs"
 	"waf/control-plane/internal/upstreams"
+	"waf/control-plane/internal/virtualpatches"
 	"waf/control-plane/internal/wafpolicies"
 )
 
@@ -56,6 +57,10 @@ type EasySiteProfileStateReader interface {
 	List() ([]easysiteprofiles.EasySiteProfile, error)
 }
 
+type VirtualPatchStateReader interface {
+	ListActive(siteID string) ([]virtualpatches.VirtualPatch, error)
+}
+
 type AntiDDoSSettingsReader interface {
 	Get() (antiddos.Settings, error)
 }
@@ -86,6 +91,7 @@ type RevisionCompileService struct {
 	accessPolicies    AccessPolicyStateReader
 	rateLimitPolicies RateLimitPolicyStateReader
 	easySiteProfiles  EasySiteProfileStateReader
+	virtualPatches    VirtualPatchStateReader
 	antiDDoSSettings  AntiDDoSSettingsReader
 	materials         CertificateMaterialReader
 	audits            *AuditService
@@ -298,7 +304,24 @@ func (s *RevisionCompileService) buildSnapshot() (revisionsnapshots.Snapshot, []
 		RateLimitPolicies: rateLimitPolicyItems,
 		EasySiteProfiles:  easySiteProfileItems,
 		AntiDDoSSettings:  antiDDoSSettings,
+		VirtualPatches:    collectActiveVirtualPatches(siteItems, s.virtualPatches),
 	}, materialItems, nil
+}
+
+// collectActiveVirtualPatches gathers all active (non-expired) patches for every site.
+func collectActiveVirtualPatches(sites []sites.Site, store VirtualPatchStateReader) []virtualpatches.VirtualPatch {
+	if store == nil {
+		return nil
+	}
+	out := make([]virtualpatches.VirtualPatch, 0)
+	for _, site := range sites {
+		patches, err := store.ListActive(site.ID)
+		if err != nil {
+			continue
+		}
+		out = append(out, patches...)
+	}
+	return out
 }
 
 func nextRevisionVersion(items []revisions.Revision) int {
@@ -315,6 +338,11 @@ func (s *RevisionCompileService) SetGovernance(governance interface {
 	PrepareCompiledRevision(ctx context.Context, revision revisions.Revision) (revisions.Revision, error)
 }) {
 	s.governance = governance
+}
+
+// SetVirtualPatchStore wires an optional virtual patch reader into the compile service.
+func (s *RevisionCompileService) SetVirtualPatchStore(store VirtualPatchStateReader) {
+	s.virtualPatches = store
 }
 
 // normalizeTargetSiteIDs trims, lowercases, deduplicates and stable-sorts the

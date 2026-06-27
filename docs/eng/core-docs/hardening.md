@@ -67,6 +67,15 @@ Recommended baseline:
 - monitor revision failures, runtime readiness, and lock contention;
 - keep enough retention to analyze incidents and releases.
 
+## HTTP Request Smuggling Hardening
+
+Recommended baseline:
+
+- use `WAF_RUNTIME_DISABLE_CHUNKED_TRANSFER=1` in compose profiles to disable `chunked_transfer_encoding` on backend proxying;
+- TARINIO nginx templates automatically inject `$request_id` into upstream headers for tracing and desync detection;
+- ensure `large_client_header_buffers` does not exceed the value appropriate for your edge topology;
+- combine with strict `Content-Security-Policy` and `Strict-Transport-Security` headers on the response path.
+
 ## Hardening Diagnostics
 
 Recommended baseline:

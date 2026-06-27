@@ -70,13 +70,15 @@ func readNewEvents(backend sentinelsource.Backend, offset int64) ([]parsedAccess
 	out := make([]parsedAccess, 0, len(items))
 	for _, item := range items {
 		out = append(out, parsedAccess{
-			ip:        item.IP,
-			site:      normalizeSiteID(item.Site),
-			status:    item.Status,
-			method:    item.Method,
-			path:      item.Path,
-			userAgent: item.UserAgent,
-			when:      item.When,
+			ip:          item.IP,
+			site:        normalizeSiteID(item.Site),
+			status:      item.Status,
+			method:      item.Method,
+			path:        item.Path,
+			userAgent:   item.UserAgent,
+			ja3:         item.JA3,
+			antibotFail: item.AntibotFail,
+			when:        item.When,
 		})
 	}
 	return out, nextOffset, nil
@@ -91,13 +93,15 @@ func parseAccessLine(line string) (parsedAccess, bool) {
 				when, err := time.Parse(time.RFC3339, strings.TrimSpace(item.Timestamp))
 				if err == nil {
 					return parsedAccess{
-						ip:        ip,
-						site:      normalizeSiteID(item.Site),
-						status:    item.Status,
-						method:    strings.TrimSpace(item.Method),
-						path:      strings.TrimSpace(item.URI),
-						userAgent: strings.TrimSpace(item.UserAgent),
-						when:      when.UTC(),
+						ip:          ip,
+						site:        normalizeSiteID(item.Site),
+						status:      item.Status,
+						method:      strings.TrimSpace(item.Method),
+						path:        strings.TrimSpace(item.URI),
+						userAgent:   strings.TrimSpace(item.UserAgent),
+						ja3:         strings.TrimSpace(item.JA3),
+						antibotFail: item.AntibotFail,
+						when:        when.UTC(),
 					}, true
 				}
 			}

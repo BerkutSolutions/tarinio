@@ -34,6 +34,7 @@ export function buildDetailModel(stats, requestRows, eventRows) {
   const blockedBySite = new Map();
   const attacksByURL = new Map();
   const attackSitesByURL = new Map();
+  const attackIPsByURL = new Map();
   const attacksByCountry = new Map();
   const errorsByCodeAndSite = new Map();
   const ipDetails = new Map();
@@ -41,6 +42,7 @@ export function buildDetailModel(stats, requestRows, eventRows) {
   const fallbackBlockedBySite = new Map();
   const fallbackAttacksByURL = new Map();
   const fallbackAttackSitesByURL = new Map();
+  const fallbackAttackIPsByURL = new Map();
   const fallbackAttacksByCountry = new Map();
   const fallbackIPDetails = new Map();
   let eventAttackCount = 0;
@@ -97,6 +99,7 @@ export function buildDetailModel(stats, requestRows, eventRows) {
       addToNestedMap(fallbackAttackSitesByURL, uri, site, 1);
       addToMap(fallbackAttacksByCountry, requestCountry, 1);
       if (ip) {
+        addToNestedMap(fallbackAttackIPsByURL, uri, ip, 1);
         const fallbackDetail = ensureIPDetail(fallbackIPDetails, ip);
         if (fallbackDetail) {
           fallbackDetail.attacks += 1;
@@ -138,6 +141,9 @@ export function buildDetailModel(stats, requestRows, eventRows) {
     addToMap(attacksByURL, path, 1);
     addToNestedMap(attackSitesByURL, path, site, 1);
     addToMap(attacksByCountry, countryCode, 1);
+    if (ip) {
+      addToNestedMap(attackIPsByURL, path, ip, 1);
+    }
     if (isBlockedSecurityEvent(item)) {
       addToMap(blockedBySite, site, 1);
     }
@@ -182,11 +188,13 @@ export function buildDetailModel(stats, requestRows, eventRows) {
   const blockedSiteSource = useFallbackBlocked ? fallbackBlockedBySite : blockedBySite;
   const attackURLSource = useFallbackAttacks ? fallbackAttacksByURL : attacksByURL;
   const attackSitesByURLSource = useFallbackAttacks ? fallbackAttackSitesByURL : attackSitesByURL;
+  const attackIPsByURLSource = useFallbackAttacks ? fallbackAttackIPsByURL : attackIPsByURL;
   const attackCountrySource = useFallbackAttacks ? fallbackAttacksByCountry : attacksByCountry;
 
   const attacksByURLWithSites = topCounts(attackURLSource, 20).map((item) => ({
     ...item,
-    sites: topCounts(attackSitesByURLSource.get(item.key) || new Map(), 5)
+    sites: topCounts(attackSitesByURLSource.get(item.key) || new Map(), 5),
+    ips:   topCounts(attackIPsByURLSource.get(item.key)   || new Map(), 20)
   }));
 
   const errorsByCode = [];

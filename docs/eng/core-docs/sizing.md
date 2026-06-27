@@ -1,7 +1,5 @@
 ﻿# Sizing Guide
 
-This page belongs to the current documentation branch.
-
 ## Purpose
 
 This guide helps operators estimate CPU, memory, and storage needs for TARINIO deployments.
@@ -51,6 +49,8 @@ Starting point:
 - dedicated PostgreSQL
 - dedicated Redis
 - capacity reserved for Prometheus / Grafana
+- dedicated Vault (for mTLS certificates and logging secrets)
+- capacity reserved for tarinio-sentinel
 
 ## Storage Considerations
 
@@ -71,7 +71,9 @@ The main multipliers are:
 - event and request log retention;
 - CRS usage and policy complexity;
 - observability retention;
-- High Availability and load-test workloads.
+- High Availability and load-test workloads;
+- number of mTLS-enabled sites (additional TLS handshake overhead);
+- number of Virtual Patching rules (increases compile-time load).
 
 ## Practical Recommendation
 
@@ -79,5 +81,3 @@ Start with conservative headroom, then validate with:
 
 - [Observability](core-docs/observability.md)
 - your own preproduction traffic profile.
-
-

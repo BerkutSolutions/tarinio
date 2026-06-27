@@ -224,6 +224,25 @@ Mandatory implementation order:
 - Depends on: `S1-45`, `S1-46`, `S1-47`, `S1-48`
 - DoD: validated scenarios cover routing, TLS, WAF blocking, rate limiting, jobs, reports, and rollback
 
+## Stage 1 Extension Note
+
+The backlog items S1-01 through S1-49 were completed for the MVP. After MVP acceptance, the following Stage 1+ tasks were executed in v1.3.x:
+
+- `S2-01` Vault integration for mTLS ClientCA and upstream cert/key paths;
+- `S2-02` Incoming mTLS enforcement via compiler + runtime;
+- `S2-03` Outgoing upstream mTLS via compiler + runtime;
+- `S2-04` WebSocket inspection compiler mapping and runtime enforcement;
+- `S2-05` Virtual Patching per-site SecRule compiler mapping;
+- `S2-06` Geo Time Windows compiler mapping and runtime enforcement;
+- `S2-07` JA3/JA4 fingerprint blacklist compiler mapping;
+- `S2-08` Credential stuffing detection via auth-endpoint monitoring;
+- `S2-09` API positive security via OpenAPI schema enforcement;
+- `S2-10` Upstream health check compiler mapping;
+- `S2-11` tarinio-sentinel as replacement for ddos-model process;
+- `S2-12` HA control-plane topology (shared runtime root, dual API nodes).
+
+These tasks extended the compiler, domain model, runtime filesystem contract, and deployment topology beyond the original MVP backlog.
+
 ## First Implementation Task
 
 Start with `S1-01 Create module directory structure`.

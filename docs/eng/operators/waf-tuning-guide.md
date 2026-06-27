@@ -1,14 +1,14 @@
 # Practical WAF Tuning Guide
 
-This document is intended for a Stage 1 operator who already has:
+Release baseline for this guide revision: `1.3.5`.
+
+This document is intended for an operator who already has:
 
 - a running stack;
 - completed onboarding;
 - a working single-node WAF deployment.
 
 It is not a theoretical ModSecurity reference. It is a practical guide for changing policies safely.
-
-Release baseline for this guide revision: `3.0.7`.
 
 ## How WAF Fits Into The Architecture
 
@@ -27,13 +27,7 @@ This means:
 - the compiler generates a deterministic bundle;
 - runtime uses only the active compiled bundle.
 
-Manual editing of:
-
-- NGINX config;
-- ModSecurity config;
-- active bundle files
-
-is an architectural violation and will be overwritten by later revisions.
+Manual editing of NGINX config, ModSecurity config, or active bundle files is an architectural violation and will be overwritten by later revisions.
 
 ## WAF Modes
 
@@ -49,7 +43,7 @@ Use it when:
 
 Use it when:
 
-- the site' traffic profile is understood;
+- the site traffic profile is understood;
 - the baseline policy has been validated;
 - false positives are under control.
 
@@ -87,9 +81,7 @@ Recommended sequence:
 5. compile a new revision;
 6. apply and verify again.
 
-Rule of thumb:
-
-- prefer narrow exceptions over globally disabling CRS.
+Rule of thumb: prefer narrow exceptions over globally disabling CRS.
 
 ### Site Breaks After WAF Enablement
 
@@ -119,11 +111,7 @@ Check:
 - denylist and allowlist rules;
 - office, VPN, and management source ranges.
 
-Before applying a manual ban, always confirm:
-
-- the exact IP;
-- the CIDR width;
-- whether the rule affects management access.
+Before applying a manual ban, always confirm the exact IP, CIDR width, and whether the rule affects management access.
 
 ## Recommended Change Flow
 
@@ -142,6 +130,56 @@ Helpful discipline:
 - validate immediately after apply.
 
 For internet-facing production sites, run `scripts/pci-preflight-perimeter.sh` before an external ASV window and treat a failing preflight as a hard stop for policy rollout.
+
+## Configuring mTLS (v1.3.5+)
+
+### Incoming mTLS (client certificate)
+
+1. Upload the client CA certificate to Vault at path `pki/client_ca`.
+2. Enable `security_mtls.use_mtls = true` in the site profile.
+3. Set `mtls_vault_path` to the Vault path for ClientCA.
+4. Optionally enable `mtls_require_client_cert`.
+5. Compile and apply the revision.
+
+### Outgoing upstream mTLS
+
+1. Upload the cert and key to Vault (`pki/upstream_cert`, `pki/upstream_key`).
+2. Enable `security_mtls.use_upstream_mtls = true`.
+3. Set `upstream_mtls_cert_vault_path` and `upstream_mtls_key_vault_path`.
+4. Compile and apply.
+
+## Configuring WebSocket Inspection (v1.3.5+)
+
+1. Open the `WebSocket` tab in the site profile.
+2. Enable `security_websocket.use_websocket_inspection = true`.
+3. Set `max_frame_size` and `max_message_size` to match the application requirements.
+4. Optionally add `blocked_patterns` as regex strings.
+5. Compile and apply.
+
+Start with Detection mode on the site to identify false positives before switching to Prevention.
+
+## Virtual Patching (v1.3.5+)
+
+A Virtual Patch is a per-site SecRule that activates immediately after compile and apply without modifying CRS.
+
+1. Open the `Virtual Patches` tab in the site profile.
+2. Add a SecRule string, for example:
+   ```
+   SecRule REQUEST_URI "@contains /vulnerable-path" "id:9001,phase:1,deny,status:403,msg:'Virtual patch'"
+   ```
+3. Compile and apply.
+
+Virtual patches are a temporary measure. Remove them after the application vulnerability is fixed.
+
+## Geo Time Windows (v1.3.5+)
+
+Geo Time Windows allow blocking or rate-limiting traffic from a country during specific time ranges.
+
+1. Open the `Geo Time Windows` tab in the site profile.
+2. Add an entry: country, start time, end time, action (`block` or `rate_limit`).
+3. Compile and apply.
+
+Typical use: block traffic from specific regions during off-hours based on local time.
 
 ## Observability Without External SIEM
 

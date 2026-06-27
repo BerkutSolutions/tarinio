@@ -21,6 +21,7 @@ func buildEasyModSecurityRules(
 	apiEnforcementMode,
 	apiDefaultAction string,
 	apiEndpointPolicies []APIPositiveEndpointPolicyInput,
+	virtualPatches []VirtualPatchInput,
 ) string {
 	engineDirective := "SecRuleEngine On"
 	switch strings.ToLower(strings.TrimSpace(securityMode)) {
@@ -58,6 +59,9 @@ func buildEasyModSecurityRules(
 	}
 	if useAPIPositiveSecurity {
 		lines = append(lines, buildAPIPositiveModSecurityRules(siteID, openAPISchemaRef, apiEnforcementMode, apiDefaultAction, apiEndpointPolicies)...)
+	}
+	if len(virtualPatches) > 0 {
+		lines = append(lines, buildVirtualPatchModSecurityRules(virtualPatches)...)
 	}
 	return strings.Join(lines, "\n") + "\n"
 }

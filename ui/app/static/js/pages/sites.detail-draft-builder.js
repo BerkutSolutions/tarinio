@@ -12,7 +12,9 @@ export function buildDetailDraftFromForm(container, state, deps = {}) {
     normalizeAuthOrder,
     normalizeAuthServiceTokens,
     normalizeAuthSessionTTLMinutes,
-    normalizeAPIPositiveEndpointPolicies
+    normalizeAPIPositiveEndpointPolicies,
+    normalizeGeoTimeWindows,
+    normalizeWSBlockPatterns
   } = deps;
   return {
     id: container.querySelector("#service-id").value.trim().toLowerCase(),
@@ -41,6 +43,10 @@ export function buildDetailDraftFromForm(container, state, deps = {}) {
     reverse_proxy_ssl_sni_name: container.querySelector("#service-reverse-proxy-ssl-sni-name").value.trim(),
     reverse_proxy_websocket: container.querySelector("#service-reverse-proxy-websocket").checked,
     reverse_proxy_keepalive: container.querySelector("#service-reverse-proxy-keepalive").checked,
+    health_check_enabled: Boolean(container.querySelector("#service-health-check-enabled")?.checked),
+    health_check_path: container.querySelector("#service-health-check-path")?.value.trim() || "/health",
+    health_check_interval_seconds: Number(container.querySelector("#service-health-check-interval")?.value || 10),
+    health_check_fail_threshold: Number(container.querySelector("#service-health-check-fail-threshold")?.value || 3),
     pass_host_header: container.querySelector("#service-pass-host-header")?.checked ?? true,
     send_x_forwarded_for: container.querySelector("#service-send-x-forwarded-for")?.checked ?? true,
     send_x_forwarded_proto: container.querySelector("#service-send-x-forwarded-proto")?.checked ?? true,
@@ -49,6 +55,7 @@ export function buildDetailDraftFromForm(container, state, deps = {}) {
     max_client_size: container.querySelector("#service-max-client-size").value.trim(),
     http2: container.querySelector("#service-http2").checked,
     http3: container.querySelector("#service-http3").checked,
+    http_strict_parsing: Boolean(container.querySelector("#service-http-strict-parsing")?.checked),
     ssl_protocols: normalizeStringArray(state.draft.ssl_protocols),
     cookie_flags: container.querySelector("#service-cookie-flags").value.trim(),
     content_security_policy: container.querySelector("#service-content-security-policy").value.trim(),
@@ -81,11 +88,13 @@ export function buildDetailDraftFromForm(container, state, deps = {}) {
     blacklist_asn: normalizeStringArray(state.draft.blacklist_asn),
     blacklist_user_agent: normalizeStringArray(state.draft.blacklist_user_agent),
     blacklist_uri: normalizeStringArray(state.draft.blacklist_uri),
+    blacklist_ja3: normalizeStringArray(state.draft.blacklist_ja3),
     blacklist_ip_urls: normalizeStringArray(state.draft.blacklist_ip_urls),
     blacklist_rdns_urls: normalizeStringArray(state.draft.blacklist_rdns_urls),
     blacklist_asn_urls: normalizeStringArray(state.draft.blacklist_asn_urls),
     blacklist_user_agent_urls: normalizeStringArray(state.draft.blacklist_user_agent_urls),
     blacklist_uri_urls: normalizeStringArray(state.draft.blacklist_uri_urls),
+    blacklist_ja3_urls: normalizeStringArray(state.draft.blacklist_ja3_urls),
     use_limit_conn: container.querySelector("#service-use-limit-conn").checked,
     limit_conn_max_http1: Number(container.querySelector("#service-limit-conn-max-http1").value || "200"),
     limit_conn_max_http2: Number(container.querySelector("#service-limit-conn-max-http2").value || "400"),
@@ -184,6 +193,7 @@ export function buildDetailDraftFromForm(container, state, deps = {}) {
     ),
     blacklist_country: normalizeStringArray(state.draft.blacklist_country),
     whitelist_country: normalizeStringArray(state.draft.whitelist_country),
+    geo_time_windows: normalizeGeoTimeWindows(state.draft.geo_time_windows),
     api_positive_security_enabled: Boolean(state.draft.api_positive_security_enabled),
     api_positive_openapi_schema_ref: String(state.draft.api_positive_openapi_schema_ref || "").trim(),
     api_positive_enforcement_mode: String(state.draft.api_positive_enforcement_mode || "monitor").trim().toLowerCase() || "monitor",
@@ -195,6 +205,19 @@ export function buildDetailDraftFromForm(container, state, deps = {}) {
     modsecurity_crs_version: container.querySelector("#service-modsecurity-crs-version").value.trim(),
     modsecurity_crs_plugins: normalizeStringArray(state.draft.modsecurity_crs_plugins),
     modsecurity_custom_path: container.querySelector("#service-modsecurity-custom-path").value.trim(),
-    modsecurity_custom_content: container.querySelector("#service-modsecurity-custom-content").value
+    modsecurity_custom_content: container.querySelector("#service-modsecurity-custom-content").value,
+    use_ws_inspection: Boolean(container.querySelector("#service-use-ws-inspection")?.checked),
+    ws_block_patterns: normalizeWSBlockPatterns(state.draft.ws_block_patterns),
+    ws_max_message_bytes: Math.max(0, Number.parseInt(container.querySelector("#service-ws-max-message-bytes")?.value || "0", 10) || 0),
+    ws_rate_msg_per_sec: Math.max(0, Number.parseInt(container.querySelector("#service-ws-rate-msg-per-sec")?.value || "0", 10) || 0),
+    mtls_enabled: Boolean(container.querySelector("#service-mtls-enabled")?.checked),
+    mtls_optional: Boolean(container.querySelector("#service-mtls-optional")?.checked),
+    mtls_verify_depth: Math.max(0, Number.parseInt(container.querySelector("#service-mtls-verify-depth")?.value || "2", 10) || 2),
+    mtls_client_ca_ref: String(container.querySelector("#service-mtls-client-ca-ref")?.value || "").trim(),
+    mtls_pass_headers: Boolean(container.querySelector("#service-mtls-pass-headers")?.checked),
+    upstream_mtls_enabled: Boolean(container.querySelector("#service-upstream-mtls-enabled")?.checked),
+    upstream_mtls_cert_ref: String(container.querySelector("#service-upstream-mtls-cert-ref")?.value || "").trim(),
+    upstream_mtls_key_ref: String(container.querySelector("#service-upstream-mtls-key-ref")?.value || "").trim(),
+    upstream_mtls_ca_ref: String(container.querySelector("#service-upstream-mtls-ca-ref")?.value || "").trim()
   };
 }

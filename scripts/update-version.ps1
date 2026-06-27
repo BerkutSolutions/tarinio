@@ -38,21 +38,47 @@ function Update-AppMeta([string]$RepoRoot, [string]$TargetVersion) {
     Write-Utf8NoBom -Path $metaPath -Content $updated
 }
 
-function Update-PackageJsonVersion([string]$RepoRoot, [string]$TargetVersion) {
-    $pkgPath = Join-Path $RepoRoot "package.json"
-    if (-not (Test-Path $pkgPath)) {
-        return
+function Sync-I18NAppVersion([string]$RepoRoot, [string]$TargetVersion) {
+    # Updates app.version in all 5 locale files.
+    # Each locale has its own display prefix before the version number:
+    #   en, de, zh -> "v<version>"
+    #   sr         -> "в<version>"
+    #   ru         -> "Версия <version>"
+    # Docs are intentionally excluded from version sync
+    # (documentation carries version as editorial context, not a build artifact).
+    $utf8 = [System.Text.UTF8Encoding]::new($false)
+    # Cyrillic prefixes defined via char codes to avoid encoding issues in the script file itself:
+    #   ru: "Версия " (0x412 0x435 0x440 0x441 0x438 0x44F 0x20)
+    #   sr: "в" (0x432)
+    $prefixRu = [string][char]0x412 + [char]0x435 + [char]0x440 + [char]0x441 + [char]0x438 + [char]0x44F + [char]0x20
+    $prefixSr = [string][char]0x432
+    $localeValues = @{
+        "en.json" = "v$TargetVersion"
+        "de.json" = "v$TargetVersion"
+        "zh.json" = "v$TargetVersion"
+        "sr.json" = ($prefixSr + $TargetVersion)
+        "ru.json" = ($prefixRu + $TargetVersion)
     }
-}
-
-function Update-PackageLockRootVersions([string]$RepoRoot, [string]$TargetVersion) {
-    $lockPath = Join-Path $RepoRoot "package-lock.json"
-    if (-not (Test-Path $lockPath)) {
-        return
+    $i18nDir = Join-Path $RepoRoot "ui/app/static/i18n"
+    foreach ($file in $localeValues.Keys) {
+        $path = Join-Path $i18nDir $file
+        if (-not (Test-Path $path)) {
+            throw "i18n file not found: $path"
+        }
+        $raw = [System.Text.Encoding]::UTF8.GetString([System.IO.File]::ReadAllBytes($path))
+        if ($raw -notmatch '"app\.version"\s*:\s*"[^"]+"') {
+            throw "app.version key not found in $file"
+        }
+        $newValue = $localeValues[$file]
+        $updated = [regex]::Replace($raw, '("app\.version"\s*:\s*)"[^"]+"', ('$1"' + $newValue + '"'))
+        if ($updated -ne $raw) {
+            [System.IO.File]::WriteAllText($path, $updated, $utf8)
+        }
     }
 }
 
 function Sync-PackageMetadataVersion([string]$RepoRoot, [string]$TargetVersion) {
+    # Updates package.json and package-lock.json (root + packages[""] entries) via npm version.
     $pkgPath = Join-Path $RepoRoot "package.json"
     if (-not (Test-Path $pkgPath)) {
         return
@@ -93,7 +119,7 @@ function Sync-PackageMetadataVersion([string]$RepoRoot, [string]$TargetVersion) 
             throw 'package-lock.json missing packages[""] root entry'
         }
         if ($rootMatch.Groups[1].Value -ne $TargetVersion) {
-            throw ("package-lock.json packages[""`"`"].version was not updated to " + $TargetVersion)
+            throw ("package-lock.json packages[`"`"].version was not updated to " + $TargetVersion)
         }
     }
 }
@@ -103,5 +129,6 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 
 Update-AppMeta -RepoRoot $repoRoot -TargetVersion $Version
 Sync-PackageMetadataVersion -RepoRoot $repoRoot -TargetVersion $Version
+Sync-I18NAppVersion -RepoRoot $repoRoot -TargetVersion $Version
 
 Write-Host ("Version synchronized to " + $Version)

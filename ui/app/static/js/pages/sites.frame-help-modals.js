@@ -50,6 +50,7 @@ export const renderTrafficDnsblHelpModal = makeFrameRenderer({
     "exceptionsToggle",
     "lists",
     "blacklistByType",
+    "ja3Blacklist",
     "sources",
   ],
 });

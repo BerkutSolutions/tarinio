@@ -115,11 +115,13 @@ const LIST_FIELD_SET = new Set([
   "blacklist_asn",
   "blacklist_user_agent",
   "blacklist_uri",
+  "blacklist_ja3",
   "blacklist_ip_urls",
   "blacklist_rdns_urls",
   "blacklist_asn_urls",
   "blacklist_user_agent_urls",
   "blacklist_uri_urls",
+  "blacklist_ja3_urls",
   "blacklist_country",
   "whitelist_country",
   "modsecurity_crs_plugins"

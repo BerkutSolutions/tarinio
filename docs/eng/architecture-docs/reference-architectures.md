@@ -1,10 +1,20 @@
 ﻿# Reference Architectures
 
-This page belongs to the current documentation branch.
-
 ## Purpose
 
 This page gives operators reference deployment shapes to follow instead of inventing topology from scratch.
+
+## Stack Components By Topology (v1.3.5+)
+
+| Component | Single-Node | HA | Enterprise |
+|---|---|---|---|
+| `control-plane` | yes | yes (x2) | yes (x2+) |
+| `postgresql` | yes | shared | shared |
+| `vault` | yes | yes | yes |
+| `opensearch` | yes | yes | yes |
+| `redis` | no | yes | yes |
+| `clickhouse` | no | no | optional |
+| `tarinio-sentinel` | optional | optional | yes |
 
 ## 1. Single-Node Starter
 
@@ -19,6 +29,7 @@ Shape:
 - one control-plane;
 - one runtime;
 - bundled PostgreSQL;
+- Vault for secrets;
 - optional local observability.
 
 ## 2. High Availability Control-Plane
@@ -36,6 +47,7 @@ Shape:
 - `control-plane-b`
 - shared PostgreSQL
 - shared Redis
+- Vault
 - runtime
 
 ## 3. Enterprise-Style Segmented Deployment
@@ -49,9 +61,10 @@ Use when:
 Shape:
 
 - dedicated admin boundary;
-- internal PostgreSQL and Redis;
+- internal PostgreSQL, Redis, and Vault;
 - runtime in protected ingress segment;
-- Prometheus / Grafana on internal monitoring network.
+- Prometheus / Grafana on internal monitoring network;
+- tarinio-sentinel for anomaly detection.
 
 ## 4. Lab / Validation Architecture
 
@@ -63,7 +76,6 @@ Use when:
 
 Shape:
 
-- `deploy/compose/High Availability-lab`
+- `deploy/compose/ha-lab`
 
 This is the recommended rehearsal environment before production promotion.
-

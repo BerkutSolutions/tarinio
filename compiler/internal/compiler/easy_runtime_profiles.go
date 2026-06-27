@@ -21,6 +21,7 @@ func buildEasyProfileBySite(profiles []EasyProfileInput) (map[string]EasyProfile
 		profile.BlacklistIP = sortedUnique(profile.BlacklistIP)
 		profile.BlacklistUserAgent = sortedUnique(profile.BlacklistUserAgent)
 		profile.BlacklistURI = sortedUnique(profile.BlacklistURI)
+		profile.BlacklistJA3 = sortedUnique(profile.BlacklistJA3)
 		profile.BlacklistURI = normalizeBlacklistURIPatterns(profile.BlacklistURI)
 		profile.BlacklistCountry = sortedUniqueUpper(profile.BlacklistCountry)
 		profile.WhitelistCountry = sortedUniqueUpper(profile.WhitelistCountry)
@@ -146,6 +147,7 @@ func applySecurityModePolicy(profile EasyProfileInput) EasyProfileInput {
 		profile.BlacklistIP = nil
 		profile.BlacklistUserAgent = nil
 		profile.BlacklistURI = nil
+		profile.BlacklistJA3 = nil
 		profile.BlacklistCountry = nil
 		profile.WhitelistCountry = nil
 		profile.AntibotChallenge = "no"
@@ -169,6 +171,7 @@ func applySecurityModePolicy(profile EasyProfileInput) EasyProfileInput {
 		profile.BlacklistIP = nil
 		profile.BlacklistUserAgent = nil
 		profile.BlacklistURI = nil
+		profile.BlacklistJA3 = nil
 		profile.BlacklistCountry = nil
 		profile.WhitelistCountry = nil
 		profile.AntibotChallenge = "no"

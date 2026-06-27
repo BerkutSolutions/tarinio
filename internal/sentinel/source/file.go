@@ -17,13 +17,15 @@ type FileBackend struct {
 }
 
 type jsonAccess struct {
-	Timestamp string `json:"timestamp"`
-	ClientIP  string `json:"client_ip"`
-	Site      string `json:"site"`
-	Status    int    `json:"status"`
-	Method    string `json:"method"`
-	URI       string `json:"uri"`
-	UserAgent string `json:"user_agent"`
+	Timestamp   string `json:"timestamp"`
+	ClientIP    string `json:"client_ip"`
+	Site        string `json:"site"`
+	Status      int    `json:"status"`
+	Method      string `json:"method"`
+	URI         string `json:"uri"`
+	UserAgent   string `json:"user_agent"`
+	JA3         string `json:"ja3,omitempty"`
+	AntibotFail bool   `json:"antibot_fail,omitempty"`
 }
 
 func NewFileBackend(path string) *FileBackend {
@@ -76,14 +78,16 @@ func ParseAccessLine(line string) (Event, bool) {
 				when, err := time.Parse(time.RFC3339, strings.TrimSpace(item.Timestamp))
 				if err == nil {
 					return Event{
-						IP:        ip,
-						Site:      strings.TrimSpace(item.Site),
-						Status:    item.Status,
-						Method:    strings.TrimSpace(item.Method),
-						Path:      strings.TrimSpace(item.URI),
-						UserAgent: strings.TrimSpace(item.UserAgent),
-						When:      when.UTC(),
-					}, true
+							IP:          ip,
+							Site:        strings.TrimSpace(item.Site),
+							Status:      item.Status,
+							Method:      strings.TrimSpace(item.Method),
+							Path:        strings.TrimSpace(item.URI),
+							UserAgent:   strings.TrimSpace(item.UserAgent),
+							JA3:         strings.TrimSpace(item.JA3),
+							AntibotFail: item.AntibotFail,
+							When:        when.UTC(),
+						}, true
 				}
 			}
 		}

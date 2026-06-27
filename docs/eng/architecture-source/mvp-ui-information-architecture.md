@@ -381,9 +381,20 @@ API data shape:
 - `Role`
 - `AuditEvent`
 
-## Key User Flows
+## Stage 1 Extension Note
 
-## Flow: Create Site
+This document was finalized for MVP (Stage 0). In v1.3.x, the following UI sections were added beyond the original MVP scope:
+
+- `WebSocket` tab in site profile — frame inspection, size limits, blocked patterns
+- `mTLS` tab in site profile — incoming ClientCA (Vault path), outgoing upstream cert/key (Vault paths)
+- `Virtual Patches` section in site profile — ModSecurity SecRule entries per site
+- `Geo Time Windows` tab in site profile — country + time-range + action entries
+- `JA3/JA4` section in site profile — TLS fingerprint blacklist
+- `Credential Stuffing` section in site profile — auth endpoint path, threshold, ban window
+- `Upstream Health Check` section in site profile — health check path, interval, thresholds
+- `API Positive Security` tab in site profile — OpenAPI schema ref, enforcement mode, endpoint policies
+
+These sections follow the same UX rules defined in this document: human-readable labels, backend-persisted fields, no UI-only toggles.
 
 1. operator opens `Sites`
 2. operator selects `create site`

@@ -152,6 +152,16 @@ func signalExplanation(code string) string {
 		return "Single-source emergency flood pattern detected."
 	case "signal_emergency_drop":
 		return "Immediate drop was applied due to emergency flood threshold."
+	case "signal_ja3_risk":
+		return "JA3 TLS fingerprint matches a known malicious scanner or attack tool."
+	case "signal_credential_stuffing":
+		return "Repeated authentication failures on login endpoints suggest credential stuffing."
+	case "signal_antibot_fail":
+		return "Source repeatedly failed antibot challenges indicating automated non-browser traffic."
+	case "signal_bad_behavior":
+		return "Multiple bad-behavior zone hits indicate persistent policy-violating traffic patterns."
+	case "signal_ja3_antibot_correlation":
+		return "JA3 fingerprint risk and antibot failures are both present — high confidence automated threat."
 	default:
 		return "Contributed to risk score by anomaly model."
 	}
@@ -184,6 +194,32 @@ func signalRecommendations(code string) []string {
 	case "signal_ml_risk":
 		return []string{
 			"Validate ML-driven anomaly against deterministic signals before promoting to permanent ban.",
+		}
+	case "signal_ja3_risk":
+		return []string{
+			"Block or challenge the source: JA3 fingerprint is associated with known attack tools.",
+			"Review TLS logs to confirm the fingerprint match before permanent banning.",
+		}
+	case "signal_credential_stuffing":
+		return []string{
+			"Enable rate limiting and CAPTCHA on authentication endpoints.",
+			"Consider temporary blocking if failures exceed account lockout thresholds.",
+			"Review auth logs for compromised accounts and notify affected users.",
+		}
+	case "signal_antibot_fail":
+		return []string{
+			"Tighten antibot challenge policy for this source.",
+			"Consider promoting to drop if antibot failures persist across multiple ticks.",
+		}
+	case "signal_bad_behavior":
+		return []string{
+			"Review bad-behavior zone configuration and tune thresholds.",
+			"Audit whether legitimate clients are triggering the bad-behavior zone.",
+		}
+	case "signal_ja3_antibot_correlation":
+		return []string{
+			"High-confidence automated threat: consider immediate drop or temp_ban.",
+			"Correlate with threat intelligence feeds before permanent banning.",
 		}
 	default:
 		return nil

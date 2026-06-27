@@ -37,7 +37,7 @@ Before upgrade, a full backup is mandatory:
 
 - database;
 - runtime state;
-- TLS/certificate materials;
+- TLS/certificate materials (including mTLS ClientCA and upstream keys from Vault);
 - `.env` and secrets.
 
 See `docs/eng/core-docs/backups.md` for the detailed policy.

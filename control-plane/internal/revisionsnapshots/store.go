@@ -22,6 +22,7 @@ import (
 	"waf/control-plane/internal/storage"
 	"waf/control-plane/internal/tlsconfigs"
 	"waf/control-plane/internal/upstreams"
+	"waf/control-plane/internal/virtualpatches"
 	"waf/control-plane/internal/wafpolicies"
 )
 
@@ -37,6 +38,7 @@ type Snapshot struct {
 	EasySiteProfiles     []easysiteprofiles.EasySiteProfile  `json:"easy_site_profiles"`
 	AntiDDoSSettings     antiddos.Settings                   `json:"anti_ddos_settings"`
 	CertificateMaterials []CertificateMaterialSnapshot       `json:"certificate_materials"`
+	VirtualPatches       []virtualpatches.VirtualPatch       `json:"virtual_patches,omitempty"`
 }
 
 type CertificateMaterialSnapshot struct {

@@ -180,9 +180,51 @@
 ## Практические рекомендации
 
 - Для экспорта и raw-редактирования лучше сохранять полный `.env`, а не только изменённые поля. Так проще переносить сервис между окружениями.
-- `WAF_SITE_CUSTOM_LIMIT_RULES`, blacklist-массивы и geo-списки должны оставаться валидным JSON. Не смешивайте JSON и “через запятую” в одном значении.
+- `WAF_SITE_CUSTOM_LIMIT_RULES`, blacklist-массивы и geo-списки должны оставаться валидным JSON. Не смешивайте JSON и "через запятую" в одном значении.
 - Если сервис использует HTTPS к upstream, включайте `WAF_SITE_REVERSE_PROXY_SSL_SNI` и задавайте `WAF_SITE_REVERSE_PROXY_SSL_SNI_NAME`, когда upstream ждёт конкретный `server_name`.
 - Секреты вроде `*_SECRET`, `WAF_SITE_AUTH_BASIC_PASSWORD` и ACME-учётных данных лучше подставлять из безопасного секрета окружения, а не хранить в пересылаемом файле.
+
+## mTLS (Mutual TLS)
+
+| Параметр | Назначение | По умолчанию | Пример |
+| --- | --- | --- | --- |
+| `WAF_SITE_MTLS_ENABLED` | Включает проверку клиентского сертификата. | `false` | `true` |
+| `WAF_SITE_MTLS_OPTIONAL` | Опциональный режим: статус передаётся без блокировки. | `false` | `true` |
+| `WAF_SITE_MTLS_VERIFY_DEPTH` | Глубина проверки цепочки клиентского сертификата. | `1` | `2` |
+| `WAF_SITE_MTLS_CLIENT_CA_REF` | Путь к CA-файлу клиентских сертификатов внутри рантайма. | Пусто | `/etc/ssl/clients/ca.crt` |
+| `WAF_SITE_MTLS_PASS_HEADERS` | Передавать `X-Client-Verify` / `X-Client-DN` в upstream. | `false` | `true` |
+| `WAF_SITE_UPSTREAM_MTLS_ENABLED` | Предъявлять клиентский сертификат upstream-серверу. | `false` | `true` |
+| `WAF_SITE_UPSTREAM_MTLS_CERT_REF` | Путь к сертификату WAF как клиента. | Пусто | `/etc/ssl/upstream/client.crt` |
+| `WAF_SITE_UPSTREAM_MTLS_KEY_REF` | Путь к приватному ключу клиента. | Пусто | `/etc/ssl/upstream/client.key` |
+| `WAF_SITE_UPSTREAM_MTLS_CA_REF` | CA для верификации upstream-сервера. | Пусто | `/etc/ssl/upstream/ca.crt` |
+
+## JA3/JA4 Fingerprinting
+
+| Параметр | Назначение | По умолчанию | Пример |
+| --- | --- | --- | --- |
+| `WAF_SITE_BLACKLIST_JA3` | Список JA3-fingerprint для блокировки. | `[]` | `["abc123fingerprint"]` |
+| `WAF_SITE_BLACKLIST_JA3_URLS` | URL-источники внешних JA3 blacklist. | `[]` | `["https://lists.example.net/ja3-deny.txt"]` |
+
+## Virtual Patching
+
+| Параметр | Назначение | По умолчанию | Пример |
+| --- | --- | --- | --- |
+| `WAF_SITE_VIRTUAL_PATCHES` | Временные правила блокировки с TTL. Массив объектов с полями `match_uri`, `match_header`, `match_body`, `action`, `expires_at`. | `[]` | `[{"match_uri":"/old-vuln","action":"block","expires_at":"2026-12-31T00:00:00Z"}]` |
+
+## Geo Time Windows
+
+| Параметр | Назначение | По умолчанию | Пример |
+| --- | --- | --- | --- |
+| `WAF_SITE_GEO_TIME_WINDOWS` | Ограничения по GeoIP и расписанию. Массив объектов с полями `countries`, `weekdays`, `time_from`, `time_to`, `action`. | `[]` | `[{"countries":["CN"],"weekdays":["mon","tue"],"time_from":"00:00","time_to":"06:00","action":"block"}]` |
+
+## WebSocket Inspection
+
+| Параметр | Назначение | По умолчанию | Пример |
+| --- | --- | --- | --- |
+| `WAF_SITE_USE_WS_INSPECTION` | Включает инспекцию WebSocket-фреймов. Требует `WAF_SITE_REVERSE_PROXY_WEBSOCKET=true`. | `false` | `true` |
+| `WAF_SITE_WS_BLOCK_PATTERNS` | Regex-паттерны для блокировки содержимого фреймов. | `[]` | `["<script","eval\\("]` |
+| `WAF_SITE_WS_MAX_MESSAGE_BYTES` | Максимальный размер фрейма в байтах. `0` — без ограничения. | `0` | `65536` |
+| `WAF_SITE_WS_RATE_MSG_PER_SEC` | Максимальная частота фреймов в секунду. `0` — без ограничения. | `0` | `100` |
 
 ## Минимальный пример
 

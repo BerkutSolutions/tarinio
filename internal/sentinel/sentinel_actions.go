@@ -36,6 +36,27 @@ func deriveSignalWeights(stats *ipStat) map[string]float64 {
 	if stats.Count >= 10 && blockedRatio >= 0.6 {
 		out["signal_blocked_ratio"] = blockedRatio * 1.5
 	}
+	if stats.JA3BlacklistHits > 0 {
+		out["signal_ja3_risk"] = math.Min(4.0, float64(stats.JA3BlacklistHits)*2.0)
+	}
+	// credential stuffing: 5+ auth failures on auth paths
+	if stats.AuthFailures >= 5 {
+		out["signal_credential_stuffing"] = math.Min(3.0, float64(stats.AuthFailures-5)*0.4)
+	}
+	// antibot fail: 3+ failed antibot challenges
+	if stats.AntibotFails >= 3 {
+		out["signal_antibot_fail"] = math.Min(4.0, float64(stats.AntibotFails)*0.8)
+	}
+	// bad behavior zone hits: 5+ 429s from bad-behavior zone
+	if stats.BadBehaviorHits >= 5 {
+		out["signal_bad_behavior"] = math.Min(3.0, float64(stats.BadBehaviorHits-5)*0.3)
+	}
+	// JA3 + antibot correlation: two independent signals → elevated confidence
+	if _, hasJA3 := out["signal_ja3_risk"]; hasJA3 {
+		if _, hasAntibot := out["signal_antibot_fail"]; hasAntibot {
+			out["signal_ja3_antibot_correlation"] = 1.0
+		}
+	}
 	return out
 }
 

@@ -270,5 +270,8 @@ func ApplyRuntimeProfile(base Config, profile RuntimeProfile) Config {
 	if profile.ModelWeightEmergencySingle > 0 {
 		out.WeightEmergencySingle = profile.ModelWeightEmergencySingle
 	}
+	if len(profile.JA3BlacklistFingerprints) > 0 {
+		out.JA3BlacklistFingerprints = profile.JA3BlacklistFingerprints
+	}
 	return out
 }

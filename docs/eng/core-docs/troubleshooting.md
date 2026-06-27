@@ -79,6 +79,52 @@ Check:
 
 First actions:
 
+- identify which layer is blocking: WAF, rate-limit, or Anti-DDoS;
+- temporarily relax the tightest policy;
+- capture a sample of the failing request before making broad changes.
+
+## mTLS — Client Certificate Rejected
+
+Check:
+
+- `mtls_enabled` and `mtls_optional` in the site profile;
+- `mtls_client_ca_ref` path — the CA file must exist inside the runtime container;
+- `mtls_verify_depth` — the client certificate chain must fit within the configured depth;
+- `Events` and nginx logs for `ssl_verify_client` errors.
+
+First actions:
+
+- switch to `mtls_optional` for diagnosis without blocking;
+- verify the CA file is accessible inside the runtime container;
+- confirm the CA file is a valid PEM.
+
+## JA3/JA4 — Legitimate Clients Are Blocked
+
+Check:
+
+- `blacklist_ja3` list in the site profile;
+- `Events` — the blocked fingerprint is shown there;
+- no popular browser or client fingerprint was accidentally added.
+
+First actions:
+
+- copy the fingerprint from the event and compare with the blacklist;
+- remove the incorrect entry and recompile the revision.
+
+## WebSocket — Connection Closes Unexpectedly
+
+Check:
+
+- `use_ws_inspection` and `reverse_proxy_websocket` — both must be `true`;
+- `ws_block_patterns` — a pattern may match legitimate frames;
+- `ws_max_message_bytes` — the limit may be too low;
+- `ws_rate_msg_per_sec` — frame rate limit.
+
+First actions:
+
+- disable `use_ws_inspection` and verify if the problem disappears;
+- if yes, look for a conflicting pattern or an overly tight frame size limit.
+
 - identify whether the source is WAF, rate-limit, or Anti-DDoS;
 - temporarily relax the smallest relevant policy;
 - capture an example request before changing too much.
