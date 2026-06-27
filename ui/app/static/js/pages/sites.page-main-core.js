@@ -269,7 +269,7 @@ const renderAuthUsersEditor = (users, ctx) => renderAuthUsersEditorFacade(users,
 const renderAuthExclusionRulesEditor = (rules, ctx) => renderAuthExclusionRulesEditorFacade(rules, ctx, escapeHtml, normalizeArray);
 const renderAuthServiceTokensEditor = (tokens, ctx) => renderAuthServiceTokensEditorFacade(tokens, ctx, escapeHtml, normalizeArray);
 const renderAuthSessionTtlOptions = (ttlMinutes, ctx) => renderAuthSessionTtlOptionsFacade(ttlMinutes, ctx, escapeHtml);
-const renderCustomLimitRulesEditor = (rules, ctx) => renderCustomLimitRulesEditorFacade(rules, ctx, escapeHtml, normalizeArray);
+const renderCustomLimitRulesEditor = (rules, ctx, deps, disabled) => renderCustomLimitRulesEditorFacade(rules, ctx, escapeHtml, normalizeArray, disabled);
 const renderAntibotExclusionRulesEditor = (rules, ctx) => renderAntibotExclusionRulesEditorFacade(rules, ctx, escapeHtml, normalizeArray);
 const renderAntibotChallengeRulesEditor = (rules, ctx) => renderAntibotChallengeRulesEditorFacade(rules, ctx, escapeHtml, normalizeArray);
 const renderAuthHelpModalSafe = (ctx) => renderAuthHelpModal(ctx, { escapeHtml });

@@ -130,8 +130,8 @@ export function renderAuthSessionTtlOptions(ttlMinutes, ctx, escapeHtml) {
   return renderAuthSessionTtlOptionsModule(ttlMinutes, ctx, { escapeHtml });
 }
 
-export function renderCustomLimitRulesEditor(rules, ctx, escapeHtml, normalizeArray) {
-  return renderCustomLimitRulesEditorModule(rules, ctx, { escapeHtml, normalizeArray });
+export function renderCustomLimitRulesEditor(rules, ctx, escapeHtml, normalizeArray, disabled) {
+  return renderCustomLimitRulesEditorModule(rules, ctx, { escapeHtml, normalizeArray }, disabled);
 }
 
 export function renderAntibotExclusionRulesEditor(rules, ctx, escapeHtml, normalizeArray) {

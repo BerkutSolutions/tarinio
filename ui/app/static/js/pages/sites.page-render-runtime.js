@@ -244,5 +244,42 @@ export async function renderSitesRuntime(container, ctx, deps) {
     bindDetail();
   };
 
+  // Custom limit rules delegation — one-time, survives re-renders
+  container.addEventListener("click", (e) => {
+    if (state.route.mode !== "detail") return;
+    const addBtn = e.target.closest("[data-custom-limit-add]");
+    if (addBtn && !addBtn.disabled) {
+      const rows = Array.from(container.querySelectorAll("[data-custom-limit-path]")).map((input) => {
+        const idx = String(input.dataset.customLimitPath || "");
+        const rateInput = container.querySelector(`[data-custom-limit-rate="${idx}"]`);
+        const rateUnitInput = container.querySelector(`[data-custom-limit-rate-unit="${idx}"]`);
+        const v = String(rateInput?.value || "").trim();
+        const unit = rateUnitInput?.value || "r/s";
+        return { path: String(input.value || "").trim(), rate: v ? `${v}${unit}` : "" };
+      });
+      state.draft.custom_limit_rules = [...normalizeCustomLimitRules(rows, { normalizeArray }), { path: "/", rate: "10r/s" }];
+      render();
+      return;
+    }
+    const removeBtn = e.target.closest("[data-custom-limit-remove]");
+    if (removeBtn && !removeBtn.disabled) {
+      const index = Number.parseInt(String(removeBtn.dataset.customLimitRemove || "-1"), 10);
+      if (!Number.isInteger(index) || index < 0) return;
+      const rows = Array.from(container.querySelectorAll("[data-custom-limit-path]")).map((input) => {
+        const idx = String(input.dataset.customLimitPath || "");
+        const rateInput = container.querySelector(`[data-custom-limit-rate="${idx}"]`);
+        const rateUnitInput = container.querySelector(`[data-custom-limit-rate-unit="${idx}"]`);
+        const v = String(rateInput?.value || "").trim();
+        const unit = rateUnitInput?.value || "r/s";
+        return { path: String(input.value || "").trim(), rate: v ? `${v}${unit}` : "" };
+      });
+      const current = normalizeCustomLimitRules(rows, { normalizeArray });
+      if (index >= current.length) return;
+      current.splice(index, 1);
+      state.draft.custom_limit_rules = current;
+      render();
+    }
+  });
+
   await load();
 }

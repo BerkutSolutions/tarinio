@@ -170,15 +170,6 @@ set $waf_blacklist_uri_guard "$waf_easy_exception_guard:$request_uri";
 if ($waf_blacklist_uri_guard ~* "^0:.*{{ . }}") { return 403; }
 {{- end }}
 
-{{- if .BlacklistJA3 }}
-set $waf_ja3_blacklist 0;
-{{- range .BlacklistJA3 }}
-if ($ssl_ja3 = "{{ . }}") { set $waf_ja3_blacklist 1; }
-{{- end }}
-set $waf_ja3_block_guard "$waf_easy_exception_guard:$waf_ja3_blacklist";
-if ($waf_ja3_block_guard = "0:1") { return 403; }
-{{- end }}
-
 {{- if .WhitelistCountryGuardPattern }}
 set $waf_country_guard "$waf_easy_exception_guard:$waf_country_code";
 if ($waf_country_guard !~ "{{ .WhitelistCountryGuardPattern }}") { return 403; }

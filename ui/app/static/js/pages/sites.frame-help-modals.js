@@ -55,6 +55,35 @@ export const renderTrafficDnsblHelpModal = makeFrameRenderer({
   ],
 });
 
+
+export const renderTrafficAllowlistHelpModal = makeFrameRenderer({
+  chapter: "traffic",
+  frame: "allowlist",
+  rowKeys: [
+    "activate",
+    "allowlistIp",
+    "exceptions",
+    "exceptionsUri",
+  ],
+});
+
+export const renderTrafficBlacklistHelpModal = makeFrameRenderer({
+  chapter: "traffic",
+  frame: "blacklist",
+  rowKeys: [
+    "activate",
+    "ip",
+    "rdns",
+    "asn",
+    "userAgent",
+    "uri",
+    "ja3",
+    "ipUrls",
+    "dnsblActivate",
+    "dnsblProviders",
+  ],
+});
+
 export const renderUpstreamHeadersHelpModal = makeFrameRenderer({
   chapter: "upstream",
   frame: "headers",

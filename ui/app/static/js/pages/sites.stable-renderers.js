@@ -22,6 +22,8 @@ import {
 import { renderAntibotHelpModal, renderAuthHelpModal } from "./sites.auth-help-modals.js";
 import {
   renderTrafficBadBehaviorHelpModal,
+  renderTrafficBlacklistHelpModal,
+  renderTrafficAllowlistHelpModal,
   renderTrafficDnsblHelpModal,
   renderTrafficLimitsHelpModal,
   renderUpstreamHeadersHelpModal,
@@ -29,12 +31,16 @@ import {
 import {
   renderAntibotChapterHelpModal,
   renderBlockingChapterHelpModal,
-  renderFrontChapterHelpModal,
   renderGeoChapterHelpModal,
   renderHeadersChapterHelpModal,
   renderHttpChapterHelpModal,
   renderModsecChapterHelpModal,
   renderUpstreamChapterHelpModal,
+  renderWebSocketChapterHelpModal,
+  renderVirtualPatchesChapterHelpModal,
+  renderUpstreamMtlsChapterHelpModal,
+  renderFrontMainHelpModal,
+  renderFrontMtlsHelpModal,
 } from "./sites.chapter-help-modals.js";
 import {
   formatBanDurationSeconds,
@@ -59,21 +65,28 @@ import {
 import { renderListView as renderListViewModule } from "./sites.list-view.js";
 import { draftToEnvText, toEnvKey } from "./sites.stable-resources.js";
 
-function renderCustomLimitRulesEditor(rules, ctx) {
-  const safeRules = normalizeCustomLimitRules(rules);
+function renderCustomLimitRulesEditor(rules, ctx, deps, disabled = false) {
+  const safeRules = normalizeCustomLimitRules(rules, { normalizeArray });
+  const dis = disabled ? " disabled" : "";
   return `
-    <div class="waf-field full">
+    <div class="waf-field full${disabled ? " waf-disabled" : ""}">
       <label>${escapeHtml(ctx.t("sites.easy.traffic.customLimitRules"))}</label>
       <div class="waf-stack">
         ${safeRules.map((rule, index) => `
           <div class="waf-inline waf-custom-limit-row">
-            <input data-custom-limit-path="${index}" placeholder="/login" value="${escapeHtml(rule.path)}">
-            <input data-custom-limit-rate="${index}" placeholder="20r/s" value="${escapeHtml(rule.rate)}">
-            <button class="btn ghost btn-sm" type="button" data-custom-limit-remove="${index}">x</button>
+            <input data-custom-limit-path="${index}" placeholder="/login" value="${escapeHtml(rule.path)}"${dis}>
+            <div class="waf-custom-limit-rate-wrap">
+              <input data-custom-limit-rate="${index}" type="number" min="1" inputmode="numeric" placeholder="20" value="${escapeHtml(String(rule.rate || "").replace(/r\/s$|r\/m$/i, "").trim())}"${dis}>
+              <select data-custom-limit-rate-unit="${index}"${dis}>
+                <option value="r/s"${!String(rule.rate || "").endsWith("r/m") ? " selected" : ""}>r/s</option>
+                <option value="r/m"${String(rule.rate || "").endsWith("r/m") ? " selected" : ""}>r/m</option>
+              </select>
+            </div>
+            <button class="btn ghost btn-sm" type="button" data-custom-limit-remove="${index}"${dis}>x</button>
           </div>
         `).join("")}
         ${safeRules.length ? "" : `<span class="waf-note">${escapeHtml(ctx.t("sites.easy.noValues"))}</span>`}
-        <button class="btn ghost btn-sm" type="button" data-custom-limit-add>${escapeHtml(ctx.t("sites.easy.traffic.addCustomLimit"))}</button>
+        <button class="btn ghost btn-sm" type="button" data-custom-limit-add${dis}>${escapeHtml(ctx.t("sites.easy.traffic.addCustomLimit"))}</button>
       </div>
     </div>`;
 }
@@ -144,6 +157,8 @@ function renderAntibotExclusionRulesEditor(rules, ctx) {
 const renderAuthHelpModalSafe = (ctx) => renderAuthHelpModal(ctx, { escapeHtml });
 const renderAntibotHelpModalSafe = (ctx) => renderAntibotHelpModal(ctx, { escapeHtml });
 const renderTrafficBadBehaviorHelpModalSafe = (ctx) => renderTrafficBadBehaviorHelpModal(ctx, escapeHtml);
+const renderTrafficBlacklistHelpModalSafe = (ctx) => renderTrafficBlacklistHelpModal(ctx, escapeHtml);
+const renderTrafficAllowlistHelpModalSafe = (ctx) => renderTrafficAllowlistHelpModal(ctx, escapeHtml);
 const renderTrafficLimitsHelpModalSafe = (ctx) => renderTrafficLimitsHelpModal(ctx, escapeHtml);
 const renderTrafficDnsblHelpModalSafe = (ctx) => renderTrafficDnsblHelpModal(ctx, escapeHtml);
 const renderUpstreamHeadersHelpModalSafe = (ctx) => renderUpstreamHeadersHelpModal(ctx, escapeHtml);
@@ -191,10 +206,11 @@ export function renderDetailView(state, ctx) {
     renderAuthHelpModal: renderAuthHelpModalSafe,
     renderAntibotHelpModal: renderAntibotHelpModalSafe,
     renderTrafficBadBehaviorHelpModal: renderTrafficBadBehaviorHelpModalSafe,
+    renderTrafficBlacklistHelpModal: renderTrafficBlacklistHelpModalSafe,
+    renderTrafficAllowlistHelpModal: renderTrafficAllowlistHelpModalSafe,
     renderTrafficLimitsHelpModal: renderTrafficLimitsHelpModalSafe,
     renderTrafficDnsblHelpModal: renderTrafficDnsblHelpModalSafe,
     renderUpstreamHeadersHelpModal: renderUpstreamHeadersHelpModalSafe,
-    renderFrontChapterHelpModal,
     renderUpstreamChapterHelpModal,
     renderHttpChapterHelpModal,
     renderHeadersChapterHelpModal,
@@ -202,6 +218,11 @@ export function renderDetailView(state, ctx) {
     renderAntibotChapterHelpModal,
     renderGeoChapterHelpModal,
     renderModsecChapterHelpModal,
+    renderWebSocketChapterHelpModal,
+    renderVirtualPatchesChapterHelpModal,
+    renderUpstreamMtlsChapterHelpModal,
+    renderFrontMainHelpModal,
+    renderFrontMtlsHelpModal,
     renderGeoTimeWindowsEditor,
     normalizeAuthMode,
     normalizeAuthOrder,

@@ -1,184 +1,168 @@
 export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
-  const { escapeHtml, renderListEditor, getQuickListTemplates, normalizeStringArray, renderStatusCodesEditor, renderCustomLimitRulesEditor, renderAntibotExclusionRulesEditor, normalizeBanEscalationStages, formatBanDurationSeconds, renderAntibotChallengeRulesEditor, renderAuthSessionTtlOptions, renderAuthUsersEditor, renderCountryEditor, renderAuthExclusionRulesEditor, renderAuthServiceTokensEditor, renderAuthHelpModal, renderAntibotHelpModal, renderTrafficBadBehaviorHelpModal, renderTrafficLimitsHelpModal, renderTrafficDnsblHelpModal, renderHeadersChapterHelpModal, renderBlockingChapterHelpModal, renderAntibotChapterHelpModal, renderGeoChapterHelpModal, renderModsecChapterHelpModal, renderGeoTimeWindowsEditor, normalizeAuthMode, renderVirtualPatchesEditor } = deps;
+  const { escapeHtml, renderListEditor, getQuickListTemplates, normalizeStringArray, renderStatusCodesEditor, renderCustomLimitRulesEditor, renderAntibotExclusionRulesEditor, normalizeBanEscalationStages, formatBanDurationSeconds, renderAntibotChallengeRulesEditor, renderAuthSessionTtlOptions, renderAuthUsersEditor, renderCountryEditor, renderAuthExclusionRulesEditor, renderAuthServiceTokensEditor, renderAuthHelpModal, renderAntibotHelpModal, renderTrafficBadBehaviorHelpModal, renderTrafficBlacklistHelpModal, renderTrafficAllowlistHelpModal, renderTrafficLimitsHelpModal, renderTrafficDnsblHelpModal, renderHeadersChapterHelpModal, renderBlockingChapterHelpModal, renderAntibotChapterHelpModal, renderGeoChapterHelpModal, renderModsecChapterHelpModal, renderGeoTimeWindowsEditor, normalizeAuthMode, renderVirtualPatchesEditor, renderWebSocketChapterHelpModal, renderVirtualPatchesChapterHelpModal } = deps;
   const authMode = normalizeAuthMode(draft.auth_mode);
   return `
-              <section class="waf-stack waf-service-compact-section${state.activeTab === "headers" ? "" : " waf-hidden"}" data-tab-panel="headers">
-                <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
-                  <div>
-                    <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.headers.title"))}</div>
-                    <div class="muted">${escapeHtml(ctx.t("sites.easy.tab.headers.subtitle"))}</div>
-                  </div>
-                  <button class="waf-help-icon-btn" type="button" id="service-headers-chapter-help-btn" title="${escapeHtml(ctx.t("sites.help.headers.open"))}" aria-label="${escapeHtml(ctx.t("sites.help.headers.open"))}">?</button>
-                </div>
-                ${renderHeadersChapterHelpModal(ctx, escapeHtml)}
-                <div class="waf-form-grid">
-                  <div class="waf-field">
-                    <label for="service-cookie-flags">${escapeHtml(ctx.t("sites.easy.headers.cookieFlags"))}</label>
-                    <input id="service-cookie-flags" value="${escapeHtml(draft.cookie_flags)}">
-                  </div>
-                  <div class="waf-field">
-                    <label for="service-referrer-policy">${escapeHtml(ctx.t("sites.easy.headers.referrerPolicy"))}</label>
-                    <input id="service-referrer-policy" value="${escapeHtml(draft.referrer_policy)}">
-                  </div>
-                  <label class="waf-checkbox">
-                    <input id="service-hsts-enabled" type="checkbox"${draft.hsts_enabled ? " checked" : ""}>
-                    <span>${escapeHtml(ctx.t("sites.easy.headers.hstsEnabled"))}</span>
-                  </label>
-                  <div class="waf-field">
-                    <label for="service-hsts-max-age">${escapeHtml(ctx.t("sites.easy.headers.hstsMaxAge"))}</label>
-                    <input id="service-hsts-max-age" type="number" min="0" value="${escapeHtml(String(draft.hsts_max_age_seconds || 0))}">
-                  </div>
-                  <label class="waf-checkbox">
-                    <input id="service-hsts-include-subdomains" type="checkbox"${draft.hsts_include_subdomains ? " checked" : ""}>
-                    <span>${escapeHtml(ctx.t("sites.easy.headers.hstsIncludeSubdomains"))}</span>
-                  </label>
-                  <label class="waf-checkbox">
-                    <input id="service-hsts-preload" type="checkbox"${draft.hsts_preload ? " checked" : ""}>
-                    <span>${escapeHtml(ctx.t("sites.easy.headers.hstsPreload"))}</span>
-                  </label>
-                  <div class="waf-field full">
-                    <label for="service-content-security-policy">${escapeHtml(ctx.t("sites.easy.headers.contentSecurityPolicy"))}</label>
-                    <textarea id="service-content-security-policy" rows="3">${escapeHtml(draft.content_security_policy)}</textarea>
-                  </div>
-                  ${renderListEditor("permissions_policy", ctx.t("sites.easy.headers.permissionsPolicy"), draft.permissions_policy, "geolocation=()", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
-                  ${renderListEditor("keep_upstream_headers", ctx.t("sites.easy.headers.keepUpstreamHeaders"), draft.keep_upstream_headers, "X-Forwarded-For", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
-                  <label class="waf-checkbox">
-                    <input id="service-use-cors" type="checkbox"${draft.use_cors ? " checked" : ""}>
-                    <span>${escapeHtml(ctx.t("sites.easy.headers.useCors"))}</span>
-                  </label>
-                  ${renderListEditor("cors_allowed_origins", ctx.t("sites.easy.headers.allowedOrigins"), draft.cors_allowed_origins, "https://app.example.com", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
-                </div>
-              </section>
 
               <section class="waf-stack waf-service-compact-section${state.activeTab === "traffic" ? "" : " waf-hidden"}" data-tab-panel="traffic">
-                <div>
-                  <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.traffic.title"))}</div>
-                  <div class="muted">${escapeHtml(ctx.t("sites.easy.tab.traffic.subtitle"))}</div>
-                </div>
-                <div class="waf-traffic-layout">
-                  <div class="waf-stack">
-                    <div class="waf-subcard waf-stack waf-antiddos-frame">
-                    <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
-                      <div>
-                        <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.traffic.frame.badBehavior"))}</div>
-                        <div class="muted">${escapeHtml(ctx.t("sites.easy.traffic.frame.badBehavior.subtitle"))}</div>
-                      </div>
-                      <button class="waf-help-icon-btn" type="button" id="service-traffic-badbehavior-help-btn" title="${escapeHtml(ctx.t("sites.easy.traffic.badBehavior.help.open"))}" aria-label="${escapeHtml(ctx.t("sites.easy.traffic.badBehavior.help.open"))}">?</button>
-                    </div>
-                    <div class="waf-form-grid">
-                      <label class="waf-checkbox waf-field full">
-                        <input id="service-use-bad-behavior" type="checkbox"${draft.use_bad_behavior ? " checked" : ""}>
-                        <span>${escapeHtml(ctx.t("sites.easy.traffic.activateBadBehavior"))}</span>
-                      </label>
-                      ${renderStatusCodesEditor(draft.bad_behavior_status_codes, ctx)}
-                      <div class="waf-field">
-                        <label for="service-bad-behavior-ban-time">${escapeHtml(ctx.t("sites.easy.traffic.banDurationSeconds"))}</label>
-                        <input id="service-bad-behavior-ban-time" type="number" min="0" value="${escapeHtml(String(draft.bad_behavior_ban_time_seconds))}">
-                      </div>
-                      <div class="waf-field">
-                        <label for="service-bad-behavior-threshold">${escapeHtml(ctx.t("sites.easy.traffic.threshold"))}</label>
-                        <input id="service-bad-behavior-threshold" type="number" min="1" value="${escapeHtml(String(draft.bad_behavior_threshold))}">
-                      </div>
-                      <div class="waf-field">
-                        <label for="service-bad-behavior-count-time">${escapeHtml(ctx.t("sites.easy.traffic.periodSeconds"))}</label>
-                        <input id="service-bad-behavior-count-time" type="number" min="1" value="${escapeHtml(String(draft.bad_behavior_count_time_seconds))}">
-                      </div>
-                    </div>
-                    </div>
-                    <div class="waf-subcard waf-stack waf-antiddos-frame">
-                      <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
-                        <div>
-                          <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.traffic.frame.limits"))}</div>
-                          <div class="muted">${escapeHtml(ctx.t("sites.easy.traffic.frame.limits.subtitle"))}</div>
-                        </div>
-                        <button class="waf-help-icon-btn" type="button" id="service-traffic-limits-help-btn" title="${escapeHtml(ctx.t("sites.easy.traffic.limits.help.open"))}" aria-label="${escapeHtml(ctx.t("sites.easy.traffic.limits.help.open"))}">?</button>
-                      </div>
-                      <div class="waf-form-grid">
-                        <label class="waf-checkbox waf-field full">
-                          <input id="service-use-limit-conn" type="checkbox"${draft.use_limit_conn ? " checked" : ""}>
-                          <span>${escapeHtml(ctx.t("sites.easy.traffic.activateLimitConnections"))}</span>
-                        </label>
-                        <div class="waf-field">
-                          <label for="service-limit-conn-max-http1">${escapeHtml(ctx.t("sites.easy.traffic.maxHttp1Connections"))}</label>
-                          <input id="service-limit-conn-max-http1" type="number" min="1" value="${escapeHtml(String(draft.limit_conn_max_http1))}">
-                        </div>
-                        <div class="waf-field">
-                          <label for="service-limit-conn-max-http2">${escapeHtml(ctx.t("sites.easy.traffic.maxHttp2Streams"))}</label>
-                          <input id="service-limit-conn-max-http2" type="number" min="1" value="${escapeHtml(String(draft.limit_conn_max_http2))}">
-                        </div>
-                        <div class="waf-field">
-                          <label for="service-limit-conn-max-http3">${escapeHtml(ctx.t("sites.easy.traffic.maxHttp3Streams"))}</label>
-                          <input id="service-limit-conn-max-http3" type="number" min="1" value="${escapeHtml(String(draft.limit_conn_max_http3))}">
-                        </div>
-                        <label class="waf-checkbox waf-field full">
-                          <input id="service-use-limit-req" type="checkbox"${draft.use_limit_req ? " checked" : ""}>
-                          <span>${escapeHtml(ctx.t("sites.easy.traffic.activateLimitRequests"))}</span>
-                        </label>
-                        <div class="waf-field">
-                          <label for="service-limit-req-url">${escapeHtml(ctx.t("sites.easy.traffic.limitRequestUrl"))}</label>
-                          <input id="service-limit-req-url" value="${escapeHtml(draft.limit_req_url)}">
-                        </div>
-                        <div class="waf-field">
-                          <label for="service-limit-req-rate">${escapeHtml(ctx.t("sites.easy.traffic.limitRequestRate"))}</label>
-                          <input id="service-limit-req-rate" value="${escapeHtml(draft.limit_req_rate)}">
-                        </div>
-                        ${renderCustomLimitRulesEditor(draft.custom_limit_rules, ctx)}
-                      </div>
-                    </div>
+                <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
+                  <div>
+                    <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.traffic.title"))}</div>
+                    <div class="muted">${escapeHtml(ctx.t("sites.easy.tab.traffic.subtitle"))}</div>
                   </div>
-                  <div class="waf-subcard waf-stack waf-antiddos-frame">
-                    <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
-                      <div>
-                        <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.traffic.frame.dnsbl"))}</div>
-                        <div class="muted">${escapeHtml(ctx.t("sites.easy.traffic.frame.dnsbl.subtitle"))}</div>
+                </div>
+                <div class="waf-antibot-auth-grid">
+                  <div class="waf-stack">
+                    <section class="waf-subcard waf-stack">
+                      <div class="waf-card-head">
+                        <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
+                          <div>
+                            <h3>${escapeHtml(ctx.t("sites.easy.traffic.frame.allowlists"))}</h3>
+                            <div class="muted" style="font-size:12px;margin-top:2px;">${escapeHtml(ctx.t("sites.easy.traffic.frame.allowlists.subtitle"))}</div>
+                          </div>
+                          <button class="waf-help-icon-btn" type="button" id="service-traffic-allowlist-help-btn" title="${escapeHtml(ctx.t("sites.easy.traffic.allowlist.help.open"))}" aria-label="${escapeHtml(ctx.t("sites.easy.traffic.allowlist.help.open"))}">?</button>
+                        </div>
                       </div>
-                      <button class="waf-help-icon-btn" type="button" id="service-traffic-dnsbl-help-btn" title="${escapeHtml(ctx.t("sites.easy.traffic.dnsbl.help.open"))}" aria-label="${escapeHtml(ctx.t("sites.easy.traffic.dnsbl.help.open"))}">?</button>
-                    </div>
-                    <div class="waf-note">${escapeHtml(ctx.t("sites.lists.note"))}</div>
-                    <div class="waf-form-grid">
-                      <label class="waf-checkbox waf-field full">
-                        <input id="service-use-blacklist" type="checkbox"${draft.use_blacklist ? " checked" : ""}>
-                        <span>${escapeHtml(ctx.t("sites.easy.traffic.activateBlacklisting"))}</span>
-                      </label>
-                      <label class="waf-checkbox waf-field full">
-                        <input id="service-use-dnsbl" type="checkbox"${draft.use_dnsbl ? " checked" : ""}>
-                        <span>${escapeHtml(ctx.t("sites.easy.traffic.activateDnsbl"))}</span>
-                      </label>
-                      <label class="waf-checkbox waf-field full">
-                        <input id="service-use-allowlist" type="checkbox"${draft.use_allowlist ? " checked" : ""}>
-                        <span>${escapeHtml(ctx.t("sites.easy.traffic.activateAllowlist"))}</span>
-                      </label>
-                      <label class="waf-checkbox waf-field full">
-                        <input id="service-use-exceptions" type="checkbox"${draft.use_exceptions ? " checked" : ""}>
-                        <span>${escapeHtml(ctx.t("sites.easy.traffic.activateExceptions"))}</span>
-                      </label>
-                      ${renderListEditor("access_denylist", ctx.t("sites.lists.denylist"), draft.access_denylist, "203.0.113.10", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
-                      ${renderListEditor("access_allowlist", ctx.t("sites.lists.allowlist"), draft.access_allowlist, "10.0.0.0/24", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
-                      ${renderListEditor("exceptions_ip", ctx.t("sites.easy.traffic.exceptions"), draft.exceptions_ip, "203.0.113.0/24", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
-                      ${draft.use_allowlist || normalizeStringArray(draft.access_allowlist).length
-                        ? ""
-                        : `<div class="waf-note waf-field full">${escapeHtml(ctx.t("sites.easy.traffic.allowlistDisabledHint"))}</div>`}
-                      ${renderListEditor("blacklist_ip", ctx.t("sites.easy.traffic.blacklistIp"), draft.blacklist_ip, "203.0.113.0/24", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
-                      ${renderListEditor("blacklist_rdns", ctx.t("sites.easy.traffic.blacklistRdns"), draft.blacklist_rdns, ".shodan.io", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
-                      ${renderListEditor("blacklist_asn", ctx.t("sites.easy.traffic.blacklistAsn"), draft.blacklist_asn, "AS13335", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
-                      ${renderListEditor("blacklist_user_agent", ctx.t("sites.easy.traffic.blacklistUserAgent"), draft.blacklist_user_agent, "curl/*", { full: false, emptyLabel: ctx.t("sites.easy.noValues"), presets: getQuickListTemplates("blacklist_user_agent"), selectedTemplates: state.listTemplateSelection.blacklist_user_agent, ctx })}
-                      ${renderListEditor("blacklist_uri", ctx.t("sites.easy.traffic.blacklistUri"), draft.blacklist_uri, "/admin", { full: false, emptyLabel: ctx.t("sites.easy.noValues"), presets: getQuickListTemplates("blacklist_uri"), selectedTemplates: state.listTemplateSelection.blacklist_uri, ctx })}
-                      ${renderListEditor("blacklist_ja3", ctx.t("sites.easy.traffic.blacklistJa3"), draft.blacklist_ja3, "abc123...", { full: false, emptyLabel: ctx.t("sites.easy.noValues"), presets: getQuickListTemplates("blacklist_ja3"), selectedTemplates: state.listTemplateSelection.blacklist_ja3, ctx })}
-                      ${renderListEditor("blacklist_ip_urls", ctx.t("sites.easy.traffic.blacklistIpUrls"), draft.blacklist_ip_urls, "https://example.com/ip.txt", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
-                      ${renderListEditor("blacklist_rdns_urls", ctx.t("sites.easy.traffic.blacklistRdnsUrls"), draft.blacklist_rdns_urls, "https://example.com/rdns.txt", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
-                      ${renderListEditor("blacklist_asn_urls", ctx.t("sites.easy.traffic.blacklistAsnUrls"), draft.blacklist_asn_urls, "https://example.com/asn.txt", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
-                      ${renderListEditor("blacklist_user_agent_urls", ctx.t("sites.easy.traffic.blacklistUserAgentUrls"), draft.blacklist_user_agent_urls, "https://example.com/ua.txt", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
-                      ${renderListEditor("blacklist_uri_urls", ctx.t("sites.easy.traffic.blacklistUriUrls"), draft.blacklist_uri_urls, "https://example.com/uri.txt", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
-                      ${renderListEditor("blacklist_ja3_urls", ctx.t("sites.easy.traffic.blacklistJa3Urls"), draft.blacklist_ja3_urls, "https://example.com/ja3.txt", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
-                    </div>
+                      ${renderTrafficAllowlistHelpModal(ctx, escapeHtml)}
+                      <div class="waf-card-body">
+                        <div class="waf-form-grid">
+                          <label class="waf-checkbox waf-field full">
+                            <input id="service-use-allowlist" type="checkbox"${draft.use_allowlist ? " checked" : ""}>
+                            <span>${escapeHtml(ctx.t("sites.easy.traffic.activateAllowlist"))}</span>
+                          </label>
+                          ${renderListEditor("access_allowlist", ctx.t("sites.lists.allowlist"), draft.access_allowlist, "10.0.0.0/24", { full: false, emptyLabel: ctx.t("sites.easy.noValues"), inputFilter: "cidr", disabled: !draft.use_allowlist })}
+                          ${renderListEditor("exceptions_ip", ctx.t("sites.easy.traffic.exceptions"), draft.exceptions_ip, "203.0.113.0/24", { full: false, emptyLabel: ctx.t("sites.easy.noValues"), inputFilter: "cidr", disabled: !draft.use_allowlist })}
+                        </div>
+                      </div>
+                    </section>
+                    <section class="waf-subcard waf-stack" style="margin-top:12px;">
+                      <div class="waf-card-head">
+                        <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
+                          <div>
+                            <h3>${escapeHtml(ctx.t("sites.easy.traffic.frame.badBehavior"))}</h3>
+                            <div class="muted" style="font-size:12px;margin-top:2px;">${escapeHtml(ctx.t("sites.easy.traffic.frame.badBehavior.subtitle"))}</div>
+                          </div>
+                          <button class="waf-help-icon-btn" type="button" id="service-traffic-badbehavior-help-btn" title="${escapeHtml(ctx.t("sites.easy.traffic.badBehavior.help.open"))}" aria-label="${escapeHtml(ctx.t("sites.easy.traffic.badBehavior.help.open"))}">?</button>
+                        </div>
+                      </div>
+                      <div class="waf-card-body">
+                        <div class="waf-form-grid">
+                          <label class="waf-checkbox waf-field full">
+                            <input id="service-use-bad-behavior" type="checkbox"${draft.use_bad_behavior ? " checked" : ""}>
+                            <span>${escapeHtml(ctx.t("sites.easy.traffic.activateBadBehavior"))}</span>
+                          </label>
+                          ${renderStatusCodesEditor(draft.bad_behavior_status_codes, ctx, !draft.use_bad_behavior)}
+                          <div class="waf-field">
+                            <label for="service-bad-behavior-ban-time">${escapeHtml(ctx.t("sites.easy.traffic.banDurationSeconds"))}</label>
+                            <input id="service-bad-behavior-ban-time" type="number" min="0" value="${escapeHtml(String(draft.bad_behavior_ban_time_seconds))}"${!draft.use_bad_behavior ? " disabled" : ""}>
+                          </div>
+                          <div class="waf-field">
+                            <label for="service-bad-behavior-threshold">${escapeHtml(ctx.t("sites.easy.traffic.threshold"))}</label>
+                            <input id="service-bad-behavior-threshold" type="number" min="1" value="${escapeHtml(String(draft.bad_behavior_threshold))}"${!draft.use_bad_behavior ? " disabled" : ""}>
+                          </div>
+                          <div class="waf-field">
+                            <label for="service-bad-behavior-count-time">${escapeHtml(ctx.t("sites.easy.traffic.periodSeconds"))}</label>
+                            <input id="service-bad-behavior-count-time" type="number" min="1" value="${escapeHtml(String(draft.bad_behavior_count_time_seconds))}"${!draft.use_bad_behavior ? " disabled" : ""}>
+                          </div>
+                        </div>
+                      </div>
+                    </section>
+                    <section class="waf-subcard waf-stack" style="margin-top:12px;">
+                      <div class="waf-card-head">
+                        <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
+                          <div>
+                            <h3>${escapeHtml(ctx.t("sites.easy.traffic.frame.limits"))}</h3>
+                            <div class="muted" style="font-size:12px;margin-top:2px;">${escapeHtml(ctx.t("sites.easy.traffic.frame.limits.subtitle"))}</div>
+                          </div>
+                          <button class="waf-help-icon-btn" type="button" id="service-traffic-limits-help-btn" title="${escapeHtml(ctx.t("sites.easy.traffic.limits.help.open"))}" aria-label="${escapeHtml(ctx.t("sites.easy.traffic.limits.help.open"))}">?</button>
+                        </div>
+                      </div>
+                      <div class="waf-card-body">
+                        <div class="waf-form-grid">
+                          <label class="waf-checkbox waf-field full">
+                            <input id="service-use-limit-conn" type="checkbox"${draft.use_limit_conn ? " checked" : ""}>
+                            <span>${escapeHtml(ctx.t("sites.easy.traffic.activateLimitConnections"))}</span>
+                          </label>
+                          <div class="waf-field">
+                            <label for="service-limit-conn-max-http1">${escapeHtml(ctx.t("sites.easy.traffic.maxHttp1Connections"))}</label>
+                            <input id="service-limit-conn-max-http1" type="number" min="1" value="${escapeHtml(String(draft.limit_conn_max_http1))}"${!draft.use_limit_conn ? " disabled" : ""}>
+                          </div>
+                          <div class="waf-field">
+                            <label for="service-limit-conn-max-http2">${escapeHtml(ctx.t("sites.easy.traffic.maxHttp2Streams"))}</label>
+                            <input id="service-limit-conn-max-http2" type="number" min="1" value="${escapeHtml(String(draft.limit_conn_max_http2))}"${!draft.use_limit_conn ? " disabled" : ""}>
+                          </div>
+                          <div class="waf-field">
+                            <label for="service-limit-conn-max-http3">${escapeHtml(ctx.t("sites.easy.traffic.maxHttp3Streams"))}</label>
+                            <input id="service-limit-conn-max-http3" type="number" min="1" value="${escapeHtml(String(draft.limit_conn_max_http3))}"${!draft.use_limit_conn ? " disabled" : ""}>
+                          </div>
+                          <label class="waf-checkbox waf-field full">
+                            <input id="service-use-limit-req" type="checkbox"${draft.use_limit_req ? " checked" : ""}>
+                            <span>${escapeHtml(ctx.t("sites.easy.traffic.activateLimitRequests"))}</span>
+                          </label>
+                          <div class="waf-field">
+                            <label for="service-limit-req-url">${escapeHtml(ctx.t("sites.easy.traffic.limitRequestUrl"))}</label>
+                            <input id="service-limit-req-url" value="${escapeHtml(draft.limit_req_url)}"${!draft.use_limit_req ? " disabled" : ""}>
+                          </div>
+                          <div class="waf-field">
+                            <label for="service-limit-req-rate">${escapeHtml(ctx.t("sites.easy.traffic.limitRequestRate"))}</label>
+                            <div class="waf-rate-wrap">
+                              <input id="service-limit-req-rate" type="number" min="1" inputmode="numeric" value="${escapeHtml(String(draft.limit_req_rate || "").replace(/r\/s$|r\/m$/i, "").trim())}"${!draft.use_limit_req ? " disabled" : ""}>
+                              <select id="service-limit-req-rate-unit"${!draft.use_limit_req ? " disabled" : ""}>
+                                <option value="r/s"${!String(draft.limit_req_rate || "").endsWith("r/m") ? " selected" : ""}>r/s</option>
+                                <option value="r/m"${String(draft.limit_req_rate || "").endsWith("r/m") ? " selected" : ""}>r/m</option>
+                              </select>
+                            </div>
+                          </div>
+                          ${renderCustomLimitRulesEditor(draft.custom_limit_rules, ctx, { escapeHtml }, !draft.use_limit_req)}
+                        </div>
+                      </div>
+                    </section>
+                  </div>
+                  <div class="waf-stack">
+                    <section class="waf-subcard waf-stack">
+                      <div class="waf-card-head">
+                        <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
+                          <div>
+                            <h3>${escapeHtml(ctx.t("sites.easy.traffic.frame.blacklists"))}</h3>
+                            <div class="muted" style="font-size:12px;margin-top:2px;">${escapeHtml(ctx.t("sites.easy.traffic.frame.blacklists.subtitle"))}</div>
+                          </div>
+                          <button class="waf-help-icon-btn" type="button" id="service-traffic-blacklist-help-btn" title="${escapeHtml(ctx.t("sites.easy.traffic.blacklist.help.open"))}" aria-label="${escapeHtml(ctx.t("sites.easy.traffic.blacklist.help.open"))}">?</button>
+                        </div>
+                      </div>
+                      <div class="waf-card-body">
+                        <div class="waf-form-grid">
+                          <label class="waf-checkbox waf-field full">
+                            <input id="service-use-blacklist" type="checkbox"${draft.use_blacklist ? " checked" : ""}>
+                            <span>${escapeHtml(ctx.t("sites.easy.traffic.activateBlacklisting"))}</span>
+                          </label>
+                          ${renderListEditor("blacklist_ip", ctx.t("sites.easy.traffic.blacklistIp"), draft.blacklist_ip, "203.0.113.0/24", { full: false, emptyLabel: ctx.t("sites.easy.noValues"), inputFilter: "cidr", disabled: !draft.use_blacklist })}
+                          ${renderListEditor("blacklist_rdns", ctx.t("sites.easy.traffic.blacklistRdns"), draft.blacklist_rdns, ".shodan.io", { full: false, emptyLabel: ctx.t("sites.easy.noValues"), disabled: !draft.use_blacklist })}
+                          ${renderListEditor("blacklist_asn", ctx.t("sites.easy.traffic.blacklistAsn"), draft.blacklist_asn, "AS13335", { full: false, emptyLabel: ctx.t("sites.easy.noValues"), disabled: !draft.use_blacklist })}
+                          ${renderListEditor("blacklist_user_agent", ctx.t("sites.easy.traffic.blacklistUserAgent"), draft.blacklist_user_agent, "curl/*", { full: false, emptyLabel: ctx.t("sites.easy.noValues"), disabled: !draft.use_blacklist, presets: getQuickListTemplates("blacklist_user_agent"), selectedTemplates: state.listTemplateSelection.blacklist_user_agent, ctx })}
+                          ${renderListEditor("blacklist_uri", ctx.t("sites.easy.traffic.blacklistUri"), draft.blacklist_uri, "/admin", { full: false, emptyLabel: ctx.t("sites.easy.noValues"), disabled: !draft.use_blacklist, presets: getQuickListTemplates("blacklist_uri"), selectedTemplates: state.listTemplateSelection.blacklist_uri, ctx })}
+                          ${/* TODO(ja3): blacklist_ja3 field removed — nginx 1.22.1+debian modsecurity incompatible with JA3 module. Re-enable when JA3/JA4 support is added. Field kept in data model. */""}
+                          ${renderListEditor("blacklist_ip_urls", ctx.t("sites.easy.traffic.blacklistIpUrls"), draft.blacklist_ip_urls, "https://example.com/ip.txt", { full: false, emptyLabel: ctx.t("sites.easy.noValues"), disabled: !draft.use_blacklist })}
+                          ${renderListEditor("blacklist_rdns_urls", ctx.t("sites.easy.traffic.blacklistRdnsUrls"), draft.blacklist_rdns_urls, "https://example.com/rdns.txt", { full: false, emptyLabel: ctx.t("sites.easy.noValues"), disabled: !draft.use_blacklist })}
+                          ${renderListEditor("blacklist_asn_urls", ctx.t("sites.easy.traffic.blacklistAsnUrls"), draft.blacklist_asn_urls, "https://example.com/asn.txt", { full: false, emptyLabel: ctx.t("sites.easy.noValues"), disabled: !draft.use_blacklist })}
+                          ${renderListEditor("blacklist_user_agent_urls", ctx.t("sites.easy.traffic.blacklistUserAgentUrls"), draft.blacklist_user_agent_urls, "https://example.com/ua.txt", { full: false, emptyLabel: ctx.t("sites.easy.noValues"), disabled: !draft.use_blacklist })}
+                          ${renderListEditor("blacklist_uri_urls", ctx.t("sites.easy.traffic.blacklistUriUrls"), draft.blacklist_uri_urls, "https://example.com/uri.txt", { full: false, emptyLabel: ctx.t("sites.easy.noValues"), disabled: !draft.use_blacklist })}
+                          ${/* TODO(ja3): blacklist_ja3_urls removed — same reason as blacklist_ja3. */""}
+                          <label class="waf-checkbox waf-field full">
+                            <input id="service-use-dnsbl" type="checkbox"${draft.use_dnsbl ? " checked" : ""}>
+                            <span>${escapeHtml(ctx.t("sites.easy.traffic.activateDnsbl"))}</span>
+                          </label>
+                          ${renderListEditor("access_denylist", ctx.t("sites.lists.denylist"), draft.access_denylist, "203.0.113.10", { full: false, emptyLabel: ctx.t("sites.easy.noValues"), inputFilter: "cidr", disabled: !draft.use_dnsbl })}
+                        </div>
+                      </div>
+                    </section>
                   </div>
                 </div>
                 ${renderTrafficBadBehaviorHelpModal(ctx)}
                 ${renderTrafficLimitsHelpModal(ctx)}
-                ${renderTrafficDnsblHelpModal(ctx)}
+                ${renderTrafficBlacklistHelpModal(ctx)}
+                ${renderTrafficAllowlistHelpModal(ctx, escapeHtml)}
               </section>
 
-              <section class="waf-stack waf-service-compact-section${state.activeTab === "blocking" ? "" : " waf-hidden"}" data-tab-panel="blocking">
+                            <section class="waf-stack waf-service-compact-section${state.activeTab === "blocking" ? "" : " waf-hidden"}" data-tab-panel="blocking">
                 <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
                   <div>
                     <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.blocking.title"))}</div>
@@ -414,21 +398,34 @@ export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
                     <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.websocket.title"))}</div>
                     <div class="muted">${escapeHtml(ctx.t("sites.easy.tab.websocket.subtitle"))}</div>
                   </div>
+                  <button class="waf-help-icon-btn" type="button" id="service-websocket-chapter-help-btn" title="${escapeHtml(ctx.t("sites.help.websocket.open"))}" aria-label="${escapeHtml(ctx.t("sites.help.websocket.open"))}">?</button>
                 </div>
-                <div class="waf-form-grid">
-                  <label class="waf-checkbox">
-                    <input id="service-use-ws-inspection" type="checkbox"${draft.use_ws_inspection ? " checked" : ""}${!draft.reverse_proxy_websocket ? " disabled" : ""}>
-                    <span>${escapeHtml(ctx.t("sites.easy.ws.useInspection"))}</span>
-                  </label>
-                  <div class="waf-field">
-                    <label for="service-ws-max-message-bytes">${escapeHtml(ctx.t("sites.easy.ws.maxMessageBytes"))}</label>
-                    <input id="service-ws-max-message-bytes" type="number" min="0" value="${escapeHtml(String(draft.ws_max_message_bytes || 0))}">
-                  </div>
-                  <div class="waf-field">
-                    <label for="service-ws-rate-msg-per-sec">${escapeHtml(ctx.t("sites.easy.ws.rateMsgPerSec"))}</label>
-                    <input id="service-ws-rate-msg-per-sec" type="number" min="0" value="${escapeHtml(String(draft.ws_rate_msg_per_sec || 0))}">
-                  </div>
-                  ${renderListEditor("ws_block_patterns", ctx.t("sites.easy.ws.blockPatterns"), draft.ws_block_patterns, ctx.t("sites.easy.ws.blockPatternPlaceholder"), { full: true, emptyLabel: ctx.t("sites.easy.noValues") })}
+                ${renderWebSocketChapterHelpModal(ctx, escapeHtml)}
+                <div class="waf-antibot-auth-grid">
+                  <section class="waf-subcard">
+                    <div class="waf-card-head">
+                      <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
+                        <h3>${escapeHtml(ctx.t("sites.easy.ws.frameTitle"))}</h3>
+                      </div>
+                    </div>
+                    <div class="waf-card-body">
+                      <div class="waf-form-grid">
+                        <label class="waf-checkbox full">
+                          <input id="service-use-ws-inspection" type="checkbox"${draft.use_ws_inspection ? " checked" : ""}${!draft.reverse_proxy_websocket ? " disabled" : ""}>
+                          <span>${escapeHtml(ctx.t("sites.easy.ws.useInspection"))}</span>
+                        </label>
+                        <div class="waf-field">
+                          <label for="service-ws-max-message-bytes">${escapeHtml(ctx.t("sites.easy.ws.maxMessageBytes"))}</label>
+                          <input id="service-ws-max-message-bytes" type="number" min="0" value="${escapeHtml(String(draft.ws_max_message_bytes || 0))}">
+                        </div>
+                        <div class="waf-field">
+                          <label for="service-ws-rate-msg-per-sec">${escapeHtml(ctx.t("sites.easy.ws.rateMsgPerSec"))}</label>
+                          <input id="service-ws-rate-msg-per-sec" type="number" min="0" value="${escapeHtml(String(draft.ws_rate_msg_per_sec || 0))}">
+                        </div>
+                        ${renderListEditor("ws_block_patterns", ctx.t("sites.easy.ws.blockPatterns"), draft.ws_block_patterns, ctx.t("sites.easy.ws.blockPatternPlaceholder"), { full: true, emptyLabel: ctx.t("sites.easy.noValues") })}
+                      </div>
+                    </div>
+                  </section>
                 </div>
               </section>
 
@@ -438,12 +435,21 @@ export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
                     <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.virtualpatches.title"))}</div>
                     <div class="muted">${escapeHtml(ctx.t("sites.easy.tab.virtualpatches.subtitle"))}</div>
                   </div>
+                  <button class="waf-help-icon-btn" type="button" id="service-virtualpatches-chapter-help-btn" title="${escapeHtml(ctx.t("sites.help.virtualpatches.open"))}" aria-label="${escapeHtml(ctx.t("sites.help.virtualpatches.open"))}">?</button>
                 </div>
-                <div class="waf-form-grid">
-                  <div class="full">
-                    <p class="muted" style="margin:0 0 8px;">${escapeHtml(ctx.t("sites.easy.virtualpatches.hint"))}</p>
-                  </div>
-                  ${renderVirtualPatchesEditor(state, ctx, escapeHtml)}
+                ${renderVirtualPatchesChapterHelpModal(ctx, escapeHtml)}
+                <div class="waf-antibot-auth-grid">
+                  <section class="waf-subcard">
+                    <div class="waf-card-head">
+                      <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
+                        <h3>${escapeHtml(ctx.t("sites.easy.virtualpatches.frameTitle"))}</h3>
+                      </div>
+                    </div>
+                    <div class="waf-card-body">
+                      <p class="muted" style="margin:0 0 12px;">${escapeHtml(ctx.t("sites.easy.virtualpatches.hint"))}</p>
+                      ${renderVirtualPatchesEditor(state, ctx, escapeHtml)}
+                    </div>
+                  </section>
                 </div>
               </section>
 

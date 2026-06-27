@@ -24,10 +24,17 @@ export function parseIntListInput(value) {
 export function normalizeCustomLimitRules(value) {
   const seen = new Set();
   return normalizeArray(value)
-    .map((item) => ({
-      path: String(item?.path || "").trim(),
-      rate: String(item?.rate || "").trim().toLowerCase().replace(/\s+/g, "")
-    }))
+    .map((item) => {
+      const rawRate = String(item?.rate || "").trim().toLowerCase().replace(/\s+/g, "");
+      // Strip repeated r/s or r/m suffixes (e.g. "10r/sr/s" → "10r/s")
+      const numericPart = rawRate.replace(/(r\/s|r\/m)+$/, "");
+      const unitMatch = rawRate.match(/(r\/m)$/) ? "r/m" : "r/s";
+      const rate = numericPart ? `${numericPart}${unitMatch}` : rawRate;
+      return {
+        path: String(item?.path || "").trim(),
+        rate
+      };
+    })
     .filter((item) => item.path && item.rate)
     .filter((item) => {
       const key = item.path.toLowerCase() + "\u0000" + item.rate;

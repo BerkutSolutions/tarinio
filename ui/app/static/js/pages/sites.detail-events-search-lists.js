@@ -18,7 +18,8 @@ export function bindDetailSearchAndListEvents(params) {
     normalizeAntibotChallengeRules,
     normalizeAuthBasicUsers,
     normalizeAuthExclusionRules,
-    normalizeAuthServiceTokens
+    normalizeAuthServiceTokens,
+    normalizeArray
   } = params;
 
   container.querySelector("#service-settings-search")?.addEventListener("input", (event) => {
@@ -183,29 +184,6 @@ export function bindDetailSearchAndListEvents(params) {
       }
       current.splice(index, 1);
       state.draft[field] = current;
-      render();
-    });
-  });
-
-  container.querySelector("[data-custom-limit-add]")?.addEventListener("click", () => {
-    syncStateDraftFromForm();
-    state.draft.custom_limit_rules = [...normalizeCustomLimitRules(state.draft.custom_limit_rules), { path: "/", rate: "10r/s" }];
-    render();
-  });
-
-  container.querySelectorAll("[data-custom-limit-remove]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const index = Number.parseInt(String(button.dataset.customLimitRemove || "-1"), 10);
-      if (!Number.isInteger(index) || index < 0) {
-        return;
-      }
-      syncStateDraftFromForm();
-      const current = normalizeCustomLimitRules(state.draft.custom_limit_rules);
-      if (index >= current.length) {
-        return;
-      }
-      current.splice(index, 1);
-      state.draft.custom_limit_rules = current;
       render();
     });
   });

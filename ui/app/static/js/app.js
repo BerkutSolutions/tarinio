@@ -7,7 +7,7 @@ import { checkEntryAccess } from "./guard.js";
 import { escapeHtml, notify } from "./ui.js";
 
 let sidebarCollapsed = false;
-const PAGE_MODULE_VERSION = "20260625-04";
+const PAGE_MODULE_VERSION = "20260628-16";
 let lastGlobalScriptError = null;
 
 window.addEventListener("error", (event) => {

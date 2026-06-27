@@ -113,7 +113,11 @@ export function getDraftFromForm(container, state, deps) {
     custom_limit_rules: Array.from(container.querySelectorAll("[data-custom-limit-path]")).map((input) => {
       const index = String(input.dataset.customLimitPath || "");
       const rateInput = container.querySelector(`[data-custom-limit-rate="${index}"]`);
-      return { path: String(input.value || "").trim(), rate: String(rateInput?.value || "").trim() };
+      const rateUnitInput = container.querySelector(`[data-custom-limit-rate-unit="${index}"]`);
+      return {
+        path: String(input.value || "").trim(),
+        rate: (() => { const v = String(rateInput?.value || "").trim(); const unit = rateUnitInput?.value || "r/s"; return v ? `${v}${unit}` : ""; })()
+      };
     }),
     antibot_challenge: container.querySelector("#service-antibot-challenge").value,
     antibot_uri: container.querySelector("#service-antibot-uri").value.trim(),

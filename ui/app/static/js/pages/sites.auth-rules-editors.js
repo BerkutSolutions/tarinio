@@ -210,22 +210,29 @@ export function renderAuthSessionTtlOptions(ttlMinutes, ctx, deps = {}) {
     .join("");
 }
 
-export function renderCustomLimitRulesEditor(rules, ctx, deps = {}) {
+export function renderCustomLimitRulesEditor(rules, ctx, deps = {}, disabled = false) {
   const escapeHtml = deps.escapeHtml;
   const safeRules = normalizeCustomLimitRules(rules, deps);
+  const dis = disabled ? " disabled" : "";
   return `
-    <div class="waf-field full">
+    <div class="waf-field full${disabled ? " waf-disabled" : ""}">
       <label>${escapeHtml(ctx.t("sites.easy.traffic.customLimitRules"))}</label>
       <div class="waf-stack">
         ${safeRules.map((rule, index) => `
           <div class="waf-inline waf-custom-limit-row">
-            <input data-custom-limit-path="${index}" placeholder="/login" value="${escapeHtml(rule.path)}">
-            <input data-custom-limit-rate="${index}" placeholder="20r/s" value="${escapeHtml(rule.rate)}">
-            <button class="btn ghost btn-sm" type="button" data-custom-limit-remove="${index}">x</button>
+            <input data-custom-limit-path="${index}" placeholder="/login" value="${escapeHtml(rule.path)}"${dis}>
+            <div class="waf-custom-limit-rate-wrap">
+              <input data-custom-limit-rate="${index}" type="number" min="1" inputmode="numeric" placeholder="20" value="${escapeHtml(String(rule.rate || "").replace(/r\/s$|r\/m$/i, "").trim())}"${dis}>
+              <select data-custom-limit-rate-unit="${index}"${dis}>
+                <option value="r/s"${!String(rule.rate || "").endsWith("r/m") ? " selected" : ""}>r/s</option>
+                <option value="r/m"${String(rule.rate || "").endsWith("r/m") ? " selected" : ""}>r/m</option>
+              </select>
+            </div>
+            <button class="btn ghost btn-sm" type="button" data-custom-limit-remove="${index}"${dis}>x</button>
           </div>
         `).join("")}
         ${safeRules.length ? "" : `<span class="waf-note">${escapeHtml(ctx.t("sites.easy.noValues"))}</span>`}
-        <button class="btn ghost btn-sm" type="button" data-custom-limit-add>${escapeHtml(ctx.t("sites.easy.traffic.addCustomLimit"))}</button>
+        <button class="btn ghost btn-sm" type="button" data-custom-limit-add${dis}>${escapeHtml(ctx.t("sites.easy.traffic.addCustomLimit"))}</button>
       </div>
     </div>`;
 }

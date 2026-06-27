@@ -513,6 +513,89 @@ label,
   align-items: end;
 }
 
+.waf-upstream-side-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 260px;
+  max-width: 340px;
+}
+
+.waf-mtls-frame {
+  border: 1px solid rgba(255,255,255,0.07);
+}
+
+[data-tab-panel="upstream"] .waf-antibot-auth-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
+}
+
+.waf-upstream-3col-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(200px, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .waf-upstream-3col-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.waf-upstream-target-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.waf-upstream-row-1,
+.waf-upstream-row-2,
+.waf-upstream-row-3,
+.waf-upstream-row-4 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.waf-upstream-row-1 .waf-checkbox,
+.waf-upstream-row-2 .waf-checkbox,
+.waf-upstream-row-3 .waf-checkbox,
+.waf-upstream-row-4 .waf-checkbox {
+  margin-bottom: 6px;
+}
+
+.waf-upstream-combined .waf-upstream-section-divider {
+  margin-top: 4px;
+}
+
+.waf-upstream-section-divider > .waf-card-head {
+  padding-top: 12px;
+}
+
+.waf-upstream-row-5,
+.waf-upstream-row-6 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.waf-upstream-row-5 .waf-checkbox,
+.waf-upstream-row-6 .waf-checkbox {
+  margin-bottom: 6px;
+}
+
+hr.waf-upstream-divider {
+  border: none;
+  border-top: 1px solid rgba(255,255,255,0.07);
+  margin: 4px 0;
+}
+
+[data-tab-panel="websocket"] .waf-antibot-auth-grid,
+[data-tab-panel="virtualpatches"] .waf-antibot-auth-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .waf-upstream-target-row {
   display: grid;
   grid-template-columns: 78px 220px 86px;
@@ -531,6 +614,13 @@ label,
   width: 220px;
   min-width: 220px;
   max-width: 220px;
+}
+
+.waf-field-compact-sm input:not([type="checkbox"]):not([type="radio"]),
+.waf-field-compact-sm select {
+  width: 140px;
+  min-width: 140px;
+  max-width: 140px;
 }
 
 .waf-upstream-toggle-row {
@@ -878,23 +968,38 @@ label,
   grid-column: span 5;
 }
 
-.waf-service-compact-section[data-tab-panel="http"] .waf-http-max-size {
+.waf-service-compact-section[data-tab-panel="httpheaders"] .waf-http-max-size {
   grid-column: span 3;
 }
 
-.waf-service-compact-section[data-tab-panel="http"] .waf-list-editor[data-list-field="ssl_protocols"] {
-  grid-column: span 4;
+.waf-http-row-1 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
 }
 
-.waf-service-compact-section[data-tab-panel="http"] .waf-list-editor .waf-inline {
+.waf-http-row-1 .waf-list-editor {
+  flex: 1 1 180px;
+}
+
+.waf-http-row-2 {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.waf-http-row-2 .waf-list-editor {
+  flex: 1 1 180px;
+}
+
+.waf-http-row-3 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
   align-items: center;
-  gap: 8px;
 }
 
-.waf-service-compact-section[data-tab-panel="http"] .waf-list-editor .waf-inline .btn {
-  min-width: 34px;
-  padding: 0 10px;
-}
 
 .waf-service-compact-section[data-tab-panel="http"] .waf-list-editor .waf-inline .badge {
   min-height: 26px;
@@ -1051,6 +1156,110 @@ label,
 .waf-list-remove:hover {
   color: #ff9b9b;
 }
+
+.waf-rate-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.waf-rate-wrap input[type="number"] {
+  flex: 1 1 80px;
+  min-width: 60px;
+}
+
+.waf-rate-wrap select {
+  flex-shrink: 0;
+  width: auto;
+}
+
+/* Disabled fields — visual dimming */
+input:disabled,
+select:disabled,
+textarea:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.waf-field:has(input:disabled) label,
+.waf-field:has(select:disabled) label {
+  opacity: 0.4;
+}
+
+.waf-list-input-wrap.waf-disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.waf-field.waf-disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+/* Field unit suffix (r/s, px, etc.) */
+.waf-field-unit {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  white-space: nowrap;
+  margin-left: 4px;
+}
+
+.waf-custom-limit-rate-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.waf-custom-limit-rate-wrap input {
+  width: 70px;
+}
+
+/* List editor — inline add button inside input */
+.waf-list-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.waf-list-input-wrap input {
+  width: 100%;
+  padding-right: 40px;
+}
+
+.waf-list-add-btn {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 36px;
+  border: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 18px;
+  font-weight: 400;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0 6px 6px 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s, color 0.15s, background 0.15s;
+}
+
+.waf-list-input-wrap.has-value .waf-list-add-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.waf-list-add-btn:hover {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.06);
+}
+
 
 .waf-status-dropdown {
   border: 1px solid rgba(96, 121, 187, 0.35);

@@ -205,6 +205,7 @@ export function bindDetailRuntime(deps) {
     normalizeAuthBasicUsers,
     normalizeAuthExclusionRules,
     normalizeAuthServiceTokens,
+    normalizeArray,
   });
 
   bindDetailRuleEvents({

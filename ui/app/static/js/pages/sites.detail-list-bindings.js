@@ -24,6 +24,47 @@ export function bindDetailListEditors(container, state, deps) {
     feedback,
   } = deps;
 
+  // Event delegation for input filters (survives re-renders)
+  container.addEventListener("keydown", (e) => {
+    const input = e.target.closest("input[data-input-filter]");
+    if (!input) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key.length !== 1) return;
+    const filter = input.dataset.inputFilter || "";
+    if (filter === "cidr") {
+      const allowed = /^[0-9a-fA-F.:\\/]$/;
+      if (!allowed.test(e.key)) e.preventDefault();
+    }
+  });
+
+  // Event delegation for has-value class (survives re-renders)
+  container.addEventListener("input", (e) => {
+    const input = e.target.closest(".waf-list-input-wrap input");
+    if (!input) return;
+    const wrap = input.closest(".waf-list-input-wrap");
+    if (wrap) wrap.classList.toggle("has-value", input.value.trim().length > 0);
+  });
+
+  // Event delegation for Enter in list inputs (survives re-renders)
+  container.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    const input = e.target.closest(".waf-list-input-wrap input");
+    if (!input) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const field = input.id.replace("list-input-", "");
+    if (!LIST_FIELD_SET.has(field)) return;
+    const value = String(input.value || "").trim();
+    if (!value) return;
+    syncStateDraftFromForm();
+    const current = normalizeStringArray(state.draft[field]);
+    if (!current.includes(value)) current.push(value);
+    state.draft[field] = current;
+    render();
+  });
+
+
+
   container.querySelectorAll("[data-list-add]").forEach((button) => {
     button.addEventListener("click", () => {
       const field = button.dataset.listAdd || "";
@@ -130,22 +171,26 @@ export function bindDetailListEditors(container, state, deps) {
     });
   });
 
-  container.querySelector("[data-custom-limit-add]")?.addEventListener("click", () => {
-    syncStateDraftFromForm();
-    state.draft.custom_limit_rules = [...normalizeCustomLimitRules(state.draft.custom_limit_rules), { path: "/", rate: "10r/s" }];
-    render();
-  });
-  container.querySelectorAll("[data-custom-limit-remove]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const index = Number.parseInt(String(button.dataset.customLimitRemove || "-1"), 10);
+  // Event delegation for custom limit rules (survives re-renders)
+  container.addEventListener("click", (e) => {
+    const addBtn = e.target.closest("[data-custom-limit-add]");
+    if (addBtn && !addBtn.disabled) {
+      syncStateDraftFromForm();
+      state.draft.custom_limit_rules = [...normalizeCustomLimitRules(state.draft.custom_limit_rules, { normalizeArray }), { path: "/", rate: "10r/s" }];
+      render();
+      return;
+    }
+    const removeBtn = e.target.closest("[data-custom-limit-remove]");
+    if (removeBtn && !removeBtn.disabled) {
+      const index = Number.parseInt(String(removeBtn.dataset.customLimitRemove || "-1"), 10);
       if (!Number.isInteger(index) || index < 0) return;
       syncStateDraftFromForm();
-      const current = normalizeCustomLimitRules(state.draft.custom_limit_rules);
+      const current = normalizeCustomLimitRules(state.draft.custom_limit_rules, { normalizeArray });
       if (index >= current.length) return;
       current.splice(index, 1);
       state.draft.custom_limit_rules = current;
       render();
-    });
+    }
   });
 
   container.querySelector("[data-antibot-rule-add]")?.addEventListener("click", () => {

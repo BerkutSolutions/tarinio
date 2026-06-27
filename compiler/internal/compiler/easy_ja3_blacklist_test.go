@@ -5,6 +5,10 @@ import (
 	"testing"
 )
 
+// JA3 nginx blocking is disabled — the ngx_ssl_ja3 module requires a patched nginx
+// that is incompatible with the debian modsecurity module. The blacklist field is
+// preserved in the data model and UI, but no nginx directives are generated.
+
 func TestRenderEasyArtifacts_JA3Blacklist_InConfig(t *testing.T) {
 	artifacts, err := RenderEasyArtifacts(
 		[]SiteInput{
@@ -12,16 +16,16 @@ func TestRenderEasyArtifacts_JA3Blacklist_InConfig(t *testing.T) {
 		},
 		[]EasyProfileInput{
 			{
-				SiteID:           "site-ja3",
-				SecurityMode:     "block",
-				UseModSecurity:   false,
-				AllowedMethods:   []string{"GET"},
-				MaxClientSize:    "100m",
-				UseLimitConn:     true,
+				SiteID:            "site-ja3",
+				SecurityMode:      "block",
+				UseModSecurity:    false,
+				AllowedMethods:    []string{"GET"},
+				MaxClientSize:     "100m",
+				UseLimitConn:      true,
 				LimitConnMaxHTTP1: 50,
-				UseLimitReq:      true,
-				LimitReqRate:     "30r/s",
-				BlacklistJA3:     []string{"abc123deadbeef0000000000000000aa", "def456deadbeef0000000000000000bb"},
+				UseLimitReq:       true,
+				LimitReqRate:      "30r/s",
+				BlacklistJA3:      []string{"abc123deadbeef0000000000000000aa", "def456deadbeef0000000000000000bb"},
 			},
 		},
 	)
@@ -35,17 +39,10 @@ func TestRenderEasyArtifacts_JA3Blacklist_InConfig(t *testing.T) {
 	}
 
 	conf := byPath["nginx/easy/site-ja3.conf"]
-	if !strings.Contains(conf, "waf_ja3_blacklist") {
-		t.Fatalf("expected waf_ja3_blacklist in nginx config, got:\n%s", conf)
-	}
-	if !strings.Contains(conf, "abc123deadbeef0000000000000000aa") {
-		t.Fatalf("expected first JA3 fingerprint in config, got:\n%s", conf)
-	}
-	if !strings.Contains(conf, "def456deadbeef0000000000000000bb") {
-		t.Fatalf("expected second JA3 fingerprint in config, got:\n%s", conf)
-	}
-	if !strings.Contains(conf, "waf_ja3_block_guard") {
-		t.Fatalf("expected waf_ja3_block_guard in config, got:\n%s", conf)
+	// JA3 nginx directives are intentionally absent — module not available in runtime image.
+	// Verify the config still renders without error and does NOT reference unknown variables.
+	if strings.Contains(conf, "ssl_ja3") {
+		t.Fatalf("unexpected ssl_ja3 variable in nginx config (module not available): %s", conf)
 	}
 }
 
@@ -56,16 +53,16 @@ func TestRenderEasyArtifacts_JA3Blacklist_EmptyNoDirective(t *testing.T) {
 		},
 		[]EasyProfileInput{
 			{
-				SiteID:           "site-noja3",
-				SecurityMode:     "block",
-				UseModSecurity:   false,
-				AllowedMethods:   []string{"GET"},
-				MaxClientSize:    "100m",
-				UseLimitConn:     true,
+				SiteID:            "site-noja3",
+				SecurityMode:      "block",
+				UseModSecurity:    false,
+				AllowedMethods:    []string{"GET"},
+				MaxClientSize:     "100m",
+				UseLimitConn:      true,
 				LimitConnMaxHTTP1: 50,
-				UseLimitReq:      true,
-				LimitReqRate:     "30r/s",
-				BlacklistJA3:     nil,
+				UseLimitReq:       true,
+				LimitReqRate:      "30r/s",
+				BlacklistJA3:      nil,
 			},
 		},
 	)
@@ -91,12 +88,12 @@ func TestRenderEasyArtifacts_JA3Blacklist_ClearedInMonitorMode(t *testing.T) {
 		},
 		[]EasyProfileInput{
 			{
-				SiteID:           "site-mon",
-				SecurityMode:     "monitor",
-				UseModSecurity:   false,
-				AllowedMethods:   []string{"GET"},
-				MaxClientSize:    "100m",
-				BlacklistJA3:     []string{"abc123deadbeef0000000000000000aa"},
+				SiteID:         "site-mon",
+				SecurityMode:   "monitor",
+				UseModSecurity: false,
+				AllowedMethods: []string{"GET"},
+				MaxClientSize:  "100m",
+				BlacklistJA3:   []string{"abc123deadbeef0000000000000000aa"},
 			},
 		},
 	)

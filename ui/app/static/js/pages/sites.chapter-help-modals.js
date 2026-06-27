@@ -123,3 +123,65 @@ export const renderModsecChapterHelpModal = makeChapterRenderer({
     "customContent",
   ],
 });
+
+export const renderWebSocketChapterHelpModal = makeChapterRenderer({
+  chapter: "websocket",
+  rowKeys: [
+    "useInspection",
+    "maxMessageBytes",
+    "rateMsgPerSec",
+    "blockPatterns",
+  ],
+});
+
+export const renderVirtualPatchesChapterHelpModal = makeChapterRenderer({
+  chapter: "virtualpatches",
+  rowKeys: [
+    "overview",
+    "matchUri",
+    "matchMethod",
+    "matchBody",
+    "action",
+  ],
+});
+
+export const renderUpstreamMtlsChapterHelpModal = makeChapterRenderer({
+  chapter: "upstreamMtls",
+  rowKeys: [
+    "enabled",
+    "certRef",
+    "keyRef",
+    "caRef",
+  ],
+});
+
+export function renderFrontMainHelpModal(ctx, escapeHtml) {
+  return renderHelpModalShell({
+    modalID: "service-front-main-help-modal",
+    titleID: "service-front-main-help-title",
+    titleKey: "sites.help.front.main.title",
+    subtitleKey: "sites.help.front.main.subtitle",
+    rows: buildHelpRows("sites.help.front.main", [
+      "serverName", "serviceId", "securityMode", "serviceProfile",
+      "caServer", "serviceEnabled", "adaptiveModel", "autoLetsEncrypt",
+      "letsEncryptStaging", "wildcard", "tlsEnabled", "tlsSelfSigned", "certificateId",
+    ]),
+    ctx,
+    escapeHtml,
+  });
+}
+
+export function renderFrontMtlsHelpModal(ctx, escapeHtml) {
+  return renderHelpModalShell({
+    modalID: "service-front-mtls-help-modal",
+    titleID: "service-front-mtls-help-title",
+    titleKey: "sites.help.front.mtls.title",
+    subtitleKey: "sites.help.front.mtls.subtitle",
+    rows: buildHelpRows("sites.help.front.mtls", [
+      "enabled", "optional", "passHeaders", "verifyDepth", "clientCaRef",
+    ]),
+    ctx,
+    escapeHtml,
+  });
+}
+

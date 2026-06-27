@@ -101,14 +101,15 @@ export function buildDetailDraftFromForm(container, state, deps = {}) {
     limit_conn_max_http3: Number(container.querySelector("#service-limit-conn-max-http3").value || "400"),
     use_limit_req: container.querySelector("#service-use-limit-req").checked,
     limit_req_url: container.querySelector("#service-limit-req-url").value.trim(),
-    limit_req_rate: container.querySelector("#service-limit-req-rate").value.trim(),
+    limit_req_rate: (() => { const v = (container.querySelector("#service-limit-req-rate")?.value || "").trim(); const unit = container.querySelector("#service-limit-req-rate-unit")?.value || "r/s"; return v ? `${v}${unit}` : ""; })(),
     custom_limit_rules: Array.from(container.querySelectorAll("[data-custom-limit-path]"))
       .map((input) => {
         const index = String(input.dataset.customLimitPath || "");
         const rateInput = container.querySelector(`[data-custom-limit-rate="${index}"]`);
+        const rateUnitInput = container.querySelector(`[data-custom-limit-rate-unit="${index}"]`);
         return {
           path: String(input.value || "").trim(),
-          rate: String(rateInput?.value || "").trim()
+          rate: (() => { const v = String(rateInput?.value || "").trim(); const unit = rateUnitInput?.value || "r/s"; return v ? `${v}${unit}` : ""; })()
         };
       }),
     antibot_challenge: container.querySelector("#service-antibot-challenge").value,

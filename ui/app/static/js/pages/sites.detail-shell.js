@@ -17,8 +17,7 @@ export function renderWizardNav(activeTab, ctx) {
   const items = [
     { id: "front", title: ctx.t("sites.wizard.front.title"), subtitle: ctx.t("sites.wizard.front.subtitle") },
     { id: "upstream", title: ctx.t("sites.wizard.upstream.title"), subtitle: ctx.t("sites.wizard.upstream.subtitle") },
-    { id: "http", title: ctx.t("sites.easy.tab.http.title"), subtitle: ctx.t("sites.easy.tab.http.subtitle") },
-    { id: "headers", title: ctx.t("sites.easy.tab.headers.title"), subtitle: ctx.t("sites.easy.tab.headers.subtitle") },
+    { id: "httpheaders", title: ctx.t("sites.easy.tab.httpheaders.title"), subtitle: ctx.t("sites.easy.tab.httpheaders.subtitle") },
     { id: "traffic", title: ctx.t("sites.easy.tab.traffic.title"), subtitle: ctx.t("sites.easy.tab.traffic.subtitle") },
     { id: "blocking", title: ctx.t("sites.easy.tab.blocking.title"), subtitle: ctx.t("sites.easy.tab.blocking.subtitle") },
     { id: "antibot", title: ctx.t("sites.easy.tab.antibot.title"), subtitle: ctx.t("sites.easy.tab.antibot.subtitle") },

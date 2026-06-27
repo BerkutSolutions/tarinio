@@ -16,6 +16,8 @@ export function renderListEditor(field, label, values, placeholder = "", options
   const presets = Array.isArray(options.presets) ? options.presets : [];
   const selectedTemplates = normalizeStringArray(options.selectedTemplates);
   const ctx = options.ctx || null;
+  const inputFilter = options.inputFilter || "";
+  const disabled = options.disabled === true;
   const quickTemplateLabel = ctx?.t ? ctx.t("sites.easy.listTemplates.quick") : "Quick templates";
   const selectedTemplateLabel = ctx?.t ? ctx.t("sites.easy.selectedCount", { count: selectedTemplates.length }) : `Selected: ${selectedTemplates.length}`;
   const selectedValueLabel = ctx?.t ? ctx.t("sites.easy.selectedCount", { count: safeValues.length }) : `Selected: ${safeValues.length}`;
@@ -30,12 +32,12 @@ export function renderListEditor(field, label, values, placeholder = "", options
   return `
     <div class="${fieldClass} waf-list-editor" data-list-field="${escapeHtml(field)}">
       <label>${escapeHtml(label)}</label>
-      <div class="waf-inline">
-        <input id="list-input-${escapeHtml(field)}" placeholder="${escapeHtml(placeholder)}">
-        <button class="btn ghost btn-sm" type="button" data-list-add="${escapeHtml(field)}">+</button>
+      <div class="waf-list-input-wrap${disabled ? " waf-disabled" : ""}">
+        <input id="list-input-${escapeHtml(field)}" placeholder="${escapeHtml(placeholder)}" autocomplete="off"${inputFilter ? ` data-input-filter="${escapeHtml(inputFilter)}"` : ""}${disabled ? " disabled" : ""}>
+        <button class="waf-list-add-btn" type="button" data-list-add="${escapeHtml(field)}" tabindex="-1" aria-label="+"${disabled ? " disabled" : ""}>+</button>
       </div>
       ${presets.length ? `
-        <div class="waf-template-picker">
+        <div class="waf-template-picker"${disabled ? " style=\"pointer-events:none;opacity:0.35\"" : ""}>
           <details class="waf-status-dropdown">
             <summary>${escapeHtml(`${quickTemplateLabel} (${selectedTemplateLabel})`)}</summary>
             <div class="waf-status-options">
@@ -131,18 +133,18 @@ export function renderCountryEditor(field, label, values, catalog, options = {})
   `;
 }
 
-export function renderStatusCodesEditor(selectedCodes, ctx) {
+export function renderStatusCodesEditor(selectedCodes, ctx, disabled = false) {
   const selected = new Set(normalizeArray(selectedCodes).map((item) => Number(item)).filter((item) => Number.isInteger(item)));
   return `
-    <div class="waf-field full">
+    <div class="waf-field full${disabled ? " waf-disabled" : ""}">
       <label>${escapeHtml(ctx.t("sites.easy.badStatusCodes"))}</label>
-      <details class="waf-status-dropdown">
+      <details class="waf-status-dropdown"${disabled ? " style=\"pointer-events:none;opacity:0.35\"" : ""}>
         <summary>${escapeHtml(ctx.t("sites.easy.selectedCount", { count: selected.size }))}</summary>
         <div class="waf-note">${escapeHtml(ctx.t("sites.easy.badStatusCodesHint"))}</div>
         <div class="waf-status-options">
           ${BAD_BEHAVIOR_STATUS_OPTIONS.map(([code, text]) => `
             <label class="waf-checkbox waf-status-option">
-              <input type="checkbox" data-bad-code="${code}"${selected.has(code) ? " checked" : ""}>
+              <input type="checkbox" data-bad-code="${code}"${selected.has(code) ? " checked" : ""}${disabled ? " disabled" : ""}>
               <span>${escapeHtml(`${code} ${text}`)}</span>
             </label>
           `).join("")}

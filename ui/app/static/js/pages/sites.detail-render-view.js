@@ -1,7 +1,7 @@
 import { renderDetailViewRuntimeTail } from "./sites.detail-render-view-part2.js";
 
 export function renderDetailViewRuntime(state, ctx, deps) {
-  const { SETTINGS_SEARCH_INDEX, escapeHtml, renderModeTabs, renderRawEditor, renderWizardNav, normalizeServiceProfile, renderListEditor, getQuickListTemplates, normalizeStringArray, renderStatusCodesEditor, renderCustomLimitRulesEditor, renderAntibotExclusionRulesEditor, normalizeBanEscalationStages, formatBanDurationSeconds, renderAntibotChallengeRulesEditor, renderAuthSessionTtlOptions, renderAuthUsersEditor, renderCountryEditor, renderUpstreamHeadersHelpModal, renderFrontChapterHelpModal, renderUpstreamChapterHelpModal, renderHttpChapterHelpModal } = deps;
+  const { SETTINGS_SEARCH_INDEX, escapeHtml, renderModeTabs, renderRawEditor, renderWizardNav, normalizeServiceProfile, renderListEditor, getQuickListTemplates, normalizeStringArray, renderStatusCodesEditor, renderCustomLimitRulesEditor, renderAntibotExclusionRulesEditor, normalizeBanEscalationStages, formatBanDurationSeconds, renderAntibotChallengeRulesEditor, renderAuthSessionTtlOptions, renderAuthUsersEditor, renderCountryEditor, renderUpstreamHeadersHelpModal, renderUpstreamChapterHelpModal, renderHttpChapterHelpModal, renderHeadersChapterHelpModal, renderUpstreamMtlsChapterHelpModal, renderFrontMainHelpModal, renderFrontMtlsHelpModal, renderTrafficAllowlistHelpModal } = deps;
   const draft = state.draft;
   const isNew = state.route.mode === "create";
   const titleKey = isNew ? "sites.editor.newTitle" : "sites.editor.editTitle";
@@ -55,293 +55,394 @@ export function renderDetailViewRuntime(state, ctx, deps) {
             <div id="sites-feedback"></div>
             <form id="service-editor-form" class="waf-form waf-stack">
               <section class="waf-stack waf-service-compact-section${state.activeTab === "front" ? "" : " waf-hidden"}" data-tab-panel="front">
-                <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
-                  <div>
-                    <div class="waf-list-title">${escapeHtml(ctx.t("sites.wizard.front.title"))}</div>
-                    <div class="muted">${escapeHtml(ctx.t("sites.wizard.front.subtitle"))}</div>
-                  </div>
-                  <button class="waf-help-icon-btn" type="button" id="service-front-chapter-help-btn" title="${escapeHtml(ctx.t("sites.help.front.open"))}" aria-label="${escapeHtml(ctx.t("sites.help.front.open"))}">?</button>
+                <div>
+                  <div class="waf-list-title">${escapeHtml(ctx.t("sites.wizard.front.title"))}</div>
+                  <div class="muted">${escapeHtml(ctx.t("sites.wizard.front.subtitle"))}</div>
                 </div>
-                ${renderFrontChapterHelpModal(ctx, escapeHtml)}
-                <div class="waf-form-grid">
-                  <div class="waf-field">
-                    <label for="service-host">${escapeHtml(ctx.t("sites.easy.front.serverName"))}</label>
-                    <input id="service-host" value="${escapeHtml(draft.primary_host)}" placeholder="${escapeHtml(ctx.t("sites.editor.hostPlaceholder"))}">
-                  </div>
-                  <div class="waf-field">
-                    <label for="service-id">${escapeHtml(ctx.t("sites.easy.front.serviceId"))}</label>
-                    <input id="service-id" value="${escapeHtml(draft.id)}" placeholder="${escapeHtml(ctx.t("sites.editor.idPlaceholder"))}">
-                  </div>
-                  <div class="waf-field">
-                    <label for="service-security-mode">${escapeHtml(ctx.t("sites.editor.securityMode"))}</label>
-                    <select id="service-security-mode">
-                      <option value="transparent"${draft.security_mode === "transparent" ? " selected" : ""}>${escapeHtml(ctx.t("sites.easy.security.transparent"))}</option>
-                      <option value="monitor"${draft.security_mode === "monitor" ? " selected" : ""}>${escapeHtml(ctx.t("sites.easy.security.monitor"))}</option>
-                      <option value="block"${draft.security_mode === "block" ? " selected" : ""}>${escapeHtml(ctx.t("sites.easy.security.block"))}</option>
-                    </select>
-                  </div>
-                  <div class="waf-field">
-                    <label for="service-profile">${escapeHtml(ctx.t("sites.table.profile"))}</label>
-                    <select id="service-profile">
-                      <option value="strict"${normalizeServiceProfile(draft.service_profile) === "strict" ? " selected" : ""}>${escapeHtml(ctx.t("sites.profile.strict"))}</option>
-                      <option value="balanced"${normalizeServiceProfile(draft.service_profile) === "balanced" ? " selected" : ""}>${escapeHtml(ctx.t("sites.profile.balanced"))}</option>
-                      <option value="compat"${normalizeServiceProfile(draft.service_profile) === "compat" ? " selected" : ""}>${escapeHtml(ctx.t("sites.profile.compat"))}</option>
-                      <option value="api"${normalizeServiceProfile(draft.service_profile) === "api" ? " selected" : ""}>${escapeHtml(ctx.t("sites.profile.api"))}</option>
-                      <option value="public-edge"${normalizeServiceProfile(draft.service_profile) === "public-edge" ? " selected" : ""}>${escapeHtml(ctx.t("sites.profile.public-edge"))}</option>
-                    </select>
-                  </div>
-                  <div class="waf-field">
-                    <label for="service-ca-server">${escapeHtml(ctx.t("sites.easy.front.caServer"))}</label>
-                    <select id="service-ca-server">
-                      <option value="letsencrypt"${draft.certificate_authority_server === "letsencrypt" ? " selected" : ""}>letsencrypt</option>
-                      <option value="zerossl"${draft.certificate_authority_server === "zerossl" ? " selected" : ""}>zerossl</option>
-                      <option value="custom"${draft.certificate_authority_server === "custom" ? " selected" : ""}>custom</option>
-                      <option value="import"${draft.certificate_authority_server === "import" ? " selected" : ""}>${escapeHtml(ctx.t("sites.tls.importOption"))}</option>
-                    </select>
-                  </div>
-                  <label class="waf-checkbox">
-                    <input id="service-enabled" type="checkbox"${draft.enabled ? " checked" : ""}>
-                    <span>${escapeHtml(ctx.t("sites.easy.front.serviceEnabled"))}</span>
-                  </label>
-                  <label class="waf-checkbox">
-                    <input id="service-adaptive-model-enabled" type="checkbox"${draft.adaptive_model_enabled ? " checked" : ""}>
-                    <span>${escapeHtml(ctx.t("sites.easy.front.adaptiveModelEnabled"))}</span>
-                  </label>
-                  <label class="waf-checkbox">
-                    <input id="service-auto-lets-encrypt" type="checkbox"${draft.auto_lets_encrypt ? " checked" : ""}>
-                    <span>${escapeHtml(ctx.t("sites.easy.front.autoLetsEncrypt"))}</span>
-                  </label>
-                  <label class="waf-checkbox">
-                    <input id="service-lets-encrypt-staging" type="checkbox"${draft.use_lets_encrypt_staging ? " checked" : ""}>
-                    <span>${escapeHtml(ctx.t("sites.easy.front.letsEncryptStaging"))}</span>
-                  </label>
-                  <label class="waf-checkbox">
-                    <input id="service-lets-encrypt-wildcard" type="checkbox"${draft.use_lets_encrypt_wildcard ? " checked" : ""}>
-                    <span>${escapeHtml(ctx.t("sites.easy.front.wildcardCertificates"))}</span>
-                  </label>
-                  <label class="waf-checkbox">
-                    <input id="service-tls-enabled" type="checkbox"${draft.tls_enabled ? " checked" : ""}>
-                    <span>${escapeHtml(ctx.t("sites.easy.front.tlsEnabled"))}</span>
-                  </label>
-                  <label class="waf-checkbox">
-                    <input id="service-tls-self-signed" type="checkbox"${draft.tls_self_signed ? " checked" : ""}>
-                    <span>${escapeHtml(ctx.t("sites.easy.front.tlsSelfSigned"))}</span>
-                  </label>
-                  <div class="waf-subframe full" style="margin-top:8px;">
-                    <div class="waf-list-title-sm">${escapeHtml(ctx.t("sites.easy.mtls.title"))}</div>
-                    <div class="waf-form-grid">
-                      <label class="waf-checkbox">
-                        <input id="service-mtls-enabled" type="checkbox"${draft.mtls_enabled ? " checked" : ""}>
-                        <span>${escapeHtml(ctx.t("sites.easy.mtls.enabled"))}</span>
-                      </label>
-                      <label class="waf-checkbox">
-                        <input id="service-mtls-optional" type="checkbox"${draft.mtls_optional ? " checked" : ""}${!draft.mtls_enabled ? " disabled" : ""}>
-                        <span>${escapeHtml(ctx.t("sites.easy.mtls.optional"))}</span>
-                      </label>
-                      <label class="waf-checkbox">
-                        <input id="service-mtls-pass-headers" type="checkbox"${draft.mtls_pass_headers ? " checked" : ""}${!draft.mtls_enabled ? " disabled" : ""}>
-                        <span>${escapeHtml(ctx.t("sites.easy.mtls.passHeaders"))}</span>
-                      </label>
-                      <div class="waf-field">
-                        <label for="service-mtls-verify-depth">${escapeHtml(ctx.t("sites.easy.mtls.verifyDepth"))}</label>
-                        <input id="service-mtls-verify-depth" type="number" min="0" max="10" value="${escapeHtml(String(draft.mtls_verify_depth || 2))}"${!draft.mtls_enabled ? " disabled" : ""}>
-                      </div>
-                      <div class="waf-field full">
-                        <label for="service-mtls-client-ca-ref">${escapeHtml(ctx.t("sites.easy.mtls.clientCaRef"))}</label>
-                        <input id="service-mtls-client-ca-ref" value="${escapeHtml(draft.mtls_client_ca_ref || "")}" placeholder="${escapeHtml(ctx.t("sites.easy.mtls.clientCaRefPlaceholder"))}"${!draft.mtls_enabled ? " disabled" : ""}>
+                <div class="waf-antibot-auth-grid">
+                  <section class="waf-subcard">
+                    <div class="waf-card-head">
+                      <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
+                        <h3>${escapeHtml(ctx.t("sites.easy.front.sectionMain"))}</h3>
+                        <button class="waf-help-icon-btn" type="button" id="service-front-main-help-btn" title="${escapeHtml(ctx.t("sites.help.front.main.open"))}" aria-label="${escapeHtml(ctx.t("sites.help.front.main.open"))}">?</button>
                       </div>
                     </div>
-                  </div>
-                  <div class="waf-field waf-field-cert-id">
-                    <label for="service-certificate-id">${escapeHtml(ctx.t("sites.tls.certificateId"))}</label>
-                    <input id="service-certificate-id" value="${escapeHtml(draft.certificate_id)}" placeholder="${escapeHtml(ctx.t("sites.tls.certificatePlaceholder"))}">
-                    <div class="waf-field" id="service-certificate-picker"${draft.certificate_authority_server === "import" ? "" : " style=\"display:none\""}>
-                      <label for="service-import-certificate-search">${escapeHtml(ctx.t("sites.tls.importSelect"))}</label>
-                      <input id="service-import-certificate-search" list="service-import-certificate-list" placeholder="${escapeHtml(ctx.t("sites.tls.importSelectPlaceholder"))}">
-                      <datalist id="service-import-certificate-list">
-                        ${state.certificates.map((certificate) => {
-                          const id = String(certificate?.id || "").trim();
-                          if (!id) {
-                            return "";
-                          }
-                          const commonName = String(certificate?.common_name || "").trim();
-                          const status = String(certificate?.status || "unknown").trim();
-                          const label = commonName ? `${id} (${commonName}, ${status})` : `${id} (${status})`;
-                          return `<option value="${escapeHtml(id)}" label="${escapeHtml(label)}"></option>`;
-                        }).join("")}
-                      </datalist>
+                    ${renderFrontMainHelpModal(ctx, escapeHtml)}
+                    <div class="waf-card-body">
+                      <div class="waf-form-grid">
+                        <div class="waf-field">
+                          <label for="service-host">${escapeHtml(ctx.t("sites.easy.front.serverName"))}</label>
+                          <input id="service-host" value="${escapeHtml(draft.primary_host)}" placeholder="${escapeHtml(ctx.t("sites.editor.hostPlaceholder"))}">
+                        </div>
+                        <div class="waf-field">
+                          <label for="service-id">${escapeHtml(ctx.t("sites.easy.front.serviceId"))}</label>
+                          <input id="service-id" value="${escapeHtml(draft.id)}" placeholder="${escapeHtml(ctx.t("sites.editor.idPlaceholder"))}">
+                        </div>
+                        <div class="waf-field">
+                          <label for="service-security-mode">${escapeHtml(ctx.t("sites.editor.securityMode"))}</label>
+                          <select id="service-security-mode">
+                            <option value="transparent"${draft.security_mode === "transparent" ? " selected" : ""}>${escapeHtml(ctx.t("sites.easy.security.transparent"))}</option>
+                            <option value="monitor"${draft.security_mode === "monitor" ? " selected" : ""}>${escapeHtml(ctx.t("sites.easy.security.monitor"))}</option>
+                            <option value="block"${draft.security_mode === "block" ? " selected" : ""}>${escapeHtml(ctx.t("sites.easy.security.block"))}</option>
+                          </select>
+                        </div>
+                        <div class="waf-field">
+                          <label for="service-profile">${escapeHtml(ctx.t("sites.table.profile"))}</label>
+                          <select id="service-profile">
+                            <option value="strict"${normalizeServiceProfile(draft.service_profile) === "strict" ? " selected" : ""}>${escapeHtml(ctx.t("sites.profile.strict"))}</option>
+                            <option value="balanced"${normalizeServiceProfile(draft.service_profile) === "balanced" ? " selected" : ""}>${escapeHtml(ctx.t("sites.profile.balanced"))}</option>
+                            <option value="compat"${normalizeServiceProfile(draft.service_profile) === "compat" ? " selected" : ""}>${escapeHtml(ctx.t("sites.profile.compat"))}</option>
+                            <option value="api"${normalizeServiceProfile(draft.service_profile) === "api" ? " selected" : ""}>${escapeHtml(ctx.t("sites.profile.api"))}</option>
+                            <option value="public-edge"${normalizeServiceProfile(draft.service_profile) === "public-edge" ? " selected" : ""}>${escapeHtml(ctx.t("sites.profile.public-edge"))}</option>
+                          </select>
+                        </div>
+                        <label class="waf-checkbox">
+                          <input id="service-enabled" type="checkbox"${draft.enabled ? " checked" : ""}>
+                          <span>${escapeHtml(ctx.t("sites.easy.front.serviceEnabled"))}</span>
+                        </label>
+                        <label class="waf-checkbox">
+                          <input id="service-adaptive-model-enabled" type="checkbox"${draft.adaptive_model_enabled ? " checked" : ""}>
+                          <span>${escapeHtml(ctx.t("sites.easy.front.adaptiveModelEnabled"))}</span>
+                        </label>
+                      </div>
+                      <div class="waf-form-grid" style="margin-top:12px;">
+                        <div class="waf-field">
+                          <label for="service-ca-server">${escapeHtml(ctx.t("sites.easy.front.caServer"))}</label>
+                          <select id="service-ca-server">
+                            <option value="letsencrypt"${draft.certificate_authority_server === "letsencrypt" ? " selected" : ""}>letsencrypt</option>
+                            <option value="zerossl"${draft.certificate_authority_server === "zerossl" ? " selected" : ""}>zerossl</option>
+                            <option value="custom"${draft.certificate_authority_server === "custom" ? " selected" : ""}>custom</option>
+                            <option value="import"${draft.certificate_authority_server === "import" ? " selected" : ""}>${escapeHtml(ctx.t("sites.tls.importOption"))}</option>
+                          </select>
+                        </div>
+                        <label class="waf-checkbox">
+                          <input id="service-auto-lets-encrypt" type="checkbox"${draft.auto_lets_encrypt ? " checked" : ""}>
+                          <span>${escapeHtml(ctx.t("sites.easy.front.autoLetsEncrypt"))}</span>
+                        </label>
+                        <label class="waf-checkbox">
+                          <input id="service-lets-encrypt-staging" type="checkbox"${draft.use_lets_encrypt_staging ? " checked" : ""}>
+                          <span>${escapeHtml(ctx.t("sites.easy.front.letsEncryptStaging"))}</span>
+                        </label>
+                        <label class="waf-checkbox">
+                          <input id="service-lets-encrypt-wildcard" type="checkbox"${draft.use_lets_encrypt_wildcard ? " checked" : ""}>
+                          <span>${escapeHtml(ctx.t("sites.easy.front.wildcardCertificates"))}</span>
+                        </label>
+                        <label class="waf-checkbox">
+                          <input id="service-tls-enabled" type="checkbox"${draft.tls_enabled ? " checked" : ""}>
+                          <span>${escapeHtml(ctx.t("sites.easy.front.tlsEnabled"))}</span>
+                        </label>
+                        <label class="waf-checkbox">
+                          <input id="service-tls-self-signed" type="checkbox"${draft.tls_self_signed ? " checked" : ""}>
+                          <span>${escapeHtml(ctx.t("sites.easy.front.tlsSelfSigned"))}</span>
+                        </label>
+                      </div>
+                      <div class="waf-form-grid" style="margin-top:12px;">
+                        <div class="waf-field full">
+                          <label for="service-certificate-id">${escapeHtml(ctx.t("sites.tls.certificateId"))}</label>
+                          <input id="service-certificate-id" value="${escapeHtml(draft.certificate_id)}" placeholder="${escapeHtml(ctx.t("sites.tls.certificatePlaceholder"))}">
+                          <div class="waf-field" id="service-certificate-picker"${draft.certificate_authority_server === "import" ? "" : " style=\"display:none\""}>
+                            <label for="service-import-certificate-search">${escapeHtml(ctx.t("sites.tls.importSelect"))}</label>
+                            <input id="service-import-certificate-search" list="service-import-certificate-list" placeholder="${escapeHtml(ctx.t("sites.tls.importSelectPlaceholder"))}">
+                            <datalist id="service-import-certificate-list">
+                              ${state.certificates.map((certificate) => {
+                                const id = String(certificate?.id || "").trim();
+                                if (!id) {
+                                  return "";
+                                }
+                                const commonName = String(certificate?.common_name || "").trim();
+                                const status = String(certificate?.status || "unknown").trim();
+                                const label = commonName ? `${id} (${commonName}, ${status})` : `${id} (${status})`;
+                                return `<option value="${escapeHtml(id)}" label="${escapeHtml(label)}"></option>`;
+                              }).join("")}
+                            </datalist>
+                          </div>
+                          <div class="waf-actions" id="service-certificate-import-actions"${draft.certificate_authority_server === "import" ? "" : " style=\"display:none\""}>
+                            <button class="btn ghost btn-sm" type="button" id="service-certificate-import">${escapeHtml(ctx.t("sites.tls.importButton"))}</button>
+                            <button class="btn ghost btn-sm" type="button" id="service-certificate-export">${escapeHtml(ctx.t("sites.tls.exportButton"))}</button>
+                          </div>
+                          <input id="service-certificate-archive-file" type="file" accept=".zip,application/zip,application/x-zip-compressed" class="waf-hidden">
+                        </div>
+                      </div>
                     </div>
-                    <div class="waf-actions" id="service-certificate-import-actions"${draft.certificate_authority_server === "import" ? "" : " style=\"display:none\""}>
-                      <button class="btn ghost btn-sm" type="button" id="service-certificate-import">${escapeHtml(ctx.t("sites.tls.importButton"))}</button>
-                      <button class="btn ghost btn-sm" type="button" id="service-certificate-export">${escapeHtml(ctx.t("sites.tls.exportButton"))}</button>
+                  </section>
+                  <section class="waf-subcard">
+                    <div class="waf-card-head">
+                      <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
+                        <h3>${escapeHtml(ctx.t("sites.easy.mtls.title"))}</h3>
+                        <button class="waf-help-icon-btn" type="button" id="service-front-mtls-help-btn" title="${escapeHtml(ctx.t("sites.help.front.mtls.open"))}" aria-label="${escapeHtml(ctx.t("sites.help.front.mtls.open"))}">?</button>
+                      </div>
                     </div>
-                    <input id="service-certificate-archive-file" type="file" accept=".zip,application/zip,application/x-zip-compressed" class="waf-hidden">
-                  </div>
+                    ${renderFrontMtlsHelpModal(ctx, escapeHtml)}
+                    <div class="waf-card-body">
+                      <div class="waf-form-grid">
+                        <label class="waf-checkbox full">
+                          <input id="service-mtls-enabled" type="checkbox"${draft.mtls_enabled ? " checked" : ""}>
+                          <span>${escapeHtml(ctx.t("sites.easy.mtls.enabled"))}</span>
+                        </label>
+                        <label class="waf-checkbox full">
+                          <input id="service-mtls-optional" type="checkbox"${draft.mtls_optional ? " checked" : ""}${!draft.mtls_enabled ? " disabled" : ""}>
+                          <span>${escapeHtml(ctx.t("sites.easy.mtls.optional"))}</span>
+                        </label>
+                        <label class="waf-checkbox full">
+                          <input id="service-mtls-pass-headers" type="checkbox"${draft.mtls_pass_headers ? " checked" : ""}${!draft.mtls_enabled ? " disabled" : ""}>
+                          <span>${escapeHtml(ctx.t("sites.easy.mtls.passHeaders"))}</span>
+                        </label>
+                        <div class="waf-field full">
+                          <label for="service-mtls-verify-depth">${escapeHtml(ctx.t("sites.easy.mtls.verifyDepth"))}</label>
+                          <input id="service-mtls-verify-depth" type="number" min="0" max="10" value="${escapeHtml(String(draft.mtls_verify_depth || 2))}"${!draft.mtls_enabled ? " disabled" : ""}>
+                        </div>
+                        <div class="waf-field full">
+                          <label for="service-mtls-client-ca-ref">${escapeHtml(ctx.t("sites.easy.mtls.clientCaRef"))}</label>
+                          <input id="service-mtls-client-ca-ref" value="${escapeHtml(draft.mtls_client_ca_ref || "")}" placeholder="${escapeHtml(ctx.t("sites.easy.mtls.clientCaRefPlaceholder"))}"${!draft.mtls_enabled ? " disabled" : ""}>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
                 </div>
               </section>
 
-              <section class="waf-stack${state.activeTab === "upstream" ? "" : " waf-hidden"}" data-tab-panel="upstream">
+              <section class="waf-stack waf-service-compact-section${state.activeTab === "upstream" ? "" : " waf-hidden"}" data-tab-panel="upstream">
                 <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
                   <div>
                     <div class="waf-list-title">${escapeHtml(ctx.t("sites.wizard.upstream.title"))}</div>
                     <div class="muted">${escapeHtml(ctx.t("sites.wizard.upstream.subtitle"))}</div>
                   </div>
-                  <button class="waf-help-icon-btn" type="button" id="service-upstream-chapter-help-btn" title="${escapeHtml(ctx.t("sites.help.upstream.open"))}" aria-label="${escapeHtml(ctx.t("sites.help.upstream.open"))}">?</button>
                 </div>
                 ${renderUpstreamChapterHelpModal(ctx, escapeHtml)}
                 <input id="service-upstream-id" type="hidden" value="${escapeHtml(draft.upstream_id)}">
-                <div class="waf-form-grid three waf-upstream-toggle-row">
-                  <label class="waf-checkbox">
-                    <input id="service-use-reverse-proxy" type="checkbox"${draft.use_reverse_proxy ? " checked" : ""}>
-                    <span>${escapeHtml(ctx.t("sites.easy.upstream.useReverseProxy"))}</span>
-                  </label>
-                  <label class="waf-checkbox">
-                    <input id="service-reverse-proxy-keepalive" type="checkbox"${draft.reverse_proxy_keepalive ? " checked" : ""}>
-                    <span>${escapeHtml(ctx.t("sites.easy.upstream.keepalive"))}</span>
-                  </label>
-                  <label class="waf-checkbox">
-                    <input id="service-reverse-proxy-websocket" type="checkbox"${draft.reverse_proxy_websocket ? " checked" : ""}>
-                    <span>${escapeHtml(ctx.t("sites.easy.upstream.websocket"))}</span>
-                  </label>
-                </div>
-                <div class="waf-form-grid three">
-                  <label class="waf-checkbox">
-                    <input id="service-health-check-enabled" type="checkbox"${draft.health_check_enabled ? " checked" : ""}>
-                    <span>${escapeHtml(ctx.t("sites.easy.upstream.healthCheckEnabled"))}</span>
-                  </label>
-                  <div class="waf-field">
-                    <label for="service-health-check-path">${escapeHtml(ctx.t("sites.easy.upstream.healthCheckPath"))}</label>
-                    <input id="service-health-check-path" value="${escapeHtml(draft.health_check_path || "/health")}"${draft.health_check_enabled ? "" : " disabled"}>
-                  </div>
-                  <div class="waf-field">
-                    <label for="service-health-check-interval">${escapeHtml(ctx.t("sites.easy.upstream.healthCheckInterval"))}</label>
-                    <input id="service-health-check-interval" type="number" min="1" max="300" value="${escapeHtml(String(draft.health_check_interval_seconds || 10))}"${draft.health_check_enabled ? "" : " disabled"}>
-                  </div>
-                </div>
-                <div class="waf-upstream-layout">
-                  <div class="waf-form-grid three">
-                    <div class="waf-field">
-                      <label for="service-reverse-proxy-custom-host">${escapeHtml(ctx.t("sites.easy.upstream.reverseProxyCustomHost"))}</label>
-                      <input id="service-reverse-proxy-custom-host" value="${escapeHtml(draft.reverse_proxy_custom_host)}"${draft.pass_host_header ? "" : " disabled"}>
+                <div class="waf-upstream-3col-grid">
+                  <section class="waf-subcard">
+                    <div class="waf-card-head">
+                      <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
+                        <h3>${escapeHtml(ctx.t("sites.easy.upstream.targetTitle"))}</h3>
+                        <button class="waf-help-icon-btn" type="button" id="service-upstream-chapter-help-btn" title="${escapeHtml(ctx.t("sites.help.upstream.open"))}" aria-label="${escapeHtml(ctx.t("sites.help.upstream.open"))}">?</button>
+                      </div>
                     </div>
-                    <div class="waf-field">
-                    <label for="service-reverse-proxy-host">${escapeHtml(ctx.t("sites.easy.upstream.reverseProxyHost"))}</label>
-                    <input id="service-reverse-proxy-host" value="${escapeHtml(draft.reverse_proxy_host)}">
+                    <div class="waf-card-body waf-upstream-target-body">
+                      <div class="waf-upstream-row-1">
+                        <label class="waf-checkbox">
+                          <input id="service-use-reverse-proxy" type="checkbox"${draft.use_reverse_proxy ? " checked" : ""}>
+                          <span>${escapeHtml(ctx.t("sites.easy.upstream.useReverseProxy"))}</span>
+                        </label>
+                      </div>
+                      <div class="waf-upstream-row-1">
+                        <div class="waf-field waf-field-compact-xs">
+                          <label for="service-upstream-scheme">${escapeHtml(ctx.t("sites.upstream.field.scheme"))}</label>
+                          <select id="service-upstream-scheme"${!draft.use_reverse_proxy ? " disabled" : ""}>
+                            <option value="http"${draft.upstream_scheme === "http" ? " selected" : ""}>http</option>
+                            <option value="https"${draft.upstream_scheme === "https" ? " selected" : ""}>https</option>
+                          </select>
+                        </div>
+                        <div class="waf-field waf-field-compact-md">
+                          <label for="service-upstream-host">${escapeHtml(ctx.t("sites.upstream.field.hostShort"))}</label>
+                          <input id="service-upstream-host" value="${escapeHtml(draft.upstream_host)}"${!draft.use_reverse_proxy ? " disabled" : ""}>
+                        </div>
+                        <div class="waf-field waf-field-compact-xs">
+                          <label for="service-upstream-port">${escapeHtml(ctx.t("sites.upstream.field.port"))}</label>
+                          <input id="service-upstream-port" type="number" min="1" max="65535" value="${escapeHtml(String(draft.upstream_port))}"${!draft.use_reverse_proxy ? " disabled" : ""}>
+                        </div>
+                        <div class="waf-field waf-field-compact-sm">
+                          <label for="service-reverse-proxy-url">${escapeHtml(ctx.t("sites.easy.upstream.reverseProxyUrl"))}</label>
+                          <input id="service-reverse-proxy-url" value="${escapeHtml(draft.reverse_proxy_url)}"${!draft.use_reverse_proxy ? " disabled" : ""}>
+                        </div>
+                        <div class="waf-field">
+                          <label for="service-reverse-proxy-custom-host">${escapeHtml(ctx.t("sites.easy.upstream.reverseProxyCustomHost"))}</label>
+                          <input id="service-reverse-proxy-custom-host" value="${escapeHtml(draft.reverse_proxy_custom_host)}"${!draft.use_reverse_proxy ? " disabled" : ""}>
+                        </div>
+                      </div>
+                      <div class="waf-upstream-row-2">
+                        <label class="waf-checkbox">
+                          <input id="service-reverse-proxy-keepalive" type="checkbox"${draft.reverse_proxy_keepalive ? " checked" : ""}${!draft.use_reverse_proxy ? " disabled" : ""}>
+                          <span>${escapeHtml(ctx.t("sites.easy.upstream.keepalive"))}</span>
+                        </label>
+                        <label class="waf-checkbox">
+                          <input id="service-reverse-proxy-websocket" type="checkbox"${draft.reverse_proxy_websocket ? " checked" : ""}${!draft.use_reverse_proxy ? " disabled" : ""}>
+                          <span>${escapeHtml(ctx.t("sites.easy.upstream.websocket"))}</span>
+                        </label>
+                      </div>
+                      <hr class="waf-upstream-divider">
+                      <div class="waf-upstream-row-3">
+                        <label class="waf-checkbox">
+                          <input id="service-health-check-enabled" type="checkbox"${draft.health_check_enabled ? " checked" : ""}>
+                          <span>${escapeHtml(ctx.t("sites.easy.upstream.healthCheckPassive"))}</span>
+                        </label>
+                      </div>
+                      <div class="waf-upstream-row-4">
+                        <div class="waf-field waf-field-compact-md">
+                          <label for="service-health-check-path">${escapeHtml(ctx.t("sites.easy.upstream.healthCheckPath"))}</label>
+                          <input id="service-health-check-path" value="${escapeHtml(draft.health_check_path || "/health")}"${draft.health_check_enabled ? "" : " disabled"}>
+                        </div>
+                        <div class="waf-field waf-field-compact-xs">
+                          <label for="service-health-check-interval">${escapeHtml(ctx.t("sites.easy.upstream.healthCheckInterval"))}</label>
+                          <input id="service-health-check-interval" type="number" min="1" max="300" value="${escapeHtml(String(draft.health_check_interval_seconds || 10))}"${draft.health_check_enabled ? "" : " disabled"}>
+                        </div>
+                      </div>
+                      <hr class="waf-upstream-divider">
+                      <div class="waf-upstream-row-5">
+                        <label class="waf-checkbox">
+                          <input id="service-reverse-proxy-ssl-sni" type="checkbox"${draft.reverse_proxy_ssl_sni ? " checked" : ""}>
+                          <span>${escapeHtml(ctx.t("sites.easy.upstream.useSslSni"))}</span>
+                        </label>
+                      </div>
+                      <div class="waf-upstream-row-6">
+                        <div class="waf-field">
+                          <label for="service-reverse-proxy-ssl-sni-name">${escapeHtml(ctx.t("sites.easy.upstream.sslSniName"))}</label>
+                          <input id="service-reverse-proxy-ssl-sni-name" value="${escapeHtml(draft.reverse_proxy_ssl_sni_name)}"${!draft.reverse_proxy_ssl_sni ? " disabled" : ""}>
+                        </div>
+                      </div>
+                      <div class="waf-upstream-target-row"></div>
+                      <input type="hidden" id="service-reverse-proxy-host" value="${escapeHtml(draft.reverse_proxy_host)}">
                     </div>
-                    <div class="waf-field">
-                    <label for="service-reverse-proxy-url">${escapeHtml(ctx.t("sites.easy.upstream.reverseProxyUrl"))}</label>
-                    <input id="service-reverse-proxy-url" value="${escapeHtml(draft.reverse_proxy_url)}">
+                  </section>
+                  <section class="waf-subcard waf-upstream-combined">
+                    <div class="waf-card-head">
+                      <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
+                        <div>
+                          <h3>${escapeHtml(ctx.t("sites.easy.upstream.headerForwardingTitle"))}</h3>
+                          <div class="muted" style="font-size:12px;margin-top:2px;">${escapeHtml(ctx.t("sites.easy.upstream.headerForwardingHint"))}</div>
+                        </div>
+                        <button class="waf-help-icon-btn" type="button" id="service-upstream-headers-help-btn" title="${escapeHtml(ctx.t("sites.easy.upstream.headers.help.open"))}" aria-label="${escapeHtml(ctx.t("sites.easy.upstream.headers.help.open"))}">?</button>
+                      </div>
                     </div>
-                  </div>
-                  <div class="waf-upstream-target-row">
-                    <div class="waf-field waf-field-compact-xs">
-                      <label for="service-upstream-scheme">${escapeHtml(ctx.t("sites.upstream.field.scheme"))}</label>
-                      <select id="service-upstream-scheme">
-                        <option value="http"${draft.upstream_scheme === "http" ? " selected" : ""}>http</option>
-                        <option value="https"${draft.upstream_scheme === "https" ? " selected" : ""}>https</option>
-                      </select>
+                    <div class="waf-card-body">
+                      <div class="waf-form-grid">
+                        <label class="waf-checkbox">
+                          <input id="service-pass-host-header" type="checkbox"${draft.pass_host_header ? " checked" : ""}>
+                          <span>${escapeHtml(ctx.t("sites.easy.upstream.passHostHeader"))}</span>
+                        </label>
+                        <label class="waf-checkbox">
+                          <input id="service-send-x-forwarded-proto" type="checkbox"${draft.send_x_forwarded_proto ? " checked" : ""}>
+                          <span>${escapeHtml(ctx.t("sites.easy.upstream.sendXForwardedProto"))}</span>
+                        </label>
+                        <label class="waf-checkbox">
+                          <input id="service-send-x-forwarded-for" type="checkbox"${draft.send_x_forwarded_for ? " checked" : ""}>
+                          <span>${escapeHtml(ctx.t("sites.easy.upstream.sendXForwardedFor"))}</span>
+                        </label>
+                        <label class="waf-checkbox">
+                          <input id="service-send-x-real-ip" type="checkbox"${draft.send_x_real_ip ? " checked" : ""}>
+                          <span>${escapeHtml(ctx.t("sites.easy.upstream.sendXRealIp"))}</span>
+                        </label>
+                      </div>
                     </div>
-                    <div class="waf-field waf-field-compact-md">
-                      <label for="service-upstream-host">${escapeHtml(ctx.t("sites.upstream.field.host"))}</label>
-                      <input id="service-upstream-host" value="${escapeHtml(draft.upstream_host)}">
+                    <div class="waf-upstream-section-divider">
+                      <div class="waf-card-head" style="border-top:1px solid rgba(255,255,255,0.07);margin-top:8px;">
+                        <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
+                          <h3>${escapeHtml(ctx.t("sites.easy.upstream_mtls.title"))}</h3>
+                          <button class="waf-help-icon-btn" type="button" id="service-upstream-mtls-help-btn" title="${escapeHtml(ctx.t("sites.easy.upstream_mtls.help.open"))}" aria-label="${escapeHtml(ctx.t("sites.easy.upstream_mtls.help.open"))}">?</button>
+                        </div>
+                      </div>
+                      <div class="waf-card-body">
+                        ${renderUpstreamMtlsChapterHelpModal(ctx, escapeHtml)}
+                        <div class="waf-form-grid">
+                          <label class="waf-checkbox full">
+                            <input id="service-upstream-mtls-enabled" type="checkbox"${draft.upstream_mtls_enabled ? " checked" : ""}>
+                            <span>${escapeHtml(ctx.t("sites.easy.upstream_mtls.enabled"))}</span>
+                          </label>
+                          <div class="waf-field">
+                            <label for="service-upstream-mtls-cert-ref">${escapeHtml(ctx.t("sites.easy.upstream_mtls.certRef"))}</label>
+                            <input id="service-upstream-mtls-cert-ref" value="${escapeHtml(draft.upstream_mtls_cert_ref || "")}" placeholder="/etc/ssl/waf-client.crt"${!draft.upstream_mtls_enabled ? " disabled" : ""}>
+                          </div>
+                          <div class="waf-field">
+                            <label for="service-upstream-mtls-key-ref">${escapeHtml(ctx.t("sites.easy.upstream_mtls.keyRef"))}</label>
+                            <input id="service-upstream-mtls-key-ref" value="${escapeHtml(draft.upstream_mtls_key_ref || "")}" placeholder="/etc/ssl/waf-client.key"${!draft.upstream_mtls_enabled ? " disabled" : ""}>
+                          </div>
+                          <div class="waf-field">
+                            <label for="service-upstream-mtls-ca-ref">${escapeHtml(ctx.t("sites.easy.upstream_mtls.caRef"))}</label>
+                            <input id="service-upstream-mtls-ca-ref" value="${escapeHtml(draft.upstream_mtls_ca_ref || "")}" placeholder="/etc/ssl/upstream-ca.crt"${!draft.upstream_mtls_enabled ? " disabled" : ""}>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div class="waf-field waf-field-compact-xs">
-                      <label for="service-upstream-port">${escapeHtml(ctx.t("sites.upstream.field.port"))}</label>
-                      <input id="service-upstream-port" type="number" min="1" max="65535" value="${escapeHtml(String(draft.upstream_port))}">
-                    </div>
-                  </div>
-                </div>
-                <div class="waf-subframe waf-upstream-headers-frame">
-                  <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
-                    <div>
-                      <div class="waf-list-title-sm">${escapeHtml(ctx.t("sites.easy.upstream.headerForwardingTitle"))}</div>
-                      <div class="muted">${escapeHtml(ctx.t("sites.easy.upstream.headerForwardingHint"))}</div>
-                    </div>
-                    <button class="waf-help-icon-btn" type="button" id="service-upstream-headers-help-btn" title="${escapeHtml(ctx.t("sites.easy.upstream.headers.help.open"))}" aria-label="${escapeHtml(ctx.t("sites.easy.upstream.headers.help.open"))}">?</button>
-                  </div>
-                  <div class="waf-form-grid two">
-                    <label class="waf-checkbox">
-                      <input id="service-pass-host-header" type="checkbox"${draft.pass_host_header ? " checked" : ""}>
-                      <span>${escapeHtml(ctx.t("sites.easy.upstream.passHostHeader"))}</span>
-                    </label>
-                    <label class="waf-checkbox">
-                      <input id="service-send-x-forwarded-for" type="checkbox"${draft.send_x_forwarded_for ? " checked" : ""}>
-                      <span>${escapeHtml(ctx.t("sites.easy.upstream.sendXForwardedFor"))}</span>
-                    </label>
-                    <label class="waf-checkbox">
-                      <input id="service-send-x-forwarded-proto" type="checkbox"${draft.send_x_forwarded_proto ? " checked" : ""}>
-                      <span>${escapeHtml(ctx.t("sites.easy.upstream.sendXForwardedProto"))}</span>
-                    </label>
-                    <label class="waf-checkbox">
-                      <input id="service-send-x-real-ip" type="checkbox"${draft.send_x_real_ip ? " checked" : ""}>
-                      <span>${escapeHtml(ctx.t("sites.easy.upstream.sendXRealIp"))}</span>
-                    </label>
-                  </div>
-                </div>
-                <div class="waf-form-grid two waf-upstream-sni-row">
-                  <label class="waf-checkbox">
-                    <input id="service-reverse-proxy-ssl-sni" type="checkbox"${draft.reverse_proxy_ssl_sni ? " checked" : ""}>
-                    <span>${escapeHtml(ctx.t("sites.easy.upstream.useSslSni"))}</span>
-                  </label>
-                  <div class="waf-field">
-                    <label for="service-reverse-proxy-ssl-sni-name">${escapeHtml(ctx.t("sites.easy.upstream.sslSniName"))}</label>
-                    <input id="service-reverse-proxy-ssl-sni-name" value="${escapeHtml(draft.reverse_proxy_ssl_sni_name)}">
-                  </div>
-                </div>
+                  </section>
                 ${renderUpstreamHeadersHelpModal(ctx)}
-                <div class="waf-subframe full" style="margin-top:8px;">
-                  <div class="waf-list-title-sm">${escapeHtml(ctx.t("sites.easy.upstream_mtls.title"))}</div>
-                  <div class="waf-form-grid">
-                    <label class="waf-checkbox">
-                      <input id="service-upstream-mtls-enabled" type="checkbox"${draft.upstream_mtls_enabled ? " checked" : ""}>
-                      <span>${escapeHtml(ctx.t("sites.easy.upstream_mtls.enabled"))}</span>
-                    </label>
-                    <div class="waf-field">
-                      <label for="service-upstream-mtls-cert-ref">${escapeHtml(ctx.t("sites.easy.upstream_mtls.certRef"))}</label>
-                      <input id="service-upstream-mtls-cert-ref" value="${escapeHtml(draft.upstream_mtls_cert_ref || "")}" placeholder="/etc/ssl/waf-client.crt"${!draft.upstream_mtls_enabled ? " disabled" : ""}>
-                    </div>
-                    <div class="waf-field">
-                      <label for="service-upstream-mtls-key-ref">${escapeHtml(ctx.t("sites.easy.upstream_mtls.keyRef"))}</label>
-                      <input id="service-upstream-mtls-key-ref" value="${escapeHtml(draft.upstream_mtls_key_ref || "")}" placeholder="/etc/ssl/waf-client.key"${!draft.upstream_mtls_enabled ? " disabled" : ""}>
-                    </div>
-                    <div class="waf-field">
-                      <label for="service-upstream-mtls-ca-ref">${escapeHtml(ctx.t("sites.easy.upstream_mtls.caRef"))}</label>
-                      <input id="service-upstream-mtls-ca-ref" value="${escapeHtml(draft.upstream_mtls_ca_ref || "")}" placeholder="/etc/ssl/upstream-ca.crt"${!draft.upstream_mtls_enabled ? " disabled" : ""}>
-                    </div>
-                  </div>
-                </div>
               </section>
 
-              <section class="waf-stack waf-service-compact-section${state.activeTab === "http" ? "" : " waf-hidden"}" data-tab-panel="http">
-                <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
-                  <div>
-                    <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.http.title"))}</div>
-                    <div class="muted">${escapeHtml(ctx.t("sites.easy.tab.http.subtitle"))}</div>
-                  </div>
-                  <button class="waf-help-icon-btn" type="button" id="service-http-chapter-help-btn" title="${escapeHtml(ctx.t("sites.help.http.open"))}" aria-label="${escapeHtml(ctx.t("sites.help.http.open"))}">?</button>
-                </div>
-                ${renderHttpChapterHelpModal(ctx, escapeHtml)}
-                <div class="waf-form-grid">
-                  ${renderListEditor("allowed_methods", ctx.t("sites.easy.http.allowedMethods"), draft.allowed_methods, "GET", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
-                  <div class="waf-field waf-http-max-size">
-                    <label for="service-max-client-size">${escapeHtml(ctx.t("sites.easy.http.maxBodySize"))}</label>
-                    <input id="service-max-client-size" value="${escapeHtml(draft.max_client_size)}">
-                  </div>
-                  ${renderListEditor("ssl_protocols", ctx.t("sites.easy.http.sslProtocols"), draft.ssl_protocols, "TLSv1.3", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
-                  <div class="waf-http-version-toggle">
-                    <label class="waf-checkbox">
-                      <input id="service-http2" type="checkbox"${draft.http2 ? " checked" : ""}>
-                      <span>HTTP2</span>
-                    </label>
-                    <label class="waf-checkbox">
-                      <input id="service-http3" type="checkbox"${draft.http3 ? " checked" : ""}>
-                      <span>HTTP3</span>
-                    </label>
-                    <label class="waf-checkbox">
-                      <input id="service-http-strict-parsing" type="checkbox"${draft.http_strict_parsing ? " checked" : ""}>
-                      <span>${escapeHtml(ctx.t("sites.easy.http.strictParsing"))}</span>
-                    </label>
-                  </div>
+                            <section class="waf-stack waf-service-compact-section${state.activeTab === "httpheaders" ? "" : " waf-hidden"}" data-tab-panel="httpheaders">
+                <div class="waf-antibot-auth-grid">
+                  <section class="waf-subcard">
+                    <div class="waf-card-head">
+                      <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
+                        <h3>${escapeHtml(ctx.t("sites.easy.tab.http.title"))}</h3>
+                        <button class="waf-help-icon-btn" type="button" id="service-http-chapter-help-btn" title="${escapeHtml(ctx.t("sites.help.http.open"))}" aria-label="${escapeHtml(ctx.t("sites.help.http.open"))}">?</button>
+                      </div>
+                    </div>
+                    <div class="waf-card-body">
+                      ${renderHttpChapterHelpModal(ctx, escapeHtml)}
+                      <div class="waf-http-row-1">
+                        ${renderListEditor("allowed_methods", ctx.t("sites.easy.http.allowedMethods"), draft.allowed_methods, "GET", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
+                        <div class="waf-field waf-field-compact-sm">
+                          <label for="service-max-client-size">${escapeHtml(ctx.t("sites.easy.http.maxBodySize"))}</label>
+                          <input id="service-max-client-size" value="${escapeHtml(draft.max_client_size)}">
+                        </div>
+                      </div>
+                      <div class="waf-http-row-2">
+                        ${renderListEditor("ssl_protocols", ctx.t("sites.easy.http.sslProtocols"), draft.ssl_protocols, "TLSv1.3", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
+                      </div>
+                      <hr class="waf-upstream-divider">
+                      <div class="waf-http-row-3">
+                        <label class="waf-checkbox">
+                          <input id="service-http2" type="checkbox"${draft.http2 ? " checked" : ""}>
+                          <span>HTTP2</span>
+                        </label>
+                        <label class="waf-checkbox">
+                          <input id="service-http3" type="checkbox"${draft.http3 ? " checked" : ""}>
+                          <span>HTTP3</span>
+                        </label>
+                        <label class="waf-checkbox">
+                          <input id="service-http-strict-parsing" type="checkbox"${draft.http_strict_parsing ? " checked" : ""}>
+                          <span>${escapeHtml(ctx.t("sites.easy.http.strictParsing"))}</span>
+                        </label>
+                      </div>
+                    </div>
+                  </section>
+                  <section class="waf-subcard">
+                    <div class="waf-card-head">
+                      <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
+                        <h3>${escapeHtml(ctx.t("sites.easy.tab.headers.title"))}</h3>
+                        <button class="waf-help-icon-btn" type="button" id="service-headers-chapter-help-btn" title="${escapeHtml(ctx.t("sites.help.headers.open"))}" aria-label="${escapeHtml(ctx.t("sites.help.headers.open"))}">?</button>
+                      </div>
+                    </div>
+                    <div class="waf-card-body">
+                      ${renderHeadersChapterHelpModal(ctx, escapeHtml)}
+                      <div class="waf-form-grid">
+                        <div class="waf-field">
+                          <label for="service-cookie-flags">${escapeHtml(ctx.t("sites.easy.headers.cookieFlags"))}</label>
+                          <input id="service-cookie-flags" value="${escapeHtml(draft.cookie_flags)}">
+                        </div>
+                        <div class="waf-field">
+                          <label for="service-referrer-policy">${escapeHtml(ctx.t("sites.easy.headers.referrerPolicy"))}</label>
+                          <input id="service-referrer-policy" value="${escapeHtml(draft.referrer_policy)}">
+                        </div>
+                        <label class="waf-checkbox">
+                          <input id="service-hsts-enabled" type="checkbox"${draft.hsts_enabled ? " checked" : ""}>
+                          <span>${escapeHtml(ctx.t("sites.easy.headers.hstsEnabled"))}</span>
+                        </label>
+                        <div class="waf-field">
+                          <label for="service-hsts-max-age">${escapeHtml(ctx.t("sites.easy.headers.hstsMaxAge"))}</label>
+                          <input id="service-hsts-max-age" type="number" min="0" value="${escapeHtml(String(draft.hsts_max_age_seconds || 0))}">
+                        </div>
+                        <label class="waf-checkbox">
+                          <input id="service-hsts-include-subdomains" type="checkbox"${draft.hsts_include_subdomains ? " checked" : ""}>
+                          <span>${escapeHtml(ctx.t("sites.easy.headers.hstsIncludeSubdomains"))}</span>
+                        </label>
+                        <label class="waf-checkbox">
+                          <input id="service-hsts-preload" type="checkbox"${draft.hsts_preload ? " checked" : ""}>
+                          <span>${escapeHtml(ctx.t("sites.easy.headers.hstsPreload"))}</span>
+                        </label>
+                        <div class="waf-field full">
+                          <label for="service-content-security-policy">${escapeHtml(ctx.t("sites.easy.headers.contentSecurityPolicy"))}</label>
+                          <textarea id="service-content-security-policy" rows="3">${escapeHtml(draft.content_security_policy)}</textarea>
+                        </div>
+                        ${renderListEditor("permissions_policy", ctx.t("sites.easy.headers.permissionsPolicy"), draft.permissions_policy, "geolocation=()", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
+                        ${renderListEditor("keep_upstream_headers", ctx.t("sites.easy.headers.keepUpstreamHeaders"), draft.keep_upstream_headers, "X-Forwarded-For", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
+                        <label class="waf-checkbox">
+                          <input id="service-use-cors" type="checkbox"${draft.use_cors ? " checked" : ""}>
+                          <span>${escapeHtml(ctx.t("sites.easy.headers.useCors"))}</span>
+                        </label>
+                        ${renderListEditor("cors_allowed_origins", ctx.t("sites.easy.headers.allowedOrigins"), draft.cors_allowed_origins, "https://app.example.com", { full: false, emptyLabel: ctx.t("sites.easy.noValues") })}
+                      </div>
+                    </div>
+                  </section>
                 </div>
               </section>
 

@@ -107,6 +107,29 @@ export function bindDetailCore(container, state, ctx, deps) {
     render();
   });
 
+  // Checkboxes that enable/disable dependent fields — need re-render
+  [
+    "#service-health-check-enabled",
+    "#service-upstream-mtls-enabled",
+    "#service-mtls-enabled",
+    "#service-use-limit-conn",
+    "#service-use-limit-req",
+    "#service-use-exceptions",
+    "#service-use-allowlist",
+    "#service-use-dnsbl",
+    "#service-use-bad-behavior",
+    "#service-use-blacklist",
+    "#service-use-reverse-proxy",
+    "#service-ban-escalation-enabled",
+    "#service-sni-enabled",
+    "#service-reverse-proxy-ssl-sni",
+  ].forEach((id) => {
+    container.querySelector(id)?.addEventListener("change", () => {
+      syncStateDraftFromForm();
+      render();
+    });
+  });
+
   container.querySelector("#service-settings-search")?.addEventListener("input", (event) => {
     state.settingsSearch = String(event.target.value || "");
     state.highlightedSelector = "";

@@ -69,6 +69,8 @@ export function bindDetailRuleEvents(params) {
   container.querySelector("#service-antibot-help-btn")?.addEventListener("click", () => toggleHelpModal("service-antibot-help-modal", true));
   container.querySelector("#service-traffic-badbehavior-help-btn")?.addEventListener("click", () => toggleHelpModal("service-traffic-badbehavior-help-modal", true));
   container.querySelector("#service-traffic-limits-help-btn")?.addEventListener("click", () => toggleHelpModal("service-traffic-limits-help-modal", true));
+  container.querySelector("#service-traffic-blacklist-help-btn")?.addEventListener("click", () => toggleHelpModal("service-traffic-blacklist-help-modal", true));
+  container.querySelector("#service-traffic-allowlist-help-btn")?.addEventListener("click", () => toggleHelpModal("service-traffic-allowlist-help-modal", true));
   container.querySelector("#service-traffic-dnsbl-help-btn")?.addEventListener("click", () => toggleHelpModal("service-traffic-dnsbl-help-modal", true));
   container.querySelector("#service-upstream-headers-help-btn")?.addEventListener("click", () => toggleHelpModal("service-upstream-headers-help-modal", true));
   container.querySelector("#service-front-chapter-help-btn")?.addEventListener("click", () => toggleHelpModal("service-front-chapter-help-modal", true));
@@ -79,6 +81,12 @@ export function bindDetailRuleEvents(params) {
   container.querySelector("#service-antibot-chapter-help-btn")?.addEventListener("click", () => toggleHelpModal("service-antibot-chapter-help-modal", true));
   container.querySelector("#service-geo-chapter-help-btn")?.addEventListener("click", () => toggleHelpModal("service-geo-chapter-help-modal", true));
   container.querySelector("#service-modsec-chapter-help-btn")?.addEventListener("click", () => toggleHelpModal("service-modsec-chapter-help-modal", true));
+  container.querySelector("#service-websocket-chapter-help-btn")?.addEventListener("click", () => toggleHelpModal("service-websocket-chapter-help-modal", true));
+  container.querySelector("#service-virtualpatches-chapter-help-btn")?.addEventListener("click", () => toggleHelpModal("service-virtualpatches-chapter-help-modal", true));
+  container.querySelector("#service-upstream-mtls-help-btn")?.addEventListener("click", () => toggleHelpModal("service-upstreamMtls-chapter-help-modal", true));
+  container.querySelector("#service-front-main-help-btn")?.addEventListener("click", () => toggleHelpModal("service-front-main-help-modal", true));
+  container.querySelector("#service-front-mtls-help-btn")?.addEventListener("click", () => toggleHelpModal("service-front-mtls-help-modal", true));
+  container.querySelector("#service-traffic-allowlist-help-btn")?.addEventListener("click", () => toggleHelpModal("service-traffic-allowlist-help-modal", true));
   container.querySelectorAll("[data-help-close]").forEach((button) => {
     button.addEventListener("click", () => toggleHelpModal(String(button.dataset.helpClose || ""), false));
   });
