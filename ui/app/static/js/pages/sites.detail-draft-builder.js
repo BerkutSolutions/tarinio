@@ -195,6 +195,7 @@ export function buildDetailDraftFromForm(container, state, deps = {}) {
     ),
     blacklist_country: normalizeStringArray(state.draft.blacklist_country),
     whitelist_country: normalizeStringArray(state.draft.whitelist_country),
+    show_geo_block_page: Boolean(container.querySelector("#service-show-geo-block-page")?.checked),
     geo_time_windows: normalizeGeoTimeWindows(state.draft.geo_time_windows),
     api_positive_security_enabled: Boolean(state.draft.api_positive_security_enabled),
     api_positive_openapi_schema_ref: String(state.draft.api_positive_openapi_schema_ref || "").trim(),

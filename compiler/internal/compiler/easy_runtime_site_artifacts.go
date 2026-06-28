@@ -138,6 +138,7 @@ func renderEasySiteArtifacts(site SiteInput, profile EasyProfileInput) ([]Artifa
 		ExceptionsURI:                profile.ExceptionsURI,
 		BlacklistCountryGuardPattern: blacklistCountryGuardPattern(profile.BlacklistCountry),
 		WhitelistCountryGuardPattern: whitelistCountryGuardPattern(profile.WhitelistCountry),
+		ShowGeoBlockPage:             profile.ShowGeoBlockPage,
 		GeoTimeWindowSnippet:         buildGeoTimeWindowServerSnippet(site.ID, profile.GeoTimeWindows, "$"+siteExceptionVar(site.ID)),
 		WSInspectionSnippet:          buildWSInspectionServerSnippet(site.ID, profile.WSInspection),
 		MTLSSnippet:                  buildMTLSServerSnippet(profile.MTLS),

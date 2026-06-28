@@ -952,6 +952,7 @@ func mapEasyInputs(items []easysiteprofiles.EasySiteProfile, virtualPatches []vi
 
 			BlacklistCountry: item.SecurityCountryPolicy.BlacklistCountry,
 			WhitelistCountry: item.SecurityCountryPolicy.WhitelistCountry,
+			ShowGeoBlockPage: item.SecurityCountryPolicy.ShowGeoBlockPage,
 			GeoTimeWindows:   mapGeoTimeWindows(item.SecurityCountryPolicy.GeoTimeWindows),
 
 			WSInspection: pipeline.WSInspectionInput{

@@ -351,6 +351,7 @@ var englishWordExceptionsQuality = map[string]struct{}{
 	"username":       {},
 	"vault":          {},
 	"virtualpatches": {},
+	"vpn":            {},
 	"waf":            {},
 	"webauthn":       {},
 	"webhook":        {},

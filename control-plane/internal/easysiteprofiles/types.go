@@ -229,6 +229,7 @@ type GeoTimeWindow struct {
 type SecurityCountryPolicySettings struct {
 	BlacklistCountry []string        `json:"blacklist_country"`
 	WhitelistCountry []string        `json:"whitelist_country"`
+	ShowGeoBlockPage bool            `json:"show_geo_block_page"`
 	// GeoTimeWindows adds time-based geo-fencing on top of the static lists.
 	// All windows are evaluated and the first matching one wins.
 	GeoTimeWindows   []GeoTimeWindow `json:"geo_time_windows,omitempty"`

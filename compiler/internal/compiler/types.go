@@ -212,8 +212,9 @@ type EasyProfileInput struct {
 
 	ExceptionsURI []string
 
-	BlacklistCountry []string
-	WhitelistCountry []string
+	BlacklistCountry    []string
+	WhitelistCountry    []string
+	ShowGeoBlockPage    bool
 	// GeoTimeWindows defines time-based geo-fencing rules compiled into nginx.
 	GeoTimeWindows []GeoTimeWindowInput
 

@@ -103,7 +103,7 @@ func TestRenderSiteUpstreamArtifacts_ManifestCompatibleKinds(t *testing.T) {
 		t.Fatalf("render failed: %v", err)
 	}
 
-	expectedArtifacts := 3 + (2 * len(supportedErrorStatusCodes)) // nginx.conf + base.conf + site.conf + per-site/global error pages
+	expectedArtifacts := 4 + (2 * len(supportedErrorStatusCodes)) // nginx.conf + base.conf + site.conf + geo_block.html + per-site/global error pages
 	if len(artifacts) != expectedArtifacts {
 		t.Fatalf("expected %d site/runtime artifacts, got %d", expectedArtifacts, len(artifacts))
 	}

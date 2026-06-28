@@ -130,6 +130,7 @@ export function applyEasyProfileToDraft(draft, profile) {
     auth_basic_session_inactivity_minutes: normalizeAuthSessionTTLMinutes(authBasic.session_inactivity_minutes ?? draft.auth_basic_session_inactivity_minutes),
     blacklist_country: normalizeStringArray(country.blacklist_country),
     whitelist_country: normalizeStringArray(country.whitelist_country),
+    show_geo_block_page: Boolean(country.show_geo_block_page ?? draft.show_geo_block_page),
     geo_time_windows: normalizeGeoTimeWindows(country.geo_time_windows || draft.geo_time_windows),
     api_positive_security_enabled: Boolean(apiPositive.use_api_positive_security ?? draft.api_positive_security_enabled),
     api_positive_openapi_schema_ref: String(apiPositive.openapi_schema_ref || draft.api_positive_openapi_schema_ref),

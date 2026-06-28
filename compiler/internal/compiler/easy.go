@@ -81,6 +81,7 @@ type easySiteData struct {
 
 	BlacklistCountryGuardPattern string
 	WhitelistCountryGuardPattern string
+	ShowGeoBlockPage             bool
 	GeoTimeWindowSnippet         string // server-context if-guards
 	WSInspectionSnippet          string // server-context WS inspection Lua block
 	MTLSSnippet                  string // server-context mTLS directives (TASK-8.1)

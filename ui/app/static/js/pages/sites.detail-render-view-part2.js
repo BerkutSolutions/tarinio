@@ -349,6 +349,10 @@ export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
                 </div>
                 ${renderGeoChapterHelpModal(ctx, escapeHtml)}
                 <div class="waf-form-grid">
+                  <label class="waf-checkbox full">
+                    <input id="service-show-geo-block-page" type="checkbox"${draft.show_geo_block_page ? " checked" : ""}>
+                    <span>${escapeHtml(ctx.t("sites.easy.geo.showGeoBlockPage"))}</span>
+                  </label>
                   ${renderCountryEditor("blacklist_country", ctx.t("sites.easy.geo.countryBlacklist"), draft.blacklist_country, state.geoCatalog, { full: false, emptyLabel: ctx.t("sites.easy.noValues"), search: state.countryFilters.blacklist_country, ctx })}
                   ${renderCountryEditor("whitelist_country", ctx.t("sites.easy.geo.countryWhitelist"), draft.whitelist_country, state.geoCatalog, { full: false, emptyLabel: ctx.t("sites.easy.noValues"), search: state.countryFilters.whitelist_country, ctx })}
                   ${renderGeoTimeWindowsEditor(draft.geo_time_windows, state.geoCatalog, ctx)}

@@ -39,6 +39,7 @@ server {
     error_page 408 /__waf_errors/{{ .SiteID }}/408.html?rid=$request_id&ip=$remote_addr&ts=$msec;
     error_page 421 /__waf_errors/{{ .SiteID }}/421.html?rid=$request_id&ip=$remote_addr&ts=$msec;
     error_page 429 /__waf_errors/{{ .SiteID }}/429.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+    error_page 451 /__waf_errors/_global/geo_block.html?rid=$request_id&ip=$remote_addr&ts=$msec&cc=$waf_country_code;
     error_page 500 /__waf_errors/{{ .SiteID }}/500.html?rid=$request_id&ip=$remote_addr&ts=$msec;
     error_page 502 /__waf_errors/{{ .SiteID }}/502.html?rid=$request_id&ip=$remote_addr&ts=$msec;
     error_page 503 /__waf_errors/{{ .SiteID }}/503.html?rid=$request_id&ip=$remote_addr&ts=$msec;
@@ -96,6 +97,12 @@ server {
         alias /etc/waf/errors/{{ .SiteID }}/429.html;
     }
 
+    location = /__waf_errors/_global/geo_block.html {
+        internal;
+        allow all;
+        alias /etc/waf/errors/_global/geo_block.html;
+    }
+
     location = /__waf_errors/{{ .SiteID }}/500.html {
         internal;
         allow all;
@@ -138,6 +145,15 @@ server {
         include /etc/waf/nginx/easy/{{ .SiteID }}.conf;
         proxy_pass {{ .ProxyPassTarget }};
     }
+
+{{- if .IsManagementSite }}
+    location = /preview/geo-block {
+        allow all;
+        modsecurity off;
+        default_type text/html;
+        alias /etc/waf/errors/_global/geo_block.html;
+    }
+{{- end }}
 
     location ^~ /api/ {
         proxy_intercept_errors off;

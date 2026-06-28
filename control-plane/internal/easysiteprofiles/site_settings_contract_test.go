@@ -115,6 +115,7 @@ func TestSiteSettings_FieldContract(t *testing.T) {
 		"security_behavior_and_limits.use_limit_req",
 		"security_country_policy.blacklist_country",
 		"security_country_policy.whitelist_country",
+		"security_country_policy.show_geo_block_page",
 		"security_country_policy.geo_time_windows.action",
 		"security_country_policy.geo_time_windows.countries",
 		"security_country_policy.geo_time_windows.days_of_week",

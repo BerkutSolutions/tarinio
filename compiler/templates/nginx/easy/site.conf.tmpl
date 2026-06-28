@@ -183,12 +183,20 @@ if ($waf_blacklist_uri_guard ~* "^0:.*{{ . }}") { return 403; }
 
 {{- if .WhitelistCountryGuardPattern }}
 set $waf_country_guard "$waf_easy_exception_guard:$waf_country_code";
+{{- if .ShowGeoBlockPage }}
+if ($waf_country_guard !~ "{{ .WhitelistCountryGuardPattern }}") { return 451; }
+{{- else }}
 if ($waf_country_guard !~ "{{ .WhitelistCountryGuardPattern }}") { return 403; }
+{{- end }}
 {{- end }}
 
 {{- if .BlacklistCountryGuardPattern }}
 set $waf_country_guard "$waf_easy_exception_guard:$waf_country_code";
+{{- if .ShowGeoBlockPage }}
+if ($waf_country_guard ~ "{{ .BlacklistCountryGuardPattern }}") { return 451; }
+{{- else }}
 if ($waf_country_guard ~ "{{ .BlacklistCountryGuardPattern }}") { return 403; }
+{{- end }}
 {{- end }}
 
 {{- if .GeoTimeWindowSnippet }}

@@ -182,6 +182,7 @@ export function draftToEasyProfilePart2(draft, deps) {
     security_country_policy: {
       blacklist_country: draft.blacklist_country,
       whitelist_country: draft.whitelist_country,
+      show_geo_block_page: draft.show_geo_block_page,
       geo_time_windows: deps.normalizeGeoTimeWindows(draft.geo_time_windows)
     },
     security_api_positive: {

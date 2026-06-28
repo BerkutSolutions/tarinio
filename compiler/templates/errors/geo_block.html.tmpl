@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Access Restricted by Location</title>
+  <style>
+    :root { color-scheme: dark; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 12px;
+      background: radial-gradient(ellipse at top, #1a1a2e 0%, #0d0d1a 55%, #060610 100%);
+      color: #dde4f5;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      padding: 24px 16px;
+    }
+    .card {
+      width: min(520px, 100%);
+      border: 1px solid #2e3a5c;
+      border-radius: 16px;
+      background: linear-gradient(160deg, #151929 0%, #0e1420 100%);
+      box-shadow: 0 20px 48px rgba(0,0,0,.45), 0 0 0 1px rgba(80,120,200,.08);
+      overflow: hidden;
+    }
+    .card-header {
+      padding: 20px 22px 18px;
+      border-bottom: 1px solid #1e2a45;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .icon-box {
+      width: 44px;
+      height: 44px;
+      flex-shrink: 0;
+      border-radius: 11px;
+      background: linear-gradient(135deg, #1e2f50, #162240);
+      border: 1px solid #2e4070;
+      display: grid;
+      place-items: center;
+    }
+    .icon-box svg { width: 22px; height: 22px; display: block; }
+    .card-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #e8eeff;
+      line-height: 1.3;
+    }
+    .card-subtitle {
+      margin-top: 4px;
+      font-size: 13px;
+      color: #8a9bbf;
+      line-height: 1.45;
+    }
+    .card-body { padding: 16px 22px 20px; }
+    .steps-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #5b7fc4;
+      text-transform: uppercase;
+      letter-spacing: .09em;
+      margin-bottom: 10px;
+    }
+    .steps { display: flex; flex-direction: column; gap: 8px; }
+    .step {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      background: rgba(255,255,255,.028);
+      border: 1px solid rgba(255,255,255,.055);
+    }
+    .step-num { width: 26px; height: 26px; flex-shrink: 0; }
+    .step-num svg { display: block; }
+    .step-label { font-size: 14px; font-weight: 500; color: #ccd6f0; }
+    .step-desc { margin-top: 2px; font-size: 12px; color: #6e80a8; line-height: 1.45; }
+    /* Meta info block */
+    .meta-block {
+      width: min(520px, 100%);
+      border: 1px solid #1e2a45;
+      border-radius: 12px;
+      background: rgba(10,14,26,.6);
+      padding: 12px 18px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 16px;
+    }
+    .meta-row { display: flex; flex-direction: column; gap: 2px; }
+    .meta-label {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: #3a5080;
+    }
+    .meta-value {
+      font-size: 12px;
+      color: #7090b8;
+      font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+      word-break: break-all;
+    }
+    .meta-row.full { grid-column: 1 / -1; }
+    .footer {
+      font-size: 12px;
+      color: rgba(140,160,210,.45);
+      text-align: center;
+    }
+    .footer a { color: rgba(160,185,240,.6); text-decoration: none; border-bottom: 1px solid rgba(160,185,240,.18); }
+    .footer a:hover { border-bottom-color: rgba(160,185,240,.45); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="card-header">
+      <div class="icon-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#6c9adf" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+        </svg>
+      </div>
+      <div>
+        <div class="card-title" id="card-title">Access Restricted by Location</div>
+        <div class="card-subtitle" id="card-subtitle">This service is not available from your current network or region.</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="steps-title" id="steps-title">What you can try</div>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">
+            <svg viewBox="0 0 26 26" width="26" height="26">
+              <circle cx="13" cy="13" r="12" fill="#1a2c55" stroke="#2e4a8a" stroke-width="1"/>
+              <text x="13" y="13" text-anchor="middle" dominant-baseline="central" fill="#8aacdf" font-size="10" font-weight="700" font-family="system-ui,sans-serif">1</text>
+            </svg>
+          </div>
+          <div>
+            <div class="step-label" id="step1-label">Disable VPN</div>
+            <div class="step-desc" id="step1-desc">If a VPN is active on your device, turn it off and reload the page.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">
+            <svg viewBox="0 0 26 26" width="26" height="26">
+              <circle cx="13" cy="13" r="12" fill="#1a2c55" stroke="#2e4a8a" stroke-width="1"/>
+              <text x="13" y="13" text-anchor="middle" dominant-baseline="central" fill="#8aacdf" font-size="10" font-weight="700" font-family="system-ui,sans-serif">2</text>
+            </svg>
+          </div>
+          <div>
+            <div class="step-label" id="step2-label">Switch Wi-Fi network</div>
+            <div class="step-desc" id="step2-desc">If VPN is configured on your router, try a different network.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">
+            <svg viewBox="0 0 26 26" width="26" height="26">
+              <circle cx="13" cy="13" r="12" fill="#1a2c55" stroke="#2e4a8a" stroke-width="1"/>
+              <text x="13" y="13" text-anchor="middle" dominant-baseline="central" fill="#8aacdf" font-size="10" font-weight="700" font-family="system-ui,sans-serif">3</text>
+            </svg>
+          </div>
+          <div>
+            <div class="step-label" id="step3-label">Contact support</div>
+            <div class="step-desc" id="step3-desc">If you believe access should be allowed, contact the site administrator.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="meta-block">
+    <div class="meta-row">
+      <div class="meta-label" id="meta-time-label">Time</div>
+      <div class="meta-value" id="meta-time">—</div>
+    </div>
+    <div class="meta-row">
+      <div class="meta-label" id="meta-ip-label">Your IP</div>
+      <div class="meta-value" id="meta-ip">—</div>
+    </div>
+    <div class="meta-row">
+      <div class="meta-label" id="meta-country-label">Country</div>
+      <div class="meta-value" id="meta-country">—</div>
+    </div>
+    <div class="meta-row">
+      <div class="meta-label" id="meta-rid-label">Request ID</div>
+      <div class="meta-value" id="meta-rid">—</div>
+    </div>
+  </div>
+
+  <p class="footer"><a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener noreferrer">Secured by Tarinio</a></p>
+
+  <script>
+    (function () {
+      var messages = {
+        en: {
+          title:        "Access Restricted by Location",
+          subtitle:     "This service is not available from your current network or region.",
+          stepsTitle:   "What you can try",
+          step1Label:   "Disable VPN",
+          step1Desc:    "If a VPN is active on your device, turn it off and reload the page.",
+          step2Label:   "Switch Wi-Fi network",
+          step2Desc:    "If VPN is configured on your router, try a different network.",
+          step3Label:   "Contact support",
+          step3Desc:    "If you believe access should be allowed, contact the site administrator.",
+          metaTime:     "Time",
+          metaIp:       "Your IP",
+          metaCountry:  "Country",
+          metaRid:      "Request ID"
+        },
+        ru: {
+          title:        "Доступ ограничен по местоположению",
+          subtitle:     "Похоже, вы используете VPN или находитесь в регионе с ограниченным доступом.",
+          stepsTitle:   "Что можно сделать",
+          step1Label:   "Отключить VPN",
+          step1Desc:    "Если VPN активен на вашем устройстве — отключите его и обновите страницу.",
+          step2Label:   "Выбрать другую сеть Wi-Fi",
+          step2Desc:    "Если VPN настроен на роутере, попробуйте подключиться через другую сеть.",
+          step3Label:   "Обратиться к администратору",
+          step3Desc:    "Если вы считаете, что доступ должен быть разрешён, свяжитесь с администратором сайта.",
+          metaTime:     "Время",
+          metaIp:       "Ваш IP",
+          metaCountry:  "Страна",
+          metaRid:      "ID запроса"
+        },
+        de: {
+          title:        "Zugang nach Standort gesperrt",
+          subtitle:     "Dieser Dienst ist aus Ihrer aktuellen Region oder über VPN nicht verfügbar.",
+          stepsTitle:   "Mögliche Lösungen",
+          step1Label:   "VPN deaktivieren",
+          step1Desc:    "Falls ein VPN auf Ihrem Gerät aktiv ist, deaktivieren Sie es und laden Sie die Seite neu.",
+          step2Label:   "WLAN-Netzwerk wechseln",
+          step2Desc:    "Falls VPN auf Ihrem Router konfiguriert ist, versuchen Sie ein anderes Netzwerk.",
+          step3Label:   "Support kontaktieren",
+          step3Desc:    "Falls Sie glauben, dass der Zugang erlaubt sein sollte, wenden Sie sich an den Administrator.",
+          metaTime:     "Zeit",
+          metaIp:       "Ihre IP",
+          metaCountry:  "Land",
+          metaRid:      "Anfrage-ID"
+        }
+      };
+
+      /* Detect language */
+      var candidates = [];
+      try {
+        if (Array.isArray(navigator.languages)) candidates = candidates.concat(navigator.languages);
+        if (navigator.language) candidates.push(navigator.language);
+      } catch (_e) {}
+      var lang = "en";
+      for (var i = 0; i < candidates.length; i++) {
+        var code = String(candidates[i] || "").toLowerCase().split(/[-_]/)[0];
+        if (messages[code]) { lang = code; break; }
+      }
+      var m = messages[lang] || messages.en;
+      document.documentElement.lang = lang;
+      document.title = m.title;
+
+      /* Apply translations */
+      var textMap = {
+        "card-title":    m.title,
+        "card-subtitle": m.subtitle,
+        "steps-title":   m.stepsTitle,
+        "step1-label":   m.step1Label,
+        "step1-desc":    m.step1Desc,
+        "step2-label":   m.step2Label,
+        "step2-desc":    m.step2Desc,
+        "step3-label":   m.step3Label,
+        "step3-desc":    m.step3Desc,
+        "meta-time-label":    m.metaTime,
+        "meta-ip-label":      m.metaIp,
+        "meta-country-label": m.metaCountry,
+        "meta-rid-label":     m.metaRid
+      };
+      Object.keys(textMap).forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.textContent = textMap[id];
+      });
+
+      /* Read meta from query string + Server-Timing fallback */
+      function readServerTiming(name) {
+        try {
+          var entries = performance.getEntriesByType("navigation");
+          if (!entries || !entries.length) return "";
+          var nav = entries[0];
+          if (!nav.serverTiming) return "";
+          for (var i = 0; i < nav.serverTiming.length; i++) {
+            if (nav.serverTiming[i].name === name) return nav.serverTiming[i].description || "";
+          }
+        } catch (_e) {}
+        return "";
+      }
+
+      var params = new URLSearchParams(window.location.search || "");
+      var rid     = params.get("rid") || readServerTiming("rid") || "n/a";
+      var ip      = params.get("ip")  || readServerTiming("ip")  || "n/a";
+      var rawTs   = params.get("ts")  || readServerTiming("ts");
+      var cc      = params.get("cc")  || "";
+
+      /* Format timestamp */
+      var timeStr = "n/a";
+      if (rawTs) {
+        var ms = Number(rawTs) * 1000;
+        if (!isNaN(ms) && isFinite(ms)) {
+          try {
+            timeStr = new Intl.DateTimeFormat(lang, {
+              dateStyle: "medium",
+              timeStyle: "medium"
+            }).format(new Date(ms));
+          } catch (_e) { timeStr = new Date(ms).toISOString(); }
+        }
+      }
+
+      /* Country name */
+      var countryStr = cc || "n/a";
+      if (cc && cc !== "n/a" && cc.length === 2) {
+        try {
+          var regionNames = new Intl.DisplayNames([lang, "en"], { type: "region" });
+          var name = regionNames.of(cc.toUpperCase());
+          if (name) countryStr = name + " (" + cc.toUpperCase() + ")";
+        } catch (_e) {}
+      }
+
+      document.getElementById("meta-time").textContent    = timeStr;
+      document.getElementById("meta-ip").textContent      = ip;
+      document.getElementById("meta-country").textContent = countryStr;
+      document.getElementById("meta-rid").textContent     = rid;
+    })();
+  </script>
+</body>
+</html>

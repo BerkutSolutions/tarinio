@@ -104,6 +104,13 @@ func RenderSiteUpstreamArtifacts(sites []SiteInput, upstreams []UpstreamInput) (
 	}
 	artifacts = append(artifacts, globalErrorArtifacts...)
 
+	// geo_block.html — shared page for HTTP 451 geo-restriction responses
+	geoBlockPage, err := renderTemplate(filepath.Join(templatesRoot(), "..", "errors", "geo_block.html.tmpl"), nil)
+	if err != nil {
+		return nil, fmt.Errorf("render geo block page: %w", err)
+	}
+	artifacts = append(artifacts, newArtifact("errors/_global/geo_block.html", ArtifactKindNginxConfig, geoBlockPage))
+
 	for _, site := range sortedSites {
 		if !site.Enabled {
 			continue

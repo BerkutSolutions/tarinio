@@ -103,6 +103,7 @@ export const renderAntibotChapterHelpModal = makeChapterRenderer({
 export const renderGeoChapterHelpModal = makeChapterRenderer({
   chapter: "geo",
   rowKeys: [
+    "showGeoBlockPage",
     "blacklist",
     "whitelist",
     "groups",

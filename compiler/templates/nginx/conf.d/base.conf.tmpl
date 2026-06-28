@@ -164,6 +164,12 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
     }
 
+    location = /preview/geo-block {
+        allow all;
+        default_type text/html;
+        alias /etc/waf/errors/_global/geo_block.html;
+    }
+
     location / {
         return 308 https://$host$request_uri;
     }
