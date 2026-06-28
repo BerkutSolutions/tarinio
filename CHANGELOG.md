@@ -1,49 +1,38 @@
-## [1.4.1] - 27.06.2026
+## [1.4.2] - 28.06.2026
 
-### UI — Редактор сервиса: вкладки и компоновка
+### Ядро
 
-- **Вкладки "Основной фронт" и "mTLS (входящий)"** объединены в одну вкладку "Фронт" с двумя блоками внутри (`waf-antibot-auth-grid`). Каждый блок имеет собственную кнопку `?` со справкой.
-- **Вкладки "TLS" и "mTLS (входящий)"** перенесены и реструктурированы внутри объединённой вкладки "Фронт".
-- **Вкладки "HTTP и заголовки"** — добавлены отдельные кнопки справки для каждого блока (HTTP и Заголовки), добавлена справка mTLS upstream.
-- **Вкладка Upstream** — применён класс `waf-service-compact-section`, унифицированы отступы и компоновка полей.
-- **Навигация визарда (`renderWizardNav`)** — обновлён список вкладок под новую структуру.
-- **Модалки справки** — добавлены `renderHeadersChapterHelpModal`, `renderFrontMainHelpModal`, `renderFrontMtlsHelpModal`, `renderTrafficAllowlistHelpModal`, `renderUpstreamMtlsChapterHelpModal`; зарегистрированы в deps и events.
-
-### UI — Контроль трафика
-
-- **Кастомные лимиты запросов — кнопка "Добавить правило":** исправлена критическая ошибка — кнопка была всегда заблокирована из-за несовпадения сигнатуры `renderCustomLimitRulesEditor` в `stable-renderers.js`. Объект `deps` попадал в параметр `disabled` как truthy объект. Исправлена сигнатура на `(rules, ctx, deps, disabled)` и передача `normalizeArray` в `normalizeCustomLimitRules`.
-- **Delegation add/remove кастомных лимитов:** вынесено в `page-render-runtime.js` один раз до `await load()` — устраняет накопление дублирующих listeners при каждом `render()`.
-- **Кастомные лимиты — поле rate:** добавлено разделение на числовое поле + выпадающий `r/s` / `r/m`; значение хранится как `"10r/s"` или `"20r/m"`.
-- **Белые списки → поле исключений:** чекбокс "Включить исключения" убран. Поле исключений IP активно автоматически при включённом `use_allowlist`.
-- **Белые списки — подсказка:** убран текст "Белые списки отключены: значения не будут применены, пока переключатель не включен."
-- **Плохое поведение — выпадающий список статус-кодов:** добавлена поддержка `disabled` в `renderStatusCodesEditor` (`list-renderers.js`) — список и чекбоксы затемняются при выключенном `use_bad_behavior`.
-- **Плохое поведение — метка чекбокса:** "Активировать" → "Активировать защиту от плохого поведения".
-- **Чёрные списки — disabled-состояние:** URL-поля внешних списков (IP, rDNS, ASN, User-Agent, URI), а также аккордеоны быстрых шаблонов теперь затемняются при выключенном `use_blacklist`.
-- **Чёрные списки — убран лишний текст:** удалена строка "Политика доступа задаётся для каждого сервиса. Поддерживайте здесь явные разрешающие и запрещающие записи."
-- **JA3 — удалено из UI:** поля `blacklist_ja3` и `blacklist_ja3_urls` убраны из интерфейса — nginx 1.22.1 + debian modsecurity несовместимы с JA3 модулем. Данные сохраняются в модели, оставлены `TODO(ja3)` комментарии для последующего восстановления.
-
-### UI — CSS
-
-- **Новые классы компактных полей:** добавлены `waf-field-compact-xs` (78px), `waf-field-compact-sm` (140px), `waf-field-compact-md` (220px) для inline-компоновки полей upstream и rate.
-- **Класс `waf-service-compact-section`:** стандартизированные отступы для компактных секций редактора.
-- **Прочие стилевые правки:** унификация `waf-antibot-auth-grid`, `waf-subcard`, разделителей между логическими группами.
-
-### Ядро — JA3
-
-- **Компилятор:** убраны nginx-директивы `$ssl_ja3_hash` и `$ssl_ja3` из шаблонов `site.conf.tmpl` и `base.conf.tmpl` — модуль несовместим с debian modsecurity в nginx 1.22.1.
-- **Тесты компилятора (`easy_ja3_blacklist_test.go`):** переписаны под новое поведение — проверяется отсутствие `ssl_ja3` в конфиге вместо его наличия. Добавлен комментарий с объяснением причины.
-
-### Переводы
-
-- Обновлён ключ `sites.easy.traffic.activateBadBehavior` на всех 5 языках (ru, en, de, sr, zh): полное название вместо одного слова.
-- Добавлены ключи для новых справочных модалок и объединённых вкладок на всех 5 языках.
+- Добавлено поле `exceptions_uri` в профиль сайта — список URI-путей, которые исключаются из проверки WAF (antibot, rate limit, escalation) независимо от IP клиента. Компилятор генерирует nginx-директивы `if ($uri ~* "...")` устанавливающие `$waf_easy_exception_guard=1`.
 
 ### UI
 
-- **Вкладки редактора сервиса:** вкладки "Общие HTTP" и "HTTP-заголовки" объединены в одну "HTTP и заголовки" с двумя блоками внутри (по образцу "Антибот и Аутентификация"). Каждый блок имеет отдельную кнопку `?` со справкой.
-- **Upstream "Цель и параметры":** убран разнобой, поля расставлены по явным строкам. Убрано дублирующее поле `http://host:port` (автовычисляется). Добавлен знак `?` в заголовок блока. Разделители между логическими группами (keepalive/websocket, health check, SSL SNI).
-- **Upstream mTLS:** исправлено открытие модалки справки (несоответствие camelCase в ID).
-- **Blacklist:** исправлено открытие модалки справки (кнопка не была зарегистрирована в events-rules).
-- **Кнопка "+" в list editor:** кнопка добавления теперь находится внутри текстового поля справа, появляется только при наличии текста, отделена вертикальным разделителем.
-- **Enter в list editor:** нажатие Enter в поле списка добавляет значение вместо отправки формы.
-- **Вкладка "Общие HTTP":** убран `waf-form-grid`, поля расставлены по строкам — методы + размер body, протоколы SSL, чекбоксы версий с разделителем.
+- В блок «Белые списки и исключения» добавлено поле «Исключения по URI» — позволяет указать пути (например `/healthz`, `/metrics`) которые всегда пропускаются без проверки.
+- Исправлена подсказка к переключателю «Активировать белые списки» — теперь корректно поясняет что исключения по IP и URI работают независимо от этого флага.
+- Переименованы метки: «Исключения» → «Исключения по IP» во всех 5 локалях для однозначности.
+
+### Локализация
+
+- Добавлен ключ `sites.easy.traffic.exceptionsUri` на всех 5 языках (ru, en, de, sr, zh).
+- Исправлен ключ `sites.help.traffic.allowlist.activate.usage` на всех 5 языках.
+
+### Тесты
+
+- Написано 157 тестов по всем 10 вкладкам UI — полное покрытие компилятора и control-plane:
+  - `tab01_front_test.go` (19) — HSTS, AllowedMethods, MaxClientSize, HttpStrictParsing, входящий mTLS, SecurityMode
+  - `tab02_upstream_test.go` (20) — PassHostHeader+CustomHost, SSL SNI, WebSocket, Keepalive, X-Forwarded-*, HealthCheck, upstream mTLS
+  - `tab03_headers_test.go` (18) — ReferrerPolicy, CSP, PermissionsPolicy, CORS, CookieFlags → `proxy_cookie_flags`, KeepUpstreamHeaders → `proxy_pass_header`
+  - `tab04_traffic_test.go` (24) — BlacklistIP/UA/URI/Country, WhitelistCountry, ExceptionsURI, LimitConn/LimitReq → `l4guard/config.json`, BadBehavior
+  - `tab05_ban_escalation_test.go` (16) — нормализация scope/stages, валидация (пустые stages, >12, отрицательные, permanent не последний)
+  - `tab06_antibot_test.go` (14) — javascript/recaptcha/hcaptcha/turnstile, ScannerAutoBan, ExclusionRules, CookieGuard, ChallengeEscalation
+  - `tab07_geo_test.go` (16) — GeoTimeWindow snippet, block/allow action, hour range, days of week, HTTP map-артефакт `nginx/geo-timewindow/<id>.conf`, валидация
+  - `tab08_modsec_test.go` (9) — UseModSecurity артефакт, `modsecurity_rules_file`, CRS версия, плагины, custom content
+  - `tab09_websocket_test.go` (11) — WSInspection Lua-snippet, WSBlockPatterns, WSMaxMessageBytes, WSRateMsgPerSec, нормализация/валидация
+  - `tab10_virtualpatches_test.go` (10) — SecRule block/monitor по uri/body/header, patch ID в msg, интеграция в modsec артефакт
+- Все 157 тестов зелёные: `ok waf/compiler/internal/compiler`, `ok waf/control-plane/internal/easysiteprofiles`
+- Добавлен preflight в `scripts/release.sh` — все tab-тесты запускаются до `go test ./...` и до меню выбора версии; падение прерывает релиз с кодом 1
+- Добавлено правило в `.work/PROMT.md`: новая фича UI → обязательный тест `tab0X_*_test.go` в том же PR
+
+### Документация
+
+- Создан `docs/test-coverage-ru.md` — полный отчёт по покрытию тестами на русском языке: таблицы тестов по каждой вкладке, команды запуска, архитектурные выводы подтверждённые тестами
+- Создан `docs/test-coverage-en.md` — зеркальный документ на английском языке

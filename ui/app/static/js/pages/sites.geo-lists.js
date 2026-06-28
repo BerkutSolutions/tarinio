@@ -114,7 +114,7 @@ export function getQuickListTemplates(field) {
 
 export const LIST_FIELD_SET = new Set([
   "allowed_methods", "ssl_protocols", "permissions_policy", "keep_upstream_headers", "cors_allowed_origins",
-  "access_allowlist", "exceptions_ip", "access_denylist", "blacklist_ip", "blacklist_rdns", "blacklist_asn",
+  "access_allowlist", "exceptions_ip", "exceptions_uri", "access_denylist", "blacklist_ip", "blacklist_rdns", "blacklist_asn",
   "blacklist_user_agent", "blacklist_uri", "blacklist_ja3", "blacklist_ip_urls", "blacklist_rdns_urls", "blacklist_asn_urls",
   "blacklist_user_agent_urls", "blacklist_uri_urls", "blacklist_ja3_urls", "blacklist_country", "whitelist_country", "modsecurity_crs_plugins"
 ]);
@@ -143,6 +143,7 @@ export const SETTINGS_SEARCH_INDEX = [
   { id: "permissions_policy", tab: "headers", selector: "#list-input-permissions_policy", labelKey: "sites.easy.headers.permissionsPolicy" },
   { id: "access_allowlist", tab: "traffic", selector: "#list-input-access_allowlist", labelKey: "sites.lists.allowlist" },
   { id: "exceptions_ip", tab: "traffic", selector: "#list-input-exceptions_ip", labelKey: "sites.easy.traffic.exceptions" },
+  { id: "exceptions_uri", tab: "traffic", selector: "#list-input-exceptions_uri", labelKey: "sites.easy.traffic.exceptionsUri" },
   { id: "access_denylist", tab: "traffic", selector: "#list-input-access_denylist", labelKey: "sites.lists.denylist" },
   { id: "use_blacklist", tab: "traffic", selector: "#service-use-blacklist", labelKey: "sites.easy.traffic.activateBlacklisting" },
   { id: "blacklist_ja3", tab: "traffic", selector: "#list-input-blacklist_ja3", labelKey: "sites.easy.traffic.blacklistJa3" },

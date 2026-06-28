@@ -210,6 +210,8 @@ type EasyProfileInput struct {
 	BlacklistJA3       []string
 	BlacklistJA3URLs   []string
 
+	ExceptionsURI []string
+
 	BlacklistCountry []string
 	WhitelistCountry []string
 	// GeoTimeWindows defines time-based geo-fencing rules compiled into nginx.
@@ -222,6 +224,9 @@ type EasyProfileInput struct {
 	ModSecurityCRSPlugins             []string
 	ModSecurityCustomPath             string
 	ModSecurityCustomContent          string
+
+	CookieFlags         string
+	KeepUpstreamHeaders []string
 
 	UseAPIPositiveSecurity bool
 	OpenAPISchemaRef       string

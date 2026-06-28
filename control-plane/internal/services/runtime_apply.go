@@ -893,6 +893,8 @@ func mapEasyInputs(items []easysiteprofiles.EasySiteProfile, virtualPatches []vi
 			HSTSPreload:           item.HTTPHeaders.HSTSPreload,
 			UseCORS:               item.HTTPHeaders.UseCORS,
 			CORSAllowedOrigins:    item.HTTPHeaders.CORSAllowedOrigins,
+			CookieFlags:           item.HTTPHeaders.CookieFlags,
+			KeepUpstreamHeaders:   item.HTTPHeaders.KeepUpstreamHeaders,
 
 			ReverseProxyCustomHost: item.UpstreamRouting.ReverseProxyCustomHost,
 			ReverseProxySSLSNI:     item.UpstreamRouting.ReverseProxySSLSNI,
@@ -945,6 +947,8 @@ func mapEasyInputs(items []easysiteprofiles.EasySiteProfile, virtualPatches []vi
 			BlacklistIP:        item.SecurityBehaviorAndLimits.BlacklistIP,
 			BlacklistUserAgent: item.SecurityBehaviorAndLimits.BlacklistUserAgent,
 			BlacklistURI:       item.SecurityBehaviorAndLimits.BlacklistURI,
+
+			ExceptionsURI: append([]string(nil), item.SecurityBehaviorAndLimits.ExceptionsURI...),
 
 			BlacklistCountry: item.SecurityCountryPolicy.BlacklistCountry,
 			WhitelistCountry: item.SecurityCountryPolicy.WhitelistCountry,

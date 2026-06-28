@@ -28,7 +28,7 @@ export function defaultSiteDraft() {
     max_client_size: "100m", http2: true, http3: false, ssl_protocols: ["TLSv1.2", "TLSv1.3"], http_strict_parsing: false, cookie_flags: "* SameSite=Lax",
     content_security_policy: "", permissions_policy: [], keep_upstream_headers: ["*"], referrer_policy: "no-referrer-when-downgrade",
     hsts_enabled: true, hsts_max_age_seconds: 15552000, hsts_include_subdomains: false, hsts_preload: false, use_cors: false, cors_allowed_origins: ["*"],
-    use_allowlist: false, use_exceptions: false, access_allowlist: [], exceptions_ip: [], access_denylist: [], use_bad_behavior: true, bad_behavior_status_codes: [400, 401, 405, 444],
+    use_allowlist: false, use_exceptions: false, access_allowlist: [], exceptions_ip: [], exceptions_uri: [], access_denylist: [], use_bad_behavior: true, bad_behavior_status_codes: [400, 401, 405, 444],
     bad_behavior_ban_time_seconds: 300, bad_behavior_threshold: 120, bad_behavior_count_time_seconds: 120, ban_escalation_enabled: false, ban_escalation_scope: "all_sites",
     ban_escalation_stages_seconds: [300, 86400, 0], use_blacklist: false, use_dnsbl: false, blacklist_ip: [], blacklist_rdns: [], blacklist_asn: [], blacklist_user_agent: [],
     blacklist_uri: [], blacklist_ip_urls: [], blacklist_rdns_urls: [], blacklist_asn_urls: [], blacklist_user_agent_urls: [], blacklist_uri_urls: [], blacklist_ja3: [], blacklist_ja3_urls: [], use_limit_conn: true,
@@ -94,7 +94,7 @@ export function draftToEasyProfile(draft) {
     security_behavior_and_limits: {
       use_bad_behavior: draft.use_bad_behavior, bad_behavior_status_codes: draft.bad_behavior_status_codes, bad_behavior_ban_time_seconds: draft.bad_behavior_ban_time_seconds,
       bad_behavior_threshold: draft.bad_behavior_threshold, bad_behavior_count_time_seconds: draft.bad_behavior_count_time_seconds, ban_escalation_enabled: draft.ban_escalation_enabled,
-      ban_escalation_scope: banEscalationScope, ban_escalation_stages_seconds: banEscalationStages, use_exceptions: draft.use_exceptions, exceptions_ip: draft.exceptions_ip,
+      ban_escalation_scope: banEscalationScope, ban_escalation_stages_seconds: banEscalationStages, use_exceptions: draft.use_exceptions, exceptions_ip: draft.exceptions_ip, exceptions_uri: draft.exceptions_uri,
       use_blacklist: draft.use_blacklist, use_dnsbl: draft.use_dnsbl, blacklist_ip: draft.blacklist_ip, blacklist_rdns: draft.blacklist_rdns, blacklist_asn: draft.blacklist_asn,
       blacklist_user_agent: draft.blacklist_user_agent, blacklist_uri: draft.blacklist_uri, blacklist_ip_urls: draft.blacklist_ip_urls, blacklist_rdns_urls: draft.blacklist_rdns_urls,
       blacklist_asn_urls: draft.blacklist_asn_urls, blacklist_user_agent_urls: draft.blacklist_user_agent_urls, blacklist_uri_urls: draft.blacklist_uri_urls, use_limit_conn: draft.use_limit_conn,

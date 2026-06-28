@@ -128,6 +128,7 @@ type SecurityBehaviorAndLimitsSettings struct {
 	UseBlacklist           bool     `json:"use_blacklist"`
 	UseExceptions          bool     `json:"use_exceptions"`
 	ExceptionsIP           []string `json:"exceptions_ip"`
+	ExceptionsURI          []string `json:"exceptions_uri"`
 	UseDNSBL               bool     `json:"use_dnsbl"`
 	BlacklistIP            []string `json:"blacklist_ip"`
 	BlacklistRDNS          []string `json:"blacklist_rdns"`

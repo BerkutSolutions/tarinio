@@ -43,7 +43,6 @@ export const renderUpstreamChapterHelpModal = makeChapterRenderer({
     "keepalive",
     "websocket",
     "customHost",
-    "reverseProxyHost",
     "reverseProxyUrl",
     "target",
     "headerForwarding",
@@ -138,9 +137,8 @@ export const renderVirtualPatchesChapterHelpModal = makeChapterRenderer({
   chapter: "virtualpatches",
   rowKeys: [
     "overview",
-    "matchUri",
-    "matchMethod",
-    "matchBody",
+    "pattern",
+    "target",
     "action",
   ],
 });

@@ -86,6 +86,7 @@ export function applyEasyProfileToDraft(draft, profile, deps) {
     ),
     use_exceptions: Boolean(security.use_exceptions ?? draft.use_exceptions),
     exceptions_ip: deps.normalizeStringArray(security.exceptions_ip),
+    exceptions_uri: deps.normalizeStringArray(security.exceptions_uri),
     use_blacklist: Boolean(security.use_blacklist ?? draft.use_blacklist),
     use_dnsbl: Boolean(security.use_dnsbl ?? draft.use_dnsbl),
     blacklist_ip: deps.normalizeStringArray(security.blacklist_ip),

@@ -340,6 +340,11 @@ func validateProfile(profile EasySiteProfile) error {
 			return fmt.Errorf("easy site profile security_behavior_and_limits.exceptions_ip contains invalid value %s", value)
 		}
 	}
+	for _, value := range profile.SecurityBehaviorAndLimits.ExceptionsURI {
+		if value == "" || !strings.HasPrefix(value, "/") {
+			return fmt.Errorf("easy site profile security_behavior_and_limits.exceptions_uri entry must start with /: %s", value)
+		}
+	}
 	if profile.SecurityBehaviorAndLimits.LimitConnMaxHTTP1 <= 0 ||
 		profile.SecurityBehaviorAndLimits.LimitConnMaxHTTP2 <= 0 ||
 		profile.SecurityBehaviorAndLimits.LimitConnMaxHTTP3 <= 0 {

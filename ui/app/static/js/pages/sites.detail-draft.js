@@ -80,6 +80,7 @@ export function getDraftFromForm(container, state, deps) {
     use_exceptions: container.querySelector("#service-use-exceptions")?.checked || false,
     access_allowlist: normalizeStringArray(state.draft.access_allowlist),
     exceptions_ip: normalizeStringArray(state.draft.exceptions_ip),
+    exceptions_uri: normalizeStringArray(state.draft.exceptions_uri),
     access_denylist: normalizeStringArray(state.draft.access_denylist),
     use_bad_behavior: container.querySelector("#service-use-bad-behavior").checked,
     bad_behavior_status_codes: normalizeArray(state.draft.bad_behavior_status_codes).map((item) => Number(item)).filter((item) => Number.isInteger(item)),

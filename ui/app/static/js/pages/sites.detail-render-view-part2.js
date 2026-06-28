@@ -31,6 +31,7 @@ export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
                           </label>
                           ${renderListEditor("access_allowlist", ctx.t("sites.lists.allowlist"), draft.access_allowlist, "10.0.0.0/24", { full: false, emptyLabel: ctx.t("sites.easy.noValues"), inputFilter: "cidr", disabled: !draft.use_allowlist })}
                           ${renderListEditor("exceptions_ip", ctx.t("sites.easy.traffic.exceptions"), draft.exceptions_ip, "203.0.113.0/24", { full: false, emptyLabel: ctx.t("sites.easy.noValues"), inputFilter: "cidr", disabled: !draft.use_allowlist })}
+                          ${renderListEditor("exceptions_uri", ctx.t("sites.easy.traffic.exceptionsUri"), draft.exceptions_uri, "/healthz", { full: false, emptyLabel: ctx.t("sites.easy.noValues"), inputFilter: "uri", disabled: !draft.use_allowlist })}
                         </div>
                       </div>
                     </section>
@@ -398,7 +399,6 @@ export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
                     <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.websocket.title"))}</div>
                     <div class="muted">${escapeHtml(ctx.t("sites.easy.tab.websocket.subtitle"))}</div>
                   </div>
-                  <button class="waf-help-icon-btn" type="button" id="service-websocket-chapter-help-btn" title="${escapeHtml(ctx.t("sites.help.websocket.open"))}" aria-label="${escapeHtml(ctx.t("sites.help.websocket.open"))}">?</button>
                 </div>
                 ${renderWebSocketChapterHelpModal(ctx, escapeHtml)}
                 <div class="waf-antibot-auth-grid">
@@ -406,6 +406,7 @@ export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
                     <div class="waf-card-head">
                       <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
                         <h3>${escapeHtml(ctx.t("sites.easy.ws.frameTitle"))}</h3>
+                        <button class="waf-help-icon-btn" type="button" id="service-websocket-chapter-help-btn" title="${escapeHtml(ctx.t("sites.help.websocket.open"))}" aria-label="${escapeHtml(ctx.t("sites.help.websocket.open"))}">?</button>
                       </div>
                     </div>
                     <div class="waf-card-body">
@@ -435,7 +436,6 @@ export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
                     <div class="waf-list-title">${escapeHtml(ctx.t("sites.easy.tab.virtualpatches.title"))}</div>
                     <div class="muted">${escapeHtml(ctx.t("sites.easy.tab.virtualpatches.subtitle"))}</div>
                   </div>
-                  <button class="waf-help-icon-btn" type="button" id="service-virtualpatches-chapter-help-btn" title="${escapeHtml(ctx.t("sites.help.virtualpatches.open"))}" aria-label="${escapeHtml(ctx.t("sites.help.virtualpatches.open"))}">?</button>
                 </div>
                 ${renderVirtualPatchesChapterHelpModal(ctx, escapeHtml)}
                 <div class="waf-antibot-auth-grid">
@@ -443,6 +443,7 @@ export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
                     <div class="waf-card-head">
                       <div class="waf-inline" style="justify-content:space-between;align-items:center;width:100%;">
                         <h3>${escapeHtml(ctx.t("sites.easy.virtualpatches.frameTitle"))}</h3>
+                        <button class="waf-help-icon-btn" type="button" id="service-virtualpatches-chapter-help-btn" title="${escapeHtml(ctx.t("sites.help.virtualpatches.open"))}" aria-label="${escapeHtml(ctx.t("sites.help.virtualpatches.open"))}">?</button>
                       </div>
                     </div>
                     <div class="waf-card-body">

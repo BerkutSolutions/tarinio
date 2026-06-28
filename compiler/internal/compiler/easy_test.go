@@ -360,3 +360,45 @@ func TestRenderEasyArtifacts_PrioritizesHardBlocksBeforeAntibotAndSupportsScanne
 		t.Fatalf("expected scanner autoban regex guard in easy template, got: %s", siteConf)
 	}
 }
+
+func TestRenderEasyArtifacts_ExceptionsURISetsExceptionGuard(t *testing.T) {
+	artifacts, err := RenderEasyArtifacts(
+		[]SiteInput{{
+			ID:          "site-a",
+			Enabled:     true,
+			PrimaryHost: "a.example.com",
+			ListenHTTP:  true,
+		}},
+		[]EasyProfileInput{{
+			SiteID:           "site-a",
+			AllowedMethods:   []string{"GET"},
+			MaxClientSize:    "10m",
+			AntibotChallenge: "javascript",
+			AntibotURI:       "/challenge",
+			ExceptionsURI:    []string{"/healthz", "/metrics"},
+		}},
+	)
+	if err != nil {
+		t.Fatalf("render easy artifacts: %v", err)
+	}
+	var siteConf string
+	for _, item := range artifacts {
+		if item.Path == "nginx/easy/site-a.conf" {
+			siteConf = string(item.Content)
+			break
+		}
+	}
+	if siteConf == "" {
+		t.Fatal("expected easy site conf artifact")
+	}
+	if !strings.Contains(siteConf, `if ($uri ~* "/healthz")`) {
+		t.Fatalf("expected exceptions_uri guard for /healthz, got: %s", siteConf)
+	}
+	if !strings.Contains(siteConf, `if ($uri ~* "/metrics")`) {
+		t.Fatalf("expected exceptions_uri guard for /metrics, got: %s", siteConf)
+	}
+	// Both must set waf_easy_exception_guard
+	if !strings.Contains(siteConf, `set $waf_easy_exception_guard 1;`) {
+		t.Fatalf("expected exception guard assignment, got: %s", siteConf)
+	}
+}

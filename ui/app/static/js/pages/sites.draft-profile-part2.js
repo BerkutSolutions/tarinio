@@ -126,6 +126,7 @@ export function draftToEasyProfilePart2(draft, deps) {
       ban_escalation_stages_seconds: banEscalationStages,
       use_exceptions: draft.use_exceptions,
       exceptions_ip: draft.exceptions_ip,
+      exceptions_uri: draft.exceptions_uri,
       use_blacklist: draft.use_blacklist,
       use_dnsbl: draft.use_dnsbl,
       blacklist_ip: draft.blacklist_ip,

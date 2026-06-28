@@ -87,6 +87,7 @@ func TestSiteSettings_FieldContract(t *testing.T) {
 		"security_behavior_and_limits.ban_escalation_scope",
 		"security_behavior_and_limits.ban_escalation_stages_seconds",
 		"security_behavior_and_limits.exceptions_ip",
+		"security_behavior_and_limits.exceptions_uri",
 		"security_behavior_and_limits.blacklist_asn",
 		"security_behavior_and_limits.blacklist_asn_urls",
 		"security_behavior_and_limits.blacklist_ip",

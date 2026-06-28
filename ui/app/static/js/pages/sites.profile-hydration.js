@@ -84,6 +84,7 @@ export function applyEasyProfileToDraft(draft, profile) {
     ban_escalation_stages_seconds: normalizeBanEscalationStages(security.ban_escalation_stages_seconds, Number(security.bad_behavior_ban_time_seconds ?? draft.bad_behavior_ban_time_seconds)),
     use_exceptions: Boolean(security.use_exceptions ?? draft.use_exceptions),
     exceptions_ip: normalizeStringArray(security.exceptions_ip),
+    exceptions_uri: normalizeStringArray(security.exceptions_uri),
     use_blacklist: Boolean(security.use_blacklist ?? draft.use_blacklist),
     use_dnsbl: Boolean(security.use_dnsbl ?? draft.use_dnsbl),
     blacklist_ip: normalizeStringArray(security.blacklist_ip),

@@ -77,6 +77,7 @@ type easySiteData struct {
 	BlacklistUserAgent []string
 	BlacklistURI       []string
 	BlacklistJA3       []string
+	ExceptionsURI      []string
 
 	BlacklistCountryGuardPattern string
 	WhitelistCountryGuardPattern string
@@ -91,6 +92,9 @@ type easySiteData struct {
 	ModSecurityEasyRulesOn bool
 
 	HttpStrictParsing bool
+
+	CookieFlags         string
+	KeepUpstreamHeaders []string
 
 	// HealthCheckEnabled enables passive upstream health checking via proxy_next_upstream.
 	HealthCheckEnabled         bool
