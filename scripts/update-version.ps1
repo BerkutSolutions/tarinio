@@ -124,11 +124,47 @@ function Sync-PackageMetadataVersion([string]$RepoRoot, [string]$TargetVersion) 
     }
 }
 
+function Sync-DocsAndFrontendVersion([string]$RepoRoot, [string]$TargetVersion) {
+    $utf8 = [System.Text.UTF8Encoding]::new($false)
+
+    # docusaurus.config.js — navbar version label and dropdown item
+    $docusaurusPath = Join-Path $RepoRoot "docusaurus.config.js"
+    if (Test-Path $docusaurusPath) {
+        $raw = [System.IO.File]::ReadAllText($docusaurusPath, $utf8)
+        $updated = [regex]::Replace($raw, "label: 'Version \d+\.\d+\.\d+'", "label: 'Version $TargetVersion'")
+        $updated = [regex]::Replace($updated, "Current Release \d+\.\d+\.\d+", "Current Release $TargetVersion")
+        if ($updated -ne $raw) {
+            [System.IO.File]::WriteAllText($docusaurusPath, $updated, $utf8)
+        }
+    }
+
+    # src/pages/index.jsx — hero eyebrow label
+    $indexJsxPath = Join-Path $RepoRoot "src/pages/index.jsx"
+    if (Test-Path $indexJsxPath) {
+        $raw = [System.IO.File]::ReadAllText($indexJsxPath, $utf8)
+        $updated = [regex]::Replace($raw, "TARINIO \d+\.\d+\.\d+", "TARINIO $TargetVersion")
+        if ($updated -ne $raw) {
+            [System.IO.File]::WriteAllText($indexJsxPath, $updated, $utf8)
+        }
+    }
+
+    # ui/tests/release_docs_test.go — version string in test assertion
+    $releaseDocsTestPath = Join-Path $RepoRoot "ui/tests/release_docs_test.go"
+    if (Test-Path $releaseDocsTestPath) {
+        $raw = [System.IO.File]::ReadAllText($releaseDocsTestPath, $utf8)
+        $updated = [regex]::Replace($raw, "default \d+\.\d+\.\d+ profile", "default $TargetVersion profile")
+        if ($updated -ne $raw) {
+            [System.IO.File]::WriteAllText($releaseDocsTestPath, $updated, $utf8)
+        }
+    }
+}
+
 Assert-Version -Value $Version
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 
 Update-AppMeta -RepoRoot $repoRoot -TargetVersion $Version
 Sync-PackageMetadataVersion -RepoRoot $repoRoot -TargetVersion $Version
 Sync-I18NAppVersion -RepoRoot $repoRoot -TargetVersion $Version
+Sync-DocsAndFrontendVersion -RepoRoot $repoRoot -TargetVersion $Version
 
 Write-Host ("Version synchronized to " + $Version)
