@@ -30,6 +30,7 @@ export function buildDetailModel(stats, requestRows, eventRows) {
   const requestsByURL = new Map();
   const requestsByMethod = new Map();
   const requestsByIP = new Map();
+  const requestsURLsBySite = new Map();
   const attacksBySite = new Map();
   const blockedBySite = new Map();
   const attacksByURL = new Map();
@@ -66,6 +67,7 @@ export function buildDetailModel(stats, requestRows, eventRows) {
     addToMap(requestsBySite, site, 1);
     addToMap(requestsByURL, uri, 1);
     addToMap(requestsByMethod, method, 1);
+    addToNestedMap(requestsURLsBySite, site, uri, 1);
 
     if (ip) {
       addToMap(requestsByIP, ip, 1);
@@ -232,6 +234,7 @@ export function buildDetailModel(stats, requestRows, eventRows) {
     requestsByURL: topCounts(requestsByURL, 20),
     requestsByMethod: topCounts(requestsByMethod, 10),
     requestsByIP: topCounts(requestsByIP, 20),
+    requestsURLsBySite,
     attacksBySite: topCounts(attackSiteSource, 20),
     blockedBySite: topCounts(blockedSiteSource, 20),
     attacksByURL: attacksByURLWithSites,

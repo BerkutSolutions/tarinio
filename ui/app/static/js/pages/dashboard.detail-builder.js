@@ -1,5 +1,6 @@
 import { escapeHtml } from "../ui.js";
 import { renderSummaryMetrics, renderDetailTable, renderDetailSection } from "./dashboard.detail-shared.js";
+import { topCounts } from "./dashboard.detail-model-helpers.js";
 
 function countryFlag(code, deps) {
   const token = deps.normalizeCountryCode(code);
@@ -174,7 +175,17 @@ function buildWidgetDetail(action, payload, stats, detailModel, containersOvervi
         { labelKey: "dashboard.value.requestsDay", value: stats?.requests_day || 0              },
         { labelKey: "dashboard.detail.uniqueIPs",  value: uniqueRequestIPs }
       ], ctx, deps) +
-      renderDetailTable(requestTopSites, ctx, ctx.t("dashboard.detail.site"), ctx.t("dashboard.detail.requests"), {}, deps) +
+      renderDetailTable(requestTopSites, ctx, ctx.t("dashboard.detail.site"), ctx.t("dashboard.detail.requests"), {
+        labelFormatter: (item) => {
+          const raw = String(item?.key || "-");
+          const label = raw === "_global" ? escapeHtml(ctx.t("dashboard.global.siteLabel")) : escapeHtml(raw);
+          return `<strong>${label}</strong>`;
+        },
+        rowAttrs: (item) => {
+          const siteId = String(item?.key || "").trim();
+          return siteId ? `data-widget-action="site-detail" data-site-id="${escapeHtml(siteId)}"` : "";
+        }
+      }, deps) +
       renderDetailTable(requestTopURLs,  ctx, ctx.t("dashboard.detail.page"), ctx.t("dashboard.detail.requests"), {
         labelFormatter: (item) => {
           const url = escapeHtml(String(item?.key || "-"));
@@ -187,6 +198,23 @@ function buildWidgetDetail(action, payload, stats, detailModel, containersOvervi
           return url ? `data-widget-action="url-detail" data-url="${escapeHtml(url)}"` : "";
         }
       }, deps)
+    };
+  }
+
+  if (action === "site-detail") {
+    const targetSite = String(payload?.siteId || "").trim();
+    const siteLabel = targetSite === "_global"
+      ? ctx.t("dashboard.global.siteLabel")
+      : (targetSite || "-");
+    const urlMap = detailModel?.requestsURLsBySite?.get?.(targetSite) || new Map();
+    const urlRows = topCounts(urlMap, 20);
+    const urlTable = renderDetailTable(urlRows, ctx, ctx.t("dashboard.detail.page"), ctx.t("dashboard.detail.requests"), {
+      labelFormatter: (item) => `<strong>${escapeHtml(String(item?.key || "-"))}</strong>`
+    }, deps);
+    return {
+      title:    siteLabel,
+      subtitle: ctx.t("dashboard.detail.siteRequestsSubtitle"),
+      body:     urlTable || `<div class="waf-empty">${escapeHtml(ctx.t("dashboard.detail.noData"))}</div>`
     };
   }
 

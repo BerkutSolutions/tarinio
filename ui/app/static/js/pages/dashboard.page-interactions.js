@@ -120,7 +120,8 @@ function bindWidgetPickerAndDetails(refs, deps) {
       countryCode: String(actionNode.dataset.countryCode || "").trim(),
       url: String(actionNode.dataset.url || "").trim(),
       containerName: String(actionNode.dataset.containerName || "").trim(),
-      serviceName: String(actionNode.dataset.serviceName || "").trim()
+      serviceName: String(actionNode.dataset.serviceName || "").trim(),
+      siteId: String(actionNode.dataset.siteId || "").trim()
     };
     if (action === "container-logs") {
       const name = payload.containerName;
