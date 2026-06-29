@@ -695,17 +695,27 @@ func mapSiteUpstreamInputs(siteItems []sites.Site, upstreamItems []upstreams.Ups
 		hostHeaderEnabledBySite[item.SiteID] = !item.UpstreamRouting.DisableHostHeader
 	}
 
+	easySites := make(map[string]struct{}, len(easyItems))
+	customErrorPagesBySite := make(map[string]bool, len(easyItems))
+	for _, item := range easyItems {
+		easySites[item.SiteID] = struct{}{}
+		customErrorPagesBySite[item.SiteID] = item.UseCustomErrorPages
+	}
+
 	siteInputs := make([]pipeline.SiteInput, 0, len(sortedSites))
 	for _, item := range sortedSites {
 		_, hasTLS := tlsSites[item.ID]
+		_, hasEasy := easySites[item.ID]
 		siteInputs = append(siteInputs, pipeline.SiteInput{
-			ID:                item.ID,
-			Name:              item.ID,
-			Enabled:           item.Enabled,
-			PrimaryHost:       item.PrimaryHost,
-			ListenHTTP:        !hasTLS,
-			ListenHTTPS:       hasTLS,
-			DefaultUpstreamID: defaultUpstreamBySite[item.ID],
+			ID:                  item.ID,
+			Name:                item.ID,
+			Enabled:             item.Enabled,
+			PrimaryHost:         item.PrimaryHost,
+			ListenHTTP:          !hasTLS,
+			ListenHTTPS:         hasTLS,
+			DefaultUpstreamID:   defaultUpstreamBySite[item.ID],
+			UseEasyConfig:       hasEasy,
+			UseCustomErrorPages: customErrorPagesBySite[item.ID],
 		})
 	}
 
@@ -922,6 +932,7 @@ func mapEasyInputs(items []easysiteprofiles.EasySiteProfile, virtualPatches []vi
 			AuthExclusionRules: mapAuthExclusionRules(item.SecurityAuthBasic.ExclusionRules),
 			AuthSessionTTLMin: item.SecurityAuthBasic.SessionInactivityMinutes,
 			AntibotChallenge:           item.SecurityAntibot.AntibotChallenge,
+			AntibotChallengeTemplate:   item.SecurityAntibot.AntibotChallengeTemplate,
 			AntibotURI:                 item.SecurityAntibot.AntibotURI,
 			AntibotScannerAutoBan:      item.SecurityAntibot.ScannerAutoBanEnabled,
 			AntibotRecaptchaScore:      item.SecurityAntibot.AntibotRecaptchaScore,
@@ -994,6 +1005,9 @@ func mapEasyInputs(items []easysiteprofiles.EasySiteProfile, virtualPatches []vi
 			HttpStrictParsing: item.HTTPBehavior.HttpStrictParsing,
 
 			VirtualPatches: mapVirtualPatches(virtualPatches, item.SiteID),
+
+			UseCustomErrorPages: item.UseCustomErrorPages,
+			DisabledErrorPages:  item.DisabledErrorPages,
 		})
 	}
 	return out

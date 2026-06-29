@@ -7,9 +7,11 @@ type SiteInput struct {
 	Enabled           bool
 	PrimaryHost       string
 	Aliases           []string
-	ListenHTTP        bool
-	ListenHTTPS       bool
-	DefaultUpstreamID string
+	ListenHTTP          bool
+	ListenHTTPS         bool
+	DefaultUpstreamID   string
+	UseEasyConfig       bool
+	UseCustomErrorPages bool
 }
 
 // UpstreamInput is the MVP compiler input slice for upstream mapping.
@@ -180,6 +182,7 @@ type EasyProfileInput struct {
 	AuthSessionTTLMin int
 
 	AntibotChallenge           string
+	AntibotChallengeTemplate   string
 	AntibotURI                 string
 	AntibotScannerAutoBan      bool
 	AntibotRecaptchaScore      float64
@@ -255,6 +258,14 @@ type EasyProfileInput struct {
 	UpstreamMTLS UpstreamMTLSInput
 
 	VirtualPatches []VirtualPatchInput
+
+	// UseCustomErrorPages enables WAF custom error pages for this site.
+	// When true, proxy_intercept_errors is on and error_page directives are wired.
+	// When false, upstream error responses pass through unmodified.
+	UseCustomErrorPages bool
+	// DisabledErrorPages lists slugs (e.g. "404", "500") that are individually disabled.
+	// When a slug is in this list, its error_page directive is omitted from the config.
+	DisabledErrorPages []string
 }
 
 // VirtualPatchInput is the compiler input slice for a single virtual patch rule.

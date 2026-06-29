@@ -25,7 +25,6 @@ RUN apt-get update \
 
 COPY --from=builder /out/waf-control-plane /usr/local/bin/waf-control-plane
 COPY --from=builder /out/waf-cli /usr/local/bin/waf-cli
-COPY --from=builder /src/compiler/templates /src/compiler/templates
 COPY scripts /src/scripts
 COPY --from=dockercli /usr/local/bin/docker /usr/local/bin/docker
 

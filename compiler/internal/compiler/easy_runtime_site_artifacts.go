@@ -2,8 +2,10 @@ package compiler
 
 import (
 	"fmt"
-	"path/filepath"
+	"path"
 	"strings"
+
+	compiler "waf/compiler"
 )
 
 func defaultEasyProfileForSite(siteID string) EasyProfileInput {
@@ -113,6 +115,7 @@ func renderEasySiteArtifacts(site SiteInput, profile EasyProfileInput) ([]Artifa
 		AntibotTwoLayerEnabled:       antibotTwoLayer,
 		AntibotUsesInterstitial:      antibotUsesInterstitial(defaultChallenge),
 		AntibotChallenge:             defaultChallenge,
+		AntibotChallengeTemplate:     profile.AntibotChallengeTemplate,
 		AntibotEscalationMode:        profile.ChallengeEscalationMode,
 		AntibotURI:                   profile.AntibotURI,
 		AntibotVerifyURI:             antibotVerifyURI(profile.AntibotURI),
@@ -162,16 +165,18 @@ func renderEasySiteArtifacts(site SiteInput, profile EasyProfileInput) ([]Artifa
 			profile.APIEndpointPolicies,
 			profile.VirtualPatches,
 		),
-		HttpStrictParsing:   profile.HttpStrictParsing,
-		CookieFlags:         profile.CookieFlags,
-		KeepUpstreamHeaders: profile.KeepUpstreamHeaders,
+		HttpStrictParsing:          profile.HttpStrictParsing,
+		CookieFlags:                profile.CookieFlags,
+		KeepUpstreamHeaders:        profile.KeepUpstreamHeaders,
 		HealthCheckEnabled:         profile.HealthCheckEnabled,
 		HealthCheckPath:            profile.HealthCheckPath,
 		HealthCheckIntervalSeconds: profile.HealthCheckIntervalSeconds,
 		HealthCheckFailThreshold:   profile.HealthCheckFailThreshold,
+		UseCustomErrorPages:        profile.UseCustomErrorPages,
+		DisabledErrorPages:         profile.DisabledErrorPages,
 	}
 
-	content, err := renderTemplate(filepath.Join(templatesRoot(), "easy", "site.conf.tmpl"), data)
+	content, err := renderTemplate("templates/nginx/easy/site.conf.tmpl", data)
 	if err != nil {
 		return nil, false, 0, 0, fmt.Errorf("render easy site template for %s: %w", site.ID, err)
 	}
@@ -196,7 +201,7 @@ func renderEasySiteArtifacts(site SiteInput, profile EasyProfileInput) ([]Artifa
 		))
 	}
 	if data.AuthEnabled {
-		authPage, err := renderTemplate(filepath.Join(templatesRoot(), "..", "errors", "auth.html.tmpl"), authGatePageData{
+		authPage, err := renderTemplate("templates/errors/auth.html.tmpl", authGatePageData{
 			BasicVerifyURI:  data.AuthGateVerifyBasicURI,
 			TokenVerifyURI:  data.AuthGateVerifyTokenURI,
 			UseBasic:        data.AuthBasicEnabled,
@@ -227,7 +232,14 @@ func renderEasySiteArtifacts(site SiteInput, profile EasyProfileInput) ([]Artifa
 		))
 	}
 	if data.AntibotUsesInterstitial {
-		challengePage, err := renderTemplate(filepath.Join(templatesRoot(), "..", "errors", "antibot.html.tmpl"), antibotChallengePageData{
+		tmplName := "antibot.html.tmpl"
+		if t := strings.TrimSpace(data.AntibotChallengeTemplate); t != "" {
+			candidate := fmt.Sprintf("antibot-%s.html.tmpl", t)
+			if _, err := compiler.TemplatesFS.Open(path.Join("templates/errors", candidate)); err == nil {
+				tmplName = candidate
+			}
+		}
+		challengePage, err := renderTemplate(path.Join("templates/errors", tmplName), antibotChallengePageData{
 			VerifyURI: data.AntibotVerifyURI,
 		})
 		if err != nil {

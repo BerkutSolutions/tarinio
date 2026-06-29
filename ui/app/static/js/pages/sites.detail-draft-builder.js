@@ -114,6 +114,7 @@ export function buildDetailDraftFromForm(container, state, deps = {}) {
         };
       }),
     antibot_challenge: container.querySelector("#service-antibot-challenge").value,
+    antibot_challenge_template: container.querySelector("#service-antibot-challenge-template")?.value || "v2",
     antibot_uri: container.querySelector("#service-antibot-uri").value.trim(),
     antibot_scanner_auto_ban_enabled: container.querySelector("#service-antibot-scanner-auto-ban-enabled")?.checked ?? true,
     antibot_recaptcha_score: Number(container.querySelector("#service-antibot-recaptcha-score").value || "0.7"),
@@ -196,6 +197,13 @@ export function buildDetailDraftFromForm(container, state, deps = {}) {
     blacklist_country: normalizeStringArray(state.draft.blacklist_country),
     whitelist_country: normalizeStringArray(state.draft.whitelist_country),
     show_geo_block_page: Boolean(container.querySelector("#service-show-geo-block-page")?.checked),
+    use_custom_error_pages: Boolean(container.querySelector("#service-use-custom-error-pages")?.checked ?? true),
+    disabled_error_pages: (() => {
+      const cbs = container.querySelectorAll(".waf-ep-page-cb");
+      const disabled = [];
+      cbs.forEach((cb) => { if (!cb.checked) disabled.push(cb.dataset.epSlug); });
+      return disabled;
+    })(),
     geo_time_windows: normalizeGeoTimeWindows(state.draft.geo_time_windows),
     api_positive_security_enabled: Boolean(state.draft.api_positive_security_enabled),
     api_positive_openapi_schema_ref: String(state.draft.api_positive_openapi_schema_ref || "").trim(),

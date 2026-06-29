@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>428 Precondition Required</title>
+  <style>
+    :root{color-scheme:dark;--bg:#060812;--card:rgba(10,14,26,.98);--line:rgba(110,150,255,.18);--text:#e8f0ff;--muted:rgba(200,215,255,.55);--accent:#7b9fff;--ag:rgba(123,159,255,.25);--col:#f59e0b;--cg:rgba(245,158,11,.2);--green:#4ade98;--red:#ff6b6b;--rg:rgba(255,107,107,.2);}
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;font-family:"Segoe UI",Inter,system-ui,sans-serif;color:var(--text);padding:32px 20px;background:var(--bg);background-image:radial-gradient(ellipse 90% 55% at 50% -5%,rgba(140,90,0,.18),transparent),radial-gradient(ellipse 50% 40% at 85% 85%,rgba(100,60,0,.1),transparent);}
+    .icon-wrap{width:88px;height:88px;flex-shrink:0;}.icon-wrap svg{width:88px;height:88px;display:block;}
+    .card{width:min(500px,100%);border:1px solid var(--line);border-radius:20px;background:var(--card);box-shadow:0 0 0 1px rgba(255,255,255,.03),0 32px 80px rgba(0,0,0,.6);overflow:hidden;}
+    .card-top{padding:30px 28px 22px;text-align:center;border-bottom:1px solid var(--line);}
+    .badge{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.08em;margin-bottom:16px;border:1px solid rgba(245,158,11,.4);background:rgba(245,158,11,.1);color:var(--col);box-shadow:0 0 16px var(--cg);}
+    .card-top h1{font-size:clamp(20px,4vw,26px);font-weight:700;letter-spacing:-.02em;line-height:1.2;}
+    .card-top p{margin-top:8px;font-size:13.5px;color:var(--muted);line-height:1.65;}
+    .flow{padding:20px 28px;border-bottom:1px solid var(--line);}
+    .flow-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(150,170,255,.4);margin-bottom:14px;}
+    .flow-row{display:flex;align-items:center;}
+    .flow-node{display:flex;flex-direction:column;align-items:center;gap:5px;flex:1;}
+    .flow-icon{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;border:1.5px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);}
+    .flow-icon svg{width:20px;height:20px;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+    .fi-ok{border-color:rgba(74,222,152,.35)!important;background:rgba(74,222,152,.08)!important;box-shadow:0 0 12px rgba(74,222,152,.12)!important;}.fi-ok svg{stroke:var(--green)!important;}
+    .fi-shield{border-color:rgba(123,159,255,.35)!important;background:rgba(123,159,255,.08)!important;box-shadow:0 0 12px var(--ag)!important;}.fi-shield svg{stroke:var(--accent)!important;}
+    .fi-warn{border-color:rgba(251,191,36,.4)!important;background:rgba(251,191,36,.1)!important;box-shadow:0 0 12px var(--cg)!important;}.fi-warn svg{stroke:var(--col)!important;}
+    .fi-err{border-color:rgba(255,107,107,.4)!important;background:rgba(255,107,107,.1)!important;box-shadow:0 0 12px var(--rg)!important;}.fi-err svg{stroke:var(--red)!important;}
+    .flow-node-lbl{font-size:10px;color:rgba(180,200,255,.5);font-weight:600;letter-spacing:.04em;}
+    .flow-arrow{flex:0 0 32px;display:flex;flex-direction:column;align-items:center;gap:3px;margin-bottom:18px;}
+    .flow-arrow svg{width:32px;height:12px;}
+    .flow-arrow-lbl{font-size:9px;color:rgba(150,170,255,.35);letter-spacing:.03em;}
+    .card-steps{padding:20px 28px 24px;}
+    .steps-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(150,170,255,.4);margin-bottom:12px;}
+    .steps{display:flex;flex-direction:column;gap:8px;}
+    .step{display:flex;align-items:flex-start;gap:12px;padding:11px 13px;border-radius:12px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.055);}
+    .step-n{width:20px;height:20px;flex-shrink:0;border-radius:50%;background:rgba(123,159,255,.14);border:1px solid rgba(123,159,255,.3);display:grid;place-items:center;font-size:10px;font-weight:800;color:var(--accent);margin-top:1px;}
+    .step-body strong{font-size:12.5px;display:block;margin-bottom:2px;}
+    .step-body span{font-size:12px;color:var(--muted);line-height:1.5;}
+    .card-meta{margin:0 28px 26px;padding-top:16px;border-top:1px solid rgba(255,255,255,.055);display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+    .meta-cell .lbl{font-size:9.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:rgba(120,145,200,.4);margin-bottom:3px;}
+    .meta-cell .val{font-size:11.5px;color:rgba(190,210,255,.65);font-family:"SF Mono","Fira Code",Consolas,monospace;word-break:break-all;}
+    .footer{font-size:11px;color:rgba(130,155,210,.3);}
+    .footer a{color:rgba(150,175,255,.4);text-decoration:none;border-bottom:1px solid rgba(150,175,255,.15);}
+    @media(max-width:480px){.card-meta{grid-template-columns:1fr;}.flow-arrow-lbl{display:none;}}
+  </style>
+</head>
+<body>
+  <div class="icon-wrap">
+    <svg viewBox="0 0 88 88" fill="none">
+      <defs><radialGradient id="g" cx="38%" cy="32%" r="65%"><stop offset="0%" stop-color="#5a3800" stop-opacity=".8"/><stop offset="100%" stop-color="#080c1c" stop-opacity="1"/></radialGradient></defs>
+      <circle cx="44" cy="44" r="40" fill="url(#g)" stroke="rgba(245,158,11,.35)" stroke-width="1.5"/>
+      <!-- Checklist -->
+      <rect x="30" y="28" width="28" height="32" rx="3" stroke="rgba(245,158,11,.7)" stroke-width="1.8" fill="none"/>
+      <!-- Checkbox 1 checked -->
+      <rect x="34" y="34" width="6" height="6" rx="1" stroke="rgba(245,158,11,.8)" stroke-width="1.5" fill="rgba(245,158,11,.2)"/>
+      <polyline points="35,37 36.5,38.5 38.5,35.5" stroke="rgba(245,158,11,.9)" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <line x1="43" y1="37" x2="54" y2="37" stroke="rgba(245,158,11,.5)" stroke-width="1.5" stroke-linecap="round"/>
+      <!-- Checkbox 2 unchecked / required -->
+      <rect x="34" y="43" width="6" height="6" rx="1" stroke="rgba(245,158,11,.8)" stroke-width="1.5" fill="none"/>
+      <line x1="43" y1="46" x2="54" y2="46" stroke="rgba(245,158,11,.5)" stroke-width="1.5" stroke-linecap="round"/>
+      <!-- Checkbox 3 required (asterisk) -->
+      <rect x="34" y="52" width="6" height="6" rx="1" stroke="rgba(255,107,107,.7)" stroke-width="1.5" fill="rgba(255,107,107,.1)"/>
+      <text x="37" y="57" text-anchor="middle" font-size="6" fill="rgba(255,107,107,.9)" font-family="monospace">*</text>
+      <line x1="43" y1="55" x2="54" y2="55" stroke="rgba(245,158,11,.5)" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>
+  </div>
+  <div class="card">
+    <div class="card-top">
+      <div class="badge">HTTP 428</div>
+      <h1 id="card-title">Precondition Required</h1>
+      <p id="card-subtitle">The server requires the request to be conditional. Include an If-Match or If-Unmodified-Since header to proceed.</p>
+    </div>
+    <div class="flow">
+      <div class="flow-label" id="flow-label">Request path</div>
+      <div class="flow-row">
+        <div class="flow-node"><div class="flow-icon fi-warn"><svg viewBox="0 0 20 20"><circle cx="10" cy="7" r="3"/><path d="M4 17c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg></div><span class="flow-node-lbl" id="n-you">You</span></div>
+        <div class="flow-arrow"><svg viewBox="0 0 32 12"><line x1="0" y1="6" x2="26" y2="6" stroke="rgba(245,158,11,.6)" stroke-width="1.5" stroke-dasharray="3 2"/><polyline points="22,2 26,6 22,10" stroke="rgba(245,158,11,.6)" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="flow-arrow-lbl" style="color:rgba(245,158,11,.6)" id="a1-lbl">NO PRECOND</span></div>
+        <div class="flow-node"><div class="flow-icon fi-shield"><svg viewBox="0 0 20 20"><path d="M10 2l6 2.5v5c0 3.5-2.5 6-6 7.5C7.5 15.5 4 13 4 9.5v-5L10 2z"/></svg></div><span class="flow-node-lbl">WAF</span></div>
+        <div class="flow-arrow"><svg viewBox="0 0 32 12"><line x1="0" y1="6" x2="26" y2="6" stroke="rgba(100,120,180,.25)" stroke-width="1.5" stroke-dasharray="2 3"/><polyline points="22,2 26,6 22,10" stroke="rgba(100,120,180,.25)" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="flow-arrow-lbl" id="a2-lbl">BLOCKED</span></div>
+        <div class="flow-node"><div class="flow-icon"><svg viewBox="0 0 20 20" stroke="rgba(150,170,220,.35)"><rect x="3" y="4" width="14" height="12" rx="2"/><line x1="7" y1="9" x2="13" y2="9"/><line x1="7" y1="12" x2="11" y2="12"/></svg></div><span class="flow-node-lbl" id="n-host">Host</span></div>
+      </div>
+    </div>
+    <div class="card-steps">
+      <div class="steps-label" id="steps-label">What you can try</div>
+      <div class="steps">
+        <div class="step"><div class="step-n">1</div><div class="step-body"><strong id="s1t">Add a conditional header</strong><span id="s1d">Include If-Match, If-None-Match, or If-Unmodified-Since in your request headers.</span></div></div>
+        <div class="step"><div class="step-n">2</div><div class="step-body"><strong id="s2t">Fetch the current ETag</strong><span id="s2d">Perform a GET request first to retrieve the current ETag or Last-Modified value for the resource.</span></div></div>
+        <div class="step"><div class="step-n">3</div><div class="step-body"><strong id="s3t">Review the API docs</strong><span id="s3d">Check the API documentation for required precondition headers for this endpoint.</span></div></div>
+      </div>
+    </div>
+    <div class="card-meta">
+      <div class="meta-cell"><div class="lbl" id="l-ip">Client IP</div><div class="val" id="m-ip">—</div></div>
+      <div class="meta-cell"><div class="lbl" id="l-time">Time</div><div class="val" id="m-time">—</div></div>
+      <div class="meta-cell"><div class="lbl" id="l-rid">Request ID</div><div class="val" id="m-rid">—</div></div>
+      <div class="meta-cell"><div class="lbl" id="l-policy">Code</div><div class="val">precondition-required / 428</div></div>
+    </div>
+  </div>
+  <p class="footer"><a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener noreferrer">Secured by Tarinio</a></p>
+  <script>
+  (function(){
+    var C={
+      en:{title:"Precondition Required",sub:"The server requires the request to be conditional. Include an If-Match or If-Unmodified-Since header to proceed.",fl:"Request path",nu:"You",nh:"Host",a1:"NO PRECOND",a2:"BLOCKED",sl:"What you can try",s1t:"Add a conditional header",s1d:"Include If-Match, If-None-Match, or If-Unmodified-Since in your request headers.",s2t:"Fetch the current ETag",s2d:"Perform a GET request first to retrieve the current ETag or Last-Modified value for the resource.",s3t:"Review the API docs",s3d:"Check the API documentation for required precondition headers for this endpoint.",lip:"Client IP",lt:"Time",lr:"Request ID",lp:"Code",na:"n/a"},
+      ru:{title:"Требуется предусловие",sub:"Сервер требует условного запроса. Добавьте заголовок If-Match или If-Unmodified-Since для продолжения.",fl:"Путь запроса",nu:"Вы",nh:"Хост",a1:"НЕТ УСЛОВИЯ",a2:"ЗАБЛОКИРОВАНО",sl:"Что можно сделать",s1t:"Добавьте условный заголовок",s1d:"Включите If-Match, If-None-Match или If-Unmodified-Since в заголовки запроса.",s2t:"Получите текущий ETag",s2d:"Сначала выполните GET-запрос, чтобы получить текущее значение ETag или Last-Modified.",s3t:"Изучите документацию API",s3d:"Проверьте документацию API на наличие обязательных заголовков предусловия для этого эндпоинта.",lip:"Ваш IP",lt:"Время",lr:"ID запроса",lp:"Код",na:"н/д"},
+      de:{title:"Vorbedingung erforderlich",sub:"Der Server verlangt einen konditionalen Request. Fügen Sie einen If-Match- oder If-Unmodified-Since-Header hinzu.",fl:"Anfragepfad",nu:"Sie",nh:"Host",a1:"KEINE BEDINGUNG",a2:"GESPERRT",sl:"Mögliche Lösungen",s1t:"Bedingten Header hinzufügen",s1d:"Fügen Sie If-Match, If-None-Match oder If-Unmodified-Since in die Anfrage-Header ein.",s2t:"Aktuellen ETag abrufen",s2d:"Führen Sie zuerst einen GET-Request durch, um den aktuellen ETag oder Last-Modified-Wert zu erhalten.",s3t:"API-Dokumentation prüfen",s3d:"Prüfen Sie die API-Dokumentation auf erforderliche Vorbedingungsheader.",lip:"Client-IP",lt:"Zeit",lr:"Anfrage-ID",lp:"Code",na:"n/a"},
+      sr:{title:"Потребан предуслов",sub:"Сервер захтева условни захтев. Укључите If-Match или If-Unmodified-Since заглавље.",fl:"Пут захтева",nu:"Ви",nh:"Хост",a1:"НЕМА УСЛОВА",a2:"БЛОКИРАНО",sl:"Шта можете да урадите",s1t:"Додајте условно заглавље",s1d:"Укључите If-Match, If-None-Match или If-Unmodified-Since у заглавља захтева.",s2t:"Преузмите тренутни ETag",s2d:"Прво извршите GET захтев да бисте добили тренутну вредност ETag или Last-Modified.",s3t:"Прегледајте API документацију",s3d:"Проверите API документацију за обавезна заглавља предуслова.",lip:"IP клијента",lt:"Време",lr:"ID захтева",lp:"Код",na:"н/п"},
+      zh:{title:"需要前提条件",sub:"服务器要求请求是有条件的，请在请求头中包含 If-Match 或 If-Unmodified-Since。",fl:"请求路径",nu:"您",nh:"主机",a1:"缺少条件",a2:"已拦截",sl:"您可以尝试",s1t:"添加条件请求头",s1d:"在请求头中包含 If-Match、If-None-Match 或 If-Unmodified-Since。",s2t:"获取当前 ETag",s2d:"先执行 GET 请求以获取资源的当前 ETag 或 Last-Modified 值。",s3t:"查阅 API 文档",s3d:"检查 API 文档，了解此端点所需的前提条件请求头。",lip:"客户端 IP",lt:"时间",lr:"请求 ID",lp:"代码",na:"n/a"}
+    };
+    function lang(){var a=[];try{if(navigator.languages)a=Array.from(navigator.languages);if(navigator.language)a.push(navigator.language);}catch(_){}for(var i=0;i<a.length;i++){var l=(a[i]||"").toLowerCase().split(/[-_]/)[0];if(C[l])return l;}return"en";}
+    function fmt(ts,l){if(!ts)return C[l].na;var ms=+ts*1000;if(!isFinite(ms))return ts;try{return new Intl.DateTimeFormat(l,{dateStyle:"medium",timeStyle:"medium"}).format(new Date(ms));}catch(_){return new Date(ms).toISOString();}}
+    function s(id,v){var e=document.getElementById(id);if(e)e.textContent=v;}
+    var l=lang(),t=C[l],p=new URLSearchParams(location.search);
+    document.documentElement.lang=l;document.title="428 — "+t.title;
+    s("card-title",t.title);s("card-subtitle",t.sub);s("flow-label",t.fl);s("n-you",t.nu);s("n-host",t.nh);s("a1-lbl",t.a1);s("a2-lbl",t.a2);s("steps-label",t.sl);
+    s("s1t",t.s1t);s("s1d",t.s1d);s("s2t",t.s2t);s("s2d",t.s2d);s("s3t",t.s3t);s("s3d",t.s3d);
+    s("l-ip",t.lip);s("m-ip",p.get("ip")||t.na);s("l-time",t.lt);s("m-time",fmt(p.get("ts"),l));s("l-rid",t.lr);s("m-rid",p.get("rid")||t.na);s("l-policy",t.lp);
+  })();
+  </script>
+</body>
+</html>

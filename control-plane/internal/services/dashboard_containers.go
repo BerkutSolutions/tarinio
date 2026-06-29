@@ -725,6 +725,9 @@ func classifyContainerLogIssue(message string) (string, bool) {
 		"control-plane bootstrap: failed to connect to",
 		"jvmgcmonitorservice",
 		"event service runtime security collector failed: get \"http://localhost:8081/security-events\": dial tcp [::1]:8081: connect: connection refused",
+		"initdb: warning: enabling \"trust\" authentication for local connections",
+		"initdb: warning:",
+		"limiting requests, excess:",
 	}
 	for _, pattern := range benignPatterns {
 		if strings.Contains(lower, pattern) {

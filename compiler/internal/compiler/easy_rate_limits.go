@@ -2,7 +2,6 @@ package compiler
 
 import (
 	"fmt"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -182,7 +181,7 @@ func RenderEasyRateLimitArtifacts(sites []SiteInput, upstreams []UpstreamInput, 
 				ProxyPassTarget:             proxyPassTarget,
 			})
 		}
-		locationContent, err := renderTemplate(filepath.Join(templatesRoot(), "easy", "locations.conf.tmpl"), locationData)
+		locationContent, err := renderTemplate("templates/nginx/easy/locations.conf.tmpl", locationData)
 		if err != nil {
 			return nil, fmt.Errorf("render easy locations template for %s: %w", site.ID, err)
 		}
@@ -193,7 +192,7 @@ func RenderEasyRateLimitArtifacts(sites []SiteInput, upstreams []UpstreamInput, 
 		))
 	}
 
-	httpContent, err := renderTemplate(filepath.Join(templatesRoot(), "conf.d", "easy-ratelimits.conf.tmpl"), httpData)
+	httpContent, err := renderTemplate("templates/nginx/conf.d/easy-ratelimits.conf.tmpl", httpData)
 	if err != nil {
 		return nil, fmt.Errorf("render easy rate limit http template: %w", err)
 	}

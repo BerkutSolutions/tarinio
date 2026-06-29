@@ -31,6 +31,14 @@ export function bindDetailCore(container, state, ctx, deps) {
       render();
     });
   });
+
+  container.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-error-page-slug]");
+    if (!btn) return;
+    const slug = btn.dataset.errorPageSlug;
+    if (!slug) return;
+    window.open(`/api/error-pages/preview/${encodeURIComponent(slug)}`, "_blank", "noopener,noreferrer");
+  });
   container.querySelectorAll("[data-mode-tab]").forEach((button) => {
     button.addEventListener("click", () => {
       const nextMode = String(button.dataset.modeTab || "easy").trim().toLowerCase() === "raw" ? "raw" : "easy";
@@ -155,4 +163,55 @@ export function bindDetailCore(container, state, ctx, deps) {
   if (state.highlightedSelector) {
     window.setTimeout(() => highlightSelector(container, state.highlightedSelector), 30);
   }
+
+  // Error pages tab: main toggle dimming + per-page checkboxes + enable/disable all
+  container.querySelector("#service-use-custom-error-pages")?.addEventListener("change", (e) => {
+    const enabled = e.target.checked;
+    const listWrap = container.querySelector("#ep-list-wrap");
+    if (listWrap) {
+      listWrap.classList.toggle("waf-disabled", !enabled);
+    }
+    container.querySelectorAll(".waf-ep-page-cb, #ep-enable-all, #ep-disable-all").forEach((el) => {
+      el.disabled = !enabled;
+    });
+  });
+
+  container.querySelector("#ep-enable-all")?.addEventListener("click", () => {
+    container.querySelectorAll(".waf-ep-page-cb").forEach((cb) => { cb.checked = true; });
+  });
+
+  container.querySelector("#ep-disable-all")?.addEventListener("click", () => {
+    container.querySelectorAll(".waf-ep-page-cb").forEach((cb) => { cb.checked = false; });
+  });
+
+  // Antibot: enable/disable toggle — dims body + template row, resets challenge to "javascript" when enabled
+  container.querySelector("#service-antibot-enabled")?.addEventListener("change", (e) => {
+    const enabled = e.target.checked;
+    const challengeSelect = container.querySelector("#service-antibot-challenge");
+    if (challengeSelect) {
+      if (!enabled) {
+        challengeSelect.dataset.prevValue = challengeSelect.value;
+        challengeSelect.value = "no";
+      } else {
+        challengeSelect.value = challengeSelect.dataset.prevValue || "javascript";
+      }
+    }
+    const bodyWrap = container.querySelector("#antibot-body-wrap");
+    const templateRow = container.querySelector("#antibot-template-row");
+    const previewBtn = container.querySelector("#antibot-template-preview-btn");
+    const templateSelect = container.querySelector("#service-antibot-challenge-template");
+    if (bodyWrap) bodyWrap.classList.toggle("waf-disabled", !enabled);
+    if (templateRow) templateRow.classList.toggle("waf-disabled", !enabled);
+    if (previewBtn) previewBtn.disabled = !enabled;
+    if (templateSelect) templateSelect.disabled = !enabled;
+    container.querySelectorAll("#antibot-body-wrap input, #antibot-body-wrap select").forEach((el) => {
+      el.disabled = !enabled;
+    });
+  });
+
+  // Antibot: preview button opens template preview
+  container.querySelector("#antibot-template-preview-btn")?.addEventListener("click", () => {
+    const tmpl = container.querySelector("#service-antibot-challenge-template")?.value || "v2";
+    window.open(`/api/error-pages/preview/antibot-${tmpl}`, "_blank", "noopener,noreferrer");
+  });
 }

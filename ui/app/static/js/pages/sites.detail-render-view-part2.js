@@ -1,5 +1,5 @@
 export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
-  const { escapeHtml, renderListEditor, getQuickListTemplates, normalizeStringArray, renderStatusCodesEditor, renderCustomLimitRulesEditor, renderAntibotExclusionRulesEditor, normalizeBanEscalationStages, formatBanDurationSeconds, renderAntibotChallengeRulesEditor, renderAuthSessionTtlOptions, renderAuthUsersEditor, renderCountryEditor, renderAuthExclusionRulesEditor, renderAuthServiceTokensEditor, renderAuthHelpModal, renderAntibotHelpModal, renderTrafficBadBehaviorHelpModal, renderTrafficBlacklistHelpModal, renderTrafficAllowlistHelpModal, renderTrafficLimitsHelpModal, renderTrafficDnsblHelpModal, renderHeadersChapterHelpModal, renderBlockingChapterHelpModal, renderAntibotChapterHelpModal, renderGeoChapterHelpModal, renderModsecChapterHelpModal, renderGeoTimeWindowsEditor, normalizeAuthMode, renderVirtualPatchesEditor, renderWebSocketChapterHelpModal, renderVirtualPatchesChapterHelpModal } = deps;
+  const { escapeHtml, renderListEditor, getQuickListTemplates, normalizeStringArray, renderStatusCodesEditor, renderCustomLimitRulesEditor, renderAntibotExclusionRulesEditor, normalizeBanEscalationStages, formatBanDurationSeconds, renderAntibotChallengeRulesEditor, renderAuthSessionTtlOptions, renderAuthUsersEditor, renderCountryEditor, renderAuthExclusionRulesEditor, renderAuthServiceTokensEditor, renderAuthHelpModal, renderAntibotHelpModal, renderTrafficBadBehaviorHelpModal, renderTrafficBlacklistHelpModal, renderTrafficAllowlistHelpModal, renderTrafficLimitsHelpModal, renderTrafficDnsblHelpModal, renderHeadersChapterHelpModal, renderBlockingChapterHelpModal, renderAntibotChapterHelpModal, renderGeoChapterHelpModal, renderModsecChapterHelpModal, renderGeoTimeWindowsEditor, normalizeAuthMode, renderVirtualPatchesEditor, renderWebSocketChapterHelpModal, renderVirtualPatchesChapterHelpModal, renderErrorPagesTab } = deps;
   const authMode = normalizeAuthMode(draft.auth_mode);
   return `
 
@@ -225,24 +225,44 @@ export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
                       </div>
                     </div>
                     <div class="waf-card-body">
-                      <div class="waf-form-grid">
+                      <label class="waf-checkbox waf-field full" style="margin-bottom:12px;">
+                        <input id="service-antibot-enabled" type="checkbox"${draft.antibot_challenge !== "no" ? " checked" : ""}>
+                        <span>${escapeHtml(ctx.t("sites.easy.antibot.enabled"))}</span>
+                      </label>
+                      <div class="waf-field full${draft.antibot_challenge === "no" ? " waf-disabled" : ""}" id="antibot-template-row" style="display:flex;align-items:flex-end;gap:8px;margin-bottom:20px;">
+                        <div style="flex:1;min-width:0;">
+                          <label for="service-antibot-challenge-template">${escapeHtml(ctx.t("sites.easy.antibot.challengeTemplate"))}</label>
+                          <select id="service-antibot-challenge-template"${draft.antibot_challenge === "no" ? " disabled" : ""}>
+                            ${[
+                              {val:"v1", key:"sites.easy.antibot.template.v1"},
+                              {val:"v2", key:"sites.easy.antibot.template.v2"},
+                              {val:"v3", key:"sites.easy.antibot.template.v3"},
+                              {val:"v4", key:"sites.easy.antibot.template.v4"},
+                              {val:"v5", key:"sites.easy.antibot.template.v5"},
+                            ].map((t) => `<option value="${t.val}"${(draft.antibot_challenge_template || "v1") === t.val ? " selected" : ""}>${escapeHtml(ctx.t(t.key))}</option>`).join("")}
+                          </select>
+                        </div>
+                        <button type="button" class="btn ghost btn-sm" id="antibot-template-preview-btn" style="white-space:nowrap;flex-shrink:0;margin-bottom:1px;"${draft.antibot_challenge === "no" ? " disabled" : ""}>${escapeHtml(ctx.t("sites.easy.antibot.previewTemplate"))}</button>
+                      </div>
+                      <div id="antibot-body-wrap"${draft.antibot_challenge === "no" ? ' class="waf-disabled"' : ""}>
+                        <div class="waf-form-grid">
                         <div class="waf-field">
                           <label for="service-antibot-challenge">${escapeHtml(ctx.t("sites.easy.antibot.challenge"))}</label>
-                          <select id="service-antibot-challenge">
-                            ${["no", "cookie", "javascript", "captcha", "recaptcha", "hcaptcha", "turnstile", "mcaptcha"].map((mode) => `<option value="${mode}"${draft.antibot_challenge === mode ? " selected" : ""}>${mode}</option>`).join("")}
+                          <select id="service-antibot-challenge"${draft.antibot_challenge === "no" ? " disabled" : ""}>
+                            ${["cookie", "javascript", "captcha", "recaptcha", "hcaptcha", "turnstile", "mcaptcha"].map((mode) => `<option value="${mode}"${draft.antibot_challenge === mode ? " selected" : ""}>${mode}</option>`).join("")}
                           </select>
                         </div>
                         <div class="waf-field">
                           <label for="service-antibot-uri">${escapeHtml(ctx.t("sites.easy.antibot.url"))}</label>
-                          <input id="service-antibot-uri" value="${escapeHtml(draft.antibot_uri)}">
+                          <input id="service-antibot-uri" value="${escapeHtml(draft.antibot_uri)}"${draft.antibot_challenge === "no" ? " disabled" : ""}>
                         </div>
                         <label class="waf-checkbox waf-field full">
-                          <input id="service-antibot-scanner-auto-ban-enabled" type="checkbox"${draft.antibot_scanner_auto_ban_enabled ? " checked" : ""}>
+                          <input id="service-antibot-scanner-auto-ban-enabled" type="checkbox"${draft.antibot_scanner_auto_ban_enabled ? " checked" : ""}${draft.antibot_challenge === "no" ? " disabled" : ""}>
                           <span>${escapeHtml(ctx.t("sites.easy.antibot.scannerAutoBanEnabled"))}</span>
                         </label>
                         <div class="waf-field">
                           <label for="service-antibot-recaptcha-score">${escapeHtml(ctx.t("sites.easy.antibot.recaptchaScore"))}</label>
-                          <input id="service-antibot-recaptcha-score" type="number" step="0.1" min="0" max="1" value="${escapeHtml(String(draft.antibot_recaptcha_score))}">
+                          <input id="service-antibot-recaptcha-score" type="number" step="0.1" min="0" max="1" value="${escapeHtml(String(draft.antibot_recaptcha_score))}"${draft.antibot_challenge === "no" ? " disabled" : ""}>
                         </div>
                         <div class="waf-field">
                           <label for="service-antibot-recaptcha-sitekey">${escapeHtml(ctx.t("sites.easy.antibot.recaptchaSitekey"))}</label>
@@ -280,6 +300,7 @@ export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
                           </select>
                         </div>
                         ${renderAntibotChallengeRulesEditor(draft.antibot_challenge_rules, ctx)}
+                        </div>
                       </div>
                     </div>
                   </section>
@@ -458,11 +479,14 @@ export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
                 </div>
               </section>
 
+              <section class="waf-stack waf-service-compact-section${state.activeTab === "errorpages" ? "" : " waf-hidden"}" data-tab-panel="errorpages">
+                ${renderErrorPagesTab(draft, ctx)}
+              </section>
+
               <div class="waf-actions waf-actions-between">
                 <button class="btn ghost btn-sm" type="button" id="service-back-bottom">${escapeHtml(ctx.t("common.back"))}</button>
                 <button class="btn primary btn-sm" type="submit">${escapeHtml(ctx.t(isNew ? "sites.action.createSite" : "sites.action.saveSite"))}</button>
               </div>
-            </form>
           </div>
         </section>
       </div>

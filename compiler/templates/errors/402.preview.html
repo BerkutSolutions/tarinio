@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>402 Payment Required</title>
+  <style>
+    :root{color-scheme:dark;--bg:#060812;--card:rgba(10,14,26,.98);--line:rgba(110,150,255,.18);--text:#e8f0ff;--muted:rgba(200,215,255,.55);--accent:#7b9fff;--ag:rgba(123,159,255,.25);--col:#4ade98;--cg:rgba(74,222,152,.2);--green:#4ade98;--red:#ff6b6b;--rg:rgba(255,107,107,.2);}
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;font-family:"Segoe UI",Inter,system-ui,sans-serif;color:var(--text);padding:32px 20px;background:var(--bg);background-image:radial-gradient(ellipse 90% 55% at 50% -5%,rgba(10,80,40,.2),transparent),radial-gradient(ellipse 50% 40% at 85% 85%,rgba(20,60,30,.1),transparent);}
+    .icon-wrap{width:88px;height:88px;flex-shrink:0;}.icon-wrap svg{width:88px;height:88px;display:block;}
+    .card{width:min(500px,100%);border:1px solid var(--line);border-radius:20px;background:var(--card);box-shadow:0 0 0 1px rgba(255,255,255,.03),0 32px 80px rgba(0,0,0,.6);overflow:hidden;}
+    .card-top{padding:30px 28px 22px;text-align:center;border-bottom:1px solid var(--line);}
+    .badge{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.08em;margin-bottom:16px;border:1px solid rgba(74,222,152,.4);background:rgba(74,222,152,.1);color:var(--col);box-shadow:0 0 16px var(--cg);}
+    .card-top h1{font-size:clamp(20px,4vw,26px);font-weight:700;letter-spacing:-.02em;line-height:1.2;}
+    .card-top p{margin-top:8px;font-size:13.5px;color:var(--muted);line-height:1.65;}
+    .flow{padding:20px 28px;border-bottom:1px solid var(--line);}
+    .flow-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(150,170,255,.4);margin-bottom:14px;}
+    .flow-row{display:flex;align-items:center;}
+    .flow-node{display:flex;flex-direction:column;align-items:center;gap:5px;flex:1;}
+    .flow-icon{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;border:1.5px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);}
+    .flow-icon svg{width:20px;height:20px;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+    .fi-ok{border-color:rgba(74,222,152,.35)!important;background:rgba(74,222,152,.08)!important;box-shadow:0 0 12px rgba(74,222,152,.12)!important;}.fi-ok svg{stroke:var(--green)!important;}
+    .fi-shield{border-color:rgba(123,159,255,.35)!important;background:rgba(123,159,255,.08)!important;box-shadow:0 0 12px var(--ag)!important;}.fi-shield svg{stroke:var(--accent)!important;}
+    .fi-warn{border-color:rgba(251,191,36,.35)!important;background:rgba(251,191,36,.08)!important;box-shadow:0 0 12px rgba(251,191,36,.15)!important;}.fi-warn svg{stroke:#fbbf24!important;}
+    .fi-err{border-color:rgba(255,107,107,.4)!important;background:rgba(255,107,107,.1)!important;box-shadow:0 0 12px var(--rg)!important;}.fi-err svg{stroke:var(--red)!important;}
+    .flow-node-lbl{font-size:10px;color:rgba(180,200,255,.5);font-weight:600;letter-spacing:.04em;}
+    .flow-arrow{flex:0 0 32px;display:flex;flex-direction:column;align-items:center;gap:3px;margin-bottom:18px;}
+    .flow-arrow svg{width:32px;height:12px;}
+    .flow-arrow-lbl{font-size:9px;color:rgba(150,170,255,.35);letter-spacing:.03em;}
+    .card-steps{padding:20px 28px 24px;}
+    .steps-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(150,170,255,.4);margin-bottom:12px;}
+    .steps{display:flex;flex-direction:column;gap:8px;}
+    .step{display:flex;align-items:flex-start;gap:12px;padding:11px 13px;border-radius:12px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.055);}
+    .step-n{width:20px;height:20px;flex-shrink:0;border-radius:50%;background:rgba(123,159,255,.14);border:1px solid rgba(123,159,255,.3);display:grid;place-items:center;font-size:10px;font-weight:800;color:var(--accent);margin-top:1px;}
+    .step-body strong{font-size:12.5px;display:block;margin-bottom:2px;}
+    .step-body span{font-size:12px;color:var(--muted);line-height:1.5;}
+    .card-meta{margin:0 28px 26px;padding-top:16px;border-top:1px solid rgba(255,255,255,.055);display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+    .meta-cell .lbl{font-size:9.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:rgba(120,145,200,.4);margin-bottom:3px;}
+    .meta-cell .val{font-size:11.5px;color:rgba(190,210,255,.65);font-family:"SF Mono","Fira Code",Consolas,monospace;word-break:break-all;}
+    .footer{font-size:11px;color:rgba(130,155,210,.3);}
+    .footer a{color:rgba(150,175,255,.4);text-decoration:none;border-bottom:1px solid rgba(150,175,255,.15);}
+    @media(max-width:480px){.card-meta{grid-template-columns:1fr;}.flow-arrow-lbl{display:none;}}
+  </style>
+</head>
+<body>
+  <div class="icon-wrap">
+    <svg viewBox="0 0 88 88" fill="none">
+      <defs><radialGradient id="g" cx="38%" cy="32%" r="65%"><stop offset="0%" stop-color="#0a4a2a" stop-opacity=".7"/><stop offset="100%" stop-color="#080c1c" stop-opacity="1"/></radialGradient></defs>
+      <circle cx="44" cy="44" r="40" fill="url(#g)" stroke="rgba(74,222,152,.35)" stroke-width="1.5"/>
+      <rect x="26" y="32" width="36" height="24" rx="4" stroke="rgba(74,222,152,.8)" stroke-width="2" fill="none"/>
+      <line x1="26" y1="40" x2="62" y2="40" stroke="rgba(74,222,152,.5)" stroke-width="2"/>
+      <circle cx="34" cy="36" r="2" fill="rgba(74,222,152,.6)"/>
+      <circle cx="40" cy="36" r="2" fill="rgba(74,222,152,.4)"/>
+      <line x1="33" y1="48" x2="45" y2="48" stroke="rgba(74,222,152,.5)" stroke-width="1.5" stroke-linecap="round"/>
+      <line x1="33" y1="52" x2="39" y2="52" stroke="rgba(74,222,152,.3)" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>
+  </div>
+  <div class="card">
+    <div class="card-top">
+      <div class="badge">HTTP 402</div>
+      <h1 id="card-title">Payment Required</h1>
+      <p id="card-subtitle">Access to this resource requires payment. Your account may not have an active subscription or valid payment method.</p>
+    </div>
+    <div class="flow">
+      <div class="flow-label" id="flow-label">Request path</div>
+      <div class="flow-row">
+        <div class="flow-node"><div class="flow-icon fi-warn"><svg viewBox="0 0 20 20"><circle cx="10" cy="7" r="3"/><path d="M4 17c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg></div><span class="flow-node-lbl" id="n-you">You</span></div>
+        <div class="flow-arrow"><svg viewBox="0 0 32 12"><line x1="0" y1="6" x2="26" y2="6" stroke="rgba(251,191,36,.5)" stroke-width="1.5" stroke-dasharray="3 2"/><polyline points="22,2 26,6 22,10" stroke="rgba(251,191,36,.5)" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="flow-arrow-lbl" style="color:rgba(251,191,36,.5)" id="a1-lbl">UNPAID</span></div>
+        <div class="flow-node"><div class="flow-icon fi-shield"><svg viewBox="0 0 20 20"><path d="M10 2l6 2.5v5c0 3.5-2.5 6-6 7.5C7.5 15.5 4 13 4 9.5v-5L10 2z"/></svg></div><span class="flow-node-lbl">WAF</span></div>
+        <div class="flow-arrow"><svg viewBox="0 0 32 12"><line x1="0" y1="6" x2="26" y2="6" stroke="rgba(255,107,107,.4)" stroke-width="1.5" stroke-dasharray="3 2"/><polyline points="22,2 26,6 22,10" stroke="rgba(255,107,107,.4)" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="flow-arrow-lbl" style="color:rgba(255,107,107,.4)" id="a2-lbl">BLOCKED</span></div>
+        <div class="flow-node"><div class="flow-icon fi-ok"><svg viewBox="0 0 20 20"><rect x="3" y="4" width="14" height="12" rx="2"/><line x1="7" y1="9" x2="13" y2="9"/><line x1="7" y1="12" x2="11" y2="12"/></svg></div><span class="flow-node-lbl" id="n-host">Host</span></div>
+      </div>
+    </div>
+    <div class="card-steps">
+      <div class="steps-label" id="steps-label">What you can try</div>
+      <div class="steps">
+        <div class="step"><div class="step-n">1</div><div class="step-body"><strong id="s1t">Check your subscription</strong><span id="s1d">Verify that your account has an active plan or valid payment method.</span></div></div>
+        <div class="step"><div class="step-n">2</div><div class="step-body"><strong id="s2t">Complete payment</strong><span id="s2d">If a payment is pending, complete it and try again.</span></div></div>
+        <div class="step"><div class="step-n">3</div><div class="step-body"><strong id="s3t">Contact support</strong><span id="s3d">If you believe this is an error, contact the site administrator with your Request ID.</span></div></div>
+      </div>
+    </div>
+    <div class="card-meta">
+      <div class="meta-cell"><div class="lbl" id="l-ip">Client IP</div><div class="val" id="m-ip">—</div></div>
+      <div class="meta-cell"><div class="lbl" id="l-time">Time</div><div class="val" id="m-time">—</div></div>
+      <div class="meta-cell"><div class="lbl" id="l-rid">Request ID</div><div class="val" id="m-rid">—</div></div>
+      <div class="meta-cell"><div class="lbl" id="l-policy">Code</div><div class="val">payment-required / 402</div></div>
+    </div>
+  </div>
+  <p class="footer"><a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener noreferrer">Secured by Tarinio</a></p>
+  <script>
+  (function(){
+    var C={
+      en:{title:"Payment Required",sub:"Access to this resource requires payment. Your account may not have an active subscription.",fl:"Request path",nu:"You",nh:"Host",a1:"UNPAID",a2:"BLOCKED",sl:"What you can try",s1t:"Check your subscription",s1d:"Verify that your account has an active plan or valid payment method.",s2t:"Complete payment",s2d:"If a payment is pending, complete it and try again.",s3t:"Contact support",s3d:"If you believe this is an error, contact the administrator with your Request ID.",lip:"Client IP",lt:"Time",lr:"Request ID",lp:"Code",na:"n/a"},
+      ru:{title:"Требуется оплата",sub:"Доступ к ресурсу требует оплаты. Возможно, у вашего аккаунта нет активной подписки.",fl:"Путь запроса",nu:"Вы",nh:"Хост",a1:"НЕ ОПЛАЧЕНО",a2:"ЗАБЛОК.",sl:"Что можно сделать",s1t:"Проверьте подписку",s1d:"Убедитесь что у аккаунта есть активный тариф или действующий способ оплаты.",s2t:"Завершите оплату",s2d:"Если есть незавершённый платёж — оплатите и повторите попытку.",s3t:"Свяжитесь с поддержкой",s3d:"Если вы считаете что ошибка неверна, обратитесь к администратору с ID запроса.",lip:"Ваш IP",lt:"Время",lr:"ID запроса",lp:"Код",na:"н/д"},
+      de:{title:"Zahlung erforderlich",sub:"Zugriff auf diese Ressource erfordert eine Zahlung.",fl:"Anfragepfad",nu:"Sie",nh:"Host",a1:"UNBEZAHLT",a2:"GESPERRT",sl:"Mögliche Lösungen",s1t:"Abonnement prüfen",s1d:"Stellen Sie sicher, dass Ihr Konto einen aktiven Plan hat.",s2t:"Zahlung abschließen",s2d:"Falls eine Zahlung aussteht, schließen Sie sie ab.",s3t:"Support kontaktieren",s3d:"Wenden Sie sich mit Ihrer Anfrage-ID an den Administrator.",lip:"Client-IP",lt:"Zeit",lr:"Anfrage-ID",lp:"Code",na:"n/a"},
+      sr:{title:"Потребно је плаћање",sub:"Приступ овом ресурсу захтева плаћање.",fl:"Пут захтева",nu:"Ви",nh:"Хост",a1:"НЕПЛАЋЕНО",a2:"БЛОКИРАНО",sl:"Шта можете да урадите",s1t:"Проверите претплату",s1d:"Уверите се да ваш налог има активан план.",s2t:"Завршите плаћање",s2d:"Ако постоји неизвршено плаћање, завршите га.",s3t:"Контактирајте подршку",s3d:"Обратите се администратору са вашим ID-ом захтева.",lip:"IP клијента",lt:"Време",lr:"ID захтева",lp:"Код",na:"н/п"},
+      zh:{title:"需要付款",sub:"访问此资源需要付款，您的账户可能没有有效的订阅。",fl:"请求路径",nu:"您",nh:"主机",a1:"未付款",a2:"已拦截",sl:"您可以尝试",s1t:"检查订阅状态",s1d:"确认您的账户有有效的套餐或支付方式。",s2t:"完成付款",s2d:"如有待处理的付款，请完成后重试。",s3t:"联系支持",s3d:"如认为有误，请携带请求 ID 联系管理员。",lip:"客户端 IP",lt:"时间",lr:"请求 ID",lp:"代码",na:"n/a"}
+    };
+    function lang(){var a=[];try{if(navigator.languages)a=Array.from(navigator.languages);if(navigator.language)a.push(navigator.language);}catch(_){}for(var i=0;i<a.length;i++){var l=(a[i]||"").toLowerCase().split(/[-_]/)[0];if(C[l])return l;}return"en";}
+    function fmt(ts,l){if(!ts)return C[l].na;var ms=+ts*1000;if(!isFinite(ms))return ts;try{return new Intl.DateTimeFormat(l,{dateStyle:"medium",timeStyle:"medium"}).format(new Date(ms));}catch(_){return new Date(ms).toISOString();}}
+    function s(id,v){var e=document.getElementById(id);if(e)e.textContent=v;}
+    var l=lang(),t=C[l],p=new URLSearchParams(location.search);
+    document.documentElement.lang=l;document.title="402 — "+t.title;
+    s("card-title",t.title);s("card-subtitle",t.sub);s("flow-label",t.fl);s("n-you",t.nu);s("n-host",t.nh);s("a1-lbl",t.a1);s("a2-lbl",t.a2);s("steps-label",t.sl);
+    s("s1t",t.s1t);s("s1d",t.s1d);s("s2t",t.s2t);s("s2d",t.s2d);s("s3t",t.s3t);s("s3d",t.s3d);
+    s("l-ip",t.lip);s("m-ip",p.get("ip")||t.na);s("l-time",t.lt);s("m-time",fmt(p.get("ts"),l));s("l-rid",t.lr);s("m-rid",p.get("rid")||t.na);s("l-policy",t.lp);
+  })();
+  </script>
+</body>
+</html>

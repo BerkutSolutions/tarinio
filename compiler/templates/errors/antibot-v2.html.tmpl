@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Security Check</title>
+<style>
+:root{color-scheme:dark}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#060812;color:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}
+body::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;
+  background:radial-gradient(ellipse 60% 50% at 15% 50%,rgba(99,102,241,.08) 0%,transparent 60%),
+             radial-gradient(ellipse 50% 40% at 85% 50%,rgba(99,102,241,.05) 0%,transparent 60%);
+  pointer-events:none}
+.layout{display:flex;width:100%;max-width:820px;gap:0;align-items:stretch;
+  background:rgba(10,12,28,.88);border:1px solid rgba(99,102,241,.18);
+  border-radius:20px;backdrop-filter:blur(20px);
+  box-shadow:0 0 0 1px rgba(99,102,241,.07),0 32px 90px rgba(0,0,0,.65);
+  overflow:hidden}
+.left{flex:1;min-width:0;padding:48px 44px;border-right:1px solid rgba(99,102,241,.1)}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#6366f1;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.eyebrow::before{content:'';display:inline-block;width:24px;height:2px;background:#6366f1;border-radius:2px}
+h1{font-size:28px;font-weight:800;line-height:1.15;color:#f1f5f9;margin-bottom:12px}
+.sub{font-size:14px;color:rgba(226,232,240,.4);line-height:1.7;margin-bottom:36px}
+.timeline{display:flex;flex-direction:column;gap:0}
+.tl-item{display:flex;gap:16px;padding-bottom:18px;position:relative}
+.tl-item:not(:last-child)::after{content:'';position:absolute;left:10px;top:22px;width:1px;bottom:0;background:rgba(255,255,255,.07)}
+.tl-dot{width:22px;height:22px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;margin-top:1px;transition:all .4s}
+.tl-done{background:rgba(99,102,241,.2);border:1px solid rgba(99,102,241,.5);color:#818cf8}
+.tl-active{background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.4);color:#818cf8;animation:activePulse 1.5s ease infinite}
+@keyframes activePulse{0%,100%{box-shadow:0 0 0 0 rgba(99,102,241,.4)}50%{box-shadow:0 0 0 5px rgba(99,102,241,0)}}
+.tl-wait{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:rgba(226,232,240,.2)}
+.tl-lbl{font-size:13px;color:rgba(226,232,240,.45);padding-top:3px;transition:color .4s}
+.tl-item.done .tl-lbl,.tl-item.active .tl-lbl{color:rgba(226,232,240,.85)}
+.footer-row{font-size:11px;color:rgba(226,232,240,.2);margin-top:28px}
+.footer-row a{color:rgba(99,102,241,.45);text-decoration:none;font-weight:500}
+.footer-row a:hover{color:#818cf8}
+.right{flex:0 0 220px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:48px 32px}
+.meter{position:relative;width:156px;height:156px}
+.meter-svg{width:100%;height:100%;transform:rotate(-90deg)}
+.meter-track{fill:none;stroke:rgba(99,102,241,.1);stroke-width:8}
+.meter-fill{fill:none;stroke:#6366f1;stroke-width:8;stroke-linecap:round;
+  stroke-dasharray:439;stroke-dashoffset:439;transition:stroke-dashoffset .6s cubic-bezier(.4,0,.2,1)}
+.meter-val{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.meter-num{font-size:26px;font-weight:800;color:#818cf8;transition:opacity .3s}
+.meter-unit{font-size:10px;color:rgba(226,232,240,.3);text-transform:uppercase;letter-spacing:.08em}
+.meter-label{font-size:11px;color:rgba(226,232,240,.25);text-align:center;line-height:1.5}
+@media(max-width:640px){.layout{flex-direction:column}.left{border-right:none;border-bottom:1px solid rgba(99,102,241,.1)}.right{flex:none;padding:32px}}
+</style>
+</head>
+<body>
+<div class="layout">
+  <div class="left">
+    <div class="eyebrow" id="eyebrow-txt"></div>
+    <h1 id="title"></h1>
+    <p class="sub" id="subtitle"></p>
+    <div class="timeline" id="timeline-box"></div>
+    <div class="footer-row" id="footer-txt"></div>
+  </div>
+  <div class="right">
+    <div class="meter">
+      <svg class="meter-svg" viewBox="0 0 140 140">
+        <circle class="meter-track" cx="70" cy="70" r="62"/>
+        <circle class="meter-fill" id="meter-fill" cx="70" cy="70" r="62"/>
+      </svg>
+      <div class="meter-val">
+        <div class="meter-num" id="meter-num">0%</div>
+        <div class="meter-unit" id="meter-unit"></div>
+      </div>
+    </div>
+    <div class="meter-label" id="meter-label"></div>
+  </div>
+</div>
+<script>
+(function(){
+  var verifyURI = "{{ .VerifyURI }}";
+  var I={
+    en:{eyebrow:"Security checkpoint",title:"Verifying your connection",sub:"Hold tight — automated checks are in progress. You'll be redirected once complete.",
+      steps:["TLS handshake","Browser fingerprint","Threat analysis","Access token","Redirect"],
+      stDone:"✓",stActive:"↻",stWait:"○",unit:"done",label:"Security scan\nin progress",
+      footer:'<a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener">Tarinio WAF</a> · End-to-end encrypted'},
+    ru:{eyebrow:"Контрольная точка",title:"Проверка соединения",sub:"Подождите — выполняются автоматические проверки. Вы будете перенаправлены по завершении.",
+      steps:["TLS рукопожатие","Отпечаток браузера","Анализ угроз","Токен доступа","Перенаправление"],
+      stDone:"✓",stActive:"↻",stWait:"○",unit:"готово",label:"Сканирование\nбезопасности",
+      footer:'<a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener">Tarinio WAF</a> · Сквозное шифрование'},
+    de:{eyebrow:"Sicherheitsprüfpunkt",title:"Verbindung wird geprüft",sub:"Bitte warten — automatische Prüfungen laufen. Sie werden nach Abschluss weitergeleitet.",
+      steps:["TLS-Handshake","Browser-Fingerabdruck","Bedrohungsanalyse","Zugriffstoken","Weiterleitung"],
+      stDone:"✓",stActive:"↻",stWait:"○",unit:"fertig",label:"Sicherheitsscan\nläuft",
+      footer:'<a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener">Tarinio WAF</a> · Ende-zu-Ende verschlüsselt'},
+    sr:{eyebrow:"Контролна тачка",title:"Провера везе",sub:"Сачекајте — аутоматске провере су у току. Бићете преусмерени по завршетку.",
+      steps:["TLS руковање","Отисак прегледача","Анализа претњи","Приступни токен","Преусмеравање"],
+      stDone:"✓",stActive:"↻",stWait:"○",unit:"готово",label:"Безбедносни скен\nу току",
+      footer:'<a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener">Tarinio WAF</a> · End-to-end шифровано'},
+    zh:{eyebrow:"安全检查点",title:"验证您的连接",sub:"请稍候 — 自动检查正在进行中。完成后您将被重定向。",
+      steps:["TLS握手","浏览器指纹","威胁分析","访问令牌","重定向"],
+      stDone:"✓",stActive:"↻",stWait:"○",unit:"完成",label:"安全扫描\n进行中",
+      footer:'<a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener">Tarinio WAF</a> · 端到端加密'}
+  };
+  var lang=(navigator.language||'en').slice(0,2);
+  var l=I[lang]||I.en;
+  var isPreview=!location.search.includes('_waf_token')&&location.pathname.includes('preview');
+
+  function readReturnTarget(){
+    var params=new URLSearchParams(window.location.search||"");
+    var uri=String(params.get("return_uri")||"/").trim();
+    var args=String(params.get("return_args")||"").trim();
+    if(!uri||uri.charAt(0)!=="/")uri="/";
+    return{uri:uri,args:args};
+  }
+  function buildVerifyURL(t){
+    var base=new URL(verifyURI,window.location.origin).toString();
+    var q="return_uri="+encodeURI(t.uri||"/");
+    if(t.args)q+="&return_args="+encodeURIComponent(t.args);
+    return base+(base.indexOf("?")>=0?"&":"?")+q;
+  }
+
+  document.getElementById('eyebrow-txt').textContent=l.eyebrow;
+  document.getElementById('title').textContent=l.title;
+  document.getElementById('subtitle').textContent=l.sub;
+  document.getElementById('footer-txt').innerHTML=l.footer;
+  document.getElementById('meter-unit').textContent=l.unit;
+  document.getElementById('meter-label').textContent=l.label;
+
+  var steps=l.steps;
+  var box=document.getElementById('timeline-box');
+  var numEl=document.getElementById('meter-num');
+  var fillEl=document.getElementById('meter-fill');
+  var circumference=439;
+  var pcts=[0,20,40,60,80,100];
+
+  function setMeter(pct){
+    numEl.textContent=pct+'%';
+    fillEl.style.strokeDashoffset=circumference-(circumference*pct/100);
+  }
+  function renderTimeline(active){
+    box.innerHTML=steps.map(function(s,i){
+      var isDone=i<active,isRun=i===active;
+      return '<div class="tl-item'+(isDone?' done':isRun?' active':'')+'">'+
+        '<div class="tl-dot '+(isDone?'tl-done':isRun?'tl-active':'tl-wait')+'">'+
+        (isDone?l.stDone:isRun?l.stActive:l.stWait)+'</div>'+
+        '<div class="tl-lbl">'+s+'</div></div>';
+    }).join('');
+  }
+
+  var timings=[0,500,1100,1900,2700,3400];
+  var current=0;
+  renderTimeline(0);setMeter(pcts[0]);
+
+  function advance(){
+    current++;
+    renderTimeline(current);setMeter(pcts[current]);
+    if(current<steps.length){
+      setTimeout(advance,timings[current+1]-timings[current]);
+    } else {
+      if(!isPreview){
+        var t=readReturnTarget();
+        setTimeout(function(){window.location.replace(buildVerifyURL(t));},500);
+      }
+    }
+  }
+  setTimeout(advance,timings[1]);
+})();
+</script>
+</body>
+</html>

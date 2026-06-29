@@ -155,6 +155,7 @@ type SecurityBehaviorAndLimitsSettings struct {
 
 type SecurityAntibotSettings struct {
 	AntibotChallenge           string                 `json:"antibot_challenge"`
+	AntibotChallengeTemplate   string                 `json:"antibot_challenge_template,omitempty"`
 	AntibotURI                 string                 `json:"antibot_uri"`
 	ScannerAutoBanEnabled      bool                   `json:"scanner_auto_ban_enabled"`
 	AntibotRecaptchaScore      float64                `json:"antibot_recaptcha_score"`
@@ -288,8 +289,12 @@ type EasySiteProfile struct {
 	SecurityAPIPositive       SecurityAPIPositiveSettings       `json:"security_api_positive"`
 	SecurityModSecurity       SecurityModSecuritySettings       `json:"security_modsecurity"`
 	SecurityWebSocket         SecurityWebSocketSettings         `json:"security_websocket"`
-	CreatedAt                 string                            `json:"created_at"`
-	UpdatedAt                 string                            `json:"updated_at"`
+	// UseCustomErrorPages enables WAF custom error pages for this site.
+	// When true (default), proxy_intercept_errors is on and WAF error pages replace upstream errors.
+	UseCustomErrorPages bool     `json:"use_custom_error_pages"`
+	DisabledErrorPages  []string `json:"disabled_error_pages,omitempty"`
+	CreatedAt           string `json:"created_at"`
+	UpdatedAt           string `json:"updated_at"`
 }
 
 func DefaultProfile(siteID string) EasySiteProfile {
@@ -496,6 +501,7 @@ func DefaultProfile(siteID string) EasySiteProfile {
 			WSMaxMessageBytes: 0,
 			WSRateMsgPerSec:   0,
 		},
+		UseCustomErrorPages: true,
 	}
 }
 

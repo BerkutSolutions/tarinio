@@ -3,7 +3,6 @@ package compiler
 import (
 	"errors"
 	"fmt"
-	"path/filepath"
 	"sort"
 )
 
@@ -48,12 +47,12 @@ func RenderWAFArtifacts(sites []SiteInput, policies []WAFPolicyInput) ([]Artifac
 		policyBySite[policy.SiteID] = policy
 	}
 
-	baseContent, err := renderTemplate(filepath.Join(filepath.Dir(templatesRoot()), "modsecurity", "modsecurity.conf.tmpl"), modSecurityBaseData{})
+	baseContent, err := renderTemplate("templates/modsecurity/modsecurity.conf.tmpl", modSecurityBaseData{})
 	if err != nil {
 		return nil, fmt.Errorf("render modsecurity base template: %w", err)
 	}
 
-	crsSetupContent, err := renderTemplate(filepath.Join(filepath.Dir(templatesRoot()), "modsecurity", "crs-setup.conf.tmpl"), crsSetupData{})
+	crsSetupContent, err := renderTemplate("templates/modsecurity/crs-setup.conf.tmpl", crsSetupData{})
 	if err != nil {
 		return nil, fmt.Errorf("render crs setup template: %w", err)
 	}
@@ -81,7 +80,7 @@ func RenderWAFArtifacts(sites []SiteInput, policies []WAFPolicyInput) ([]Artifac
 			policy.Mode = ""
 		}
 
-		siteContent, err := renderTemplate(filepath.Join(filepath.Dir(templatesRoot()), "modsecurity", "sites", "site.conf.tmpl"), modSecuritySiteData{
+		siteContent, err := renderTemplate("templates/modsecurity/sites/site.conf.tmpl", modSecuritySiteData{
 			EngineMode:   engineMode(policy.Mode),
 			IncludeCRS:   policy.Enabled && policy.CRSEnabled,
 			OverridesRef: fmt.Sprintf("/etc/waf/modsecurity/crs-overrides/%s.conf", site.ID),
@@ -90,7 +89,7 @@ func RenderWAFArtifacts(sites []SiteInput, policies []WAFPolicyInput) ([]Artifac
 			return nil, fmt.Errorf("render modsecurity site template for %s: %w", site.ID, err)
 		}
 
-		overridesContent, err := renderTemplate(filepath.Join(filepath.Dir(templatesRoot()), "modsecurity", "crs-overrides", "site-overrides.conf.tmpl"), crsOverrideData{
+		overridesContent, err := renderTemplate("templates/modsecurity/crs-overrides/site-overrides.conf.tmpl", crsOverrideData{
 			RuleIncludes: policy.CustomRuleIncludes,
 		})
 		if err != nil {

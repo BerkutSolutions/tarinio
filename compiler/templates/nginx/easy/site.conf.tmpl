@@ -308,3 +308,126 @@ if ($waf_auth_gate_skip = 0) {
 {{- if not .UseModSecurity }}
 modsecurity off;
 {{- end }}
+
+{{- if .UseCustomErrorPages }}
+{{- if not (sliceContains .DisabledErrorPages "400") }}
+error_page 400 /__waf_errors/{{ .SiteID }}/400.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "401") }}
+error_page 401 /__waf_errors/{{ .SiteID }}/401.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "402") }}
+error_page 402 /__waf_errors/{{ .SiteID }}/402.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "403") }}
+error_page 403 /__waf_errors/{{ .SiteID }}/403.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "404") }}
+error_page 404 /__waf_errors/{{ .SiteID }}/404.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "405") }}
+error_page 405 /__waf_errors/{{ .SiteID }}/405.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "406") }}
+error_page 406 /__waf_errors/{{ .SiteID }}/406.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "407") }}
+error_page 407 /__waf_errors/{{ .SiteID }}/407.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "408") }}
+error_page 408 /__waf_errors/{{ .SiteID }}/408.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "409") }}
+error_page 409 /__waf_errors/{{ .SiteID }}/409.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "410") }}
+error_page 410 /__waf_errors/{{ .SiteID }}/410.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "411") }}
+error_page 411 /__waf_errors/{{ .SiteID }}/411.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "412") }}
+error_page 412 /__waf_errors/{{ .SiteID }}/412.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "413") }}
+error_page 413 /__waf_errors/{{ .SiteID }}/413.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "414") }}
+error_page 414 /__waf_errors/{{ .SiteID }}/414.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "415") }}
+error_page 415 /__waf_errors/{{ .SiteID }}/415.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "416") }}
+error_page 416 /__waf_errors/{{ .SiteID }}/416.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "417") }}
+error_page 417 /__waf_errors/{{ .SiteID }}/417.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "418") }}
+error_page 418 /__waf_errors/{{ .SiteID }}/418.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "421") }}
+error_page 421 /__waf_errors/{{ .SiteID }}/421.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "422") }}
+error_page 422 /__waf_errors/{{ .SiteID }}/422.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "423") }}
+error_page 423 /__waf_errors/{{ .SiteID }}/423.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "424") }}
+error_page 424 /__waf_errors/{{ .SiteID }}/424.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "425") }}
+error_page 425 /__waf_errors/{{ .SiteID }}/425.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "426") }}
+error_page 426 /__waf_errors/{{ .SiteID }}/426.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "428") }}
+error_page 428 /__waf_errors/{{ .SiteID }}/428.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "429") }}
+error_page 429 /__waf_errors/{{ .SiteID }}/429.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "431") }}
+error_page 431 /__waf_errors/{{ .SiteID }}/431.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "444") }}
+error_page 444 /__waf_errors/{{ .SiteID }}/444.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "451") }}
+error_page 451 /__waf_errors/_global/geo_block.html?rid=$request_id&ip=$remote_addr&ts=$msec&cc=$waf_country_code;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "500") }}
+error_page 500 /__waf_errors/{{ .SiteID }}/500.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "501") }}
+error_page 501 /__waf_errors/{{ .SiteID }}/501.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "502") }}
+error_page 502 /__waf_errors/{{ .SiteID }}/502.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "503") }}
+error_page 503 /__waf_errors/{{ .SiteID }}/503.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "504") }}
+error_page 504 /__waf_errors/{{ .SiteID }}/504.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "505") }}
+error_page 505 /__waf_errors/{{ .SiteID }}/505.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "507") }}
+error_page 507 /__waf_errors/{{ .SiteID }}/507.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "508") }}
+error_page 508 /__waf_errors/{{ .SiteID }}/508.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "510") }}
+error_page 510 /__waf_errors/{{ .SiteID }}/510.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "511") }}
+error_page 511 /__waf_errors/{{ .SiteID }}/511.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- end }}

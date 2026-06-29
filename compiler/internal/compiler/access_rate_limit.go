@@ -3,7 +3,6 @@ package compiler
 import (
 	"errors"
 	"fmt"
-	"path/filepath"
 	"sort"
 	"strings"
 )
@@ -121,7 +120,7 @@ func RenderAccessRateLimitArtifacts(
 		}
 	}
 
-	httpContent, err := renderTemplate(filepath.Join(templatesRoot(), "ratelimits", "http.conf.tmpl"), httpData)
+	httpContent, err := renderTemplate("templates/nginx/ratelimits/http.conf.tmpl", httpData)
 	if err != nil {
 		return nil, fmt.Errorf("render rate limit http template: %w", err)
 	}
@@ -146,7 +145,7 @@ func RenderAccessRateLimitArtifacts(
 			accessPolicy.DefaultAction = "deny"
 		}
 
-		accessContent, err := renderTemplate(filepath.Join(templatesRoot(), "access", "site.conf.tmpl"), accessSiteData{
+		accessContent, err := renderTemplate("templates/nginx/access/site.conf.tmpl", accessSiteData{
 			TrustedProxyCIDRs: accessPolicy.TrustedProxyCIDRs,
 			AllowCIDRs:        accessPolicy.AllowCIDRs,
 			DenyCIDRs:         accessPolicy.DenyCIDRs,
@@ -170,7 +169,7 @@ func RenderAccessRateLimitArtifacts(
 			}
 		}
 
-		rateContent, err := renderTemplate(filepath.Join(templatesRoot(), "ratelimits", "site.conf.tmpl"), rateLimitSiteData{
+		rateContent, err := renderTemplate("templates/nginx/ratelimits/site.conf.tmpl", rateLimitSiteData{
 			Enabled:         ratePolicy.Enabled,
 			ZoneName:        reqZoneName(site.ID),
 			ConnZoneName:    connZoneName(site.ID),

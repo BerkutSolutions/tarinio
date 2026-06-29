@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Security Check</title>
+<style>
+:root{color-scheme:dark}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#030b0a;color:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;overflow:hidden;padding:20px}
+body::before{content:'';position:fixed;inset:0;
+  background:radial-gradient(ellipse 100% 70% at 50% -20%,rgba(20,184,166,.2) 0%,transparent 55%),
+             radial-gradient(ellipse 70% 50% at 100% 100%,rgba(6,182,212,.12) 0%,transparent 50%),
+             radial-gradient(ellipse 50% 40% at 0% 60%,rgba(20,184,166,.08) 0%,transparent 50%);
+  pointer-events:none}
+body::after{content:'';position:fixed;inset:0;
+  background:repeating-linear-gradient(45deg,transparent,transparent 60px,rgba(20,184,166,.015) 60px,rgba(20,184,166,.015) 61px);
+  pointer-events:none}
+.card{position:relative;width:100%;max-width:520px;padding:48px 44px;background:rgba(10,11,22,.88);border:1px solid rgba(20,184,166,.15);border-radius:20px;backdrop-filter:blur(20px);box-shadow:0 0 0 1px rgba(20,184,166,.06),0 32px 90px rgba(0,0,0,.65);overflow:hidden}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#0d9488,#14b8a6,#06b6d4,#14b8a6,#0d9488);background-size:200% 100%;animation:gradShift 3s linear infinite;z-index:1}
+@keyframes gradShift{0%{background-position:0%}100%{background-position:200%}}
+.badge{display:inline-flex;align-items:center;gap:7px;padding:5px 13px;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);border-radius:99px;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(129,140,248,.9);margin-bottom:28px}
+.badge-dot{width:6px;height:6px;border-radius:50%;background:#818cf8;animation:bdot 1.3s ease-in-out infinite}
+@keyframes bdot{0%,100%{opacity:1}50%{opacity:.2}}
+h1{font-size:clamp(20px,4vw,28px);font-weight:800;letter-spacing:-.02em;color:#f1f5f9;margin-bottom:8px}
+.sub{font-size:14px;color:rgba(226,232,240,.45);line-height:1.7;margin-bottom:32px}
+/* scan box — no row dividers, shimmer line */
+.scan{position:relative;border:1px solid rgba(99,102,241,.14);border-radius:14px;overflow:hidden;background:rgba(99,102,241,.02);margin-bottom:28px}
+.scan::after{content:'';position:absolute;left:0;right:0;height:44px;top:-44px;background:linear-gradient(180deg,transparent,rgba(99,102,241,.1) 50%,transparent);animation:shimDown 2.6s ease-in-out infinite;pointer-events:none;z-index:0}
+@keyframes shimDown{0%{top:-44px}100%{top:100%}}
+.scan-row{position:relative;z-index:1;display:flex;align-items:center;gap:12px;padding:11px 14px}
+.sd{width:8px;height:8px;border-radius:50%;flex-shrink:0;transition:background .4s,box-shadow .4s}
+.sd-done{background:#34d399;box-shadow:0 0 6px rgba(52,211,153,.4)}
+.sd-run{background:#818cf8;box-shadow:0 0 8px rgba(129,140,248,.5);animation:sdpulse 1s ease-in-out infinite}
+.sd-wait{background:rgba(255,255,255,.12)}
+@keyframes sdpulse{0%,100%{opacity:1}50%{opacity:.3}}
+.scan-lbl{font-size:13px;color:rgba(226,232,240,.65);flex:1}
+.scan-val{font-size:12px;transition:color .4s}
+.sv-ok{color:#34d399}
+.sv-run{color:#818cf8;animation:bdot 1.2s ease-in-out infinite}
+.sv-wait{color:rgba(226,232,240,.25)}
+.spinner{width:13px;height:13px;border-radius:50%;border:2px solid rgba(129,140,248,.2);border-top-color:#818cf8;animation:spin .8s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.note{font-size:11.5px;color:rgba(129,140,248,.4);font-style:italic;margin-bottom:20px;line-height:1.5}
+.footer{font-size:11.5px;color:rgba(226,232,240,.22);line-height:1.6}
+.footer a{color:rgba(99,102,241,.55);font-weight:500;text-decoration:none}
+.footer a:hover{color:rgba(129,140,248,.8)}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="badge"><span class="badge-dot"></span><span id="badge-txt"></span></div>
+  <h1 id="title"></h1>
+  <p class="sub" id="subtitle"></p>
+  <div class="scan" id="scan-box"></div>
+  <p class="note" id="note-txt"></p>
+  <div class="footer" id="footer-txt"></div>
+</div>
+<script>
+(function(){
+  var dest=location.pathname||'/';
+  var I={
+    en:{badge:"Security Scan",title:"Identity Verification",sub:"TARINIO scans your browser. One-time bot check.",
+      steps:[
+        {lbl:"TLS handshake",ok:"Verified",run:"Checking…",wait:"Pending"},
+        {lbl:"Browser fingerprint",ok:"Verified",run:"Analyzing…",wait:"Pending"},
+        {lbl:"Threat analysis",ok:"Clear",run:"Scanning…",wait:"Pending"},
+        {lbl:"Access token",ok:"Issued",run:"Issuing…",wait:"Pending"},
+        {lbl:"Destination",ok:dest,run:dest,wait:dest}
+      ],
+      note:"If verification is complete, make sure cookies are enabled.",
+      footer:'Protected by <a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener">Tarinio WAF</a> &nbsp;·&nbsp; Do not refresh this page'},
+    ru:{badge:"Проверка безопасности",title:"Проверка личности",sub:"TARINIO сканирует браузер. Разовая проверка на бота.",
+      steps:[
+        {lbl:"TLS рукопожатие",ok:"Готово",run:"Проверяю…",wait:"Ожидание"},
+        {lbl:"Отпечаток браузера",ok:"Проверено",run:"Анализирую…",wait:"Ожидание"},
+        {lbl:"Анализ угроз",ok:"Чисто",run:"Сканирую…",wait:"Ожидание"},
+        {lbl:"Токен доступа",ok:"Выдан",run:"Выдаю…",wait:"Ожидание"},
+        {lbl:"Пункт назначения",ok:dest,run:dest,wait:dest}
+      ],
+      note:"Если проверка завершилась, убедитесь что cookie включены.",
+      footer:'Защищено <a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener">Tarinio WAF</a> &nbsp;·&nbsp; Не обновляйте страницу'},
+    de:{badge:"Sicherheitsscan",title:"Identitätsprüfung",sub:"TARINIO scannt Ihren Browser. Einmalige Bot-Überprüfung.",
+      steps:[
+        {lbl:"TLS-Handshake",ok:"Verifiziert",run:"Überprüfe…",wait:"Ausstehend"},
+        {lbl:"Browser-Fingerabdruck",ok:"Verifiziert",run:"Analysiere…",wait:"Ausstehend"},
+        {lbl:"Bedrohungsanalyse",ok:"Klar",run:"Scanne…",wait:"Ausstehend"},
+        {lbl:"Zugriffstoken",ok:"Ausgestellt",run:"Ausstellen…",wait:"Ausstehend"},
+        {lbl:"Zieladresse",ok:dest,run:dest,wait:dest}
+      ],
+      note:"Falls die Prüfung abgeschlossen ist, stellen Sie sicher, dass Cookies aktiviert sind.",
+      footer:'Geschützt von <a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener">Tarinio WAF</a> &nbsp;·&nbsp; Seite nicht aktualisieren'},
+    sr:{badge:"Безбедносни скен",title:"Верификација идентитета",sub:"TARINIO скенира прегледач. Једнократна провера бота.",
+      steps:[
+        {lbl:"TLS руковање",ok:"Верификовано",run:"Проверавам…",wait:"На чекању"},
+        {lbl:"Отисак прегледача",ok:"Верификовано",run:"Анализирам…",wait:"На чекању"},
+        {lbl:"Анализа претњи",ok:"Чисто",run:"Скенирам…",wait:"На чекању"},
+        {lbl:"Приступни токен",ok:"Издат",run:"Издајем…",wait:"На чекању"},
+        {lbl:"Одредиште",ok:dest,run:dest,wait:dest}
+      ],
+      note:"Ако је верификација завршена, уверите се да су колачићи укључени.",
+      footer:'Заштићено са <a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener">Tarinio WAF</a> &nbsp;·&nbsp; Не освежавај страницу'},
+    zh:{badge:"安全扫描",title:"身份验证",sub:"TARINIO 正在扫描您的浏览器。一次性机器人检查。",
+      steps:[
+        {lbl:"TLS握手",ok:"已验证",run:"验证中…",wait:"等待中"},
+        {lbl:"浏览器指纹",ok:"已验证",run:"分析中…",wait:"等待中"},
+        {lbl:"威胁分析",ok:"安全",run:"扫描中…",wait:"等待中"},
+        {lbl:"访问令牌",ok:"已颁发",run:"颁发中…",wait:"等待中"},
+        {lbl:"目标地址",ok:dest,run:dest,wait:dest}
+      ],
+      note:"如果验证已完成，请确保Cookie已启用。",
+      footer:'受 <a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener">Tarinio WAF</a> 保护 &nbsp;·&nbsp; 请勿刷新页面'}
+  };
+  var lang=navigator.language||'en';
+  var l=I[lang.slice(0,2)]||I.en;
+  var isPreview=!location.search.includes('_waf_token')&&location.pathname.includes('preview');
+
+  document.getElementById('badge-txt').textContent=l.badge;
+  document.getElementById('title').textContent=l.title;
+  document.getElementById('subtitle').textContent=l.sub;
+  document.getElementById('note-txt').textContent=l.note;
+  document.getElementById('footer-txt').innerHTML=l.footer;
+
+  var steps=l.steps;
+  var box=document.getElementById('scan-box');
+
+  function renderRows(active){
+    box.innerHTML=steps.map(function(s,i){
+      var isDone=i<active,isRun=i===active;
+      return '<div class="scan-row">'+
+        '<div class="sd '+(isDone?'sd-done':isRun?'sd-run':'sd-wait')+'"></div>'+
+        '<span class="scan-lbl">'+s.lbl+'</span>'+
+        (isRun?'<span class="scan-val sv-run">'+s.run+'</span>'+(i<4?'<div class="spinner"></div>':''):
+         isDone?'<span class="scan-val sv-ok">'+s.ok+'</span>':
+         '<span class="scan-val sv-wait">'+s.wait+'</span>')+
+        '</div>';
+    }).join('');
+  }
+
+  var timings=[0,500,1100,1800,2500,3200];
+  var current=0;
+  renderRows(0);
+
+  function advance(){
+    current++;
+    renderRows(current);
+    if(current<steps.length){
+      setTimeout(advance,timings[current+1]-timings[current]);
+    } else {
+      if(!isPreview){setTimeout(function(){location.reload();},700);}
+    }
+  }
+  setTimeout(advance,timings[1]);
+})();
+</script>
+</body>
+</html>

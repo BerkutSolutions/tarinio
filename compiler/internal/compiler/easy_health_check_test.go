@@ -1,14 +1,13 @@
 package compiler
 
 import (
-	"path/filepath"
 	"strings"
 	"testing"
 )
 
 func renderSiteConfForTest(t *testing.T, data nginxSiteData) string {
 	t.Helper()
-	tmplPath := filepath.Join(templatesRoot(), "sites", "site.conf.tmpl")
+	tmplPath := "templates/nginx/sites/site.conf.tmpl"
 	content, err := renderTemplate(tmplPath, data)
 	if err != nil {
 		t.Fatalf("renderTemplate(%s): %v", tmplPath, err)

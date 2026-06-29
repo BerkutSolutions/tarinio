@@ -8,11 +8,12 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"path/filepath"
-	"runtime"
+	"path"
 	"sort"
 	"strings"
 	"text/template"
+
+	compiler "waf/compiler"
 )
 
 type nginxMainData struct {
@@ -36,6 +37,8 @@ type nginxSiteData struct {
 	// HealthCheckEnabled adds keepalive to the upstream block and
 	// proxy_next_upstream directives to the location blocks.
 	HealthCheckEnabled bool
+	UseEasyConfig      bool
+	UseCustomErrorPages bool
 }
 
 type nginxHostMapEntry struct {
@@ -80,7 +83,7 @@ func RenderSiteUpstreamArtifacts(sites []SiteInput, upstreams []UpstreamInput) (
 
 	var artifacts []ArtifactOutput
 
-	mainContent, err := renderTemplate(filepath.Join(templatesRoot(), "nginx.conf.tmpl"), nginxMainData{
+	mainContent, err := renderTemplate("templates/nginx/nginx.conf.tmpl", nginxMainData{
 		SitesIncludeGlob: "sites/*.conf",
 	})
 	if err != nil {
@@ -88,7 +91,7 @@ func RenderSiteUpstreamArtifacts(sites []SiteInput, upstreams []UpstreamInput) (
 	}
 	artifacts = append(artifacts, newArtifact("nginx/nginx.conf", ArtifactKindNginxConfig, mainContent))
 
-	baseContent, err := renderTemplate(filepath.Join(templatesRoot(), "conf.d", "base.conf.tmpl"), nginxBaseData{
+	baseContent, err := renderTemplate("templates/nginx/conf.d/base.conf.tmpl", nginxBaseData{
 		ErrorStatusCodes:         append([]int(nil), supportedErrorStatusCodes...),
 		HostMapEntries:           buildHostMapEntries(sortedSites),
 		ManagementAPIProxyTarget: managementAPIProxyTarget(),
@@ -105,7 +108,7 @@ func RenderSiteUpstreamArtifacts(sites []SiteInput, upstreams []UpstreamInput) (
 	artifacts = append(artifacts, globalErrorArtifacts...)
 
 	// geo_block.html — shared page for HTTP 451 geo-restriction responses
-	geoBlockPage, err := renderTemplate(filepath.Join(templatesRoot(), "..", "errors", "geo_block.html.tmpl"), nil)
+	geoBlockPage, err := renderTemplate("templates/errors/geo_block.html.tmpl", nil)
 	if err != nil {
 		return nil, fmt.Errorf("render geo block page: %w", err)
 	}
@@ -117,7 +120,7 @@ func RenderSiteUpstreamArtifacts(sites []SiteInput, upstreams []UpstreamInput) (
 		}
 
 		upstream := upstreamByID[site.DefaultUpstreamID]
-		siteContent, err := renderTemplate(filepath.Join(templatesRoot(), "sites", "site.conf.tmpl"), nginxSiteData{
+		siteContent, err := renderTemplate("templates/nginx/sites/site.conf.tmpl", nginxSiteData{
 			SiteID:                    site.ID,
 			SiteIDSlug:                slugSiteID(site.ID),
 			ServerNames:               collectServerNames(site),
@@ -131,6 +134,8 @@ func RenderSiteUpstreamArtifacts(sites []SiteInput, upstreams []UpstreamInput) (
 			PassHostHeader:            upstream.PassHostHeader,
 			RateLimitCookie:           rateLimitCookieName(site.ID),
 			RateLimitEscalationCookie: rateLimitEscalationCookieName(site.ID),
+			UseEasyConfig:             site.UseEasyConfig,
+			UseCustomErrorPages:       site.UseCustomErrorPages,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("render site template for %s: %w", site.ID, err)
@@ -257,13 +262,22 @@ func slugSiteID(siteID string) string {
 	return value
 }
 
-func renderTemplate(path string, data any) ([]byte, error) {
-	content, err := os.ReadFile(path)
+func renderTemplate(tmplPath string, data any) ([]byte, error) {
+	content, err := compiler.TemplatesFS.ReadFile(tmplPath)
 	if err != nil {
 		return nil, err
 	}
 
-	tmpl, err := template.New(filepath.Base(path)).Parse(string(content))
+	tmpl, err := template.New(path.Base(tmplPath)).Funcs(template.FuncMap{
+		"sliceContains": func(slice []string, s string) bool {
+			for _, v := range slice {
+				if v == s {
+					return true
+				}
+			}
+			return false
+		},
+	}).Parse(string(content))
 	if err != nil {
 		return nil, err
 	}
@@ -272,7 +286,6 @@ func renderTemplate(path string, data any) ([]byte, error) {
 	if err := tmpl.Execute(&buf, data); err != nil {
 		return nil, err
 	}
-
 	return buf.Bytes(), nil
 }
 
@@ -286,13 +299,9 @@ func newArtifact(path string, kind ArtifactKind, content []byte) ArtifactOutput 
 	}
 }
 
+// templatesRoot returns the embed FS prefix for nginx templates.
 func templatesRoot() string {
-	_, currentFile, _, ok := runtime.Caller(0)
-	if !ok {
-		return filepath.Join("compiler", "templates", "nginx")
-	}
-
-	return filepath.Join(filepath.Dir(currentFile), "..", "..", "templates", "nginx")
+	return "templates/nginx"
 }
 
 func renderSiteErrorArtifacts(siteID string) ([]ArtifactOutput, error) {
@@ -300,7 +309,7 @@ func renderSiteErrorArtifacts(siteID string) ([]ArtifactOutput, error) {
 
 	artifacts := make([]ArtifactOutput, 0, len(pages))
 	for _, page := range pages {
-		content, err := renderTemplate(filepath.Join(templatesRoot(), "..", "errors", "status.html.tmpl"), page)
+		content, err := renderTemplate("templates/errors/status.html.tmpl", page)
 		if err != nil {
 			return nil, err
 		}

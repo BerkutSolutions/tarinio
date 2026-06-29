@@ -357,24 +357,37 @@ func artifactsByPath(artifacts []ArtifactOutput) map[string]ArtifactOutput {
 // Если артефакт не найден или рендер падает — тест провален.
 func mustRenderSiteConf(t *testing.T, siteID string, profile EasyProfileInput) string {
 	t.Helper()
-	artifacts, err := RenderEasyArtifacts(
-		[]SiteInput{{
-			ID:          siteID,
-			Enabled:     true,
-			PrimaryHost: siteID + ".example.com",
-			ListenHTTP:  true,
-		}},
-		[]EasyProfileInput{profile},
-	)
+	siteInput := SiteInput{
+		ID:                  siteID,
+		Enabled:             true,
+		PrimaryHost:         siteID + ".example.com",
+		ListenHTTP:          true,
+		UseEasyConfig:       true,
+		UseCustomErrorPages: profile.UseCustomErrorPages,
+		DefaultUpstreamID:   "up",
+	}
+	easyArtifacts, err := RenderEasyArtifacts([]SiteInput{siteInput}, []EasyProfileInput{profile})
 	if err != nil {
 		t.Fatalf("RenderEasyArtifacts(%s): %v", siteID, err)
 	}
-	wantPath := "nginx/easy/" + siteID + ".conf"
-	for _, a := range artifacts {
-		if a.Path == wantPath {
-			return string(a.Content)
+	upstreamArtifacts, err := RenderSiteUpstreamArtifacts(
+		[]SiteInput{siteInput},
+		[]UpstreamInput{{ID: "up", SiteID: siteID, Host: "127.0.0.1", Port: 8080, Scheme: "http"}},
+	)
+	if err != nil {
+		t.Fatalf("RenderSiteUpstreamArtifacts(%s): %v", siteID, err)
+	}
+	easyPath := "nginx/easy/" + siteID + ".conf"
+	sitesPath := "nginx/sites/" + siteID + ".conf"
+	var combined strings.Builder
+	for _, a := range append(easyArtifacts, upstreamArtifacts...) {
+		if a.Path == easyPath || a.Path == sitesPath {
+			combined.WriteString(string(a.Content))
+			combined.WriteString("\n")
 		}
 	}
-	t.Fatalf("artifact %q not found in rendered artifacts", wantPath)
-	return ""
+	if combined.Len() == 0 {
+		t.Fatalf("neither %q nor %q found in rendered artifacts", easyPath, sitesPath)
+	}
+	return combined.String()
 }

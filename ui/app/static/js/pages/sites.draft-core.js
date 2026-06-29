@@ -33,7 +33,7 @@ export function defaultSiteDraft() {
     ban_escalation_stages_seconds: [300, 86400, 0], use_blacklist: false, use_dnsbl: false, blacklist_ip: [], blacklist_rdns: [], blacklist_asn: [], blacklist_user_agent: [],
     blacklist_uri: [], blacklist_ip_urls: [], blacklist_rdns_urls: [], blacklist_asn_urls: [], blacklist_user_agent_urls: [], blacklist_uri_urls: [], blacklist_ja3: [], blacklist_ja3_urls: [], use_limit_conn: true,
     limit_conn_max_http1: 200, limit_conn_max_http2: 400, limit_conn_max_http3: 400, use_limit_req: true, limit_req_url: "/", limit_req_rate: "120r/s", custom_limit_rules: [],
-    antibot_challenge: "no", antibot_uri: "/challenge", antibot_scanner_auto_ban_enabled: true, antibot_recaptcha_score: 0.7, antibot_recaptcha_sitekey: "", antibot_recaptcha_secret: "",
+    antibot_challenge: "no", antibot_challenge_template: "v1", antibot_uri: "/challenge", antibot_scanner_auto_ban_enabled: true, antibot_recaptcha_score: 0.7, antibot_recaptcha_sitekey: "", antibot_recaptcha_secret: "",
     antibot_hcaptcha_sitekey: "", antibot_hcaptcha_secret: "", antibot_turnstile_sitekey: "", antibot_turnstile_secret: "", antibot_exclusion_rules: [], challenge_escalation_enabled: false,
     challenge_escalation_mode: "javascript", antibot_challenge_rules: [], use_auth_basic: false, auth_basic_location: "sitewide", auth_basic_user: "changeme", auth_basic_password: "",
     auth_basic_text: "Restricted area", auth_basic_users: [{ username: "changeme", password: "", enabled: true, last_login_at: "" }], auth_basic_session_inactivity_minutes: 60,
@@ -42,7 +42,9 @@ export function defaultSiteDraft() {
     modsecurity_crs_version: "4", modsecurity_crs_plugins: [], modsecurity_custom_path: "modsec/anomaly_score.conf", modsecurity_custom_content: "",
     use_ws_inspection: false, ws_block_patterns: [], ws_max_message_bytes: 0, ws_rate_msg_per_sec: 0,
     mtls_enabled: false, mtls_optional: false, mtls_verify_depth: 2, mtls_client_ca_ref: "", mtls_pass_headers: false,
-    upstream_mtls_enabled: false, upstream_mtls_cert_ref: "", upstream_mtls_key_ref: "", upstream_mtls_ca_ref: ""
+    upstream_mtls_enabled: false, upstream_mtls_cert_ref: "", upstream_mtls_key_ref: "", upstream_mtls_ca_ref: "",
+    use_custom_error_pages: true,
+    disabled_error_pages: [],
   };
 }
 
@@ -102,14 +104,14 @@ export function draftToEasyProfile(draft) {
       limit_req_url: limitReqURL.startsWith("/") ? limitReqURL : "/", limit_req_rate: limitReqRate, custom_limit_rules: normalizeCustomLimitRules(draft.custom_limit_rules)
     },
     security_antibot: {
-      antibot_challenge: draft.antibot_challenge, antibot_uri: draft.antibot_uri, scanner_auto_ban_enabled: Boolean(draft.antibot_scanner_auto_ban_enabled),
+      antibot_challenge: draft.antibot_challenge, antibot_challenge_template: draft.antibot_challenge_template || "v1", antibot_uri: draft.antibot_uri, scanner_auto_ban_enabled: Boolean(draft.antibot_scanner_auto_ban_enabled),
       antibot_recaptcha_score: draft.antibot_recaptcha_score, antibot_recaptcha_sitekey: draft.antibot_recaptcha_sitekey, antibot_recaptcha_secret: draft.antibot_recaptcha_secret,
       antibot_hcaptcha_sitekey: draft.antibot_hcaptcha_sitekey, antibot_hcaptcha_secret: draft.antibot_hcaptcha_secret, antibot_turnstile_sitekey: draft.antibot_turnstile_sitekey,
       antibot_turnstile_secret: draft.antibot_turnstile_secret, exclusion_rules: normalizeAntibotExclusionRules(draft.antibot_exclusion_rules), challenge_escalation_enabled: Boolean(draft.challenge_escalation_enabled),
       challenge_escalation_mode: String(draft.challenge_escalation_mode || "javascript").trim().toLowerCase() || "javascript", challenge_rules: normalizeAntibotChallengeRules(draft.antibot_challenge_rules)
     },
     security_auth_basic: { use_auth_basic: draft.use_auth_basic, auth_basic_location: "sitewide", auth_basic_user: firstUser.username, auth_basic_password: firstUser.password, auth_basic_text: authBasicText, users: authUsers, session_inactivity_minutes: authSessionTTLMinutes },
-    security_country_policy: { blacklist_country: draft.blacklist_country, whitelist_country: draft.whitelist_country, geo_time_windows: normalizeGeoTimeWindows(draft.geo_time_windows) },
+    security_country_policy: { blacklist_country: draft.blacklist_country, whitelist_country: draft.whitelist_country, show_geo_block_page: Boolean(draft.show_geo_block_page), geo_time_windows: normalizeGeoTimeWindows(draft.geo_time_windows) },
     security_api_positive: {
       use_api_positive_security: Boolean(draft.api_positive_security_enabled), openapi_schema_ref: String(draft.api_positive_openapi_schema_ref || "").trim(),
       enforcement_mode: String(draft.api_positive_enforcement_mode || "monitor").trim().toLowerCase() || "monitor",
@@ -118,6 +120,8 @@ export function draftToEasyProfile(draft) {
     security_modsecurity: {
       use_modsecurity: draft.use_modsecurity, use_modsecurity_crs_plugins: draft.use_modsecurity_crs_plugins, use_modsecurity_custom_configuration: draft.use_modsecurity_custom_configuration,
       modsecurity_crs_version: draft.modsecurity_crs_version, modsecurity_crs_plugins: draft.modsecurity_crs_plugins, custom_configuration: { path: customPath, content: draft.modsecurity_custom_content }
-    }
+    },
+    use_custom_error_pages: Boolean(draft.use_custom_error_pages ?? true),
+    disabled_error_pages: Array.isArray(draft.disabled_error_pages) ? draft.disabled_error_pages : [],
   };
 }

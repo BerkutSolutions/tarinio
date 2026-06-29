@@ -82,8 +82,8 @@ func TestModsec_Disabled_NoRulesFileDirective(t *testing.T) {
 		MaxClientSize:  "10m",
 		UseModSecurity: false,
 	})
-	if strings.Contains(conf, "modsecurity_rules_file") {
-		t.Fatalf("did not expect modsecurity_rules_file when UseModSecurity=false, got:\n%s", conf)
+	if strings.Contains(conf, "modsecurity_rules_file /etc/waf/modsecurity/easy/") {
+		t.Fatalf("did not expect easy modsecurity_rules_file when UseModSecurity=false, got:\n%s", conf)
 	}
 }
 

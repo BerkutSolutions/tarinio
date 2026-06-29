@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Security Check</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#060812;color:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;overflow:hidden}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(99,102,241,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(99,102,241,.06) 1px,transparent 1px);background-size:40px 40px;pointer-events:none}
+.card{position:relative;width:100%;max-width:480px;padding:48px 44px;background:rgba(10,12,28,.85);border:1px solid rgba(99,102,241,.18);border-radius:20px;backdrop-filter:blur(18px);box-shadow:0 0 0 1px rgba(99,102,241,.08),0 24px 80px rgba(0,0,0,.6);margin:20px}
+.card::after{content:'';position:absolute;inset:-1px;border-radius:20px;background:linear-gradient(180deg,transparent 0%,rgba(99,102,241,.12) 50%,transparent 100%);background-size:100% 200%;animation:scan 3s linear infinite;pointer-events:none}
+@keyframes scan{0%{background-position:0 -100%}100%{background-position:0 200%}}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.25);border-radius:99px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#818cf8;margin-bottom:28px}
+.badge-dot{width:6px;height:6px;border-radius:50%;background:#818cf8;animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
+h1{font-size:22px;font-weight:700;color:#f1f5f9;line-height:1.3;margin-bottom:10px}
+.sub{font-size:13.5px;color:rgba(226,232,240,.4);line-height:1.7;margin-bottom:28px}
+.prog-wrap{height:3px;background:rgba(255,255,255,.06);border-radius:99px;overflow:hidden;margin-bottom:28px}
+.prog-bar{height:100%;border-radius:99px;background:linear-gradient(90deg,#6366f1,#818cf8,#6366f1);background-size:200% 100%;animation:progFill 3.5s ease-out forwards,shimmer 2s linear infinite}
+@keyframes progFill{from{width:4%}60%{width:70%}85%{width:88%}to{width:100%}}
+@keyframes shimmer{0%{background-position:0%}100%{background-position:200%}}
+.checks{display:flex;flex-direction:column;gap:10px;margin-bottom:28px}
+.chk{display:flex;align-items:center;gap:10px;font-size:13px;color:rgba(226,232,240,.5);transition:color .4s}
+.chk.done{color:rgba(226,232,240,.85)}
+.chk-icon{width:20px;height:20px;border-radius:6px;border:1px solid rgba(99,102,241,.25);background:rgba(99,102,241,.07);display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;transition:all .4s}
+.chk.done .chk-icon{background:rgba(99,102,241,.2);border-color:rgba(99,102,241,.5);color:#818cf8}
+.chk.active .chk-icon{animation:pulse 1s ease-in-out infinite}
+.chk-lbl{flex:1}
+.chk-val{font-size:11px}
+.cv-ok{color:#34d399}
+.cv-run{color:#818cf8;animation:pulse 1.2s ease-in-out infinite}
+.cv-wait{color:rgba(226,232,240,.2)}
+.footer{font-size:11px;color:rgba(226,232,240,.2)}
+.footer a{color:rgba(99,102,241,.5);text-decoration:none;font-weight:500}
+.footer a:hover{color:#818cf8}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="badge"><span class="badge-dot"></span><span id="badge-txt"></span></div>
+  <h1 id="title"></h1>
+  <p class="sub" id="subtitle"></p>
+  <div class="prog-wrap"><div class="prog-bar"></div></div>
+  <div class="checks" id="checks-box"></div>
+  <div class="footer" id="footer-txt"></div>
+</div>
+<script>
+(function(){
+  var I={
+    en:{badge:"Security Scan",title:"Verifying your browser",sub:"Please wait while Tarinio WAF performs an automated security check.",steps:["TLS handshake","Browser fingerprint","Threat analysis","Access token","Redirect"],stOk:"✓",stRun:"…",stWait:"",footer:'Protected by <a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener">Tarinio WAF</a> · Do not refresh'},
+    ru:{badge:"Проверка",title:"Проверка браузера",sub:"Подождите, пока Tarinio WAF выполняет автоматическую проверку безопасности.",steps:["TLS рукопожатие","Отпечаток браузера","Анализ угроз","Токен доступа","Перенаправление"],stOk:"✓",stRun:"…",stWait:"",footer:'Защищено <a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener">Tarinio WAF</a> · Не обновляйте страницу'},
+    de:{badge:"Sicherheitsscan",title:"Browser wird überprüft",sub:"Bitte warten Sie, während Tarinio WAF eine automatische Sicherheitsprüfung durchführt.",steps:["TLS-Handshake","Browser-Fingerabdruck","Bedrohungsanalyse","Zugriffstoken","Weiterleitung"],stOk:"✓",stRun:"…",stWait:"",footer:'Geschützt von <a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener">Tarinio WAF</a> · Nicht aktualisieren'},
+    sr:{badge:"Безбедносни скен",title:"Верификација прегледача",sub:"Сачекајте док Tarinio WAF врши аутоматску безбедносну проверу.",steps:["TLS руковање","Отисак прегледача","Анализа претњи","Приступни токен","Преусмеравање"],stOk:"✓",stRun:"…",stWait:"",footer:'Заштићено са <a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener">Tarinio WAF</a> · Не освежавај'},
+    zh:{badge:"安全扫描",title:"验证您的浏览器",sub:"请稍候，Tarinio WAF 正在执行自动安全检查。",steps:["TLS握手","浏览器指纹","威胁分析","访问令牌","重定向"],stOk:"✓",stRun:"…",stWait:"",footer:'受 <a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener">Tarinio WAF</a> 保护 · 请勿刷新'}
+  };
+  var lang=navigator.language||'en';
+  var l=I[lang.slice(0,2)]||I.en;
+  var isPreview=location.pathname.includes('preview');
+
+  document.getElementById('badge-txt').textContent=l.badge;
+  document.getElementById('title').textContent=l.title;
+  document.getElementById('subtitle').textContent=l.sub;
+  document.getElementById('footer-txt').innerHTML=l.footer;
+
+  var box=document.getElementById('checks-box');
+  function renderRows(active){
+    box.innerHTML=l.steps.map(function(s,i){
+      var isDone=i<active,isRun=i===active;
+      return '<div class="chk'+(isDone?' done':isRun?' active':'')+'">'+
+        '<div class="chk-icon">'+(isDone?'✓':isRun?'↻':'')+'</div>'+
+        '<span class="chk-lbl">'+s+'</span>'+
+        '<span class="chk-val '+(isDone?'cv-ok':isRun?'cv-run':'cv-wait')+'">'+
+        (isDone?l.stOk:isRun?l.stRun:l.stWait)+'</span>'+
+        '</div>';
+    }).join('');
+  }
+
+  var timings=[400,900,1700,2400,3000];
+  var current=0;
+  renderRows(0);
+  function advance(){
+    current++;
+    if(current<l.steps.length){renderRows(current);setTimeout(advance,timings[current]-timings[current-1]);}
+    else{
+      renderRows(l.steps.length);
+      if(!isPreview){setTimeout(function(){location.reload();},600);}
+    }
+  }
+  setTimeout(advance,timings[0]);
+})();
+</script>
+</body>
+</html>

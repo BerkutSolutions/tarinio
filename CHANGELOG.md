@@ -1,20 +1,45 @@
-## [1.4.3] - 28.06.2026
+## [1.4.4] - 29.06.2026
 
 ### Ядро
 
-- Добавлено поле `show_geo_block_page` в профиль сайта (страновая политика) — при включении WAF возвращает HTTP 451 вместо 403 для заблокированных по стране запросов и отдаёт информационную страницу.
-- Создан глобальный артефакт `errors/_global/geo_block.html` — HTML-страница с тёмной темой, трёхязычной локализацией (ru/en/de) и инфо-блоком (время запроса, IP клиента, страна по GeoIP, Request ID).
-- `error_page 451` в `site.conf.tmpl` передаёт параметры `rid`, `ip`, `ts`, `cc` через query string — страница читает их через `URLSearchParams`.
-- Добавлен preview-location `/preview/geo-block` в management server block (`base.conf.tmpl` и `site.conf.tmpl`).
-- Обновлены тесты компилятора: `expectedArtifacts = 4 + (2 * len(supportedErrorStatusCodes))`, добавлен `show_geo_block_page` в contract-тест control-plane.
+- Удалены старые шаблоны `compiler/templates/errors/403.html.tmpl` и `compiler/templates/errors/50x.html.tmpl` — не вызывались ни из одного Go-файла; все HTTP-ошибки генерируются через `status.html.tmpl`.
+- Добавлено поле `AntibotChallengeTemplate` в `EasyProfileInput` (compiler/types.go), `easyConfigData` (easy.go) и маппинг в `runtime_apply.go` + `easy_runtime_site_artifacts.go` — выбор HTML-шаблона страницы antibot-challenge по имени (v1–v5).
+- Созданы шаблоны `antibot-v1.html.tmpl` ... `antibot-v5.html.tmpl` из preview-файлов; при пустом/неизвестном значении используется `antibot.html.tmpl` (оригинал).
 
-### UI
+### CI / Release
 
-- На вкладке «Гео» добавлен чекбокс «Показывать страницу ограничения по региону» — первым элементом, выше списков стран.
-- Добавлено пояснение к чекбоксу в хелп-модалке гео-вкладки.
-- Исправлен CSS: добавлено `.waf-checkbox.full { grid-column: 1 / -1 }` — чекбокс корректно занимает всю строку в двухколоночном гриде.
+- Исправлен smoke-стек в `scripts/local-ci-preflight.ps1`: runtime HTTP, runtime HTTPS и UI теперь получают разные host-порты, а retry при `port is already allocated` пересоздаёт весь набор портов без пересечения.
+- `New-FreeTcpPort` больше не выбирает порт через ephemeral `:0`; вместо этого подбирает свободный порт из диапазона `20000-29999`, чтобы снизить race с повторным использованием ephemeral-портов Docker/Windows.
 
-### Локализация
+### UI: Antibot (Tab 6)
 
-- Добавлен ключ `sites.easy.geo.showGeoBlockPage` на всех 5 языках (ru, en, de, sr, zh).
-- Добавлены ключи `sites.help.geo.showGeoBlockPage.label` и `sites.help.geo.showGeoBlockPage.usage` на всех 5 языках.
+- Исправлено: `antibot_challenge_template` не сохранялся — поле отсутствовало в `draftToEasyProfile` в `sites.draft-core.js`.
+- Кнопка «Просмотр» рядом с выпадающим «Шаблон страницы проверки» выровнена по нижнему краю поля (`align-items:flex-end`).
+
+### UI: Страницы ошибок (Tab 11)
+
+- Добавлено поле `UseCustomErrorPages bool` в `EasyProfileInput` (compiler/types.go), `EasySiteProfile` (easysiteprofiles/types.go) и маппинг в runtime_apply.go.
+- По умолчанию `true` — для всех существующих сайтов кастомные страницы включены автоматически.
+- При `UseCustomErrorPages=true` в easy/site.conf.tmpl добавляются `proxy_intercept_errors on` и `error_page` директивы для всех 40+ кодов (400–511, 451→geo_block).
+- Добавлен тест `tab11_errorpages_test.go` — проверяет наличие/отсутствие директив.
+- Контрактный тест `TestSiteSettings_FieldContract` обновлён для нового поля `use_custom_error_pages`.
+- Добавлена вкладка «Error Pages» (Tab 11) в редактор сайта — чекбокс включения кастомных страниц ошибок + список всех 40+ кодов с индивидуальными чекбоксами и кнопками Preview.
+- Добавлен API endpoint `GET /api/error-pages/preview/{slug}` в control-plane — отдаёт preview-страницу по slug, доступен только авторизованным пользователям.
+- Добавлены i18n-ключи для вкладки Error Pages на всех 5 языках (ru, en, de, sr, zh).
+- Затемнение блока списка страниц при отключённом чекбоксе — паттерн из whitelist/blacklist секций.
+
+### UI: Антибот — выбор шаблона страницы проверки
+
+- Добавлено поле `AntibotChallengeTemplate string` в `EasySiteProfile` (easysiteprofiles/types.go) — хранит выбранный шаблон страницы проверки браузера (v1–v5), по умолчанию `"v2"`.
+- Поле сохраняется и восстанавливается через draft-слой (draft-core, draft-builder, detail-draft, profile-hydration, draft-profile-part2).
+- В блоке антибота на вкладке Security добавлены: select выбора варианта шаблона (1–5 вариант) и кнопка Preview — открывает `/api/error-pages/preview/antibot-vN` в новой вкладке.
+- Контрактный тест обновлён для нового поля `security_antibot.antibot_challenge_template`.
+- Добавлены i18n-ключи `sites.easy.antibot.challengeTemplate`, `sites.easy.antibot.previewTemplate`, `sites.easy.antibot.template.v1`–`v5` на всех 5 языках.
+
+### Шаблоны страницы браузерной проверки (antibot preview)
+
+- **antibot-v1** — оригинальный шаблон; исправлен редирект в preview-режиме (добавлена проверка `isPreview` перед `window.location.replace`).
+- **antibot-v2** — синий/indigo стиль; убрана горизонтальная полоса прогресса; 5 шагов (TLS, отпечаток, угрозы, токен, перенаправление); i18n (en/ru/de/sr/zh); гиперссылка; уникальный фон — угловые indigo/purple свечения + диагональные линии 135°.
+- **antibot-v3** — indigo grid карточка со scanning line; 5 шагов; i18n; гиперссылка; исправлен footer ru.
+- **antibot-v4** — split layout: timeline слева + SVG circle meter справа; плавное заполнение через `stroke-dashoffset`; равномерные проценты 0→20→40→60→80→100%; последний шаг показывает путь назначения; i18n; гиперссылка.
+- **antibot-v5** — янтарный/amber стиль; 3 шага (отпечаток, верификационная cookie, пункт назначения); shimmer-линия внутри блока статусов; заметка про cookie; i18n; уникальный фон teal aurora; градиентная полоса teal→cyan→teal сверху карточки.

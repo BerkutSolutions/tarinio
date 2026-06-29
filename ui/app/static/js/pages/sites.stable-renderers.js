@@ -57,6 +57,7 @@ import {
 } from "./sites.list-renderers.js";
 import { renderDetailViewRuntime } from "./sites.detail-render-view.js";
 import { renderVirtualPatchesEditor as renderVirtualPatchesEditorModule } from "./sites.virtual-patches-editor.js";
+import { renderErrorPagesTab as renderErrorPagesTabModule } from "./sites.detail-render-errorpages.js";
 import {
   renderModeTabs as renderModeTabsModule,
   renderRawEditor as renderRawEditorModule,
@@ -229,5 +230,6 @@ export function renderDetailView(state, ctx) {
     normalizeAuthExclusionRules,
     normalizeAuthServiceTokens,
     renderVirtualPatchesEditor: (vpState, vpCtx) => renderVirtualPatchesEditorModule(vpState, vpCtx),
+    renderErrorPagesTab: (epDraft, epCtx) => renderErrorPagesTabModule(epDraft, epCtx),
   });
 }

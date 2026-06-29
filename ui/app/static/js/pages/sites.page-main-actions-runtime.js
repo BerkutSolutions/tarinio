@@ -46,7 +46,8 @@ export function renderDetailViewRuntimeBridge(state, ctx, deps) {
     renderAuthServiceTokensEditor,
     renderAuthHelpModal,
     renderAntibotHelpModal,
-    normalizeAuthMode
+    normalizeAuthMode,
+    renderErrorPagesTab,
   } = deps;
   return renderDetailViewPart2(state, ctx, {
     SETTINGS_SEARCH_INDEX,
@@ -71,7 +72,8 @@ export function renderDetailViewRuntimeBridge(state, ctx, deps) {
     renderAuthServiceTokensEditor,
     renderAuthHelpModal,
     renderAntibotHelpModal,
-    normalizeAuthMode
+    normalizeAuthMode,
+    renderErrorPagesTab,
   });
 }
 

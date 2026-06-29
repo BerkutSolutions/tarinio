@@ -3,7 +3,6 @@ package compiler
 import (
 	"errors"
 	"fmt"
-	"path/filepath"
 	"sort"
 	"strings"
 )
@@ -68,7 +67,7 @@ func RenderTLSArtifacts(sites []SiteInput, tlsConfigs []TLSConfigInput, certific
 			return nil, fmt.Errorf("site %s certificate %s belongs to site %s", site.ID, cert.ID, cert.SiteID)
 		}
 
-		content, err := renderTemplate(filepath.Join(filepath.Dir(templatesRoot()), "tls", "refs.conf.tmpl"), tlsRefsData{
+		content, err := renderTemplate("templates/tls/refs.conf.tmpl", tlsRefsData{
 			CertificatePath: cert.StorageRef,
 			PrivateKeyPath:  cert.PrivateKeyRef,
 		})

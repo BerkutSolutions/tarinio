@@ -30,7 +30,10 @@ server {
     server_name {{ range $index, $name := .ServerNames }}{{ if $index }} {{ end }}{{ $name }}{{ end }};
     include /etc/waf/nginx/access/{{ .SiteID }}.conf;
     add_header Server-Timing "rid;desc=$request_id,ip;desc=$remote_addr,ts;desc=$msec" always;
+{{- if or (not .UseEasyConfig) (and .UseEasyConfig .UseCustomErrorPages) }}
     proxy_intercept_errors on;
+{{- end }}
+{{- if not .UseEasyConfig }}
     error_page 400 /__waf_errors/{{ .SiteID }}/400.html?rid=$request_id&ip=$remote_addr&ts=$msec;
     error_page 401 /__waf_errors/{{ .SiteID }}/401.html?rid=$request_id&ip=$remote_addr&ts=$msec;
     error_page 403 /__waf_errors/{{ .SiteID }}/403.html?rid=$request_id&ip=$remote_addr&ts=$msec;
@@ -44,6 +47,7 @@ server {
     error_page 502 /__waf_errors/{{ .SiteID }}/502.html?rid=$request_id&ip=$remote_addr&ts=$msec;
     error_page 503 /__waf_errors/{{ .SiteID }}/503.html?rid=$request_id&ip=$remote_addr&ts=$msec;
     error_page 504 /__waf_errors/{{ .SiteID }}/504.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
 
     location = /__waf_errors/{{ .SiteID }}/400.html {
         internal;
@@ -147,12 +151,46 @@ server {
     }
 
 {{- if .IsManagementSite }}
-    location = /preview/geo-block {
-        allow all;
-        modsecurity off;
-        default_type text/html;
-        alias /etc/waf/errors/_global/geo_block.html;
-    }
+    location = /preview/geo-block { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/geo_block.html; }
+    location = /preview/400 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/400.html; }
+    location = /preview/401 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/401.html; }
+    location = /preview/403 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/403.html; }
+    location = /preview/404 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/404.html; }
+    location = /preview/405 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/405.html; }
+    location = /preview/408 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/408.html; }
+    location = /preview/421 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/421.html; }
+    location = /preview/429 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/429.html; }
+    location = /preview/402 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/402.html; }
+    location = /preview/406 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/406.html; }
+    location = /preview/407 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/407.html; }
+    location = /preview/409 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/409.html; }
+    location = /preview/410 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/410.html; }
+    location = /preview/411 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/411.html; }
+    location = /preview/412 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/412.html; }
+    location = /preview/413 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/413.html; }
+    location = /preview/414 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/414.html; }
+    location = /preview/415 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/415.html; }
+    location = /preview/416 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/416.html; }
+    location = /preview/417 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/417.html; }
+    location = /preview/418 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/418.html; }
+    location = /preview/422 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/422.html; }
+    location = /preview/423 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/423.html; }
+    location = /preview/424 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/424.html; }
+    location = /preview/425 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/425.html; }
+    location = /preview/426 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/426.html; }
+    location = /preview/428 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/428.html; }
+    location = /preview/431 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/431.html; }
+    location = /preview/444 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/444.html; }
+    location = /preview/500 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/500.html; }
+    location = /preview/501 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/501.html; }
+    location = /preview/502 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/502.html; }
+    location = /preview/503 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/503.html; }
+    location = /preview/504 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/504.html; }
+    location = /preview/505 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/505.html; }
+    location = /preview/507 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/507.html; }
+    location = /preview/508 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/508.html; }
+    location = /preview/510 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/510.html; }
+    location = /preview/511 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/511.html; }
 {{- end }}
 
     location ^~ /api/ {

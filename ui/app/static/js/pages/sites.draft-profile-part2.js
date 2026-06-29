@@ -152,6 +152,7 @@ export function draftToEasyProfilePart2(draft, deps) {
     },
     security_antibot: {
       antibot_challenge: draft.antibot_challenge,
+      antibot_challenge_template: draft.antibot_challenge_template || "v2",
       antibot_uri: draft.antibot_uri,
       scanner_auto_ban_enabled: Boolean(draft.antibot_scanner_auto_ban_enabled),
       antibot_recaptcha_score: draft.antibot_recaptcha_score,
@@ -208,7 +209,9 @@ export function draftToEasyProfilePart2(draft, deps) {
       ws_block_patterns: deps.normalizeWSBlockPatterns(draft.ws_block_patterns),
       ws_max_message_bytes: Math.max(0, Number.parseInt(String(draft.ws_max_message_bytes || "0"), 10) || 0),
       ws_rate_msg_per_sec: Math.max(0, Number.parseInt(String(draft.ws_rate_msg_per_sec || "0"), 10) || 0)
-    }
+    },
+    use_custom_error_pages: Boolean(draft.use_custom_error_pages ?? true),
+    disabled_error_pages: Array.isArray(draft.disabled_error_pages) ? draft.disabled_error_pages : [],
   };
 }
 

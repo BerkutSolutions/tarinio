@@ -54,6 +54,7 @@ type easySiteData struct {
 	AntibotTwoLayerEnabled   bool
 	AntibotUsesInterstitial  bool
 	AntibotChallenge         string
+	AntibotChallengeTemplate string
 	AntibotEscalationMode    string
 	AntibotURI               string
 	AntibotVerifyURI         string
@@ -102,6 +103,9 @@ type easySiteData struct {
 	HealthCheckPath            string
 	HealthCheckIntervalSeconds int
 	HealthCheckFailThreshold   int
+
+	UseCustomErrorPages bool
+	DisabledErrorPages  []string
 }
 
 type l4GuardConfigData struct {

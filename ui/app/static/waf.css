@@ -2090,3 +2090,74 @@ canvas {
   background: rgba(125, 155, 255, 0.22);
 }
 
+/* Error Pages tab */
+.waf-error-pages-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 420px;
+  overflow-y: auto;
+  padding-right: 4px;
+  transition: opacity 0.2s;
+}
+.waf-error-pages-list.waf-disabled {
+  opacity: 0.35;
+  pointer-events: none;
+  user-select: none;
+}
+.waf-error-pages-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(255,255,255,.025);
+  border: 1px solid rgba(255,255,255,.055);
+  gap: 8px;
+}
+.waf-error-pages-label {
+  font-size: 12.5px;
+  color: var(--text-muted, rgba(200,215,255,.65));
+  font-family: "SF Mono","Fira Code",Consolas,monospace;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.waf-eprow-off {
+  opacity: 0.35;
+}
+.waf-error-pages-check {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.waf-error-pages-check input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  accent-color: #818cf8;
+  cursor: pointer;
+}
+.waf-error-pages-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  margin-bottom: 4px;
+}
+.waf-error-pages-header-label {
+  flex: 1;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: rgba(200,215,255,0.3);
+}
+.waf-error-pages-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
