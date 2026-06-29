@@ -142,9 +142,9 @@ write_env_value() {
 }
 
 is_placeholder_secret() {
-  value="$(printf "%s" "$1" | tr -d '\r')"
+  value="$(printf "%s" "$1" | tr -d '\r' | tr '[:upper:]' '[:lower:]' | tr '_' '-')"
   case "$value" in
-    ""|change-me*|default|changeme|please-change*)
+    ""|change-me*|default|changeme|please-change*|todo|secret|password|replace-me*)
       return 0
       ;;
     *)
@@ -181,19 +181,19 @@ ensure_secure_env_defaults() {
     write_env_value POSTGRES_DB "$postgres_db"
     changed=1
   fi
-  if [ "$ENV_CREATED" -eq 1 ] && is_placeholder_secret "$postgres_password"; then
+  if is_placeholder_secret "$postgres_password"; then
     postgres_password="$(generate_secret 40)"
     write_env_value POSTGRES_PASSWORD "$postgres_password"
     changed=1
     ok "generated secure POSTGRES_PASSWORD"
   fi
-  if [ "$needs_clickhouse" -eq 1 ] && [ "$ENV_CREATED" -eq 1 ] && is_placeholder_secret "$clickhouse_password"; then
+  if [ "$needs_clickhouse" -eq 1 ] && is_placeholder_secret "$clickhouse_password"; then
     clickhouse_password="$(generate_secret 40)"
     write_env_value CLICKHOUSE_PASSWORD "$clickhouse_password"
     changed=1
     ok "generated secure CLICKHOUSE_PASSWORD"
   fi
-  if [ "$ENV_CREATED" -eq 1 ] && is_placeholder_secret "$opensearch_password"; then
+  if is_placeholder_secret "$opensearch_password"; then
     opensearch_password="$(generate_secret 40)"
     write_env_value OPENSEARCH_PASSWORD "$opensearch_password"
     changed=1
