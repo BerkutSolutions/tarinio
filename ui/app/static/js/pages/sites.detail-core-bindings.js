@@ -207,6 +207,7 @@ export function bindDetailCore(container, state, ctx, deps) {
     container.querySelectorAll("#antibot-body-wrap input, #antibot-body-wrap select").forEach((el) => {
       el.disabled = !enabled;
     });
+    syncStateDraftFromForm();
   });
 
   // Antibot: preview button opens template preview
