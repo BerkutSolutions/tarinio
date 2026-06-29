@@ -82,6 +82,9 @@ func normalizeProfile(profile EasySiteProfile) EasySiteProfile {
 	profile.SecurityBehaviorAndLimits.CustomLimitRules = normalizeCustomLimitRules(profile.SecurityBehaviorAndLimits.CustomLimitRules)
 
 	profile.SecurityAntibot.AntibotChallenge = strings.ToLower(strings.TrimSpace(profile.SecurityAntibot.AntibotChallenge))
+	if profile.SecurityAntibot.AntibotChallenge == "" {
+		profile.SecurityAntibot.AntibotChallenge = AntibotChallengeNo
+	}
 	profile.SecurityAntibot.AntibotURI = strings.TrimSpace(profile.SecurityAntibot.AntibotURI)
 	profile.SecurityAntibot.AntibotRecaptchaSitekey = strings.TrimSpace(profile.SecurityAntibot.AntibotRecaptchaSitekey)
 	profile.SecurityAntibot.AntibotRecaptchaSecret = strings.TrimSpace(profile.SecurityAntibot.AntibotRecaptchaSecret)

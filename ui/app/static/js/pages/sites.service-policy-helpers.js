@@ -51,7 +51,6 @@ function hasCustomLimitReqURL(value) {
 export function applyServiceProfilePresetToDraft(draft, profile) {
   const next = { ...draft, service_profile: normalizeServiceProfile(profile) };
   if (next.service_profile === "strict") {
-    next.security_mode = "block";
     next.use_bad_behavior = true;
     next.bad_behavior_status_codes = [400, 401, 403, 404, 405, 429, 444];
     next.bad_behavior_threshold = 60;
@@ -68,7 +67,6 @@ export function applyServiceProfilePresetToDraft(draft, profile) {
     next.limit_conn_max_http3 = 220;
     next.antibot_challenge = "javascript";
   } else if (next.service_profile === "compat") {
-    next.security_mode = "monitor";
     next.use_bad_behavior = false;
     next.use_limit_req = false;
     next.use_limit_conn = true;
@@ -77,7 +75,6 @@ export function applyServiceProfilePresetToDraft(draft, profile) {
     next.limit_conn_max_http3 = 500;
     next.antibot_challenge = "no";
   } else if (next.service_profile === "api") {
-    next.security_mode = "block";
     next.allowed_methods = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"];
     next.use_cors = true;
     next.cors_allowed_origins = ["*"];
@@ -91,7 +88,6 @@ export function applyServiceProfilePresetToDraft(draft, profile) {
     next.api_positive_enforcement_mode = "monitor";
     next.api_positive_default_action = "allow";
   } else if (next.service_profile === "public-edge") {
-    next.security_mode = "block";
     next.use_bad_behavior = true;
     next.bad_behavior_status_codes = [400, 401, 403, 404, 405, 429, 444];
     next.bad_behavior_threshold = 80;
@@ -105,8 +101,6 @@ export function applyServiceProfilePresetToDraft(draft, profile) {
     }
     next.limit_req_rate = "100r/s";
     next.antibot_challenge = "javascript";
-  } else {
-    next.security_mode = "block";
   }
   return next;
 }
