@@ -1045,6 +1045,7 @@
   "sites.easy.antibot.authSectionTitle": "Аутентификација",
   "sites.easy.antibot.enabled": "Укључи антибот",
   "sites.easy.antibot.challengeTemplate": "Шаблон странице провере",
+  "sites.easy.antibot.previewCookieNotice": "Cookie режим користи прозирну проверу — кориснику се не приказује страница изазова.",
   "sites.easy.antibot.previewTemplate": "Преглед",
   "sites.easy.antibot.template.v1": "1. варијанта",
   "sites.easy.antibot.template.v2": "2. варијанта",

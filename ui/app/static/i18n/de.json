@@ -1045,6 +1045,7 @@
   "sites.easy.antibot.authSectionTitle": "Authentifizierung",
   "sites.easy.antibot.enabled": "Antibot aktivieren",
   "sites.easy.antibot.challengeTemplate": "Challenge-Seitenvorlage",
+  "sites.easy.antibot.previewCookieNotice": "Cookie-Modus verwendet eine transparente Prüfung — dem Benutzer wird keine Challenge-Seite angezeigt.",
   "sites.easy.antibot.previewTemplate": "Vorschau",
   "sites.easy.antibot.template.v1": "1. Variante",
   "sites.easy.antibot.template.v2": "2. Variante",

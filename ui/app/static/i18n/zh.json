@@ -1045,6 +1045,7 @@
   "sites.easy.antibot.authSectionTitle": "身份验证",
   "sites.easy.antibot.enabled": "启用防机器人",
   "sites.easy.antibot.challengeTemplate": "验证页面模板",
+  "sites.easy.antibot.previewCookieNotice": "Cookie 模式使用透明验证 — 用户不会看到任何验证页面。",
   "sites.easy.antibot.previewTemplate": "预览",
   "sites.easy.antibot.template.v1": "第1款",
   "sites.easy.antibot.template.v2": "第2款",

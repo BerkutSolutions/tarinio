@@ -1035,6 +1035,7 @@
   "sites.easy.antibot.authSectionTitle": "Аутентификация",
   "sites.easy.antibot.enabled": "Включить антибот",
   "sites.easy.antibot.challengeTemplate": "Шаблон страницы проверки",
+  "sites.easy.antibot.previewCookieNotice": "Режим cookie использует прозрачную проверку — страница проверки пользователю не показывается.",
   "sites.easy.antibot.previewTemplate": "Просмотр",
   "sites.easy.antibot.template.v1": "1 вариант",
   "sites.easy.antibot.template.v2": "2 вариант",

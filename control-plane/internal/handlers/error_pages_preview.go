@@ -58,6 +58,12 @@ var errorPagePreviewAllowedSlugs = map[string]string{
 	"antibot-v3": "antibot-v3.preview.html",
 	"antibot-v4": "antibot-v4.preview.html",
 	"antibot-v5": "antibot-v5.preview.html",
+	// captcha challenge page variants
+	"captcha-v1": "captcha-v1.preview.html",
+	"captcha-v2": "captcha-v2.preview.html",
+	"captcha-v3": "captcha-v3.preview.html",
+	"captcha-v4": "captcha-v4.preview.html",
+	"captcha-v5": "captcha-v5.preview.html",
 }
 
 var reSlug = regexp.MustCompile(`^[a-z0-9\-]+$`)

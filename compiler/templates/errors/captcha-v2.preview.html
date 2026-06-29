@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Security Check</title>
+<style>
+:root{color-scheme:dark}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#060812;color:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}
+
+body::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;
+  background:radial-gradient(ellipse 60% 50% at 15% 50%,rgba(99,102,241,.08) 0%,transparent 60%),
+             radial-gradient(ellipse 50% 40% at 85% 50%,rgba(99,102,241,.05) 0%,transparent 60%);
+  pointer-events:none}
+
+.layout{display:flex;width:100%;max-width:820px;gap:0;align-items:stretch;
+  background:rgba(10,12,28,.88);border:1px solid rgba(99,102,241,.18);
+  border-radius:20px;backdrop-filter:blur(20px);
+  box-shadow:0 0 0 1px rgba(99,102,241,.07),0 32px 90px rgba(0,0,0,.65);
+  overflow:hidden}
+
+/* left */
+.left{flex:1;min-width:0;padding:48px 44px;border-right:1px solid rgba(99,102,241,.1)}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#6366f1;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.eyebrow::before{content:'';display:inline-block;width:24px;height:2px;background:#6366f1;border-radius:2px}
+h1{font-size:28px;font-weight:800;line-height:1.15;color:#f1f5f9;margin-bottom:12px}
+.sub{font-size:14px;color:rgba(226,232,240,.4);line-height:1.7;margin-bottom:32px}
+
+/* captcha widget */
+.captcha-label{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(99,102,241,.7);margin-bottom:12px}
+.captcha-widget{border:1px solid rgba(99,102,241,.22);border-radius:14px;background:rgba(99,102,241,.04);padding:18px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+.captcha-left{display:flex;align-items:center;gap:12px}
+.captcha-checkbox{width:24px;height:24px;border-radius:6px;border:2px solid rgba(99,102,241,.4);background:rgba(99,102,241,.06);flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.captcha-text{font-size:14px;color:rgba(226,232,240,.8);font-weight:500}
+.captcha-logo{display:flex;flex-direction:column;align-items:center;gap:3px;opacity:.4}
+.captcha-logo-icon{width:32px;height:32px}
+.captcha-logo-name{font-size:9px;color:rgba(226,232,240,.5);letter-spacing:.04em;text-transform:uppercase}
+.captcha-logo-sub{font-size:8px;color:rgba(226,232,240,.3);letter-spacing:.02em}
+.verify-btn{width:100%;padding:11px;background:rgba(99,102,241,.14);border:1px solid rgba(99,102,241,.32);border-radius:10px;color:#818cf8;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .2s,border-color .2s;letter-spacing:.02em;margin-bottom:12px}
+.verify-btn:hover{background:rgba(99,102,241,.24);border-color:rgba(99,102,241,.52)}
+.captcha-note{font-size:11px;color:rgba(226,232,240,.2);line-height:1.6;font-style:italic;margin-bottom:28px}
+
+.footer-row{font-size:11px;color:rgba(226,232,240,.2);margin-top:4px}
+.footer-row a{color:rgba(99,102,241,.45);text-decoration:none;font-weight:500}
+.footer-row a:hover{color:#818cf8}
+
+/* right panel */
+.right{flex:0 0 220px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:48px 32px}
+.shield-wrap{width:100px;height:100px;border-radius:50%;border:2px solid rgba(99,102,241,.2);background:rgba(99,102,241,.05);display:flex;align-items:center;justify-content:center;animation:shieldPulse 2.5s ease-in-out infinite}
+@keyframes shieldPulse{0%,100%{box-shadow:0 0 0 0 rgba(99,102,241,.15)}50%{box-shadow:0 0 0 12px rgba(99,102,241,0)}}
+.shield-svg{width:44px;height:44px}
+.right-label{font-size:11px;color:rgba(226,232,240,.25);text-align:center;line-height:1.6;max-width:140px}
+
+@media(max-width:640px){.layout{flex-direction:column}.left{border-right:none;border-bottom:1px solid rgba(99,102,241,.1)}.right{flex:none;padding:32px}}
+</style>
+</head>
+<body>
+<div class="layout">
+  <div class="left">
+    <div class="eyebrow" id="eyebrow-txt">Security checkpoint</div>
+    <h1 id="title">Human Verification</h1>
+    <p class="sub" id="subtitle">Please complete the captcha below to confirm you are a human. Your access will be restored immediately after verification.</p>
+
+    <div class="captcha-label" id="captcha-label">Human Verification</div>
+    <div class="captcha-widget">
+      <div class="captcha-left">
+        <div class="captcha-checkbox" aria-label="I am not a robot">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" opacity="0.3">
+            <path d="M2 6l3 3 5-5" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <span class="captcha-text" id="not-robot-txt">I'm not a robot</span>
+      </div>
+      <div class="captcha-logo">
+        <svg class="captcha-logo-icon" viewBox="0 0 32 32" fill="none">
+          <circle cx="16" cy="16" r="14" stroke="rgba(129,140,248,.35)" stroke-width="1.5"/>
+          <path d="M10 16a6 6 0 1 1 12 0" stroke="rgba(129,140,248,.5)" stroke-width="1.5" stroke-linecap="round"/>
+          <circle cx="16" cy="16" r="3" fill="rgba(99,102,241,.3)" stroke="rgba(129,140,248,.5)" stroke-width="1.2"/>
+        </svg>
+        <span class="captcha-logo-name">CAPTCHA</span>
+        <span class="captcha-logo-sub">Privacy - Terms</span>
+      </div>
+    </div>
+    <button class="verify-btn" type="button" id="verify-btn">Verify</button>
+    <div class="captcha-note" id="captcha-note">Captcha type is configured in site settings (reCAPTCHA / hCaptcha / Turnstile / mCaptcha)</div>
+    <div class="footer-row" id="footer-txt"><a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener">Tarinio WAF</a> · End-to-end encrypted</div>
+  </div>
+  <div class="right">
+    <div class="shield-wrap">
+      <svg class="shield-svg" viewBox="0 0 44 44" fill="none">
+        <path d="M22 4L6 10v12c0 9.9 6.9 18.3 16 20.4C31.1 40.3 38 31.9 38 22V10L22 4z" fill="rgba(99,102,241,.1)" stroke="#6366f1" stroke-width="1.5" stroke-linejoin="round"/>
+        <path d="M15 22l5 5 9-9" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+      </svg>
+    </div>
+    <div class="right-label" id="right-label">Awaiting captcha verification</div>
+  </div>
+</div>
+<script>
+(function(){
+  var I={
+    en:{eyebrow:"Security checkpoint",title:"Human Verification",sub:"Please complete the captcha below to confirm you are a human. Your access will be restored immediately after verification.",captchaLabel:"Human Verification",notRobot:"I'm not a robot",verifyBtn:"Verify",note:"Captcha type is configured in site settings (reCAPTCHA / hCaptcha / Turnstile / mCaptcha)",footer:'<a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener">Tarinio WAF</a> · End-to-end encrypted',rightLabel:"Awaiting captcha\nverification"},
+    ru:{eyebrow:"Контрольная точка",title:"Подтверждение личности",sub:"Пройдите капчу ниже, чтобы подтвердить, что вы человек. Доступ будет восстановлен сразу после проверки.",captchaLabel:"Подтверждение личности",notRobot:"Я не робот",verifyBtn:"Подтвердить",note:"Тип капчи настраивается в настройках сайта (reCAPTCHA / hCaptcha / Turnstile / mCaptcha)",footer:'<a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener">Tarinio WAF</a> · Сквозное шифрование',rightLabel:"Ожидание\nверификации капчи"},
+    de:{eyebrow:"Sicherheitsprüfpunkt",title:"Menschliche Verifizierung",sub:"Bitte schließen Sie das Captcha ab, um zu bestätigen, dass Sie ein Mensch sind. Der Zugriff wird sofort nach der Verifizierung wiederhergestellt.",captchaLabel:"Menschliche Verifizierung",notRobot:"Ich bin kein Roboter",verifyBtn:"Verifizieren",note:"Der Captcha-Typ wird in den Website-Einstellungen konfiguriert (reCAPTCHA / hCaptcha / Turnstile / mCaptcha)",footer:'<a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener">Tarinio WAF</a> · Ende-zu-Ende verschlüsselt',rightLabel:"Warte auf\nCaptcha-Verifizierung"},
+    sr:{eyebrow:"Контролна тачка",title:"Верификација идентитета",sub:"Молимо вас да завршите капчу испод да бисте потврдили да сте човек. Приступ ће бити обновљен одмах након верификације.",captchaLabel:"Верификација идентитета",notRobot:"Нисам робот",verifyBtn:"Верификуј",note:"Тип капче се конфигурише у подешавањима сајта (reCAPTCHA / hCaptcha / Turnstile / mCaptcha)",footer:'<a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener">Tarinio WAF</a> · End-to-end шифровано',rightLabel:"Чека се\nверификација капче"},
+    zh:{eyebrow:"安全检查点",title:"人机验证",sub:"请完成以下验证码，以确认您是人类。验证完成后，您的访问将立即恢复。",captchaLabel:"人机验证",notRobot:"我不是机器人",verifyBtn:"验证",note:"验证码类型在网站设置中配置（reCAPTCHA / hCaptcha / Turnstile / mCaptcha）",footer:'<a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener">Tarinio WAF</a> · 端到端加密',rightLabel:"等待验证码\n验证"}
+  };
+  var lang=navigator.language||'en';
+  var l=I[lang.slice(0,2)]||I.en;
+  document.getElementById('eyebrow-txt').textContent=l.eyebrow;
+  document.getElementById('title').textContent=l.title;
+  document.getElementById('subtitle').textContent=l.sub;
+  document.getElementById('captcha-label').textContent=l.captchaLabel;
+  document.getElementById('not-robot-txt').textContent=l.notRobot;
+  document.getElementById('verify-btn').textContent=l.verifyBtn;
+  document.getElementById('captcha-note').textContent=l.note;
+  document.getElementById('footer-txt').innerHTML=l.footer;
+  document.getElementById('right-label').textContent=l.rightLabel;
+})();
+</script>
+</body>
+</html>

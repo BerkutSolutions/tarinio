@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Security Check</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#060812;color:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;overflow:hidden}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(99,102,241,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(99,102,241,.06) 1px,transparent 1px);background-size:40px 40px;pointer-events:none}
+.card{position:relative;width:100%;max-width:480px;padding:48px 44px;background:rgba(10,12,28,.85);border:1px solid rgba(99,102,241,.18);border-radius:20px;backdrop-filter:blur(18px);box-shadow:0 0 0 1px rgba(99,102,241,.08),0 24px 80px rgba(0,0,0,.6);margin:20px}
+.card::after{content:'';position:absolute;inset:-1px;border-radius:20px;background:linear-gradient(180deg,transparent 0%,rgba(99,102,241,.12) 50%,transparent 100%);background-size:100% 200%;animation:scan 3s linear infinite;pointer-events:none}
+@keyframes scan{0%{background-position:0 -100%}100%{background-position:0 200%}}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.25);border-radius:99px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#818cf8;margin-bottom:28px}
+.badge-dot{width:6px;height:6px;border-radius:50%;background:#818cf8;animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
+h1{font-size:22px;font-weight:700;color:#f1f5f9;line-height:1.3;margin-bottom:10px}
+.sub{font-size:13.5px;color:rgba(226,232,240,.4);line-height:1.7;margin-bottom:28px}
+
+/* captcha area replacing progress bar + checks */
+.captcha-section{margin-bottom:28px}
+.captcha-label{font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(129,140,248,.5);margin-bottom:12px}
+.captcha-widget{border:1px solid rgba(99,102,241,.2);border-radius:12px;background:rgba(99,102,241,.04);padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
+.captcha-left{display:flex;align-items:center;gap:10px}
+.captcha-checkbox{width:22px;height:22px;border-radius:5px;border:2px solid rgba(99,102,241,.38);background:rgba(99,102,241,.06);flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.captcha-text{font-size:13px;color:rgba(226,232,240,.75);font-weight:500}
+.captcha-logo{display:flex;flex-direction:column;align-items:center;gap:2px;opacity:.38}
+.captcha-logo-icon{width:28px;height:28px}
+.captcha-logo-name{font-size:8px;color:rgba(226,232,240,.5);letter-spacing:.04em;text-transform:uppercase}
+.captcha-logo-sub{font-size:7px;color:rgba(226,232,240,.3)}
+
+.verify-btn{width:100%;padding:11px;background:rgba(99,102,241,.14);border:1px solid rgba(99,102,241,.3);border-radius:10px;color:#818cf8;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;transition:background .2s,border-color .2s;letter-spacing:.02em;margin-bottom:14px}
+.verify-btn:hover{background:rgba(99,102,241,.24);border-color:rgba(99,102,241,.5)}
+.captcha-note{font-size:11px;color:rgba(226,232,240,.2);line-height:1.6;font-style:italic;margin-bottom:4px}
+
+.footer{font-size:11px;color:rgba(226,232,240,.2)}
+.footer a{color:rgba(99,102,241,.5);text-decoration:none;font-weight:500}
+.footer a:hover{color:#818cf8}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="badge"><span class="badge-dot"></span><span id="badge-txt">Security Scan</span></div>
+  <h1 id="title">Verifying your browser</h1>
+  <p class="sub" id="subtitle">Please wait while Tarinio WAF performs an automated security check.</p>
+
+  <div class="captcha-section">
+    <div class="captcha-label" id="captcha-label">Human Verification</div>
+    <div class="captcha-widget">
+      <div class="captcha-left">
+        <div class="captcha-checkbox" aria-label="I am not a robot">
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none" opacity="0.3">
+            <path d="M2 6l3 3 5-5" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <span class="captcha-text" id="not-robot-txt">I'm not a robot</span>
+      </div>
+      <div class="captcha-logo">
+        <svg class="captcha-logo-icon" viewBox="0 0 32 32" fill="none">
+          <circle cx="16" cy="16" r="14" stroke="rgba(129,140,248,.35)" stroke-width="1.5"/>
+          <path d="M10 16a6 6 0 1 1 12 0" stroke="rgba(129,140,248,.5)" stroke-width="1.5" stroke-linecap="round"/>
+          <circle cx="16" cy="16" r="3" fill="rgba(99,102,241,.3)" stroke="rgba(129,140,248,.5)" stroke-width="1.2"/>
+        </svg>
+        <span class="captcha-logo-name">CAPTCHA</span>
+        <span class="captcha-logo-sub">Privacy - Terms</span>
+      </div>
+    </div>
+    <button class="verify-btn" type="button" id="verify-btn">Verify</button>
+    <div class="captcha-note" id="captcha-note">Captcha type is configured in site settings (reCAPTCHA / hCaptcha / Turnstile / mCaptcha)</div>
+  </div>
+
+  <div class="footer" id="footer-txt">Protected by <a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener">Tarinio WAF</a> · Do not refresh</div>
+</div>
+<script>
+(function(){
+  var I={
+    en:{badge:"Security Scan",title:"Verifying your browser",sub:"Please wait while Tarinio WAF performs an automated security check.",captchaLabel:"Human Verification",notRobot:"I'm not a robot",verifyBtn:"Verify",note:"Captcha type is configured in site settings (reCAPTCHA / hCaptcha / Turnstile / mCaptcha)",footer:'Protected by <a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener">Tarinio WAF</a> · Do not refresh'},
+    ru:{badge:"Проверка",title:"Проверка браузера",sub:"Подождите, пока Tarinio WAF выполняет автоматическую проверку безопасности.",captchaLabel:"Подтверждение личности",notRobot:"Я не робот",verifyBtn:"Подтвердить",note:"Тип капчи настраивается в настройках сайта (reCAPTCHA / hCaptcha / Turnstile / mCaptcha)",footer:'Защищено <a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener">Tarinio WAF</a> · Не обновляйте страницу'},
+    de:{badge:"Sicherheitsscan",title:"Browser wird überprüft",sub:"Bitte warten Sie, während Tarinio WAF eine automatische Sicherheitsprüfung durchführt.",captchaLabel:"Menschliche Verifizierung",notRobot:"Ich bin kein Roboter",verifyBtn:"Verifizieren",note:"Der Captcha-Typ wird in den Website-Einstellungen konfiguriert (reCAPTCHA / hCaptcha / Turnstile / mCaptcha)",footer:'Geschützt von <a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener">Tarinio WAF</a> · Nicht aktualisieren'},
+    sr:{badge:"Безбедносни скен",title:"Верификација прегледача",sub:"Сачекајте док Tarinio WAF врши аутоматску безбедносну проверу.",captchaLabel:"Верификација идентитета",notRobot:"Нисам робот",verifyBtn:"Верификуј",note:"Тип капче се конфигурише у подешавањима сајта (reCAPTCHA / hCaptcha / Turnstile / mCaptcha)",footer:'Заштићено са <a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener">Tarinio WAF</a> · Не освежавај'},
+    zh:{badge:"安全扫描",title:"验证您的浏览器",sub:"请稍候，Tarinio WAF 正在执行自动安全检查。",captchaLabel:"人机验证",notRobot:"我不是机器人",verifyBtn:"验证",note:"验证码类型在网站设置中配置（reCAPTCHA / hCaptcha / Turnstile / mCaptcha）",footer:'受 <a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener">Tarinio WAF</a> 保护 · 请勿刷新'}
+  };
+  var lang=navigator.language||'en';
+  var l=I[lang.slice(0,2)]||I.en;
+  document.getElementById('badge-txt').textContent=l.badge;
+  document.getElementById('title').textContent=l.title;
+  document.getElementById('subtitle').textContent=l.sub;
+  document.getElementById('captcha-label').textContent=l.captchaLabel;
+  document.getElementById('not-robot-txt').textContent=l.notRobot;
+  document.getElementById('verify-btn').textContent=l.verifyBtn;
+  document.getElementById('captcha-note').textContent=l.note;
+  document.getElementById('footer-txt').innerHTML=l.footer;
+})();
+</script>
+</body>
+</html>

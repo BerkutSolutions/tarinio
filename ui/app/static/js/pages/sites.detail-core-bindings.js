@@ -205,7 +205,23 @@ export function bindDetailCore(container, state, ctx, deps) {
 
   // Antibot: preview button opens template preview
   container.querySelector("#antibot-template-preview-btn")?.addEventListener("click", () => {
-    const tmpl = container.querySelector("#service-antibot-challenge-template")?.value || "v2";
+    const challenge = container.querySelector("#service-antibot-enabled")?.checked
+      ? (container.querySelector("#service-antibot-challenge")?.value || "cookie")
+      : "cookie";
+    const tmpl = container.querySelector("#service-antibot-challenge-template")?.value || "v1";
+
+    if (challenge === "cookie") {
+      ctx.notify(ctx.t("sites.easy.antibot.previewCookieNotice"), "success");
+      return;
+    }
+
+    const captchaModes = ["captcha", "recaptcha", "hcaptcha", "turnstile", "mcaptcha"];
+    if (captchaModes.includes(challenge)) {
+      window.open(`/api/error-pages/preview/captcha-${tmpl}`, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    // javascript mode
     window.open(`/api/error-pages/preview/antibot-${tmpl}`, "_blank", "noopener,noreferrer");
   });
 }

@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Security Check In Progress</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #08111d;
+      --panel: rgba(18, 28, 44, 0.96);
+      --line: rgba(122, 164, 255, 0.16);
+      --text: #eef4ff;
+      --muted: rgba(238, 244, 255, 0.72);
+      --accent: #8ab4ff;
+      --accent-soft: rgba(138, 180, 255, 0.14);
+      --ok: #74d8a4;
+      --warn: #ffcd72;
+      --bad: #ff8d8d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", Inter, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top, rgba(86, 148, 255, 0.2), transparent 34%),
+        radial-gradient(circle at 80% 10%, rgba(84, 211, 162, 0.12), transparent 26%),
+        var(--bg);
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+    .shell {
+      width: min(760px, 100%);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: var(--panel);
+      box-shadow: 0 28px 64px rgba(0, 0, 0, 0.32);
+      overflow: hidden;
+    }
+    .hero {
+      padding: 28px 30px 18px;
+      border-bottom: 1px solid var(--line);
+    }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 0 0 rgba(138, 180, 255, 0.5);
+      animation: pulse 1.7s ease-out infinite;
+    }
+    h1 {
+      margin: 18px 0 0;
+      font-size: clamp(30px, 4vw, 44px);
+      line-height: 1.05;
+    }
+    .sub {
+      margin: 12px 0 0;
+      max-width: 640px;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.6;
+    }
+    .body {
+      padding: 22px 30px 30px;
+      display: grid;
+      gap: 18px;
+    }
+
+    /* captcha widget block replacing .status spinner */
+    .captcha-block {
+      display: grid;
+      gap: 14px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 20px 18px;
+      background: linear-gradient(180deg, var(--accent-soft), transparent);
+    }
+    .captcha-block-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .captcha-widget-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border: 1px solid rgba(138, 180, 255, 0.18);
+      border-radius: 12px;
+      padding: 14px 16px;
+      background: rgba(138, 180, 255, 0.05);
+    }
+    .captcha-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .captcha-checkbox {
+      width: 24px;
+      height: 24px;
+      border-radius: 5px;
+      border: 2px solid rgba(138, 180, 255, 0.4);
+      background: rgba(138, 180, 255, 0.07);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .captcha-text {
+      font-size: 14px;
+      color: var(--muted);
+      font-weight: 500;
+    }
+    .captcha-logo {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      opacity: 0.4;
+    }
+    .captcha-logo-icon { width: 32px; height: 32px; }
+    .captcha-logo-name {
+      font-size: 9px;
+      color: rgba(238,244,255,.5);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .captcha-logo-sub {
+      font-size: 8px;
+      color: rgba(238,244,255,.3);
+    }
+    .captcha-note-inline {
+      font-size: 12px;
+      color: rgba(238, 244, 255, 0.38);
+      font-style: italic;
+      line-height: 1.55;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .tile {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .tile h2 {
+      margin: 0 0 8px;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+    .tile p {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.55;
+      color: var(--text);
+    }
+    .footer-text {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+    .btn {
+      appearance: none;
+      border: 1px solid rgba(138, 180, 255, 0.25);
+      background: rgba(138, 180, 255, 0.1);
+      color: var(--accent);
+      padding: 10px 20px;
+      border-radius: 12px;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .2s, border-color .2s;
+      letter-spacing: 0.02em;
+    }
+    .btn:hover {
+      background: rgba(138, 180, 255, 0.18);
+      border-color: rgba(138, 180, 255, 0.45);
+    }
+    .powered {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 20px;
+      z-index: 20;
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center;
+    }
+    .powered a {
+      color: #cfe1ff;
+      text-decoration: none;
+      border-bottom: 1px solid rgba(207, 225, 255, 0.35);
+    }
+    .powered a:hover {
+      border-bottom-color: rgba(207, 225, 255, 0.85);
+    }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(138, 180, 255, 0.5); }
+      70% { box-shadow: 0 0 0 12px rgba(138, 180, 255, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(138, 180, 255, 0); }
+    }
+    @media (max-width: 760px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <div class="eyebrow"><span class="dot"></span><span id="eyebrow-label">Security Check</span></div>
+      <h1 id="hero-title">Human Verification Required</h1>
+      <p class="sub" id="hero-sub">This site is protected by TARINIO anti-bot challenge mode. Please complete the captcha below to verify you are human and gain access to the requested page.</p>
+    </section>
+    <section class="body">
+      <article class="captcha-block">
+        <strong class="captcha-block-title" id="captcha-title">Human Verification</strong>
+        <div class="captcha-widget-row">
+          <div class="captcha-left">
+            <div class="captcha-checkbox" aria-label="I am not a robot">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" opacity="0.3">
+                <path d="M2 6l3 3 5-5" stroke="#8ab4ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <span class="captcha-text" id="not-robot-txt">I'm not a robot</span>
+          </div>
+          <div class="captcha-logo">
+            <svg class="captcha-logo-icon" viewBox="0 0 32 32" fill="none">
+              <circle cx="16" cy="16" r="14" stroke="rgba(138,180,255,.35)" stroke-width="1.5"/>
+              <path d="M10 16a6 6 0 1 1 12 0" stroke="rgba(138,180,255,.5)" stroke-width="1.5" stroke-linecap="round"/>
+              <circle cx="16" cy="16" r="3" fill="rgba(86,148,255,.25)" stroke="rgba(138,180,255,.5)" stroke-width="1.2"/>
+            </svg>
+            <span class="captcha-logo-name">CAPTCHA</span>
+            <span class="captcha-logo-sub">Privacy - Terms</span>
+          </div>
+        </div>
+        <div class="captcha-note-inline" id="captcha-note">Captcha type is configured in site settings (reCAPTCHA / hCaptcha / Turnstile / mCaptcha)</div>
+      </article>
+
+      <section class="grid">
+        <article class="tile">
+          <h2 id="tile-browser-title">Browser</h2>
+          <p id="browser-state">Waiting for verification.</p>
+        </article>
+        <article class="tile">
+          <h2 id="tile-cookie-title">Cookie</h2>
+          <p id="cookie-state">Cookie not issued yet.</p>
+        </article>
+        <article class="tile">
+          <h2 id="tile-return-title">Return</h2>
+          <p id="return-state">The original path will open after verification.</p>
+        </article>
+      </section>
+
+      <div class="actions">
+        <button id="verify-btn" class="btn" type="button">Verify</button>
+      </div>
+      <div class="footer-text" id="footer-text">If you have completed the captcha and the page does not advance, review your browser privacy extensions and cookie settings, then retry.</div>
+    </section>
+  </main>
+  <div class="powered">
+    <a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener noreferrer">Secured by Tarinio</a>
+  </div>
+  <script>
+    (function () {
+      var messages = {
+        en: {
+          pageTitle: "Security Check In Progress",
+          eyebrow: "Security Check In Progress",
+          heroTitle: "Human Verification Required",
+          heroSub: "This site is protected by TARINIO anti-bot challenge mode. Please complete the captcha below to verify you are human and gain access to the requested page.",
+          captchaTitle: "Human Verification",
+          notRobot: "I'm not a robot",
+          captchaNote: "Captcha type is configured in site settings (reCAPTCHA / hCaptcha / Turnstile / mCaptcha)",
+          tileBrowser: "Browser",
+          tileCookie: "Cookie",
+          tileReturn: "Return",
+          browserWaiting: "Waiting for verification.",
+          cookieWaiting: "Cookie not issued yet.",
+          returnWaiting: "The original path will open after verification.",
+          verifyBtn: "Verify",
+          footer: "If you have completed the captcha and the page does not advance, review your browser privacy extensions and cookie settings, then retry."
+        },
+        ru: {
+          pageTitle: "Проверка безопасности",
+          eyebrow: "Проверка безопасности",
+          heroTitle: "Требуется подтверждение личности",
+          heroSub: "Сайт защищён anti-bot режимом TARINIO. Пройдите капчу ниже, чтобы подтвердить, что вы человек, и получить доступ к запрошенной странице.",
+          captchaTitle: "Подтверждение личности",
+          notRobot: "Я не робот",
+          captchaNote: "Тип капчи настраивается в настройках сайта (reCAPTCHA / hCaptcha / Turnstile / mCaptcha)",
+          tileBrowser: "Браузер",
+          tileCookie: "Cookie",
+          tileReturn: "Возврат",
+          browserWaiting: "Ожидание верификации.",
+          cookieWaiting: "Cookie пока не выдана.",
+          returnWaiting: "Исходный путь откроется после верификации.",
+          verifyBtn: "Подтвердить",
+          footer: "Если после прохождения капчи страница не продолжает работу, проверьте расширения приватности и настройки cookie, затем повторите."
+        },
+        de: {
+          pageTitle: "Sicherheitsprüfung läuft",
+          eyebrow: "Sicherheitsprüfung läuft",
+          heroTitle: "Menschliche Verifizierung erforderlich",
+          heroSub: "Diese Website ist durch den TARINIO Anti-Bot-Modus geschützt. Bitte schließen Sie das Captcha ab, um zu bestätigen, dass Sie ein Mensch sind.",
+          captchaTitle: "Menschliche Verifizierung",
+          notRobot: "Ich bin kein Roboter",
+          captchaNote: "Der Captcha-Typ wird in den Website-Einstellungen konfiguriert (reCAPTCHA / hCaptcha / Turnstile / mCaptcha)",
+          tileBrowser: "Browser",
+          tileCookie: "Cookie",
+          tileReturn: "Rückkehr",
+          browserWaiting: "Warte auf Verifizierung.",
+          cookieWaiting: "Cookie noch nicht ausgestellt.",
+          returnWaiting: "Der ursprüngliche Pfad öffnet sich nach der Verifizierung.",
+          verifyBtn: "Verifizieren",
+          footer: "Falls die Seite nach dem Captcha nicht weitergeht, überprüfen Sie Datenschutz-Erweiterungen und Cookie-Einstellungen."
+        },
+        sr: {
+          pageTitle: "Безбедносна провера у току",
+          eyebrow: "Безбедносна провера у току",
+          heroTitle: "Потребна је верификација идентитета",
+          heroSub: "Овај сајт је заштићен TARINIO anti-bot режимом. Молимо завршите капчу испод да бисте потврдили да сте особа.",
+          captchaTitle: "Верификација идентитета",
+          notRobot: "Нисам робот",
+          captchaNote: "Тип капче се конфигурише у подешавањима сајта (reCAPTCHA / hCaptcha / Turnstile / mCaptcha)",
+          tileBrowser: "Прегледач",
+          tileCookie: "Cookie",
+          tileReturn: "Повратак",
+          browserWaiting: "Чека се верификација.",
+          cookieWaiting: "Cookie још није издата.",
+          returnWaiting: "Оригинална путања ће се отворити после верификације.",
+          verifyBtn: "Верификуј",
+          footer: "Ако страница не напредује после капче, проверите приватност екстензије и подешавања cookie-ја."
+        },
+        zh: {
+          pageTitle: "安全检查进行中",
+          eyebrow: "安全检查进行中",
+          heroTitle: "需要人机验证",
+          heroSub: "本站受 TARINIO 反机器人质询模式保护。请完成以下验证码，确认您是人类，以访问所请求的页面。",
+          captchaTitle: "人机验证",
+          notRobot: "我不是机器人",
+          captchaNote: "验证码类型在网站设置中配置（reCAPTCHA / hCaptcha / Turnstile / mCaptcha）",
+          tileBrowser: "浏览器",
+          tileCookie: "Cookie",
+          tileReturn: "返回",
+          browserWaiting: "等待验证。",
+          cookieWaiting: "尚未颁发 Cookie。",
+          returnWaiting: "验证后将自动打开原始路径。",
+          verifyBtn: "验证",
+          footer: "如果完成验证码后页面没有跳转，请检查浏览器隐私扩展和 Cookie 设置，然后重试。"
+        }
+      };
+
+      var lang = "en";
+      try {
+        var candidates = [];
+        if (Array.isArray(navigator.languages)) candidates = candidates.concat(navigator.languages);
+        if (navigator.language) candidates.push(navigator.language);
+        for (var i = 0; i < candidates.length; i++) {
+          var token = String(candidates[i] || "").toLowerCase().split(/[-_]/)[0];
+          if (messages[token]) { lang = token; break; }
+        }
+      } catch (_) {}
+
+      function m(key) {
+        var set = messages[lang] || messages.en;
+        return (set && set[key] !== undefined) ? set[key] : (messages.en[key] || key);
+      }
+
+      document.documentElement.lang = lang;
+      document.title = m("pageTitle");
+      document.getElementById("eyebrow-label").textContent = m("eyebrow");
+      document.getElementById("hero-title").textContent = m("heroTitle");
+      document.getElementById("hero-sub").textContent = m("heroSub");
+      document.getElementById("captcha-title").textContent = m("captchaTitle");
+      document.getElementById("not-robot-txt").textContent = m("notRobot");
+      document.getElementById("captcha-note").textContent = m("captchaNote");
+      document.getElementById("tile-browser-title").textContent = m("tileBrowser");
+      document.getElementById("tile-cookie-title").textContent = m("tileCookie");
+      document.getElementById("tile-return-title").textContent = m("tileReturn");
+      document.getElementById("browser-state").textContent = m("browserWaiting");
+      document.getElementById("cookie-state").textContent = m("cookieWaiting");
+      document.getElementById("return-state").textContent = m("returnWaiting");
+      document.getElementById("verify-btn").textContent = m("verifyBtn");
+      document.getElementById("footer-text").textContent = m("footer");
+    })();
+  </script>
+</body>
+</html>
