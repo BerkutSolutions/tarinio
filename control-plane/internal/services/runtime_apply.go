@@ -345,6 +345,7 @@ func (s *ApplyService) compileBundle(revision revisions.Revision, snapshot revis
 	easyInputs := mapEasyInputs(snapshot.EasySiteProfiles, snapshot.VirtualPatches)
 	easyInputs = applyAntiDDoSDefaultEasyProfiles(siteInputs, easyInputs)
 	rateInputs = applyAntiDDoSRateOverrides(siteInputs, rateInputs, antiDDoSSettings)
+	rateInputs = applyEasyLimitReqURLOverrides(rateInputs, easyInputs)
 
 	siteArtifacts, err := pipeline.RenderSiteUpstreamArtifacts(siteInputs, upstreamInputs)
 	if err != nil {
@@ -469,6 +470,29 @@ func applyAntiDDoSRateOverrides(siteInputs []pipeline.SiteInput, items []pipelin
 		out = append(out, item)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].SiteID < out[j].SiteID })
+	return out
+}
+
+// applyEasyLimitReqURLOverrides copies LimitReqURL from easy-profile into the
+// matching RateLimitPolicyInput so the nginx ratelimits/site.conf snippet
+// applies limit_req only to the configured URI instead of every request.
+func applyEasyLimitReqURLOverrides(items []pipeline.RateLimitPolicyInput, easyInputs []pipeline.EasyProfileInput) []pipeline.RateLimitPolicyInput {
+	urlBySite := make(map[string]string, len(easyInputs))
+	for _, e := range easyInputs {
+		if e.UseLimitReq && strings.TrimSpace(e.LimitReqURL) != "" {
+			urlBySite[e.SiteID] = strings.TrimSpace(e.LimitReqURL)
+		}
+	}
+	if len(urlBySite) == 0 {
+		return items
+	}
+	out := make([]pipeline.RateLimitPolicyInput, len(items))
+	copy(out, items)
+	for i, item := range out {
+		if url, ok := urlBySite[item.SiteID]; ok {
+			out[i].LimitReqURL = url
+		}
+	}
 	return out
 }
 
@@ -949,6 +973,7 @@ func mapEasyInputs(items []easysiteprofiles.EasySiteProfile, virtualPatches []vi
 			LimitConnMaxHTTP2:         item.SecurityBehaviorAndLimits.LimitConnMaxHTTP2,
 			LimitConnMaxHTTP3:         item.SecurityBehaviorAndLimits.LimitConnMaxHTTP3,
 			UseLimitReq:               item.SecurityBehaviorAndLimits.UseLimitReq,
+			LimitReqURL:               item.SecurityBehaviorAndLimits.LimitReqURL,
 			LimitReqRate:              item.SecurityBehaviorAndLimits.LimitReqRate,
 			CustomLimitRules:          mapCustomLimitRules(item.SecurityBehaviorAndLimits.CustomLimitRules),
 			UseBadBehavior:            item.SecurityBehaviorAndLimits.UseBadBehavior,

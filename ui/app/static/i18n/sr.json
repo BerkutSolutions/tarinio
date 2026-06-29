@@ -346,7 +346,7 @@
   "app.sites": "Услуге",
   "app.tls": "ТЛС / сертификати",
   "app.user.noRoles": "Нема улога",
-  "app.version": "в1.4.4",
+  "app.version": "в1.4.5",
   "auth.2fa.challengeMissing": "2ФА изазов недостаје. Пријавите се поново.",
   "auth.2fa.code": "2ФА код",
   "auth.2fa.codeRequired": "Потребан је 2ФА код",

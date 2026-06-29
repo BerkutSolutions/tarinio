@@ -154,11 +154,7 @@ func New(
 		http.MethodPut:    {rbac.PermissionSitesWrite},
 		http.MethodDelete: {rbac.PermissionSitesWrite},
 	}, handlers.NewSitesHandler(siteService, siteBanService)))
-	errorPagesTemplatesDir := strings.TrimSpace(os.Getenv("WAF_ERROR_PAGES_TEMPLATES_DIR"))
-	if errorPagesTemplatesDir == "" {
-		errorPagesTemplatesDir = "/src/compiler/templates/errors"
-	}
-	mux.Handle("/api/error-pages/preview/", withAuth(authService, rbac.PermissionSitesRead, handlers.NewErrorPagePreviewHandler(errorPagesTemplatesDir)))
+	mux.Handle("/api/error-pages/preview/", withAuth(authService, rbac.PermissionSitesRead, handlers.NewErrorPagePreviewHandler("")))
 	mux.Handle("/api/upstreams", withMethodPermissions(authService, map[string]rbac.Permission{
 		http.MethodGet:  rbac.PermissionUpstreamsRead,
 		http.MethodPost: rbac.PermissionUpstreamsWrite,

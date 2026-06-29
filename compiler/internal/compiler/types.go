@@ -90,6 +90,7 @@ type RateLimitPolicyInput struct {
 	WindowSeconds int
 	Burst         int
 	StatusCode    int
+	LimitReqURL   string
 }
 
 type CustomRateLimitRuleInput struct {
@@ -201,6 +202,7 @@ type EasyProfileInput struct {
 	LimitConnMaxHTTP2         int
 	LimitConnMaxHTTP3         int
 	UseLimitReq               bool
+	LimitReqURL               string
 	LimitReqRate              string
 	CustomLimitRules          []CustomRateLimitRuleInput
 	UseBadBehavior            bool

@@ -195,8 +195,10 @@ server {
 
     location ^~ /api/ {
         proxy_intercept_errors off;
+{{- if not .UseEasyConfig }}
         modsecurity on;
         modsecurity_rules_file /etc/waf/modsecurity/sites/{{ .SiteID }}.conf;
+{{- end }}
         include /etc/waf/nginx/ratelimits/{{ .SiteID }}.conf;
 {{- if .IsManagementSite }}
         proxy_set_header Host $http_host;
@@ -215,8 +217,10 @@ server {
     }
 
     location / {
+{{- if not .UseEasyConfig }}
         modsecurity on;
         modsecurity_rules_file /etc/waf/modsecurity/sites/{{ .SiteID }}.conf;
+{{- end }}
         include /etc/waf/nginx/ratelimits/{{ .SiteID }}.conf;
 {{- if .PassHostHeader }}
         proxy_set_header Host $http_host;

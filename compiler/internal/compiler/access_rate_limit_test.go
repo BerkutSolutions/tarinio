@@ -158,3 +158,89 @@ func TestRenderAccessRateLimitArtifacts_ManagementAllowlistDefaultsToDeny(t *tes
 		t.Fatalf("expected management site allowlist to imply default deny, got: %s", accessConf)
 	}
 }
+
+func TestRenderAccessRateLimitArtifacts_LimitReqURLScopesDirective(t *testing.T) {
+	artifacts, err := RenderAccessRateLimitArtifacts(
+		[]SiteInput{
+			{ID: "site-a", Enabled: true, PrimaryHost: "a.example.com", ListenHTTP: true, DefaultUpstreamID: "up-a"},
+		},
+		nil,
+		[]RateLimitPolicyInput{
+			{ID: "rate-a", SiteID: "site-a", Enabled: true, Requests: 30, WindowSeconds: 1, Burst: 30, StatusCode: 429, LimitReqURL: "/login"},
+		},
+	)
+	if err != nil {
+		t.Fatalf("render failed: %v", err)
+	}
+	var siteConf string
+	for _, artifact := range artifacts {
+		if artifact.Path == "nginx/ratelimits/site-a.conf" {
+			siteConf = string(artifact.Content)
+			break
+		}
+	}
+	if siteConf == "" {
+		t.Fatal("expected nginx/ratelimits/site-a.conf artifact")
+	}
+	// limit_req stays in server context; URL scoping is handled by an http-level
+	// map so generated nginx remains valid.
+	if strings.Contains(siteConf, "if ($uri") {
+		t.Fatalf("limit_req must not be wrapped in an nginx if-block, got: %s", siteConf)
+	}
+	if !strings.Contains(siteConf, "limit_req zone=site_site-a_req") {
+		t.Fatalf("expected limit_req directive, got: %s", siteConf)
+	}
+	// limit_conn must remain unconditional (connection limit is site-wide)
+	if !strings.Contains(siteConf, "limit_conn site_site-a_conn") {
+		t.Fatalf("expected unconditional limit_conn directive, got: %s", siteConf)
+	}
+
+	var httpConf string
+	for _, artifact := range artifacts {
+		if artifact.Path == "nginx/conf.d/ratelimits.conf" {
+			httpConf = string(artifact.Content)
+			break
+		}
+	}
+	if !strings.Contains(httpConf, "map $uri $waf_rate_limit_req_key_site_a") {
+		t.Fatalf("expected URI-scoped rate-limit key map, got: %s", httpConf)
+	}
+	if !strings.Contains(httpConf, `~*^/login $waf_rate_limit_key_site_a;`) {
+		t.Fatalf("expected /login to feed the base rate-limit key, got: %s", httpConf)
+	}
+	if !strings.Contains(httpConf, "limit_req_zone $waf_rate_limit_req_key_site_a zone=site_site-a_req:10m") {
+		t.Fatalf("expected limit_req_zone to use the scoped key, got: %s", httpConf)
+	}
+}
+
+func TestRenderAccessRateLimitArtifacts_NoLimitReqURLAppliesGlobally(t *testing.T) {
+	artifacts, err := RenderAccessRateLimitArtifacts(
+		[]SiteInput{
+			{ID: "site-b", Enabled: true, PrimaryHost: "b.example.com", ListenHTTP: true, DefaultUpstreamID: "up-b"},
+		},
+		nil,
+		[]RateLimitPolicyInput{
+			{ID: "rate-b", SiteID: "site-b", Enabled: true, Requests: 100, WindowSeconds: 1, Burst: 50, StatusCode: 429},
+		},
+	)
+	if err != nil {
+		t.Fatalf("render failed: %v", err)
+	}
+	var siteConf string
+	for _, artifact := range artifacts {
+		if artifact.Path == "nginx/ratelimits/site-b.conf" {
+			siteConf = string(artifact.Content)
+			break
+		}
+	}
+	if siteConf == "" {
+		t.Fatal("expected nginx/ratelimits/site-b.conf artifact")
+	}
+	// Without LimitReqURL, limit_req must NOT be wrapped in an if-block
+	if strings.Contains(siteConf, "if ($uri") {
+		t.Fatalf("expected global limit_req without if-block, got: %s", siteConf)
+	}
+	if !strings.Contains(siteConf, "limit_req zone=site_site-b_req") {
+		t.Fatalf("expected unconditional limit_req directive, got: %s", siteConf)
+	}
+}

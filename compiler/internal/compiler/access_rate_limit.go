@@ -15,10 +15,14 @@ type accessSiteData struct {
 }
 
 type rateLimitHTTPEntry struct {
-	ZoneName     string
-	ConnZoneName string
-	KeyVar       string
-	Rate         string
+	ZoneName        string
+	ConnZoneName    string
+	LimitReqKeyVar  string
+	ConnKeyVar      string
+	BaseKeyVar      string
+	Rate            string
+	LimitReqURLVar  string
+	LimitReqPattern string
 }
 
 type rateLimitExceptionEntry struct {
@@ -36,6 +40,7 @@ type rateLimitSiteData struct {
 	Enabled         bool
 	ZoneName        string
 	ConnZoneName    string
+	LimitReqURLVar  string
 	Burst           int
 	StatusCode      int
 	ConnectionLimit int
@@ -111,11 +116,23 @@ func RenderAccessRateLimitArtifacts(
 			AllowCIDRs:   append([]string(nil), accessPolicy.AllowCIDRs...),
 		})
 		if policy, ok := rateBySite[site.ID]; ok && policy.Enabled {
+			baseKeyVar := siteRateLimitKeyVar(site.ID)
+			limitReqKeyVar := baseKeyVar
+			limitReqURLVar := ""
+			limitReqPattern := strings.TrimSpace(policy.LimitReqURL)
+			if limitReqPattern != "" {
+				limitReqURLVar = siteRateLimitReqKeyVar(site.ID)
+				limitReqKeyVar = limitReqURLVar
+			}
 			httpData.Entries = append(httpData.Entries, rateLimitHTTPEntry{
-				ZoneName:     reqZoneName(site.ID),
-				ConnZoneName: connZoneName(site.ID),
-				KeyVar:       siteRateLimitKeyVar(site.ID),
-				Rate:         formatRate(policy.Requests, policy.WindowSeconds),
+				ZoneName:        reqZoneName(site.ID),
+				ConnZoneName:    connZoneName(site.ID),
+				LimitReqKeyVar:  limitReqKeyVar,
+				ConnKeyVar:      baseKeyVar,
+				BaseKeyVar:      baseKeyVar,
+				Rate:            formatRate(policy.Requests, policy.WindowSeconds),
+				LimitReqURLVar:  limitReqURLVar,
+				LimitReqPattern: limitReqPattern,
 			})
 		}
 	}
@@ -225,6 +242,10 @@ func siteExceptionVar(siteID string) string {
 
 func siteRateLimitKeyVar(siteID string) string {
 	return fmt.Sprintf("waf_rate_limit_key_%s", slugSiteID(siteID))
+}
+
+func siteRateLimitReqKeyVar(siteID string) string {
+	return fmt.Sprintf("waf_rate_limit_req_key_%s", slugSiteID(siteID))
 }
 
 func formatRate(requests, windowSeconds int) string {

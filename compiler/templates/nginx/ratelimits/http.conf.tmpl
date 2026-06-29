@@ -11,6 +11,12 @@ map ${{ .ExceptionVar }} ${{ .KeyVar }} {
 }
 {{- end }}
 {{- range .Entries }}
-limit_req_zone ${{ .KeyVar }} zone={{ .ZoneName }}:10m rate={{ .Rate }};
-limit_conn_zone ${{ .KeyVar }} zone={{ .ConnZoneName }}:10m;
+{{- if .LimitReqURLVar }}
+map $uri ${{ .LimitReqURLVar }} {
+    default "";
+    ~*^{{ .LimitReqPattern }} ${{ .BaseKeyVar }};
+}
+{{- end }}
+limit_req_zone ${{ .LimitReqKeyVar }} zone={{ .ZoneName }}:10m rate={{ .Rate }};
+limit_conn_zone ${{ .ConnKeyVar }} zone={{ .ConnZoneName }}:10m;
 {{- end }}

@@ -84,6 +84,10 @@ func TestRenderEasyArtifacts_ProtectionModesPerSite(t *testing.T) {
 	if !strings.Contains(blockRules, "Include /etc/waf/modsecurity/coreruleset/rules/*.conf") {
 		t.Fatalf("expected block mode to include CRS, got: %s", blockRules)
 	}
+	blockNginx := byPath["nginx/easy/site-block.conf"]
+	if !strings.Contains(blockNginx, "modsecurity on;") {
+		t.Fatalf("expected block mode easy snippet to enable modsecurity, got: %s", blockNginx)
+	}
 
 	if _, ok := byPath["modsecurity/easy/site-monitor.conf"]; ok {
 		t.Fatal("did not expect modsecurity/easy artifact for monitor mode")
