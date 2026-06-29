@@ -626,7 +626,7 @@ if [ -d "$INSTALL_DIR/.git" ]; then
 
   step "Updating existing repository in $INSTALL_DIR"
   run_logged git -C "$INSTALL_DIR" fetch --all --tags
-  run_logged git -C "$INSTALL_DIR" checkout "$BRANCH"
+  run_logged git -C "$INSTALL_DIR" checkout -B "$BRANCH" "origin/$BRANCH"
   run_logged git -C "$INSTALL_DIR" pull --ff-only origin "$BRANCH"
   ok "repository updated to branch $BRANCH"
 else
