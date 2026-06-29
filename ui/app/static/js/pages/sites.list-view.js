@@ -71,7 +71,7 @@ export function renderListView(state, ctx, formatCertificateExpiryByLanguage, st
 }
 
 export function bindList(container, state, ctx, deps) {
-  const { go, load, downloadJSON, exportSelectedServicesEnv, importServicesFiles, toEnvKey, putWithPostFallback, normalizeSiteID } = deps;
+  const { go, load, downloadJSON, exportSelectedServicesEnv, importServicesFiles, toEnvKey, putWithPostFallback, normalizeSiteID, deleteServiceWithResources, confirmAction, normalizeArray } = deps;
   const feedback = container.querySelector("#sites-feedback");
   container.querySelector("#services-create")?.addEventListener("click", () => go(`${routeBase()}/new`));
   container.querySelector("#services-refresh")?.addEventListener("click", load);
@@ -109,6 +109,37 @@ export function bindList(container, state, ctx, deps) {
   container.querySelector("#services-search")?.addEventListener("input", (event) => { state.search = event.target.value; const s = Number(event.target.selectionStart || state.search.length); const e = Number(event.target.selectionEnd || s); deps.render(); const nextInput = container.querySelector("#services-search"); if (nextInput) { nextInput.focus(); nextInput.setSelectionRange(s, e); } });
   container.querySelector("#services-sort")?.addEventListener("change", (event) => { state.sort = event.target.value; deps.render(); });
   container.querySelector("#services-select-all")?.addEventListener("change", (event) => { const checked = Boolean(event.target.checked); for (const site of state.filteredSites) { if (checked) state.selectedSiteIDs.add(site.id); else state.selectedSiteIDs.delete(site.id); } deps.render(); });
+  container.querySelector("#services-delete-selected")?.addEventListener("click", async () => {
+    feedback.innerHTML = "";
+    const selectedIDs = Array.from(state.selectedSiteIDs).filter((id) => state.sites.some((site) => normalizeSiteID(site.id) === normalizeSiteID(id)));
+    if (!selectedIDs.length) { setError(feedback, ctx.t("sites.error.noServicesSelected")); return; }
+    if (!confirmAction(ctx.t("sites.confirm.deleteSelected", { count: selectedIDs.length }))) { return; }
+    try {
+      setLoading(feedback, ctx.t("sites.action.deleting"));
+      const sharedSnapshot = {
+        sites: state.sites, upstreams: state.upstreams, tlsConfigs: state.tlsConfigs,
+        easyProfiles: await ctx.api.get("/api/easy-site-profiles").catch(() => []),
+        wafPolicies: await ctx.api.get("/api/waf-policies").catch(() => []),
+        ratePolicies: await ctx.api.get("/api/rate-limit-policies").catch(() => []),
+        accessPolicies: await ctx.api.get("/api/access-policies").catch(() => [])
+      };
+      let deletedCount = 0;
+      for (const siteID of selectedIDs) {
+        await deleteServiceWithResources(siteID, ctx, sharedSnapshot);
+        deletedCount += 1;
+        sharedSnapshot.sites = normalizeArray(sharedSnapshot.sites).filter((item) => normalizeSiteID(item?.id) !== normalizeSiteID(siteID));
+        sharedSnapshot.upstreams = normalizeArray(sharedSnapshot.upstreams).filter((item) => normalizeSiteID(item?.site_id) !== normalizeSiteID(siteID));
+        sharedSnapshot.tlsConfigs = normalizeArray(sharedSnapshot.tlsConfigs).filter((item) => normalizeSiteID(item?.site_id) !== normalizeSiteID(siteID));
+        sharedSnapshot.easyProfiles = normalizeArray(sharedSnapshot.easyProfiles).filter((item) => normalizeSiteID(item?.site_id) !== normalizeSiteID(siteID));
+        sharedSnapshot.wafPolicies = normalizeArray(sharedSnapshot.wafPolicies).filter((item) => normalizeSiteID(item?.site_id) !== normalizeSiteID(siteID));
+        sharedSnapshot.ratePolicies = normalizeArray(sharedSnapshot.ratePolicies).filter((item) => normalizeSiteID(item?.site_id) !== normalizeSiteID(siteID));
+        sharedSnapshot.accessPolicies = normalizeArray(sharedSnapshot.accessPolicies).filter((item) => normalizeSiteID(item?.site_id) !== normalizeSiteID(siteID));
+      }
+      state.selectedSiteIDs = new Set();
+      ctx.notify(ctx.t("sites.toast.servicesDeleted", { count: deletedCount }));
+      await load();
+    } catch (error) { setError(feedback, `${ctx.t("sites.error.deleteSite")}: ${String(error?.message || error)}`); }
+  });
   container.querySelectorAll("[data-select-site]").forEach((checkbox) => {
     checkbox.addEventListener("change", (event) => { event.stopPropagation(); const siteID = String(event.target.dataset.selectSite || ""); if (!siteID) return; if (event.target.checked) state.selectedSiteIDs.add(siteID); else state.selectedSiteIDs.delete(siteID); });
   });

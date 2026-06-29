@@ -1,4 +1,5 @@
 import { setLoading } from "../ui.js";
+import { confirmAction } from "../ui.js";
 import {
   go,
   mergeByID,
@@ -33,6 +34,7 @@ import {
   importServicesFiles,
   putWithPostFallback,
   toEnvKey,
+  deleteServiceWithResources,
 } from "./sites.stable-resources.js";
 import {
   renderDetailView,
@@ -274,6 +276,9 @@ export async function renderSites(container, ctx) {
       toEnvKey,
       putWithPostFallback,
       normalizeSiteID,
+      normalizeArray,
+      deleteServiceWithResources,
+      confirmAction,
       render,
     });
   };
