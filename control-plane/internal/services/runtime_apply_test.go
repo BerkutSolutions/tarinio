@@ -302,6 +302,7 @@ func TestApplyService_CompilesEasyProfileArtifacts(t *testing.T) {
 	easy.SecurityAuthBasic.AuthBasicPassword = "secret"
 	easy.SecurityAntibot.AntibotChallenge = easysiteprofiles.AntibotChallengeRecaptcha
 	easy.SecurityAntibot.AntibotURI = "/challenge"
+	easy.SecurityAntibot.ScannerAutoBanEnabled = true
 	easy.SecurityAntibot.AntibotRecaptchaSitekey = "site-key"
 	easy.SecurityAntibot.AntibotRecaptchaSecret = "secret-key"
 	easy.SecurityModSecurity.UseModSecurity = true

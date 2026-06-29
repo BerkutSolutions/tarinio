@@ -11,6 +11,16 @@
 ### Ядро
 
 - Убрана директива `modsecurity on;` из шаблона `nginx/easy/site.conf.tmpl`: включение ModSecurity управляется через `SecRuleEngine` внутри `modsecurity/easy/<site>.conf`, а `modsecurity on;` на уровне server-блока переопределяло `SecRuleEngine Off` management-сайта и блокировало запросы к панели управления с кодом 403.
+- Шаблон `nginx/easy/site.conf.tmpl`: добавлен `proxy_intercept_errors off;` когда `use_custom_error_pages=false` — nginx теперь пропускает upstream-ответы с ошибками без подмены на страницы WAF.
+- Компилятор `renderSiteErrorArtifacts`: страницы ошибок теперь берутся из новых статичных `.preview.html` шаблонов (если доступны) вместо устаревшего `status.html.tmpl` с блоком "Что делать дальше".
+
+### UI
+
+- `sites.detail-draft-builder.js`: значение `antibot_challenge` теперь определяется по состоянию чекбокса `#service-antibot-enabled` — если чекбокс снят, всегда сохраняется `"no"` независимо от значения скрытого select. Исправлен баг когда снятие чекбокса не сохранялось (select не имеет опции `"no"`).
+- `sites.detail-core-bindings.js`: упрощён toggle-handler антибота — больше не меняет `challengeSelect.value`, вместо этого управляет только `disabled` состоянием.
+- `sites.detail-draft-builder.js`: `antibot_scanner_auto_ban_enabled` теперь возвращает `false` если поле скрыто/disabled (`?? false` вместо `?? true`).
+- `sites.draft-core.js`: дефолт `antibot_scanner_auto_ban_enabled` изменён с `true` на `false`.
+- `control-plane/easysiteprofiles`: дефолт `ScannerAutoBanEnabled` изменён с `true` на `false`.
 
 ## [1.4.5] - 29.06.2026
 

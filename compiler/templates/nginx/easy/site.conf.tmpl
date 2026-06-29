@@ -309,6 +309,10 @@ if ($waf_auth_gate_skip = 0) {
 modsecurity off;
 {{- end }}
 
+{{- if not .UseCustomErrorPages }}
+proxy_intercept_errors off;
+{{- end }}
+
 {{- if .UseCustomErrorPages }}
 {{- if not (sliceContains .DisabledErrorPages "400") }}
 error_page 400 /__waf_errors/{{ .SiteID }}/400.html?rid=$request_id&ip=$remote_addr&ts=$msec;

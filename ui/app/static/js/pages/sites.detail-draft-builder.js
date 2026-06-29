@@ -113,10 +113,10 @@ export function buildDetailDraftFromForm(container, state, deps = {}) {
           rate: (() => { const v = String(rateInput?.value || "").trim(); const unit = rateUnitInput?.value || "r/s"; return v ? `${v}${unit}` : ""; })()
         };
       }),
-    antibot_challenge: container.querySelector("#service-antibot-challenge").value,
+    antibot_challenge: container.querySelector("#service-antibot-enabled")?.checked ? (container.querySelector("#service-antibot-challenge").value || "cookie") : "no",
     antibot_challenge_template: container.querySelector("#service-antibot-challenge-template")?.value || "v2",
     antibot_uri: container.querySelector("#service-antibot-uri").value.trim(),
-    antibot_scanner_auto_ban_enabled: container.querySelector("#service-antibot-scanner-auto-ban-enabled")?.checked ?? true,
+    antibot_scanner_auto_ban_enabled: container.querySelector("#service-antibot-scanner-auto-ban-enabled")?.checked ?? false,
     antibot_recaptcha_score: Number(container.querySelector("#service-antibot-recaptcha-score").value || "0.7"),
     antibot_recaptcha_sitekey: container.querySelector("#service-antibot-recaptcha-sitekey").value.trim(),
     antibot_recaptcha_secret: container.querySelector("#service-antibot-recaptcha-secret").value.trim(),

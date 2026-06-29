@@ -188,14 +188,6 @@ export function bindDetailCore(container, state, ctx, deps) {
   container.querySelector("#service-antibot-enabled")?.addEventListener("change", (e) => {
     const enabled = e.target.checked;
     const challengeSelect = container.querySelector("#service-antibot-challenge");
-    if (challengeSelect) {
-      if (!enabled) {
-        challengeSelect.dataset.prevValue = challengeSelect.value;
-        challengeSelect.value = "no";
-      } else {
-        challengeSelect.value = challengeSelect.dataset.prevValue || "javascript";
-      }
-    }
     const bodyWrap = container.querySelector("#antibot-body-wrap");
     const templateRow = container.querySelector("#antibot-template-row");
     const previewBtn = container.querySelector("#antibot-template-preview-btn");
@@ -207,6 +199,7 @@ export function bindDetailCore(container, state, ctx, deps) {
     container.querySelectorAll("#antibot-body-wrap input, #antibot-body-wrap select").forEach((el) => {
       el.disabled = !enabled;
     });
+    if (challengeSelect) challengeSelect.disabled = !enabled;
     syncStateDraftFromForm();
   });
 

@@ -309,10 +309,22 @@ func renderSiteErrorArtifacts(siteID string) ([]ArtifactOutput, error) {
 
 	artifacts := make([]ArtifactOutput, 0, len(pages))
 	for _, page := range pages {
-		content, err := renderTemplate("templates/errors/status.html.tmpl", page)
-		if err != nil {
-			return nil, err
+		var content []byte
+		var err error
+
+		// Use the new static preview page if available — these are the
+		// canonical production error pages. Fall back to status.html.tmpl
+		// only for codes that don't have a dedicated preview file yet.
+		previewPath := fmt.Sprintf("templates/errors/%d.preview.html", page.StatusCode)
+		if previewContent, fsErr := compiler.TemplatesFS.ReadFile(previewPath); fsErr == nil {
+			content = previewContent
+		} else {
+			content, err = renderTemplate("templates/errors/status.html.tmpl", page)
+			if err != nil {
+				return nil, err
+			}
 		}
+
 		artifacts = append(artifacts, newArtifact(
 			fmt.Sprintf("errors/%s/%d.html", siteID, page.StatusCode),
 			ArtifactKindNginxConfig,

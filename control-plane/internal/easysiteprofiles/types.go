@@ -441,7 +441,7 @@ func DefaultProfile(siteID string) EasySiteProfile {
 		SecurityAntibot: SecurityAntibotSettings{
 			AntibotChallenge:           AntibotChallengeNo,
 			AntibotURI:                 "/challenge",
-			ScannerAutoBanEnabled:      true,
+			ScannerAutoBanEnabled:      false,
 			AntibotRecaptchaScore:      0.7,
 			AntibotRecaptchaSitekey:    "",
 			AntibotRecaptchaSecret:     "",

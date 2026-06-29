@@ -22,8 +22,8 @@ func TestDefaultProfile_HasExpectedDefaults(t *testing.T) {
 	if profile.SecurityAntibot.AntibotChallenge != AntibotChallengeNo {
 		t.Fatalf("unexpected antibot default: %s", profile.SecurityAntibot.AntibotChallenge)
 	}
-	if !profile.SecurityAntibot.ScannerAutoBanEnabled {
-		t.Fatal("expected scanner auto-ban enabled by default")
+	if profile.SecurityAntibot.ScannerAutoBanEnabled {
+		t.Fatal("expected scanner auto-ban disabled by default")
 	}
 	if !profile.SecurityModSecurity.UseModSecurityCRSPlugins {
 		t.Fatal("expected CRS to be enabled by default for easy profiles")
