@@ -344,6 +344,7 @@ func (s *ApplyService) compileBundle(revision revisions.Revision, snapshot revis
 	rateInputs := mapRateLimitInputs(snapshot.RateLimitPolicies)
 	easyInputs := mapEasyInputs(snapshot.EasySiteProfiles, snapshot.VirtualPatches)
 	easyInputs = applyAntiDDoSDefaultEasyProfiles(siteInputs, easyInputs)
+	siteInputs = applyEasySiteInputFlags(siteInputs, easyInputs)
 	rateInputs = applyAntiDDoSRateOverrides(siteInputs, rateInputs, antiDDoSSettings)
 	rateInputs = applyEasyLimitReqURLOverrides(rateInputs, easyInputs)
 
@@ -436,6 +437,25 @@ func applyAntiDDoSDefaultEasyProfiles(siteInputs []pipeline.SiteInput, items []p
 		out = append(out, item)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].SiteID < out[j].SiteID })
+	return out
+}
+
+func applyEasySiteInputFlags(siteInputs []pipeline.SiteInput, easyInputs []pipeline.EasyProfileInput) []pipeline.SiteInput {
+	if len(easyInputs) == 0 {
+		return siteInputs
+	}
+	easyBySite := make(map[string]pipeline.EasyProfileInput, len(easyInputs))
+	for _, item := range easyInputs {
+		easyBySite[item.SiteID] = item
+	}
+	out := make([]pipeline.SiteInput, len(siteInputs))
+	copy(out, siteInputs)
+	for i := range out {
+		if easy, ok := easyBySite[out[i].ID]; ok {
+			out[i].UseEasyConfig = true
+			out[i].UseCustomErrorPages = easy.UseCustomErrorPages
+		}
+	}
 	return out
 }
 
@@ -945,16 +965,16 @@ func mapEasyInputs(items []easysiteprofiles.EasySiteProfile, virtualPatches []vi
 			HealthCheckIntervalSeconds: item.UpstreamRouting.HealthCheckIntervalSeconds,
 			HealthCheckFailThreshold:   item.UpstreamRouting.HealthCheckFailThreshold,
 
-			UseAuthBasic:      item.SecurityAuthBasic.UseAuthBasic,
-			AuthMode:          item.SecurityAuthBasic.AuthMode,
-			AuthOrder:         item.SecurityAuthBasic.AuthOrder,
-			AuthBasicUser:     item.SecurityAuthBasic.AuthBasicUser,
-			AuthBasicPassword: item.SecurityAuthBasic.AuthBasicPassword,
-			AuthBasicText:     item.SecurityAuthBasic.AuthBasicText,
-			AuthUsers:         mapAuthUsers(item.SecurityAuthBasic.Users),
-			AuthServiceTokens: mapAuthServiceTokens(item.SecurityAuthBasic.ServiceTokens),
-			AuthExclusionRules: mapAuthExclusionRules(item.SecurityAuthBasic.ExclusionRules),
-			AuthSessionTTLMin: item.SecurityAuthBasic.SessionInactivityMinutes,
+			UseAuthBasic:               item.SecurityAuthBasic.UseAuthBasic,
+			AuthMode:                   item.SecurityAuthBasic.AuthMode,
+			AuthOrder:                  item.SecurityAuthBasic.AuthOrder,
+			AuthBasicUser:              item.SecurityAuthBasic.AuthBasicUser,
+			AuthBasicPassword:          item.SecurityAuthBasic.AuthBasicPassword,
+			AuthBasicText:              item.SecurityAuthBasic.AuthBasicText,
+			AuthUsers:                  mapAuthUsers(item.SecurityAuthBasic.Users),
+			AuthServiceTokens:          mapAuthServiceTokens(item.SecurityAuthBasic.ServiceTokens),
+			AuthExclusionRules:         mapAuthExclusionRules(item.SecurityAuthBasic.ExclusionRules),
+			AuthSessionTTLMin:          item.SecurityAuthBasic.SessionInactivityMinutes,
 			AntibotChallenge:           item.SecurityAntibot.AntibotChallenge,
 			AntibotChallengeTemplate:   item.SecurityAntibot.AntibotChallengeTemplate,
 			AntibotURI:                 item.SecurityAntibot.AntibotURI,

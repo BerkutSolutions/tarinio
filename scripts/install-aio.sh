@@ -529,6 +529,26 @@ probe_host_http() {
   fail "host probe failed for $url after ${attempts} attempts"
 }
 
+compile_and_apply_current_revision() {
+  compile_out="$($COMPOSE_CMD -f docker-compose.yml exec -T control-plane waf-cli revisions compile 2>&1)" || {
+    printf '%s\n' "$compile_out" >>"$LOG_FILE"
+    return 1
+  }
+  printf '%s\n' "$compile_out" >>"$LOG_FILE"
+  revision_id="$(printf '%s\n' "$compile_out" | awk -F': ' '/^Compiled revision:/ { print $2; exit }')"
+  if [ -z "$revision_id" ]; then
+    printf '%s\n' "failed to parse compiled revision id" >>"$LOG_FILE"
+    return 1
+  fi
+  sleep 4
+  apply_out="$($COMPOSE_CMD -f docker-compose.yml exec -T control-plane waf-cli revisions apply "$revision_id" 2>&1)" || {
+    printf '%s\n' "$apply_out" >>"$LOG_FILE"
+    return 1
+  }
+  printf '%s\n' "$apply_out" >>"$LOG_FILE"
+  printf '%s\n' "$apply_out" | grep -q '(succeeded)'
+}
+
 extract_version() {
   file="$1"
   if [ ! -f "$file" ]; then
@@ -561,7 +581,7 @@ trap on_exit EXIT
 
 mkdir -p "$(dirname "$LOG_FILE")"
 : >"$LOG_FILE"
-reset_screen()
+reset_screen
 
 section "TARINIO AIO Installer"
 step "Checking required tools"
@@ -686,6 +706,9 @@ ok "status collected"
 section "Post-Upgrade Health Gate"
 step "Probing control-plane health endpoint"
 probe_container_http control-plane "http://127.0.0.1:8080/healthz" "$CONTAINER_PROBE_ATTEMPTS"
+step "Compiling and applying a fresh runtime revision"
+compile_and_apply_current_revision
+ok "fresh runtime revision applied"
 step "Probing runtime health endpoint"
 probe_container_http runtime "http://127.0.0.1:8081/healthz" "$CONTAINER_PROBE_ATTEMPTS"
 step "Probing public runtime gateway route"

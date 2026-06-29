@@ -171,6 +171,22 @@ func TestApplyService_ApplyUsesRevisionSnapshotAndMarksActive(t *testing.T) {
 	if !strings.Contains(string(content), "rev-000001") {
 		t.Fatalf("expected active pointer to contain revision id, got %s", string(content))
 	}
+	siteConfContent, err := os.ReadFile(filepath.Join(root, "candidates", "rev-000001", "nginx", "sites", "site-a.conf"))
+	if err != nil {
+		t.Fatalf("read generated site conf: %v", err)
+	}
+	siteConf := string(siteConfContent)
+	if strings.Contains(siteConf, "modsecurity on;") || strings.Contains(siteConf, "modsecurity_rules_file /etc/waf/modsecurity/sites/site-a.conf;") {
+		t.Fatalf("default generated easy profile must suppress base modsecurity directives, got: %s", siteConf)
+	}
+	easyConfContent, err := os.ReadFile(filepath.Join(root, "candidates", "rev-000001", "nginx", "easy", "site-a.conf"))
+	if err != nil {
+		t.Fatalf("read generated easy conf: %v", err)
+	}
+	easyConf := string(easyConfContent)
+	if !strings.Contains(easyConf, "modsecurity on;") || !strings.Contains(easyConf, "modsecurity_rules_file /etc/waf/modsecurity/easy/site-a.conf;") {
+		t.Fatalf("default generated easy profile must own modsecurity directives, got: %s", easyConf)
+	}
 	if len(eventStore.items) != 2 || eventStore.items[0].Type != events.TypeApplyStarted || eventStore.items[1].Type != events.TypeApplySucceeded {
 		t.Fatalf("unexpected success events: %+v", eventStore.items)
 	}
@@ -448,6 +464,25 @@ func TestMapSiteUpstreamInputs_RespectsHostHeaderToggle(t *testing.T) {
 	}
 	if upstreamInputs[0].PassHostHeader {
 		t.Fatalf("expected host header forwarding disabled, got %+v", upstreamInputs[0])
+	}
+}
+
+func TestApplyEasySiteInputFlags_MarksGeneratedDefaultEasyProfiles(t *testing.T) {
+	siteInputs := []pipeline.SiteInput{{ID: "localhost", Enabled: true}}
+	easyInputs := []pipeline.EasyProfileInput{{SiteID: "localhost", UseCustomErrorPages: true}}
+
+	got := applyEasySiteInputFlags(siteInputs, easyInputs)
+	if len(got) != 1 {
+		t.Fatalf("expected one site input, got %d", len(got))
+	}
+	if !got[0].UseEasyConfig {
+		t.Fatalf("expected generated easy profile to mark site as easy-enabled: %+v", got[0])
+	}
+	if !got[0].UseCustomErrorPages {
+		t.Fatalf("expected custom error page flag to propagate: %+v", got[0])
+	}
+	if siteInputs[0].UseEasyConfig {
+		t.Fatalf("expected input slice to remain immutable")
 	}
 }
 
