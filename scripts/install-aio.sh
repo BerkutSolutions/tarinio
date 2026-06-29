@@ -669,6 +669,7 @@ ensure_secure_env_defaults
 section "Build And Start"
 EXISTING_CONTAINERS="$($COMPOSE_CMD -f docker-compose.yml ps -aq 2>/dev/null || true)"
 if [ -n "$EXISTING_CONTAINERS" ]; then
+  IS_UPGRADE=1
   if [ "$COMPOSE_LEGACY" -eq 1 ]; then
     step "Legacy docker-compose detected: removing old project containers to avoid recreate bug (without volumes)"
     if run_logged $COMPOSE_CMD -f docker-compose.yml down --remove-orphans; then
@@ -685,6 +686,7 @@ if [ -n "$EXISTING_CONTAINERS" ]; then
     fi
   fi
 else
+  IS_UPGRADE=0
   ok "no existing containers from this profile"
 fi
 
@@ -706,9 +708,13 @@ ok "status collected"
 section "Post-Upgrade Health Gate"
 step "Probing control-plane health endpoint"
 probe_container_http control-plane "http://127.0.0.1:8080/healthz" "$CONTAINER_PROBE_ATTEMPTS"
-step "Compiling and applying a fresh runtime revision"
-compile_and_apply_current_revision
-ok "fresh runtime revision applied"
+if [ "$IS_UPGRADE" -eq 1 ]; then
+  step "Compiling and applying a fresh runtime revision"
+  compile_and_apply_current_revision
+  ok "fresh runtime revision applied"
+else
+  ok "fresh install: skipping runtime revision compile (no users yet, onboarding required)"
+fi
 step "Probing runtime health endpoint"
 probe_container_http runtime "http://127.0.0.1:8081/healthz" "$CONTAINER_PROBE_ATTEMPTS"
 step "Probing public runtime gateway route"

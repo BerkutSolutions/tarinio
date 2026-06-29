@@ -164,7 +164,6 @@ if ($waf_auth_gate_skip = 0) {
 {{- end }}
 
 {{- if .UseModSecurityEasyFile }}
-modsecurity on;
 modsecurity_rules_file /etc/waf/modsecurity/easy/{{ .SiteID }}.conf;
 {{- end }}
 

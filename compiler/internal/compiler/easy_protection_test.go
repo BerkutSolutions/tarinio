@@ -85,8 +85,8 @@ func TestRenderEasyArtifacts_ProtectionModesPerSite(t *testing.T) {
 		t.Fatalf("expected block mode to include CRS, got: %s", blockRules)
 	}
 	blockNginx := byPath["nginx/easy/site-block.conf"]
-	if !strings.Contains(blockNginx, "modsecurity on;") {
-		t.Fatalf("expected block mode easy snippet to enable modsecurity, got: %s", blockNginx)
+	if !strings.Contains(blockNginx, "modsecurity_rules_file") {
+		t.Fatalf("expected block mode easy snippet to include modsecurity_rules_file, got: %s", blockNginx)
 	}
 
 	if _, ok := byPath["modsecurity/easy/site-monitor.conf"]; ok {

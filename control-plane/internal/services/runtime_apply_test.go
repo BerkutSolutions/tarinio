@@ -184,7 +184,7 @@ func TestApplyService_ApplyUsesRevisionSnapshotAndMarksActive(t *testing.T) {
 		t.Fatalf("read generated easy conf: %v", err)
 	}
 	easyConf := string(easyConfContent)
-	if !strings.Contains(easyConf, "modsecurity on;") || !strings.Contains(easyConf, "modsecurity_rules_file /etc/waf/modsecurity/easy/site-a.conf;") {
+	if !strings.Contains(easyConf, "modsecurity_rules_file /etc/waf/modsecurity/easy/site-a.conf;") {
 		t.Fatalf("default generated easy profile must own modsecurity directives, got: %s", easyConf)
 	}
 	if len(eventStore.items) != 2 || eventStore.items[0].Type != events.TypeApplyStarted || eventStore.items[1].Type != events.TypeApplySucceeded {
