@@ -71,7 +71,7 @@ func TestValidateCandidateBundle(t *testing.T) {
 
 func TestWriteBootstrapNginxConfig(t *testing.T) {
 	root := t.TempDir()
-	if err := writeBootstrapNginxConfig(root, bootstrapUIUpstream); err != nil {
+	if err := writeBootstrapNginxConfig(root, bootstrapUIUpstream()); err != nil {
 		t.Fatalf("write bootstrap config failed: %v", err)
 	}
 

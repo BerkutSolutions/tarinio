@@ -298,12 +298,12 @@ func TestRenderEasyRateLimitArtifacts_CustomStatusFromBadBehaviorCodes(t *testin
 		byPath[item.Path] = string(item.Content)
 	}
 	locationsConf := byPath["nginx/easy-locations/site-a.conf"]
-	if !strings.Contains(locationsConf, "limit_req_status 403;") {
-		t.Fatalf("expected custom location to use status from bad_behavior_status_codes, got: %s", locationsConf)
+	if !strings.Contains(locationsConf, "limit_req_status 429;") {
+		t.Fatalf("expected custom route rate limit to return 429 independently of bad_behavior_status_codes, got: %s", locationsConf)
 	}
 }
 
-func TestRenderEasyRateLimitArtifacts_CustomStatusSupportsNon429Codes(t *testing.T) {
+func TestRenderEasyRateLimitArtifacts_CustomStatusIgnoresNon429Codes(t *testing.T) {
 	artifacts, err := RenderEasyRateLimitArtifacts(
 		[]SiteInput{{
 			ID:                "site-b",
@@ -339,7 +339,7 @@ func TestRenderEasyRateLimitArtifacts_CustomStatusSupportsNon429Codes(t *testing
 		byPath[item.Path] = string(item.Content)
 	}
 	locationsConf := byPath["nginx/easy-locations/site-b.conf"]
-	if !strings.Contains(locationsConf, "limit_req_status 451;") {
-		t.Fatalf("expected custom location to use configured non-429 status code, got: %s", locationsConf)
+	if !strings.Contains(locationsConf, "limit_req_status 429;") {
+		t.Fatalf("expected custom route rate limit to return 429 independently of non-429 status codes, got: %s", locationsConf)
 	}
 }

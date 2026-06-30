@@ -443,8 +443,8 @@ func TestApplyService_CompilesEasyProfileArtifacts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read ratelimits http config: %v", err)
 	}
-	if !strings.Contains(string(rateHTTPContent), "rate=40r/s") {
-		t.Fatalf("expected global anti-ddos l7 rate override in ratelimits config, got: %s", string(rateHTTPContent))
+	if !strings.Contains(string(rateHTTPContent), "rate=10r/s") {
+		t.Fatalf("expected explicit site rate policy to survive anti-ddos defaults, got: %s", string(rateHTTPContent))
 	}
 }
 
@@ -511,7 +511,7 @@ func TestMapAccessInputs_AllowlistDefaultsToDenyForAllSites(t *testing.T) {
 	got := mapAccessInputs([]accesspolicies.AccessPolicy{
 		{ID: "site-a-access", SiteID: "site-a", AllowList: []string{"10.0.0.0/24"}},
 		{ID: "site-b-access", SiteID: "site-b", AllowList: nil},
-	})
+	}, nil)
 	if len(got) != 2 {
 		t.Fatalf("expected 2 mapped access policies, got %d", len(got))
 	}

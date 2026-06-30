@@ -158,12 +158,12 @@ if ($waf_auth_bearer_guard = "{{ .BearerGuard }}") { set $waf_auth_header_verifi
 set $waf_auth_gate_verified 0;
 if ($waf_auth_cookie_verified = 1) { set $waf_auth_gate_verified 1; }
 if ($waf_auth_header_verified = 1) { set $waf_auth_gate_verified 1; }
-if ($waf_auth_gate_skip = 0) {
-    if ($waf_auth_gate_verified = 0) { return 302 {{ .AuthGateLoginURI }}?return_uri=$uri&return_args=$args; }
-}
+set $waf_auth_gate_guard "$waf_auth_gate_skip:$waf_auth_gate_verified";
+if ($waf_auth_gate_guard = "0:0") { return 302 {{ .AuthGateLoginURI }}?return_uri=$uri&return_args=$args; }
 {{- end }}
 
 {{- if .UseModSecurityEasyFile }}
+modsecurity on;
 modsecurity_rules_file /etc/waf/modsecurity/easy/{{ .SiteID }}.conf;
 {{- end }}
 
@@ -207,11 +207,7 @@ if ($waf_country_guard ~ "{{ .BlacklistCountryGuardPattern }}") { return 403; }
 {{ .WSInspectionSnippet }}
 {{- end }}
 
-{{- if .MTLSSnippet }}
-{{ .MTLSSnippet }}
-{{- end }}
-
-{{- if and .AntibotEnabled .AntibotScannerAutoBan }}
+{{- if .AntibotScannerAutoBan }}
 set $waf_antibot_scanner_guard "$waf_easy_exception_guard:$request_uri:$http_user_agent";
 if ($waf_antibot_scanner_guard ~* "^0:.*(?:{{ .AntibotScannerPattern }})") { return 403; }
 {{- end }}
@@ -243,10 +239,9 @@ if ($request_method = GET) { set $waf_antibot_safe_method 1; }
 if ($request_method = HEAD) { set $waf_antibot_safe_method 1; }
 set $waf_antibot_guard "$waf_antibot_exception_guard:$waf_antibot_verified:$waf_antibot_safe_method";
 {{- if .AntibotTwoLayerEnabled }}
-if ($waf_antibot_guard = "0:0:1") {
-    if ($waf_antibot_stage1_verified = 0) { return 302 {{ .AntibotStage1RedirectURI }}?return_uri=$uri&return_args=$args; }
-    return 302 $waf_antibot_effective_redirect?return_uri=$uri&return_args=$args;
-}
+set $waf_antibot_stage_guard "$waf_antibot_guard:$waf_antibot_stage1_verified";
+if ($waf_antibot_stage_guard = "0:0:1:0") { return 302 {{ .AntibotStage1RedirectURI }}?return_uri=$uri&return_args=$args; }
+if ($waf_antibot_stage_guard = "0:0:1:1") { return 302 $waf_antibot_effective_redirect?return_uri=$uri&return_args=$args; }
 {{- else }}
 if ($waf_antibot_guard = "0:0:1") { return 302 $waf_antibot_effective_redirect?return_uri=$uri&return_args=$args; }
 {{- end }}
@@ -300,17 +295,12 @@ if ($waf_auth_bearer_guard = "{{ .BearerGuard }}") { set $waf_auth_header_verifi
 set $waf_auth_gate_verified 0;
 if ($waf_auth_cookie_verified = 1) { set $waf_auth_gate_verified 1; }
 if ($waf_auth_header_verified = 1) { set $waf_auth_gate_verified 1; }
-if ($waf_auth_gate_skip = 0) {
-    if ($waf_auth_gate_verified = 0) { return 302 {{ .AuthGateLoginURI }}?return_uri=$uri&return_args=$args; }
-}
+set $waf_auth_gate_guard "$waf_auth_gate_skip:$waf_auth_gate_verified";
+if ($waf_auth_gate_guard = "0:0") { return 302 {{ .AuthGateLoginURI }}?return_uri=$uri&return_args=$args; }
 {{- end }}
 
 {{- if not .UseModSecurity }}
 modsecurity off;
-{{- end }}
-
-{{- if not .UseCustomErrorPages }}
-proxy_intercept_errors off;
 {{- end }}
 
 {{- if .UseCustomErrorPages }}
@@ -435,3 +425,4 @@ error_page 510 /__waf_errors/{{ .SiteID }}/510.html?rid=$request_id&ip=$remote_a
 error_page 511 /__waf_errors/{{ .SiteID }}/511.html?rid=$request_id&ip=$remote_addr&ts=$msec;
 {{- end }}
 {{- end }}
+

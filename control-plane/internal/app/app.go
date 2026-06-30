@@ -487,8 +487,10 @@ func New(cfg config.Config) (*App, error) {
 	runtimeReadyProbe := services.NewHTTPRuntimeReadyProbe(cfg.RuntimeHealthURL, cfg.RuntimeAPIToken)
 	dashboardService := services.NewDashboardService(eventService, runtimeRequestCollector, runtimeReadyProbe)
 	dashboardService.StartBackgroundRefresh()
-	runtimeCRSService := services.NewRuntimeCRSService(services.RuntimeBaseURLFromHealthURL(cfg.RuntimeHealthURL), cfg.RuntimeAPIToken)
+
 	containerRuntimeService := services.NewContainerRuntimeService()
+	dashboardService.WithContainerIssueReader(containerRuntimeService)
+	runtimeCRSService := services.NewRuntimeCRSService(services.RuntimeBaseURLFromHealthURL(cfg.RuntimeHealthURL), cfg.RuntimeAPIToken)
 	adminScriptService := services.NewAdminScriptService(cfg.RevisionStoreDir, detectScriptsRoot())
 	httpServer := httpserver.New(cfg.HTTPAddr, cfg.RuntimeRoot, cfg.RevisionStoreDir, cfg.RuntimeHealthURL, coord.Enabled(), coord.NodeID(), cfg.Metrics.Token, postgresBackend, setupService, revisionService, authService, enterpriseService, sessionStore, userStore, roleStore, siteService, manualBanService, upstreamService, certificateService, tlsConfigService, tlsAutoRenewService, certificateUploadService, certificateMaterialStore, letsEncryptService, selfSignedCertificateService, wafPolicyService, accessPolicyService, rateLimitPolicyService, easySiteProfileService, virtualPatchService, antiDDoSService, antiDDoSRuleSuggestionsService, eventService, revisionCompileService, applyService, revisionCatalogService, auditService, reportService, dashboardService, containerRuntimeService, runtimeCRSService, runtimeRequestCollector, runtimeReadyProbe, runtimeSecurityCollector, runtimeRequestCollector, adminScriptService)
 	var devFastStartBootstrapper *services.DevFastStartBootstrapper

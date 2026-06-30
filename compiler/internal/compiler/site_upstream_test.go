@@ -276,9 +276,11 @@ func TestRenderSiteUpstreamArtifacts_DefaultServerKeepsAdminRoutesReachable(t *t
 
 	content := string(baseArtifact.Content)
 	for _, fragment := range []string{
+		"limit_req_zone $binary_remote_addr zone=waf_management_login_req:10m rate=5r/s;",
 		"location ^~ /api/ {",
 		"proxy_pass http://control-plane:8080;",
 		"location = /login {",
+		"limit_req zone=waf_management_login_req burst=20 nodelay;",
 		"location = /login/2fa {",
 		"location ^~ /onboarding/ {",
 		"location ^~ /static/ {",
@@ -286,6 +288,54 @@ func TestRenderSiteUpstreamArtifacts_DefaultServerKeepsAdminRoutesReachable(t *t
 	} {
 		if !strings.Contains(content, fragment) {
 			t.Fatalf("expected base config to contain %q, got: %s", fragment, content)
+		}
+	}
+}
+
+func TestRenderSiteUpstreamArtifacts_ManagementSiteLimitsLogin(t *testing.T) {
+	artifacts, err := RenderSiteUpstreamArtifacts(
+		[]SiteInput{
+			{
+				ID:                "localhost",
+				Enabled:           true,
+				PrimaryHost:       "localhost",
+				ListenHTTP:        true,
+				ListenHTTPS:       true,
+				DefaultUpstreamID: "up-a",
+			},
+		},
+		[]UpstreamInput{
+			{
+				ID:             "up-a",
+				SiteID:         "localhost",
+				Scheme:         "http",
+				Host:           "ui",
+				Port:           80,
+				BasePath:       "/",
+				PassHostHeader: true,
+			},
+		},
+	)
+	if err != nil {
+		t.Fatalf("render failed: %v", err)
+	}
+
+	var siteArtifact ArtifactOutput
+	for _, artifact := range artifacts {
+		if artifact.Path == "nginx/sites/localhost.conf" {
+			siteArtifact = artifact
+			break
+		}
+	}
+	content := string(siteArtifact.Content)
+	for _, fragment := range []string{
+		"location = /login {",
+		"limit_req zone=waf_management_login_req burst=20 nodelay;",
+		"limit_req_status 429;",
+		"proxy_pass http://ui:80;",
+	} {
+		if !strings.Contains(content, fragment) {
+			t.Fatalf("expected management site config to contain %q, got: %s", fragment, content)
 		}
 	}
 }

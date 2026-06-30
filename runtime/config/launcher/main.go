@@ -20,7 +20,14 @@ import (
 const defaultRuntimeRoot = "/var/lib/waf"
 const defaultHealthAddr = "127.0.0.1:8081"
 const runtimeAuthHeader = "X-WAF-Runtime-Token"
-const bootstrapUIUpstream = "http://ui:80"
+const defaultBootstrapUIUpstream = "http://ui:80"
+
+func bootstrapUIUpstream() string {
+	if v := strings.TrimSpace(os.Getenv("WAF_BOOTSTRAP_UI_UPSTREAM")); v != "" {
+		return v
+	}
+	return defaultBootstrapUIUpstream
+}
 
 var errActivePointerMissing = errors.New("active/current.json is required")
 var runtimeProm = newRuntimeMetrics()
@@ -120,7 +127,7 @@ func (p *runtimeProcess) bootCurrent() error {
 }
 
 func (p *runtimeProcess) bootBootstrapUI() error {
-	if err := writeBootstrapNginxConfig("/etc/waf/nginx", bootstrapUIUpstream); err != nil {
+	if err := writeBootstrapNginxConfig("/etc/waf/nginx", bootstrapUIUpstream()); err != nil {
 		return err
 	}
 	return p.startOrReloadLocked()

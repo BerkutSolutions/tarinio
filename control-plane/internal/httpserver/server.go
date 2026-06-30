@@ -271,6 +271,9 @@ func New(
 	mux.Handle("/api/dashboard/stats", withMethodAllPermissions(authService, map[string][]rbac.Permission{
 		http.MethodGet: {rbac.PermissionDashboardRead, rbac.PermissionReportsRead},
 	}, handlers.NewDashboardHandler(dashboardService)))
+	mux.Handle("/api/dashboard/services/", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodDelete: {rbac.PermissionDashboardRead},
+	}, handlers.NewDashboardHandler(dashboardService)))
 	mux.Handle("/api/dashboard/containers/overview", withMethodAllPermissions(authService, map[string][]rbac.Permission{
 		http.MethodGet: {rbac.PermissionDashboardRead, rbac.PermissionReportsRead},
 	}, handlers.NewDashboardContainersHandler(containerRuntimeService)))

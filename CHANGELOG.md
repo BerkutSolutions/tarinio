@@ -1,87 +1,39 @@
-## [1.4.6] - 29.06.2026
+## [1.4.7] - 30.06.2026
 
-### Инфраструктура
+### Безопасность
 
-- Исправлен шаблон `crs-setup.conf.tmpl`: теперь устанавливает `tx.crs_setup_version=4270`, что устраняет блокировку всех запросов с кодом 500 правилом CRS 901001 при свежей установке.
-- `scripts/install-aio.sh`: компиляция и применение ревизии при post-upgrade health gate теперь выполняются только при обновлении существующей установки (`IS_UPGRADE=1`); при первичной установке этот шаг пропускается, так как пользователей ещё нет и waf-cli не может авторизоваться.
-- `scripts/install-aio.sh`: `git checkout` заменён на `git checkout -B origin/main` — теперь корректно работает при detached HEAD (после установки через тег v1.x.x).
-- `scripts/install-aio.sh`: `is_placeholder_secret` теперь нормализует значение к нижнему регистру и заменяет `_` на `-` перед проверкой — `CHANGE_ME` корректно определяется как плейсхолдер.
-- `scripts/install-aio.sh`: генерация паролей `POSTGRES_PASSWORD` и `OPENSEARCH_PASSWORD` теперь не зависит от `ENV_CREATED` — пароли генерируются при любом запуске если в `.env` стоят плейсхолдеры.
-
-### Ядро
-
-- Убрана директива `modsecurity on;` из шаблона `nginx/easy/site.conf.tmpl`: включение ModSecurity управляется через `SecRuleEngine` внутри `modsecurity/easy/<site>.conf`, а `modsecurity on;` на уровне server-блока переопределяло `SecRuleEngine Off` management-сайта и блокировало запросы к панели управления с кодом 403.
-- Шаблон `nginx/easy/site.conf.tmpl`: добавлен `proxy_intercept_errors off;` когда `use_custom_error_pages=false` — nginx теперь пропускает upstream-ответы с ошибками без подмены на страницы WAF.
-- Компилятор `renderSiteErrorArtifacts`: страницы ошибок теперь берутся из новых статичных `.preview.html` шаблонов (если доступны) вместо устаревшего `status.html.tmpl` с блоком "Что делать дальше".
-
-### UI
-
-- `sites.detail-draft-builder.js`: значение `antibot_challenge` теперь определяется по состоянию чекбокса `#service-antibot-enabled` — если чекбокс снят, всегда сохраняется `"no"` независимо от значения скрытого select. Исправлен баг когда снятие чекбокса не сохранялось (select не имеет опции `"no"`).
-- `sites.detail-core-bindings.js`: упрощён toggle-handler антибота — больше не меняет `challengeSelect.value`, вместо этого управляет только `disabled` состоянием.
-- `sites.detail-draft-builder.js`: `antibot_scanner_auto_ban_enabled` теперь возвращает `false` если поле скрыто/disabled (`?? false` вместо `?? true`).
-- `sites.draft-core.js`: дефолт `antibot_scanner_auto_ban_enabled` изменён с `true` на `false`.
-- `control-plane/easysiteprofiles`: дефолт `ScannerAutoBanEnabled` изменён с `true` на `false`.
-
-## [1.4.5] - 29.06.2026
+- Восстановлена эталонная работа WAF в полном runtime-stack e2e: чёрные списки IP, User-Agent и URI снова блокируют трафик, ModSecurity/CRS реально останавливает SQLi и XSS, виртуальные патчи применяются как SecRule, scanner auto-ban блокирует сигнатуры сканеров независимо от основной antibot-challenge логики, а режимы transparent и monitor больше не оставляют активные блокирующие правила.
+- Исправлены guard-цепочки nginx для Basic Auth и двухслойной antibot-эскалации: вложенные `if` заменены на безопасные составные переменные, поэтому auth-gate стабильно отдаёт 302 на `/auth`, verify endpoint выставляет cookie, а challenge escalation корректно ведёт клиента через stage1.
+- Восстановлена корректная работа кастомных страниц ошибок: брендированная 403-страница включается при `use_custom_error_pages=true`, отключение конкретного кода через `disabled_error_pages` возвращает стандартную короткую страницу, а geo-block остаётся на 451.
+- Login endpoints панели управления получили отдельный edge rate-limit с HTTP 429, чтобы внешний WAF на отдельной ВМ не оставлял `/login` без первой линии защиты, но при этом не включал self-ban/escalation для операторов панели.
 
 ### Ядро
 
-- Исправлена генерация nginx для ограничения частоты по конкретному URI: теперь зона выбирается через http-level `map`, а не через недопустимый `limit_req` внутри `if`, поэтому ревизия снова применима на PROD.
-- Исправлено дублирование директив ModSecurity в easy-site локациях: базовый site-шаблон больше не включает `modsecurity on` для easy-сайтов, а easy-snippet сам задаёт `on` или `off`.
-- Исправлена сборка ревизии для сайтов без сохранённого easy-профиля: автоматически созданный default easy-profile теперь помечает site-конфиг как easy-enabled и не дублирует ModSecurity в runtime.
-- Исправлено дублирование `modsecurity off` в `/static/` location easy-сайтов: static-location больше не задаёт ModSecurity отдельно, когда подключает общий easy-snippet.
-- Прозрачный режим и режим наблюдения сохраняют пассивное поведение без включённых модулей безопасности: не подключают ModSecurity, blacklist, антибот, auth-gate, geo-блокировки, rate-limit и L4 guard даже если черновик содержал включённые защитные настройки.
+- Easy runtime compiler теперь явно включает `modsecurity on` только рядом с easy ModSecurity rules file и не подмешивает legacy `modsecurity/sites/<site>.conf` в custom route locations. Это устраняет рассинхронизацию между easy-профилем и legacy-политиками и возвращает предсказуемое поведение CRS, виртуальных патчей и security modes.
+- Custom route rate-limit стабилизирован как HTTP 429 независимо от набора `bad_behavior_status_codes`, а anti-DDoS L7 defaults больше не перетирают уже заданную site-level rate-limit policy.
+- Scanner auto-ban отделён от основного antibot challenge: включённая защита от сканеров теперь генерирует самостоятельный guard и продолжает работать даже если интерактивный challenge отключён.
 
-### Инфраструктура
+### Сервисы
 
-- `scripts/install-aio.sh` после обновления control-plane теперь компилирует и применяет свежую runtime-ревизию перед проверкой публичного gateway, чтобы установка не оставалась на старой активной ревизии.
+- API easy-site профиля получил обратную совместимость с top-level alias-полями, которые используются e2e и legacy-клиентами: security mode, blacklist/exceptions, rate-limit, geo policy, custom limit rules, auth session TTL и virtual patches корректно раскладываются во вложенные структуры профиля.
+- `virtual_patches` добавлены в контракт easy-site профиля и проходят весь путь от API до runtime compiler, поэтому per-site виртуальные патчи сохраняются, компилируются и применяются в ModSecurity artifact.
+- Runtime apply теперь объединяет виртуальные патчи из easy-profile и отдельного хранилища virtual patches, сохраняя совместимость обоих источников правил.
+- Incoming mTLS теперь применяется в server-контексте HTTPS-сайта, а CA bundle для проверки клиентских сертификатов попадает в runtime-артефакты вместе с TLS-материалами.
 
 ### Тесты
 
-- Добавлена проверка, что URI-scoped rate-limit генерирует валидный nginx-конфиг через отдельный ключ зоны, а transparent/monitor остаются без активной защиты при стресс-настройках.
+- Полный `TestE2EBehavioral` прошёл на runtime-stack: подтверждены blacklist, rate-limit, antibot, scanner auto-ban, ModSecurity SQLi/XSS, Basic Auth gate, CORS/CSP/Referrer/Permissions headers, custom error pages, virtual patches, challenge rules, two-layer escalation, cookie flags, strict parsing, WebSocket config, geo time windows, incoming mTLS и сохранение JA3-полей.
+- `MTLS_IncomingClientCert_Required` больше не скипается: тест генерирует self-signed CA, server cert и client cert, проверяет отказ HTTPS без клиентского сертификата, успешный проход с клиентским сертификатом и обратный проход после выключения mTLS.
+- Обновлены compiler/service contract tests под новые runtime-инварианты: safe nginx guards без вложенных `if`, обязательный 429 для route rate-limit, сохранение explicit site policy при anti-DDoS L7 defaults и расширенный контракт easy-site profile.
+- Документы покрытия тестами дополнены вкладкой 11 и behavioral e2e как доказательной базой реальной работы WAF, а не только статической генерации конфигов.
+- E2E-раннер для release-проверки теперь показывает компактные этапы запуска стека, healthcheck, compile/apply и по каждому функциональному subtest выводит имя, ожидаемый результат и фактическое совпадение, а подробный Docker/Go вывод сохраняется в `.work/logs` и раскрывается только при ошибке.
 
-## [1.4.4] - 29.06.2026
+### Документация
 
-### Ядро
+- Актуализирована доказательная база WAF UI и runtime-поведения: tab01–tab11 описывают статические compiler guarantees, а `TestE2EBehavioral` закреплён как эталон end-to-end работы WAF в Docker Compose stack.
+- Changelog очищен от устаревших записей предыдущего шага и приведён к релизу 1.4.7 с группировкой по подсистемам.
 
-- Удалены старые шаблоны `compiler/templates/errors/403.html.tmpl` и `compiler/templates/errors/50x.html.tmpl` — не вызывались ни из одного Go-файла; все HTTP-ошибки генерируются через `status.html.tmpl`.
-- Добавлено поле `AntibotChallengeTemplate` в `EasyProfileInput` (compiler/types.go), `easyConfigData` (easy.go) и маппинг в `runtime_apply.go` + `easy_runtime_site_artifacts.go` — выбор HTML-шаблона страницы antibot-challenge по имени (v1–v5).
-- Созданы шаблоны `antibot-v1.html.tmpl` ... `antibot-v5.html.tmpl` из preview-файлов; при пустом/неизвестном значении используется `antibot.html.tmpl` (оригинал).
+### Инфраструктура
 
-### CI / Release
-
-- Исправлен smoke-стек в `scripts/local-ci-preflight.ps1`: runtime HTTP, runtime HTTPS и UI теперь получают разные host-порты, а retry при `port is already allocated` пересоздаёт весь набор портов без пересечения.
-- `New-FreeTcpPort` больше не выбирает порт через ephemeral `:0`; вместо этого подбирает свободный порт из диапазона `20000-29999`, чтобы снизить race с повторным использованием ephemeral-портов Docker/Windows.
-
-### UI: Antibot (Tab 6)
-
-- Исправлено: `antibot_challenge_template` не сохранялся — поле отсутствовало в `draftToEasyProfile` в `sites.draft-core.js`.
-- Кнопка «Просмотр» рядом с выпадающим «Шаблон страницы проверки» выровнена по нижнему краю поля (`align-items:flex-end`).
-
-### UI: Страницы ошибок (Tab 11)
-
-- Добавлено поле `UseCustomErrorPages bool` в `EasyProfileInput` (compiler/types.go), `EasySiteProfile` (easysiteprofiles/types.go) и маппинг в runtime_apply.go.
-- По умолчанию `true` — для всех существующих сайтов кастомные страницы включены автоматически.
-- При `UseCustomErrorPages=true` в easy/site.conf.tmpl добавляются `proxy_intercept_errors on` и `error_page` директивы для всех 40+ кодов (400–511, 451→geo_block).
-- Добавлен тест `tab11_errorpages_test.go` — проверяет наличие/отсутствие директив.
-- Контрактный тест `TestSiteSettings_FieldContract` обновлён для нового поля `use_custom_error_pages`.
-- Добавлена вкладка «Error Pages» (Tab 11) в редактор сайта — чекбокс включения кастомных страниц ошибок + список всех 40+ кодов с индивидуальными чекбоксами и кнопками Preview.
-- Добавлен API endpoint `GET /api/error-pages/preview/{slug}` в control-plane — отдаёт preview-страницу по slug, доступен только авторизованным пользователям.
-- Добавлены i18n-ключи для вкладки Error Pages на всех 5 языках (ru, en, de, sr, zh).
-- Затемнение блока списка страниц при отключённом чекбоксе — паттерн из whitelist/blacklist секций.
-
-### UI: Антибот — выбор шаблона страницы проверки
-
-- Добавлено поле `AntibotChallengeTemplate string` в `EasySiteProfile` (easysiteprofiles/types.go) — хранит выбранный шаблон страницы проверки браузера (v1–v5), по умолчанию `"v2"`.
-- Поле сохраняется и восстанавливается через draft-слой (draft-core, draft-builder, detail-draft, profile-hydration, draft-profile-part2).
-- В блоке антибота на вкладке Security добавлены: select выбора варианта шаблона (1–5 вариант) и кнопка Preview — открывает `/api/error-pages/preview/antibot-vN` в новой вкладке.
-- Контрактный тест обновлён для нового поля `security_antibot.antibot_challenge_template`.
-- Добавлены i18n-ключи `sites.easy.antibot.challengeTemplate`, `sites.easy.antibot.previewTemplate`, `sites.easy.antibot.template.v1`–`v5` на всех 5 языках.
-
-### Шаблоны страницы браузерной проверки (antibot preview)
-
-- **antibot-v1** — оригинальный шаблон; исправлен редирект в preview-режиме (добавлена проверка `isPreview` перед `window.location.replace`).
-- **antibot-v2** — синий/indigo стиль; убрана горизонтальная полоса прогресса; 5 шагов (TLS, отпечаток, угрозы, токен, перенаправление); i18n (en/ru/de/sr/zh); гиперссылка; уникальный фон — угловые indigo/purple свечения + диагональные линии 135°.
-- **antibot-v3** — indigo grid карточка со scanning line; 5 шагов; i18n; гиперссылка; исправлен footer ru.
-- **antibot-v4** — split layout: timeline слева + SVG circle meter справа; плавное заполнение через `stroke-dashoffset`; равномерные проценты 0→20→40→60→80→100%; последний шаг показывает путь назначения; i18n; гиперссылка.
-- **antibot-v5** — янтарный/amber стиль; 3 шага (отпечаток, верификационная cookie, пункт назначения); shimmer-линия внутри блока статусов; заметка про cookie; i18n; уникальный фон teal aurora; градиентная полоса teal→cyan→teal сверху карточки.
+- Версия синхронизирована на 1.4.7 через штатный механизм: metadata приложения, npm package metadata и i18n `app.version` во всех поддерживаемых локалях обновлены единообразно.
+- Sentinel image больше не выполняет `apk add` во время финальной сборки: сертификаты CA копируются из builder-слоя, поэтому локальный стек и `install-aio.sh` не падают из-за временных TLS/Alpine mirror ошибок при сборке.

@@ -58,7 +58,7 @@ func TestRenderEasyArtifacts_AntibotTwoLayerAndRules(t *testing.T) {
 	}
 
 	siteConf := byPath["nginx/easy/site-a.conf"]
-	if !strings.Contains(siteConf, "if ($waf_antibot_stage1_verified = 0) { return 302 /challenge/stage1/verify?return_uri=$uri&return_args=$args; }") {
+	if !strings.Contains(siteConf, `if ($waf_antibot_stage_guard = "0:0:1:0") { return 302 /challenge/stage1/verify?return_uri=$uri&return_args=$args; }`) {
 		t.Fatalf("expected stage1 redirect in easy site conf, got: %s", siteConf)
 	}
 	if !strings.Contains(siteConf, `if ($uri ~* "^/login$")`) || !strings.Contains(siteConf, `set $waf_antibot_effective_challenge "recaptcha";`) {

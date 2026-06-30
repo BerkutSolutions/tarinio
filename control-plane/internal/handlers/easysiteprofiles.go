@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"strings"
 
@@ -74,11 +75,17 @@ func (h *EasySiteProfilesHandler) upsert(w http.ResponseWriter, r *http.Request)
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "site id is required"})
 		return
 	}
-	var item easysiteprofiles.EasySiteProfile
-	if err := json.NewDecoder(r.Body).Decode(&item); err != nil {
+	rawBody, err := io.ReadAll(r.Body)
+	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
 		return
 	}
+	var item easysiteprofiles.EasySiteProfile
+	if err := json.Unmarshal(rawBody, &item); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
+		return
+	}
+	applyEasyProfileTopLevelAliases(rawBody, &item)
 	item.SiteID = siteID
 	updated, err := h.profiles.Upsert(withActorIP(r), item)
 	if err != nil {
@@ -107,4 +114,50 @@ func (h *EasySiteProfilesHandler) delete(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func applyEasyProfileTopLevelAliases(rawBody []byte, item *easysiteprofiles.EasySiteProfile) {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(rawBody, &raw); err != nil {
+		return
+	}
+	applyRawString(raw, "security_mode", &item.FrontService.SecurityMode)
+	applyRawBool(raw, "use_blacklist", &item.SecurityBehaviorAndLimits.UseBlacklist)
+	applyRawStringSlice(raw, "blacklist_ip", &item.SecurityBehaviorAndLimits.BlacklistIP)
+	applyRawStringSlice(raw, "blacklist_user_agent", &item.SecurityBehaviorAndLimits.BlacklistUserAgent)
+	applyRawStringSlice(raw, "blacklist_uri", &item.SecurityBehaviorAndLimits.BlacklistURI)
+	applyRawStringSlice(raw, "exceptions_uri", &item.SecurityBehaviorAndLimits.ExceptionsURI)
+	applyRawBool(raw, "use_limit_req", &item.SecurityBehaviorAndLimits.UseLimitReq)
+	applyRawString(raw, "limit_req_rate", &item.SecurityBehaviorAndLimits.LimitReqRate)
+	applyRawBool(raw, "use_bad_behavior", &item.SecurityBehaviorAndLimits.UseBadBehavior)
+	applyRawStringSlice(raw, "blacklist_country", &item.SecurityCountryPolicy.BlacklistCountry)
+	applyRawStringSlice(raw, "whitelist_country", &item.SecurityCountryPolicy.WhitelistCountry)
+	applyRawBool(raw, "show_geo_block_page", &item.SecurityCountryPolicy.ShowGeoBlockPage)
+	if value, ok := raw["custom_limit_rules"]; ok {
+		_ = json.Unmarshal(value, &item.SecurityBehaviorAndLimits.CustomLimitRules)
+	}
+	if value, ok := raw["auth_session_ttl_min"]; ok {
+		_ = json.Unmarshal(value, &item.SecurityAuthBasic.SessionInactivityMinutes)
+	}
+	if value, ok := raw["virtual_patches"]; ok {
+		_ = json.Unmarshal(value, &item.VirtualPatches)
+	}
+}
+
+func applyRawString(raw map[string]json.RawMessage, key string, target *string) {
+	if value, ok := raw[key]; ok {
+		_ = json.Unmarshal(value, target)
+	}
+}
+
+func applyRawBool(raw map[string]json.RawMessage, key string, target *bool) {
+	if value, ok := raw[key]; ok {
+		_ = json.Unmarshal(value, target)
+	}
+}
+
+func applyRawStringSlice(raw map[string]json.RawMessage, key string, target *[]string) {
+	if value, ok := raw[key]; ok {
+		_ = json.Unmarshal(value, target)
+	}
 }

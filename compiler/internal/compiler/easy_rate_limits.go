@@ -349,17 +349,5 @@ func expandCustomLimitRuleAliases(path, rate string) []CustomRateLimitRuleInput 
 }
 
 func easyCustomLimitStatusCode(values []int) int {
-	// Preserve existing ban/escalation behavior when 429 is present.
-	for _, value := range values {
-		if value == 429 {
-			return 429
-		}
-	}
-	// Otherwise allow any explicitly configured valid status code.
-	for _, value := range values {
-		if (value >= 100 && value <= 599) || value == 444 {
-			return value
-		}
-	}
 	return 429
 }

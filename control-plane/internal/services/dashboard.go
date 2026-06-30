@@ -1,6 +1,7 @@
 package services
 
 import (
+	"fmt"
 	"net/url"
 	"strings"
 	"sync"
@@ -25,11 +26,17 @@ type runtimeRequestCounter interface {
 	CollectCount(query url.Values) (int, error)
 }
 
+// dashboardContainerIssueReader — интерфейс для получения ошибок из логов контейнеров.
+type dashboardContainerIssueReader interface {
+	Issues() (DashboardContainerIssuesSummary, error)
+}
+
 type DashboardService struct {
-	events       dashboardEventReader
-	requests     RuntimeRequestCollector
-	runtimeReady dashboardEventProber
-	sampler      dashboardSnapshotSampler
+	events          dashboardEventReader
+	requests        RuntimeRequestCollector
+	runtimeReady    dashboardEventProber
+	containers      dashboardContainerIssueReader
+	sampler         dashboardSnapshotSampler
 	requestsCache struct {
 		mu   sync.Mutex
 		rows []map[string]any
@@ -38,12 +45,30 @@ type DashboardService struct {
 		mu    sync.Mutex
 		items []events.Event
 	}
+	// dismissedServiceErrors хранит ID ошибок сервисов, которые пользователь скрыл.
+	// Хранится in-memory (сбрасывается при перезапуске — это нормально для этого кейса).
+	dismissedServiceErrors struct {
+		mu   sync.RWMutex
+		ids  map[string]struct{}
+	}
 }
 
 type DashboardServiceStatus struct {
-	Name      string `json:"name"`
-	Up        bool   `json:"up"`
-	CheckedAt string `json:"checked_at"`
+	Name           string                      `json:"name"`
+	Up             bool                        `json:"up"`
+	CheckedAt      string                      `json:"checked_at"`
+	UpstreamErrors []DashboardServiceError     `json:"upstream_errors,omitempty"`
+	HasErrors      bool                        `json:"has_errors"`
+}
+
+// DashboardServiceError — одна ошибка upstream для сервиса (из nginx логов runtime).
+type DashboardServiceError struct {
+	ID            string `json:"id"`
+	Message       string `json:"message"`
+	NormalizedMsg string `json:"normalized_msg"`
+	Count         int    `json:"count"`
+	FirstSeen     string `json:"first_seen,omitempty"`
+	LastSeen      string `json:"last_seen,omitempty"`
 }
 
 type DashboardTimeCount struct {
@@ -193,7 +218,7 @@ var processState struct {
 }
 
 func NewDashboardService(events dashboardEventReader, requests RuntimeRequestCollector, runtimeReady dashboardEventProber) *DashboardService {
-	return &DashboardService{
+	s := &DashboardService{
 		events:       events,
 		requests:     requests,
 		runtimeReady: runtimeReady,
@@ -201,6 +226,39 @@ func NewDashboardService(events dashboardEventReader, requests RuntimeRequestCol
 			interval: 15 * time.Second,
 		},
 	}
+	s.dismissedServiceErrors.ids = make(map[string]struct{})
+	return s
+}
+
+// WithContainerIssueReader подключает сервис чтения ошибок контейнеров.
+// Вызывается из app.go после создания DashboardService.
+func (s *DashboardService) WithContainerIssueReader(c dashboardContainerIssueReader) {
+	if s == nil {
+		return
+	}
+	s.containers = c
+}
+
+// DismissServiceErrors помечает ошибки сервиса как скрытые по их ID.
+func (s *DashboardService) DismissServiceErrors(errorIDs []string) {
+	if s == nil || len(errorIDs) == 0 {
+		return
+	}
+	s.dismissedServiceErrors.mu.Lock()
+	defer s.dismissedServiceErrors.mu.Unlock()
+	for _, id := range errorIDs {
+		if id = strings.TrimSpace(id); id != "" {
+			s.dismissedServiceErrors.ids[id] = struct{}{}
+		}
+	}
+}
+
+// isDismissed проверяет скрыта ли ошибка пользователем.
+func (s *DashboardService) isDismissed(id string) bool {
+	s.dismissedServiceErrors.mu.RLock()
+	defer s.dismissedServiceErrors.mu.RUnlock()
+	_, ok := s.dismissedServiceErrors.ids[id]
+	return ok
 }
 
 func (s *DashboardService) Stats() (DashboardStats, error) {
@@ -251,7 +309,134 @@ func (s *DashboardService) collectServiceStatus(now time.Time) []DashboardServic
 			CheckedAt: checkedAt,
 		})
 	}
+
+	// Собираем upstream ошибки из логов runtime контейнера и
+	// привязываем к сайтам по имени хоста в сообщении.
+	upstreamErrsByHost := s.collectUpstreamErrors()
+	for i, st := range statuses {
+		errs, ok := upstreamErrsByHost[st.Name]
+		if !ok {
+			continue
+		}
+		statuses[i].UpstreamErrors = errs
+		statuses[i].HasErrors = len(errs) > 0
+	}
+
+	// Добавляем сервисы из upstream errors у которых нет явного статуса.
+	for host, errs := range upstreamErrsByHost {
+		found := false
+		for _, st := range statuses {
+			if st.Name == host {
+				found = true
+				break
+			}
+		}
+		if found {
+			continue
+		}
+		statuses = append(statuses, DashboardServiceStatus{
+			Name:           host,
+			Up:             true, // upstream ошибки не означают что сервис down
+			CheckedAt:      checkedAt,
+			UpstreamErrors: errs,
+			HasErrors:      len(errs) > 0,
+		})
+	}
+
 	return statuses
+}
+
+// collectUpstreamErrors читает Issues из runtime контейнера и фильтрует
+// nginx upstream timed out / connection refused ошибки, группируя их по хосту сервиса.
+func (s *DashboardService) collectUpstreamErrors() map[string][]DashboardServiceError {
+	if s.containers == nil {
+		return nil
+	}
+	summary, err := s.containers.Issues()
+	if err != nil {
+		return nil
+	}
+
+	out := map[string][]DashboardServiceError{}
+	for _, issue := range summary.Issues {
+		// Интересуют только upstream ошибки nginx из runtime контейнера.
+		if issue.Container != "tarinio-runtime" && issue.Container != "waf-e2e-runtime" {
+			continue
+		}
+		lower := strings.ToLower(issue.NormalizedLog)
+		if !strings.Contains(lower, "upstream timed out") &&
+			!strings.Contains(lower, "upstream prematurely closed") &&
+			!strings.Contains(lower, "no live upstreams while connecting") &&
+			!strings.Contains(lower, "connect() failed") {
+			continue
+		}
+
+		// Извлекаем hostname сервера из поля "server: <host>" в nginx лог строке.
+		host := extractNginxServerHost(issue.SampleLog)
+		if host == "" {
+			host = extractNginxServerHost(issue.NormalizedLog)
+		}
+		if host == "" {
+			continue
+		}
+
+		id := fmt.Sprintf("%s|%s|%s", issue.Container, issue.Severity, issue.NormalizedLog)
+		// ID детерминирован — используем для dismiss проверки.
+		errorID := shortHashID(id)
+
+		if s.isDismissed(errorID) {
+			continue
+		}
+
+		out[host] = append(out[host], DashboardServiceError{
+			ID:            errorID,
+			Message:       issue.SampleLog,
+			NormalizedMsg: issue.NormalizedLog,
+			Count:         issue.Count,
+			FirstSeen:     issue.FirstSeen,
+			LastSeen:      issue.LastSeen,
+		})
+	}
+	return out
+}
+
+// extractNginxServerHost извлекает значение поля "server: <host>" из строки nginx лога.
+// Пример: "... server: n8n.hantico.com, request: ..." → "n8n.hantico.com"
+func extractNginxServerHost(message string) string {
+	const marker = "server: "
+	idx := strings.Index(strings.ToLower(message), marker)
+	if idx < 0 {
+		return ""
+	}
+	rest := message[idx+len(marker):]
+	end := strings.IndexAny(rest, ", 	\n")
+	if end < 0 {
+		end = len(rest)
+	}
+	host := strings.TrimSpace(rest[:end])
+	// Убираем порт если есть.
+	if colonIdx := strings.LastIndex(host, ":"); colonIdx > 0 {
+		// Только если это не IPv6.
+		if !strings.Contains(host[:colonIdx], ":") {
+			host = host[:colonIdx]
+		}
+	}
+	return host
+}
+
+// shortHashID возвращает короткий детерминированный ID строки (6 hex символов).
+func shortHashID(s string) string {
+	h := fnv32a(s)
+	return fmt.Sprintf("%08x", h)
+}
+
+func fnv32a(s string) uint32 {
+	var h uint32 = 2166136261
+	for i := 0; i < len(s); i++ {
+		h ^= uint32(s[i])
+		h *= 16777619
+	}
+	return h
 }
 
 func (s *DashboardService) collectRequestsDay() (int, bool) {

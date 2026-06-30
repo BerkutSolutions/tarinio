@@ -28,6 +28,8 @@ func (f *fakeDashboardService) Probe(kind string, _ url.Values) error {
 	return nil
 }
 
+func (f *fakeDashboardService) DismissServiceErrors(_ []string) {}
+
 func TestDashboardHandler_Stats(t *testing.T) {
 	handler := NewDashboardHandler(&fakeDashboardService{})
 

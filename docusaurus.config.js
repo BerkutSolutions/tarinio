@@ -97,10 +97,10 @@ const config = {
           ],
         },
         {
-          label: 'Version 1.4.6',
+          label: 'Version 1.4.7',
           position: 'right',
           items: [
-            {label: 'Current Release 1.4.6', to: '/ru/core-docs/release-policy/'},
+            {label: 'Current Release 1.4.7', to: '/ru/core-docs/release-policy/'},
             {label: 'CHANGELOG', href: 'https://github.com/BerkutSolutions/tarinio/blob/main/CHANGELOG.md'},
           ],
         },

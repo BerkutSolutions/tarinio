@@ -48,23 +48,56 @@ function formatAttackURLLabel(item) {
 }
 
 function renderServiceMiniDashboard(service, stats, detailModel, ctx, deps) {
-  const name           = String(service?.name || "");
-  const isUp           = Boolean(service?.up);
-  const attacksBySite  = Array.isArray(detailModel?.attacksBySite)  ? detailModel.attacksBySite  : [];
-  const blockedBySite  = Array.isArray(detailModel?.blockedBySite)  ? detailModel.blockedBySite  : [];
-  const requestsBySite = Array.isArray(detailModel?.requestsBySite) ? detailModel.requestsBySite : [];
-  const attackCount    = Number(attacksBySite.find((i)  => i.key === name)?.count || 0);
-  const blockedCount   = Number(blockedBySite.find((i)  => i.key === name)?.count || 0);
-  const requestCount   = Number(requestsBySite.find((i) => i.key === name)?.count || 0);
-  const ipSummary      = Array.isArray(detailModel?.ipDetailsSummary) ? detailModel.ipDetailsSummary : [];
-  const topAttackers   = ipSummary
+  const name = String(service?.name || "");
+  const isUp = Boolean(service?.up);
+  const upstreamErrors = Array.isArray(service?.upstream_errors) ? service.upstream_errors : [];
+  const ipSummary = Array.isArray(detailModel?.ipSummary) ? detailModel.ipSummary : [];
+  const requestCount = (detailModel?.requestsBySite?.get?.(name) ?? 0);
+  const attackCount = (detailModel?.attacksBySite?.get?.(name) ?? 0);
+  const blockedCount = (detailModel?.blockedBySite?.get?.(name) ?? 0);
+  const topAttackers = ipSummary
     .filter((item) => (Array.isArray(item.sites) ? item.sites : []).some((s) => s.key === name))
     .slice(0, 10)
     .map((item) => ({ key: item.ip, count: item.attacks || item.requests || 0, countryCode: item.countryCode }));
-  const attacksByURL  = Array.isArray(detailModel?.attacksByURL) ? detailModel.attacksByURL.slice(0, 10) : [];
-  const tone          = isUp ? "success" : "danger";
-  const statusLabel   = isUp ? ctx.t("dashboard.services.statusUp") : ctx.t("dashboard.services.statusDown");
-  const checkedAt     = formatCheckedAt(service?.checked_at);
+  const attacksByURL = Array.isArray(detailModel?.attacksByURL) ? detailModel.attacksByURL.slice(0, 10) : [];
+  const tone = isUp ? "success" : "danger";
+  const statusLabel = isUp ? ctx.t("dashboard.services.statusUp") : ctx.t("dashboard.services.statusDown");
+  const checkedAt = formatCheckedAt(service?.checked_at);
+
+  const errorsBlock = upstreamErrors.length > 0 ? `
+    <div class="service-errors-section" style="margin:12px 0 4px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <strong style="color:var(--color-warning)">${escapeHtml(ctx.t("dashboard.services.errorsTitle"))}</strong>
+        <button type="button" class="btn ghost btn-sm"
+          data-dismiss-service-error="all"
+          data-service-name="${escapeHtml(name)}"
+          style="font-size:11px">
+          ${escapeHtml(ctx.t("dashboard.services.dismissAll"))}
+        </button>
+      </div>
+      <div class="service-errors-list">
+        ${upstreamErrors.map((err) => `
+          <div class="service-error-row" style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid var(--color-border)">
+            <div style="flex:1;min-width:0">
+              <div style="font-size:12px;word-break:break-all;color:var(--color-text-secondary)">${escapeHtml(String(err?.normalized_msg || err?.message || ""))}</div>
+              <div style="font-size:11px;color:var(--color-text-muted);margin-top:2px">
+                ${escapeHtml(ctx.t("dashboard.services.errorCount"))}: ${escapeHtml(String(err?.count || 1))}
+                ${err?.last_seen ? ` · ${escapeHtml(formatCheckedAt(err.last_seen))}` : ""}
+              </div>
+            </div>
+            <button type="button" class="btn ghost btn-sm"
+              data-dismiss-service-error="${escapeHtml(String(err?.id || ""))}"
+              data-service-name="${escapeHtml(name)}"
+              style="flex-shrink:0;font-size:11px"
+              title="${escapeHtml(ctx.t("dashboard.services.dismissError"))}">
+              ✕
+            </button>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  ` : "";
+
   return `
     <div class="dashboard-service-detail">
       <div class="dashboard-service-detail-header">
@@ -72,6 +105,7 @@ function renderServiceMiniDashboard(service, stats, detailModel, ctx, deps) {
         ${checkedAt ? `<span class="muted" style="font-size:12px">${escapeHtml(ctx.t("dashboard.services.checkedAt"))}: ${escapeHtml(checkedAt)}</span>` : ""}
       </div>
       ${!isUp ? `<div class="alert warning" style="margin:8px 0 4px">${escapeHtml(ctx.t("dashboard.services.hostDown"))}</div>` : ""}
+      ${errorsBlock}
       ${renderSummaryMetrics([
         { labelKey: "dashboard.detail.requests", value: requestCount },
         { labelKey: "dashboard.detail.attacks",  value: attackCount  },

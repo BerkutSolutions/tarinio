@@ -110,8 +110,6 @@ location {{ .LocationModifier }} {{ .LocationPath }} {
 {{- if .DisableProxyInterceptErrors }}
     proxy_intercept_errors off;
 {{- end }}
-    modsecurity on;
-    modsecurity_rules_file /etc/waf/modsecurity/sites/{{ $.SiteID }}.conf;
     include /etc/waf/nginx/easy/{{ $.SiteID }}.conf;
     limit_req zone={{ .ZoneName }} burst={{ .Burst }} nodelay;
     limit_req_status {{ .StatusCode }};

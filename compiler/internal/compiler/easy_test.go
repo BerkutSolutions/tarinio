@@ -74,7 +74,7 @@ func TestRenderEasyArtifacts_GeneratesSiteAndAuthBasicFiles(t *testing.T) {
 	if !strings.Contains(siteConf, "client_body_buffer_size 512k;") {
 		t.Fatalf("expected client body buffer directive, got: %s", siteConf)
 	}
-	if !strings.Contains(siteConf, "set $waf_auth_gate_skip 0;") || !strings.Contains(siteConf, "if ($waf_auth_gate_verified = 0) { return 302 /auth?return_uri=$uri&return_args=$args; }") {
+	if !strings.Contains(siteConf, "set $waf_auth_gate_skip 0;") || !strings.Contains(siteConf, `if ($waf_auth_gate_guard = "0:0") { return 302 /auth?return_uri=$uri&return_args=$args; }`) {
 		t.Fatalf("expected auth gate redirect guard, got: %s", siteConf)
 	}
 	if !strings.Contains(siteConf, "if ($cookie_waf_antibot_") {

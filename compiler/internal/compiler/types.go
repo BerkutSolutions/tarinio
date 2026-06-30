@@ -2,16 +2,17 @@ package compiler
 
 // SiteInput is the MVP compiler input slice for host-based routing and listeners.
 type SiteInput struct {
-	ID                string
-	Name              string
-	Enabled           bool
-	PrimaryHost       string
-	Aliases           []string
+	ID                  string
+	Name                string
+	Enabled             bool
+	PrimaryHost         string
+	Aliases             []string
 	ListenHTTP          bool
 	ListenHTTPS         bool
 	DefaultUpstreamID   string
 	UseEasyConfig       bool
 	UseCustomErrorPages bool
+	MTLS                MTLSInput
 }
 
 // UpstreamInput is the MVP compiler input slice for upstream mapping.
@@ -78,6 +79,7 @@ type AccessPolicyInput struct {
 	AllowCIDRs        []string
 	DenyCIDRs         []string
 	TrustedProxyCIDRs []string
+	SecurityMode      string // "block", "monitor", "transparent" — monitor/transparent disables deny
 }
 
 // RateLimitPolicyInput is the MVP compiler input slice for basic nginx request
@@ -171,16 +173,16 @@ type EasyProfileInput struct {
 	SendXForwardedProto    bool
 	SendXRealIP            bool
 
-	UseAuthBasic      bool
-	AuthMode          string
-	AuthOrder         string
-	AuthBasicUser     string
-	AuthBasicPassword string
-	AuthBasicText     string
-	AuthUsers         []ServiceAuthUserInput
-	AuthServiceTokens []ServiceAuthTokenInput
+	UseAuthBasic       bool
+	AuthMode           string
+	AuthOrder          string
+	AuthBasicUser      string
+	AuthBasicPassword  string
+	AuthBasicText      string
+	AuthUsers          []ServiceAuthUserInput
+	AuthServiceTokens  []ServiceAuthTokenInput
 	AuthExclusionRules []AuthExclusionRuleInput
-	AuthSessionTTLMin int
+	AuthSessionTTLMin  int
 
 	AntibotChallenge           string
 	AntibotChallengeTemplate   string
@@ -217,9 +219,9 @@ type EasyProfileInput struct {
 
 	ExceptionsURI []string
 
-	BlacklistCountry    []string
-	WhitelistCountry    []string
-	ShowGeoBlockPage    bool
+	BlacklistCountry []string
+	WhitelistCountry []string
+	ShowGeoBlockPage bool
 	// GeoTimeWindows defines time-based geo-fencing rules compiled into nginx.
 	GeoTimeWindows []GeoTimeWindowInput
 

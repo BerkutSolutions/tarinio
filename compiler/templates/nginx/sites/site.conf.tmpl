@@ -21,6 +21,10 @@ server {
     ssl_ecdh_curve X25519:secp384r1;
     error_page 497 =307 https://$http_host$request_uri;
 {{- end }}
+{{- if .MTLSSnippet }}
+{{ .MTLSSnippet }}
+{{- end }}
+    include /etc/waf/nginx/access/{{ .SiteID }}.conf;
     set $waf_antibot_effective_challenge "no";
     set $waf_host_allowed 0;
 {{- range .ServerNames }}
@@ -28,7 +32,6 @@ server {
 {{- end }}
     if ($waf_host_allowed = 0) { return 421; }
     server_name {{ range $index, $name := .ServerNames }}{{ if $index }} {{ end }}{{ $name }}{{ end }};
-    include /etc/waf/nginx/access/{{ .SiteID }}.conf;
     add_header Server-Timing "rid;desc=$request_id,ip;desc=$remote_addr,ts;desc=$msec" always;
 {{- if or (not .UseEasyConfig) (and .UseEasyConfig .UseCustomErrorPages) }}
     proxy_intercept_errors on;
@@ -140,6 +143,28 @@ server {
         alias /var/lib/waf/control-plane/acme-challenges/;
     }
 
+{{- if .IsManagementSite }}
+    location = /login {
+        limit_req zone=waf_management_login_req burst=20 nodelay;
+        limit_req_status 429;
+        proxy_pass {{ .UIProxyTarget }};
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    location = /login/2fa {
+        limit_req zone=waf_management_login_req burst=20 nodelay;
+        limit_req_status 429;
+        proxy_pass {{ .UIProxyTarget }};
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+{{- end }}
+
     location ^~ /static/ {
         proxy_intercept_errors off;
 {{- if not .UseEasyConfig }}
@@ -235,3 +260,4 @@ server {
         proxy_pass {{ .ProxyPassTarget }};
     }
 }
+

@@ -359,11 +359,12 @@ func (s *EasySiteProfileService) syncEasyToLegacy(profile easysiteprofiles.EasyS
 			}
 		}
 		target := accesspolicies.AccessPolicy{
-			ID:        accessID,
-			SiteID:    profile.SiteID,
-			Enabled:   profile.SecurityBehaviorAndLimits.UseBlacklist || profile.SecurityBehaviorAndLimits.UseExceptions,
-			AllowList: nil,
-			DenyList:  append([]string(nil), profile.SecurityBehaviorAndLimits.BlacklistIP...),
+			ID:                  accessID,
+			SiteID:              profile.SiteID,
+			Enabled:             profile.SecurityBehaviorAndLimits.UseBlacklist || profile.SecurityBehaviorAndLimits.UseExceptions,
+			AllowList:           nil,
+			DenyList:            append([]string(nil), profile.SecurityBehaviorAndLimits.BlacklistIP...),
+			TrustedProxyCIDRs:   append([]string(nil), profile.SecurityBehaviorAndLimits.AccessTrustedProxyCIDRs...),
 		}
 		if profile.SecurityBehaviorAndLimits.UseExceptions {
 			target.AllowList = append([]string(nil), profile.SecurityBehaviorAndLimits.ExceptionsIP...)

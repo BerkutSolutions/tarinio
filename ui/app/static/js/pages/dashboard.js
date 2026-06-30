@@ -263,7 +263,8 @@ export async function renderDashboard(container, ctx) {
     renderStats: renderAllStats,
     ensureDetailModel,
     buildWidgetDetail,
-    buildDetailModel
+    buildDetailModel,
+    loadDashboardStats: () => load(true)
   });
 
   const load = (silent = false) => loadDashboardStats(silent, {

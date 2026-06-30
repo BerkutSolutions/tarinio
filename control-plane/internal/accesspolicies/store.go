@@ -18,13 +18,14 @@ import (
 
 // AccessPolicy is the minimal Stage 1 control-plane access policy entity.
 type AccessPolicy struct {
-	ID        string   `json:"id"`
-	SiteID    string   `json:"site_id"`
-	Enabled   bool     `json:"enabled"`
-	AllowList []string `json:"allowlist"`
-	DenyList  []string `json:"denylist"`
-	CreatedAt string   `json:"created_at"`
-	UpdatedAt string   `json:"updated_at"`
+	ID                string   `json:"id"`
+	SiteID            string   `json:"site_id"`
+	Enabled           bool     `json:"enabled"`
+	AllowList         []string `json:"allowlist"`
+	DenyList          []string `json:"denylist"`
+	TrustedProxyCIDRs []string `json:"trusted_proxy_cidrs,omitempty"`
+	CreatedAt         string   `json:"created_at"`
+	UpdatedAt         string   `json:"updated_at"`
 }
 
 type state struct {

@@ -335,12 +335,12 @@ func (s *ApplyService) emitEvent(event events.Event) {
 func (s *ApplyService) compileBundle(revision revisions.Revision, snapshot revisionsnapshots.Snapshot) (*pipeline.RevisionBundle, error) {
 	siteInputs, upstreamInputs := mapSiteUpstreamInputs(snapshot.Sites, snapshot.Upstreams, snapshot.TLSConfigs, snapshot.EasySiteProfiles)
 	antiDDoSSettings := antiddos.NormalizeSettings(snapshot.AntiDDoSSettings)
-	tlsInputs, certInputs, tlsMaterialArtifacts, err := s.mapTLSInputs(snapshot.TLSConfigs, snapshot.CertificateMaterials)
+	tlsInputs, certInputs, tlsMaterialArtifacts, err := s.mapTLSInputs(snapshot.TLSConfigs, snapshot.CertificateMaterials, snapshot.EasySiteProfiles)
 	if err != nil {
 		return nil, err
 	}
 	wafInputs := mapWAFInputs(snapshot.WAFPolicies)
-	accessInputs := mapAccessInputs(snapshot.AccessPolicies)
+	accessInputs := mapAccessInputs(snapshot.AccessPolicies, snapshot.EasySiteProfiles)
 	rateInputs := mapRateLimitInputs(snapshot.RateLimitPolicies)
 	easyInputs := mapEasyInputs(snapshot.EasySiteProfiles, snapshot.VirtualPatches)
 	easyInputs = applyAntiDDoSDefaultEasyProfiles(siteInputs, easyInputs)
@@ -469,6 +469,9 @@ func applyAntiDDoSRateOverrides(siteInputs []pipeline.SiteInput, items []pipelin
 	}
 	for _, site := range siteInputs {
 		if !site.Enabled {
+			continue
+		}
+		if _, exists := bySite[site.ID]; exists {
 			continue
 		}
 		if isManagementSiteID(strings.TrimSpace(site.ID)) {
@@ -667,7 +670,7 @@ func adaptiveModelScope(globalEnabled bool, profiles []easysiteprofiles.EasySite
 	return true, out
 }
 
-func (s *ApplyService) mapTLSInputs(configs []tlsconfigs.TLSConfig, materials []revisionsnapshots.CertificateMaterialSnapshot) ([]pipeline.TLSConfigInput, []pipeline.CertificateInput, []pipeline.ArtifactOutput, error) {
+func (s *ApplyService) mapTLSInputs(configs []tlsconfigs.TLSConfig, materials []revisionsnapshots.CertificateMaterialSnapshot, profiles []easysiteprofiles.EasySiteProfile) ([]pipeline.TLSConfigInput, []pipeline.CertificateInput, []pipeline.ArtifactOutput, error) {
 	sortedConfigs := append([]tlsconfigs.TLSConfig(nil), configs...)
 	sort.Slice(sortedConfigs, func(i, j int) bool { return sortedConfigs[i].SiteID < sortedConfigs[j].SiteID })
 
@@ -679,6 +682,7 @@ func (s *ApplyService) mapTLSInputs(configs []tlsconfigs.TLSConfig, materials []
 	tlsInputs := make([]pipeline.TLSConfigInput, 0, len(sortedConfigs))
 	certInputs := make([]pipeline.CertificateInput, 0, len(sortedConfigs))
 	tlsMaterialArtifacts := make([]pipeline.ArtifactOutput, 0, len(sortedConfigs)*2)
+	seenMaterialArtifacts := map[string]struct{}{}
 	for _, config := range sortedConfigs {
 		tlsInputs = append(tlsInputs, pipeline.TLSConfigInput{
 			ID:                  config.SiteID + "-tls",
@@ -707,13 +711,53 @@ func (s *ApplyService) mapTLSInputs(configs []tlsconfigs.TLSConfig, materials []
 			StorageRef:    fmt.Sprintf("/etc/waf/tls/materials/%s/certificate.pem", config.CertificateID),
 			PrivateKeyRef: fmt.Sprintf("/etc/waf/tls/materials/%s/private.key", config.CertificateID),
 		})
+		seenMaterialArtifacts[config.CertificateID] = struct{}{}
 		tlsMaterialArtifacts = append(tlsMaterialArtifacts,
 			pipeline.NewArtifact(fmt.Sprintf("tls/materials/%s/certificate.pem", config.CertificateID), pipeline.ArtifactKindTLSRef, certificatePEM),
 			pipeline.NewArtifact(fmt.Sprintf("tls/materials/%s/private.key", config.CertificateID), pipeline.ArtifactKindTLSRef, privateKeyPEM),
 		)
 	}
 
+	for _, profile := range profiles {
+		if !profile.FrontService.MTLSEnabled {
+			continue
+		}
+		certificateID := certificateMaterialIDFromRef(profile.FrontService.MTLSClientCARef)
+		if certificateID == "" {
+			continue
+		}
+		if _, ok := seenMaterialArtifacts[certificateID]; ok {
+			continue
+		}
+		material, ok := materialByCertificateID[certificateID]
+		if !ok {
+			return nil, nil, nil, fmt.Errorf("mTLS CA material %s not found in revision snapshot", certificateID)
+		}
+		certificatePEM, err := s.snapshots.ReadMaterial(material.CertificateRef)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		seenMaterialArtifacts[certificateID] = struct{}{}
+		tlsMaterialArtifacts = append(tlsMaterialArtifacts,
+			pipeline.NewArtifact(fmt.Sprintf("tls/materials/%s/certificate.pem", certificateID), pipeline.ArtifactKindTLSRef, certificatePEM),
+		)
+	}
+
 	return tlsInputs, certInputs, tlsMaterialArtifacts, nil
+}
+
+func certificateMaterialIDFromRef(ref string) string {
+	ref = strings.TrimSpace(strings.ReplaceAll(ref, "\\", "/"))
+	if ref == "" {
+		return ""
+	}
+	parts := strings.Split(ref, "/")
+	for i := 0; i+2 < len(parts); i++ {
+		if parts[i] == "files" && parts[i+2] == "certificate.pem" {
+			return parts[i+1]
+		}
+	}
+	return ""
 }
 
 func mapSiteUpstreamInputs(siteItems []sites.Site, upstreamItems []upstreams.Upstream, tlsItems []tlsconfigs.TLSConfig, easyItems []easysiteprofiles.EasySiteProfile) ([]pipeline.SiteInput, []pipeline.UpstreamInput) {
@@ -735,8 +779,16 @@ func mapSiteUpstreamInputs(siteItems []sites.Site, upstreamItems []upstreams.Ups
 		}
 	}
 	hostHeaderEnabledBySite := make(map[string]bool, len(easyItems))
+	mtlsBySite := make(map[string]pipeline.MTLSInput, len(easyItems))
 	for _, item := range easyItems {
 		hostHeaderEnabledBySite[item.SiteID] = !item.UpstreamRouting.DisableHostHeader
+		mtlsBySite[item.SiteID] = pipeline.MTLSInput{
+			MTLSEnabled:     item.FrontService.MTLSEnabled,
+			MTLSOptional:    item.FrontService.MTLSOptional,
+			MTLSVerifyDepth: item.FrontService.MTLSVerifyDepth,
+			MTLSClientCARef: runtimeCertificateMaterialPath(item.FrontService.MTLSClientCARef),
+			MTLSPassHeaders: item.FrontService.MTLSPassHeaders,
+		}
 	}
 
 	easySites := make(map[string]struct{}, len(easyItems))
@@ -750,6 +802,7 @@ func mapSiteUpstreamInputs(siteItems []sites.Site, upstreamItems []upstreams.Ups
 	for _, item := range sortedSites {
 		_, hasTLS := tlsSites[item.ID]
 		_, hasEasy := easySites[item.ID]
+		mtls := mtlsBySite[item.ID]
 		siteInputs = append(siteInputs, pipeline.SiteInput{
 			ID:                  item.ID,
 			Name:                item.ID,
@@ -760,6 +813,7 @@ func mapSiteUpstreamInputs(siteItems []sites.Site, upstreamItems []upstreams.Ups
 			DefaultUpstreamID:   defaultUpstreamBySite[item.ID],
 			UseEasyConfig:       hasEasy,
 			UseCustomErrorPages: customErrorPagesBySite[item.ID],
+			MTLS:                mtls,
 		})
 	}
 
@@ -783,6 +837,17 @@ func mapSiteUpstreamInputs(siteItems []sites.Site, upstreamItems []upstreams.Ups
 	return siteInputs, upstreamInputs
 }
 
+func runtimeCertificateMaterialPath(ref string) string {
+	ref = strings.TrimSpace(ref)
+	if ref == "" || strings.HasPrefix(ref, "/") {
+		return ref
+	}
+	if certificateID := certificateMaterialIDFromRef(ref); certificateID != "" {
+		return "/etc/waf/tls/materials/" + certificateID + "/certificate.pem"
+	}
+	return "/var/lib/waf/control-plane/" + strings.TrimLeft(ref, "/")
+}
+
 func mapWAFInputs(items []wafpolicies.WAFPolicy) []pipeline.WAFPolicyInput {
 	sorted := append([]wafpolicies.WAFPolicy(nil), items...)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].ID < sorted[j].ID })
@@ -804,7 +869,12 @@ func mapWAFInputs(items []wafpolicies.WAFPolicy) []pipeline.WAFPolicyInput {
 	return out
 }
 
-func mapAccessInputs(items []accesspolicies.AccessPolicy) []pipeline.AccessPolicyInput {
+func mapAccessInputs(items []accesspolicies.AccessPolicy, profiles []easysiteprofiles.EasySiteProfile) []pipeline.AccessPolicyInput {
+	// build site→security_mode lookup from easy profiles
+	modeBysite := make(map[string]string, len(profiles))
+	for _, p := range profiles {
+		modeBysite[p.SiteID] = strings.ToLower(strings.TrimSpace(p.FrontService.SecurityMode))
+	}
 	sorted := append([]accesspolicies.AccessPolicy(nil), items...)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].ID < sorted[j].ID })
 	out := make([]pipeline.AccessPolicyInput, 0, len(sorted))
@@ -814,11 +884,13 @@ func mapAccessInputs(items []accesspolicies.AccessPolicy) []pipeline.AccessPolic
 			defaultAction = "deny"
 		}
 		out = append(out, pipeline.AccessPolicyInput{
-			ID:            item.ID,
-			SiteID:        item.SiteID,
-			DefaultAction: defaultAction,
-			AllowCIDRs:    append([]string(nil), item.AllowList...),
-			DenyCIDRs:     append([]string(nil), item.DenyList...),
+			ID:                item.ID,
+			SiteID:            item.SiteID,
+			DefaultAction:     defaultAction,
+			AllowCIDRs:        append([]string(nil), item.AllowList...),
+			DenyCIDRs:         append([]string(nil), item.DenyList...),
+			TrustedProxyCIDRs: append([]string(nil), item.TrustedProxyCIDRs...),
+			SecurityMode:      modeBysite[item.SiteID],
 		})
 	}
 	return out
@@ -1049,7 +1121,7 @@ func mapEasyInputs(items []easysiteprofiles.EasySiteProfile, virtualPatches []vi
 
 			HttpStrictParsing: item.HTTPBehavior.HttpStrictParsing,
 
-			VirtualPatches: mapVirtualPatches(virtualPatches, item.SiteID),
+			VirtualPatches: append(mapProfileVirtualPatches(item.VirtualPatches), mapVirtualPatches(virtualPatches, item.SiteID)...),
 
 			UseCustomErrorPages: item.UseCustomErrorPages,
 			DisabledErrorPages:  item.DisabledErrorPages,
@@ -1124,6 +1196,19 @@ func mapVirtualPatches(patches []virtualpatches.VirtualPatch, siteID string) []p
 		if p.SiteID != siteID {
 			continue
 		}
+		out = append(out, pipeline.VirtualPatchInput{
+			ID:      p.ID,
+			Pattern: p.Pattern,
+			Target:  p.Target,
+			Action:  p.Action,
+		})
+	}
+	return out
+}
+
+func mapProfileVirtualPatches(patches []easysiteprofiles.VirtualPatchSettings) []pipeline.VirtualPatchInput {
+	out := make([]pipeline.VirtualPatchInput, 0, len(patches))
+	for _, p := range patches {
 		out = append(out, pipeline.VirtualPatchInput{
 			ID:      p.ID,
 			Pattern: p.Pattern,

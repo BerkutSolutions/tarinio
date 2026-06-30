@@ -1,0 +1,200 @@
+# E2E test stack — full control-plane + runtime stack for behavioral testing.
+# Used by scripts/run-e2e-tests.sh: spun up, tested, torn down with volumes.
+# Stack name: waf-e2e (all volumes/containers prefixed to avoid collision).
+# Runtime is exposed on port 18081 (health) and 10080 (HTTP proxy).
+
+services:
+  control-plane:
+    build:
+      context: ../../..
+      dockerfile: control-plane/Dockerfile
+    container_name: waf-e2e-control-plane
+    restart: "no"
+    environment:
+      CONTROL_PLANE_HTTP_ADDR: 0.0.0.0:8080
+      CONTROL_PLANE_STARTUP_SELF_TEST_ENABLED: "false"
+      WAF_RUNTIME_ROOT: /var/lib/waf
+      CONTROL_PLANE_SECURITY_PEPPER: e2e-test-pepper-do-not-use-in-prod
+      WAF_BOOTSTRAP_UI_UPSTREAM: "http://upstream-echo:8888"
+      WAF_RUNTIME_HEALTH_URL: http://runtime:8081/readyz
+      WAF_RUNTIME_RELOAD_URL: http://runtime:8081/reload
+      WAF_RUNTIME_API_TOKEN: e2e-test-runtime-token
+      CONTROL_PLANE_SENTINEL_BAN_SYNC_ENABLED: "false"
+      POSTGRES_DSN: postgres://waf:e2e-test-postgres-pw@postgres:5432/waf?sslmode=disable
+      OPENSEARCH_ENDPOINT: ""
+      VAULT_ENABLED: "true"
+      VAULT_ADDR: http://vault:8200
+      VAULT_MOUNT: secret
+      VAULT_PATH_PREFIX: tarinio
+      VAULT_TOKEN: ""
+      VAULT_TOKEN_FILE: /var/run/waf-secrets/root-token
+      CONTROL_PLANE_BOOTSTRAP_ADMIN_ENABLED: "true"
+      CONTROL_PLANE_BOOTSTRAP_ADMIN_ID: e2e-admin
+      CONTROL_PLANE_BOOTSTRAP_ADMIN_USERNAME: e2e-admin
+      CONTROL_PLANE_BOOTSTRAP_ADMIN_EMAIL: e2e@tarinio.test
+      CONTROL_PLANE_BOOTSTRAP_ADMIN_PASSWORD: e2e-password-1234
+      CONTROL_PLANE_ACME_ENABLED: "false"
+      WAF_DEFAULT_BAD_BEHAVIOR_BAN_TIME_SECONDS: "300"
+      WAF_DEFAULT_BAD_BEHAVIOR_THRESHOLD: "20"
+      WAF_DEFAULT_BAD_BEHAVIOR_COUNT_TIME_SECONDS: "30"
+      WAF_DEFAULT_LIMIT_CONN_MAX_HTTP1: "80"
+      WAF_DEFAULT_LIMIT_CONN_MAX_HTTP2: "160"
+      WAF_DEFAULT_LIMIT_REQ_RATE: "120r/s"
+    volumes:
+      - waf-e2e-runtime-data:/var/lib/waf
+      - waf-e2e-control-plane-data:/var/lib/waf/control-plane
+      - waf-e2e-certificates-data:/var/lib/waf/control-plane/certificate-materials
+      - waf-e2e-vault-bootstrap:/var/run/waf-secrets:ro
+    ports:
+      - "18080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+    networks:
+      - waf-e2e-net
+
+  runtime:
+    build:
+      context: ../../..
+      dockerfile: runtime/image/Dockerfile
+    container_name: waf-e2e-runtime
+    restart: "no"
+    environment:
+      WAF_RUNTIME_ROOT: /var/lib/waf
+      WAF_REQUEST_ARCHIVE_ROOT: /var/lib/waf-request-archive
+      WAF_RUNTIME_HEALTH_ADDR: 0.0.0.0:8081
+      WAF_RUNTIME_API_TOKEN: e2e-test-runtime-token
+      CONTROL_PLANE_SECURITY_PEPPER: e2e-test-pepper-do-not-use-in-prod
+      WAF_BOOTSTRAP_UI_UPSTREAM: "http://upstream-echo:8888"
+      OPENSEARCH_ENDPOINT: ""
+      VAULT_ENABLED: "true"
+      VAULT_ADDR: http://vault:8200
+      VAULT_MOUNT: secret
+      VAULT_PATH_PREFIX: tarinio
+      VAULT_TOKEN: ""
+      VAULT_TOKEN_FILE: /var/run/waf-secrets/root-token
+      WAF_L4_GUARD_ADAPTIVE_PATH: /etc/waf/l4guard-adaptive/adaptive.json
+      WAF_L4_GUARD_REAPPLY_INTERVAL_SECONDS: "5"
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    sysctls:
+      - net.ipv4.tcp_timestamps=0
+    volumes:
+      - waf-e2e-runtime-data:/var/lib/waf:ro
+      - waf-e2e-request-archive-data:/var/lib/waf-request-archive
+      - waf-e2e-control-plane-data:/var/lib/waf/control-plane:ro
+      - waf-e2e-certificates-data:/var/lib/waf/control-plane/certificate-materials:ro
+      - waf-e2e-nginx-logs:/var/log/nginx
+      - waf-e2e-l4-adaptive:/etc/waf/l4guard-adaptive:ro
+      - waf-e2e-vault-bootstrap:/var/run/waf-secrets:ro
+    ports:
+      - "10080:80"
+      - "10443:443"
+      - "18081:8081"
+    expose:
+      - "80"
+      - "443"
+      - "8081"
+    depends_on:
+      control-plane:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8081/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+    networks:
+      - waf-e2e-net
+
+  # Minimal upstream target for behavioral tests — echoes requests back
+  upstream-echo:
+    image: ealen/echo-server:latest
+    container_name: waf-e2e-upstream-echo
+    restart: "no"
+    environment:
+      PORT: "8888"
+    expose:
+      - "8888"
+    networks:
+      - waf-e2e-net
+
+  postgres:
+    image: postgres:15
+    container_name: waf-e2e-postgres
+    restart: "no"
+    environment:
+      POSTGRES_USER: waf
+      POSTGRES_PASSWORD: e2e-test-postgres-pw
+      POSTGRES_DB: waf
+      POSTGRES_INITDB_ARGS: "--auth-local=scram-sha-256 --auth-host=scram-sha-256 --locale=C.UTF-8"
+    volumes:
+      - waf-e2e-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U waf -d waf"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - waf-e2e-net
+
+  vault:
+    image: hashicorp/vault:1.18
+    container_name: waf-e2e-vault
+    restart: "no"
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_LOCAL_CONFIG: |
+        ui = true
+        disable_mlock = true
+        storage "file" { path = "/vault/file" }
+        listener "tcp" { address = "0.0.0.0:8200" tls_disable = 1 }
+        api_addr = "http://vault:8200"
+      VAULT_BOOTSTRAP_DIR: /vault/bootstrap
+      VAULT_LOCAL_ADDR: http://127.0.0.1:8200
+      VAULT_MOUNT: secret
+    entrypoint: ["/bin/sh", "/usr/local/bin/tarinio-vault-entrypoint"]
+    volumes:
+      - waf-e2e-vault-data:/vault/file
+      - waf-e2e-vault-bootstrap:/vault/bootstrap
+      - ./vault/entrypoint.sh:/usr/local/bin/tarinio-vault-entrypoint:ro
+    healthcheck:
+      test: ["CMD-SHELL", "vault status -address=http://127.0.0.1:8200 >/dev/null 2>&1; code=$$?; [ \"$$code\" = \"0\" ]"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - waf-e2e-net
+
+networks:
+  waf-e2e-net:
+    name: waf-e2e-net
+
+volumes:
+  waf-e2e-runtime-data:
+    name: waf-e2e-runtime-data
+  waf-e2e-control-plane-data:
+    name: waf-e2e-control-plane-data
+  waf-e2e-certificates-data:
+    name: waf-e2e-certificates-data
+  waf-e2e-postgres-data:
+    name: waf-e2e-postgres-data
+  waf-e2e-vault-data:
+    name: waf-e2e-vault-data
+  waf-e2e-vault-bootstrap:
+    name: waf-e2e-vault-bootstrap
+  waf-e2e-nginx-logs:
+    name: waf-e2e-nginx-logs
+  waf-e2e-request-archive-data:
+    name: waf-e2e-request-archive-data
+  waf-e2e-l4-adaptive:
+    name: waf-e2e-l4-adaptive
+

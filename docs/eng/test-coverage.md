@@ -1,8 +1,8 @@
 # WAF UI Test Coverage — Reference Document
 
-**Version:** 1.4.2
-**Date:** 2026-06-28
-**Status:** 157 tests — all green
+**Version:** 1.4.7
+**Date:** 2026-06-29
+**Status:** 158 tab tests + full runtime WAF e2e — all green
 
 This document serves as proof of WAF functional coverage per UI tab.
 If something regresses, run one of the commands below — green tests mean the system works as expected.
@@ -26,6 +26,10 @@ go test ./compiler/internal/compiler/ -run "TestGeo_" -v
 go test ./compiler/internal/compiler/ -run "TestModsec_" -v
 go test ./compiler/internal/compiler/ -run "TestWebSocket_" -v
 go test ./compiler/internal/compiler/ -run "TestVirtualPatches_" -v
+go test ./compiler/internal/compiler/ -run "TestErrorPages_" -v
+
+# Full runtime-stack WAF reference
+E2E_FILTER=TestE2EBehavioral sh scripts/run-e2e-tests.sh
 
 # Full suite
 go test ./...
@@ -244,7 +248,7 @@ File: `compiler/internal/compiler/tab08_modsec_test.go`
 
 ---
 
-### Tab 9 — WebSocket Inspection (11 tests)
+### Tab 9 — WebSocket Inspection (10 tests)
 
 File: `compiler/internal/compiler/tab09_websocket_test.go`
 
@@ -282,6 +286,44 @@ File: `compiler/internal/compiler/tab10_virtualpatches_test.go`
 
 ---
 
+### Tab 11 — Custom Error Pages (2 tests)
+
+File: `compiler/internal/compiler/tab11_errorpages_test.go`
+
+| Test | What it verifies |
+|------|-----------------|
+| TestErrorPages_Enabled_HasProxyInterceptAndErrorPages | `UseCustomErrorPages=true` enables `proxy_intercept_errors on`, generates `error_page`, and emits site-scoped `/__waf_errors/<site>/...` paths |
+| TestErrorPages_Disabled_NoProxyIntercept | `UseCustomErrorPages=false` does not add `proxy_intercept_errors on` and does not generate `error_page` directives |
+
+---
+
+## Runtime e2e — WAF Behavioral Reference (31 scenarios)
+
+File: `ui/tests/e2e_behavioral_test.go`
+
+This suite runs in the full Docker Compose stack (`control-plane`, `runtime`, `postgres`, `vault`, `upstream-echo`) and verifies real WAF behavior on HTTP requests, not just artifact generation.
+
+| Scenario group | What it proves |
+|----------------|----------------|
+| Blacklist IP / User-Agent / URI | Requests are actually blocked with 403; disabling rules restores pass-through |
+| RateLimit and custom route limits | Burst traffic receives 429; route-specific limits trigger on the target URI only |
+| Antibot and cookie flow | A new client receives 302 to challenge, verify sets the cookie, then upstream returns 200 |
+| SecurityMode transparent / monitor | Passive modes do not leave active deny/ModSecurity/auth/antibot blocking paths enabled |
+| Custom error pages | Branded 403 page is enabled, while `disabled_error_pages` falls back to the short standard page |
+| Scanner auto-ban | `sqlmap`/`nikto` signatures are blocked with 403 independently of the main antibot challenge |
+| ModSecurity CRS | SQL injection and XSS are blocked with 403; legitimate requests pass |
+| Geo policy | Blacklist/whitelist country configs apply and 451 is available for geo-block responses |
+| Basic Auth gate | Anonymous requests get 302 to `/auth`; verify endpoint returns 204 and sets auth cookie |
+| Response headers | CORS, CSP, Referrer-Policy, Permissions-Policy and HSTS are present in real responses |
+| Exceptions URI | URI exceptions bypass blacklist guard |
+| Virtual patches | Per-site URI SecRule blocks the request with 403 |
+| Antibot exclusions/rules/escalation | Exclusions skip challenge, per-path rules change challenge, two-layer escalation routes to stage1 |
+| Cookie flags / upstream headers / strict parsing / WS / geo time windows / JA3 | Configs apply without nginx reload errors and preserve runtime invariants |
+
+In the latest green run: 30 scenarios PASS, the mTLS upload scenario SKIP because no test CA file is present in the environment; the overall `TestE2EBehavioral` completed with `PASS`.
+
+---
+
 ## Summary Table
 
 | Tab | File | Tests | Package |
@@ -294,9 +336,11 @@ File: `compiler/internal/compiler/tab10_virtualpatches_test.go`
 | 6 — Antibot | tab06_antibot_test.go | 14 | compiler/internal/compiler |
 | 7 — Geo | tab07_geo_test.go | 16 | compiler/internal/compiler |
 | 8 — ModSecurity | tab08_modsec_test.go | 9 | compiler/internal/compiler |
-| 9 — WebSocket | tab09_websocket_test.go | 11 | compiler/internal/compiler |
+| 9 — WebSocket | tab09_websocket_test.go | 10 | compiler/internal/compiler |
 | 10 — Virtual Patches | tab10_virtualpatches_test.go | 10 | compiler/internal/compiler |
-| **Total** | | **157** | |
+| 11 — Error Pages | tab11_errorpages_test.go | 2 | compiler/internal/compiler |
+| **Total tab tests** | | **158** | |
+| Runtime WAF e2e | e2e_behavioral_test.go | 31 scenarios | ui/tests |
 
 ---
 
@@ -325,10 +369,13 @@ Escalation replaces the base challenge with the escalation mode. The string `"ja
 **WebSocket inspection:**
 The WS snippet is a Lua block, not nginx directives. The snippet is not generated when the pattern list is empty and limits are zero, even if `UseWSInspection=true`.
 
+**Runtime WAF:**
+The behavioral e2e is the reference for actual WAF behavior: it checks runtime nginx responses, cookies, redirects, status codes and applied revisions. Tab tests prove artifact structure; runtime e2e proves that those artifacts work together.
+
 ---
 
 ## Release Integration
 
-The preflight in `scripts/release.sh` runs all tab tests before the main `go test ./...` and before the version selection menu. Any single test failure aborts the release with exit code 1.
+The preflight in `scripts/release.ps1` runs tab tests, `go test ./...`, and full `TestE2EBehavioral` before publishing. Any single test failure aborts the release with exit code 1.
 
 Project rule (`.work/PROMT.md`): every new UI feature requires a corresponding test in `tab0X_*_test.go` or `easysiteprofiles/tab0X_*_test.go` in the same PR.

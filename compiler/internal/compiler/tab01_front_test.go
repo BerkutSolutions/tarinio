@@ -362,6 +362,8 @@ func mustRenderSiteConf(t *testing.T, siteID string, profile EasyProfileInput) s
 		Enabled:             true,
 		PrimaryHost:         siteID + ".example.com",
 		ListenHTTP:          true,
+		ListenHTTPS:         profile.MTLS.MTLSEnabled,
+		MTLS:                profile.MTLS,
 		UseEasyConfig:       true,
 		UseCustomErrorPages: profile.UseCustomErrorPages,
 		DefaultUpstreamID:   "up",

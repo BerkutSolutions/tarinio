@@ -53,11 +53,11 @@ type FrontServiceSettings struct {
 	ACMEAccountEmail           string `json:"acme_account_email"`
 
 	// mTLS — incoming client certificate verification (TASK-8.1)
-	MTLSEnabled       bool   `json:"mtls_enabled"`
-	MTLSOptional      bool   `json:"mtls_optional"`
-	MTLSVerifyDepth   int    `json:"mtls_verify_depth"`
-	MTLSClientCARef   string `json:"mtls_client_ca_ref"`
-	MTLSPassHeaders   bool   `json:"mtls_pass_headers"`
+	MTLSEnabled     bool   `json:"mtls_enabled"`
+	MTLSOptional    bool   `json:"mtls_optional"`
+	MTLSVerifyDepth int    `json:"mtls_verify_depth"`
+	MTLSClientCARef string `json:"mtls_client_ca_ref"`
+	MTLSPassHeaders bool   `json:"mtls_pass_headers"`
 }
 
 type UpstreamRoutingSettings struct {
@@ -73,12 +73,12 @@ type UpstreamRoutingSettings struct {
 	DisableXForwardedFor   bool   `json:"disable_x_forwarded_for"`
 	// HealthCheckEnabled enables passive upstream health checking via proxy_next_upstream.
 	// When true, nginx retries failed upstream requests on the next available server.
-	HealthCheckEnabled          bool   `json:"health_check_enabled"`
-	HealthCheckPath             string `json:"health_check_path"`
-	HealthCheckIntervalSeconds  int    `json:"health_check_interval_seconds"`
-	HealthCheckFailThreshold    int    `json:"health_check_fail_threshold"`
-	DisableXForwardedProto      bool   `json:"disable_x_forwarded_proto"`
-	EnableXRealIP               bool   `json:"enable_x_real_ip"`
+	HealthCheckEnabled         bool   `json:"health_check_enabled"`
+	HealthCheckPath            string `json:"health_check_path"`
+	HealthCheckIntervalSeconds int    `json:"health_check_interval_seconds"`
+	HealthCheckFailThreshold   int    `json:"health_check_fail_threshold"`
+	DisableXForwardedProto     bool   `json:"disable_x_forwarded_proto"`
+	EnableXRealIP              bool   `json:"enable_x_real_ip"`
 
 	// mTLS — outgoing client certificate for upstream connections (TASK-8.2)
 	UpstreamMTLSEnabled bool   `json:"upstream_mtls_enabled"`
@@ -125,23 +125,24 @@ type SecurityBehaviorAndLimitsSettings struct {
 	BanEscalationScope          string `json:"ban_escalation_scope"`
 	BanEscalationStagesSeconds  []int  `json:"ban_escalation_stages_seconds"`
 
-	UseBlacklist           bool     `json:"use_blacklist"`
-	UseExceptions          bool     `json:"use_exceptions"`
-	ExceptionsIP           []string `json:"exceptions_ip"`
-	ExceptionsURI          []string `json:"exceptions_uri"`
-	UseDNSBL               bool     `json:"use_dnsbl"`
-	BlacklistIP            []string `json:"blacklist_ip"`
-	BlacklistRDNS          []string `json:"blacklist_rdns"`
-	BlacklistASN           []string `json:"blacklist_asn"`
-	BlacklistUserAgent     []string `json:"blacklist_user_agent"`
-	BlacklistURI           []string `json:"blacklist_uri"`
-	BlacklistJA3           []string `json:"blacklist_ja3"`
-	BlacklistIPURLs        []string `json:"blacklist_ip_urls"`
-	BlacklistRDNSURLs      []string `json:"blacklist_rdns_urls"`
-	BlacklistASNURLs       []string `json:"blacklist_asn_urls"`
-	BlacklistUserAgentURLs []string `json:"blacklist_user_agent_urls"`
-	BlacklistURIURLs       []string `json:"blacklist_uri_urls"`
-	BlacklistJA3URLs       []string `json:"blacklist_ja3_urls"`
+	UseBlacklist            bool     `json:"use_blacklist"`
+	UseExceptions           bool     `json:"use_exceptions"`
+	ExceptionsIP            []string `json:"exceptions_ip"`
+	ExceptionsURI           []string `json:"exceptions_uri"`
+	UseDNSBL                bool     `json:"use_dnsbl"`
+	AccessTrustedProxyCIDRs []string `json:"access_trusted_proxy_cidrs"`
+	BlacklistIP             []string `json:"blacklist_ip"`
+	BlacklistRDNS           []string `json:"blacklist_rdns"`
+	BlacklistASN            []string `json:"blacklist_asn"`
+	BlacklistUserAgent      []string `json:"blacklist_user_agent"`
+	BlacklistURI            []string `json:"blacklist_uri"`
+	BlacklistJA3            []string `json:"blacklist_ja3"`
+	BlacklistIPURLs         []string `json:"blacklist_ip_urls"`
+	BlacklistRDNSURLs       []string `json:"blacklist_rdns_urls"`
+	BlacklistASNURLs        []string `json:"blacklist_asn_urls"`
+	BlacklistUserAgentURLs  []string `json:"blacklist_user_agent_urls"`
+	BlacklistURIURLs        []string `json:"blacklist_uri_urls"`
+	BlacklistJA3URLs        []string `json:"blacklist_ja3_urls"`
 
 	UseLimitConn      bool              `json:"use_limit_conn"`
 	LimitConnMaxHTTP1 int               `json:"limit_conn_max_http1"`
@@ -182,14 +183,14 @@ type AntibotChallengeRule struct {
 }
 
 type SecurityAuthBasicSettings struct {
-	UseAuthBasic      bool               `json:"use_auth_basic"`
-	AuthMode          string             `json:"auth_mode"`
-	AuthOrder         string             `json:"auth_order"`
-	AuthBasicLocation string             `json:"auth_basic_location"`
-	AuthBasicUser     string             `json:"auth_basic_user"`
-	AuthBasicPassword string             `json:"auth_basic_password"`
-	AuthBasicText     string             `json:"auth_basic_text"`
-	Users             []SecurityAuthUser `json:"users"`
+	UseAuthBasic      bool                        `json:"use_auth_basic"`
+	AuthMode          string                      `json:"auth_mode"`
+	AuthOrder         string                      `json:"auth_order"`
+	AuthBasicLocation string                      `json:"auth_basic_location"`
+	AuthBasicUser     string                      `json:"auth_basic_user"`
+	AuthBasicPassword string                      `json:"auth_basic_password"`
+	AuthBasicText     string                      `json:"auth_basic_text"`
+	Users             []SecurityAuthUser          `json:"users"`
 	ExclusionRules    []SecurityAuthExclusionRule `json:"exclusion_rules"`
 	ServiceTokens     []SecurityAuthServiceToken  `json:"service_tokens"`
 	// SessionInactivityMinutes controls auth session expiration for service-auth cookies.
@@ -220,20 +221,20 @@ type SecurityAuthServiceToken struct {
 // are blocked or allowed only during the specified UTC hours and days of week.
 // HoursStart < HoursEnd must hold (e.g. 9..17 blocks from 09:00 to 17:00 UTC).
 type GeoTimeWindow struct {
-	Countries  []string `json:"countries"`   // ISO 3166-1 alpha-2 codes
-	Action     string   `json:"action"`      // "block" | "allow"
+	Countries  []string `json:"countries"`    // ISO 3166-1 alpha-2 codes
+	Action     string   `json:"action"`       // "block" | "allow"
 	DaysOfWeek []int    `json:"days_of_week"` // 0=Sunday, 1=Monday … 6=Saturday
-	HoursStart int      `json:"hours_start"` // 0-23 UTC (inclusive)
-	HoursEnd   int      `json:"hours_end"`   // 0-23 UTC (exclusive)
+	HoursStart int      `json:"hours_start"`  // 0-23 UTC (inclusive)
+	HoursEnd   int      `json:"hours_end"`    // 0-23 UTC (exclusive)
 }
 
 type SecurityCountryPolicySettings struct {
-	BlacklistCountry []string        `json:"blacklist_country"`
-	WhitelistCountry []string        `json:"whitelist_country"`
-	ShowGeoBlockPage bool            `json:"show_geo_block_page"`
+	BlacklistCountry []string `json:"blacklist_country"`
+	WhitelistCountry []string `json:"whitelist_country"`
+	ShowGeoBlockPage bool     `json:"show_geo_block_page"`
 	// GeoTimeWindows adds time-based geo-fencing on top of the static lists.
 	// All windows are evaluated and the first matching one wins.
-	GeoTimeWindows   []GeoTimeWindow `json:"geo_time_windows,omitempty"`
+	GeoTimeWindows []GeoTimeWindow `json:"geo_time_windows,omitempty"`
 }
 
 type APIPositiveEndpointPolicy struct {
@@ -261,7 +262,7 @@ type ModSecurityCustomConfiguration struct {
 // Inspection is active only when UseWSInspection=true AND ReverseProxyWebsocket=true.
 type SecurityWebSocketSettings struct {
 	UseWSInspection   bool     `json:"use_ws_inspection"`
-	WSBlockPatterns   []string `json:"ws_block_patterns"`   // regex patterns matched against frame text
+	WSBlockPatterns   []string `json:"ws_block_patterns"`    // regex patterns matched against frame text
 	WSMaxMessageBytes int      `json:"ws_max_message_bytes"` // 0 = unlimited
 	WSRateMsgPerSec   int      `json:"ws_rate_msg_per_sec"`  // 0 = unlimited
 }
@@ -273,6 +274,13 @@ type SecurityModSecuritySettings struct {
 	ModSecurityCRSVersion    string                         `json:"modsecurity_crs_version"`
 	ModSecurityCRSPlugins    []string                       `json:"modsecurity_crs_plugins"`
 	CustomConfiguration      ModSecurityCustomConfiguration `json:"custom_configuration"`
+}
+
+type VirtualPatchSettings struct {
+	ID      string `json:"id"`
+	Pattern string `json:"pattern"`
+	Target  string `json:"target"`
+	Action  string `json:"action"`
 }
 
 // EasySiteProfile is an Easy-mode site configuration aggregate.
@@ -289,12 +297,13 @@ type EasySiteProfile struct {
 	SecurityAPIPositive       SecurityAPIPositiveSettings       `json:"security_api_positive"`
 	SecurityModSecurity       SecurityModSecuritySettings       `json:"security_modsecurity"`
 	SecurityWebSocket         SecurityWebSocketSettings         `json:"security_websocket"`
+	VirtualPatches            []VirtualPatchSettings            `json:"virtual_patches,omitempty"`
 	// UseCustomErrorPages enables WAF custom error pages for this site.
 	// When true (default), proxy_intercept_errors is on and WAF error pages replace upstream errors.
 	UseCustomErrorPages bool     `json:"use_custom_error_pages"`
 	DisabledErrorPages  []string `json:"disabled_error_pages,omitempty"`
-	CreatedAt           string `json:"created_at"`
-	UpdatedAt           string `json:"updated_at"`
+	CreatedAt           string   `json:"created_at"`
+	UpdatedAt           string   `json:"updated_at"`
 }
 
 func DefaultProfile(siteID string) EasySiteProfile {
@@ -418,6 +427,7 @@ func DefaultProfile(siteID string) EasySiteProfile {
 			UseBlacklist:                false,
 			UseExceptions:               false,
 			ExceptionsIP:                []string{},
+			AccessTrustedProxyCIDRs:     []string{},
 			UseDNSBL:                    false,
 			BlacklistIP:                 []string{},
 			BlacklistRDNS:               []string{},
@@ -469,8 +479,8 @@ func DefaultProfile(siteID string) EasySiteProfile {
 					Enabled:  true,
 				},
 			},
-			ExclusionRules: []SecurityAuthExclusionRule{},
-			ServiceTokens:  []SecurityAuthServiceToken{},
+			ExclusionRules:           []SecurityAuthExclusionRule{},
+			ServiceTokens:            []SecurityAuthServiceToken{},
 			SessionInactivityMinutes: 60,
 		},
 		SecurityCountryPolicy: SecurityCountryPolicySettings{

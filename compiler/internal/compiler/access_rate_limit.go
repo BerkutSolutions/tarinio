@@ -142,8 +142,34 @@ func RenderAccessRateLimitArtifacts(
 		return nil, fmt.Errorf("render rate limit http template: %w", err)
 	}
 
+	// Собираем все уникальные TrustedProxyCIDRs из всех access policies
+	// и выносим set_real_ip_from в http context (conf.d) чтобы real_ip модуль
+	// работал в POST_READ_PHASE и корректно заменял $remote_addr до обработки deny.
+	allTrustedCIDRs := map[string]struct{}{}
+	for _, policy := range accessPolicies {
+		for _, cidr := range policy.TrustedProxyCIDRs {
+			if cidr != "" {
+				allTrustedCIDRs[cidr] = struct{}{}
+			}
+		}
+	}
+	trustedCIDRSlice := sortedUnique(func() []string {
+		out := make([]string, 0, len(allTrustedCIDRs))
+		for cidr := range allTrustedCIDRs {
+			out = append(out, cidr)
+		}
+		return out
+	}())
+	realIPContent, err := renderTemplate("templates/nginx/conf.d/real_ip.conf.tmpl", struct {
+		TrustedProxyCIDRs []string
+	}{TrustedProxyCIDRs: trustedCIDRSlice})
+	if err != nil {
+		return nil, fmt.Errorf("render real_ip template: %w", err)
+	}
+
 	artifacts := []ArtifactOutput{
 		newArtifact("nginx/conf.d/ratelimits.conf", ArtifactKindNginxConfig, httpContent),
+		newArtifact("nginx/conf.d/real_ip.conf", ArtifactKindNginxConfig, realIPContent),
 	}
 
 	for _, site := range sortedSites {
@@ -158,7 +184,13 @@ func RenderAccessRateLimitArtifacts(
 				DefaultAction: "allow",
 			}
 		}
-		if shouldDefaultDenySite(site.ID, accessPolicy) {
+		// transparent/monitor mode: disable all active blocking — deny rules must not apply.
+		mode := strings.ToLower(strings.TrimSpace(accessPolicy.SecurityMode))
+		if mode == "transparent" || mode == "monitor" {
+			accessPolicy.DenyCIDRs = nil
+			accessPolicy.AllowCIDRs = nil
+			accessPolicy.DefaultAction = "allow"
+		} else if shouldDefaultDenySite(site.ID, accessPolicy) {
 			accessPolicy.DefaultAction = "deny"
 		}
 

@@ -28,6 +28,7 @@ type nginxSiteData struct {
 	ListenHTTPS               bool
 	IsManagementSite          bool
 	ManagementAPIProxyTarget  string
+	UIProxyTarget             string
 	UpstreamName              string
 	UpstreamAddress           string
 	ProxyPassTarget           string
@@ -36,9 +37,10 @@ type nginxSiteData struct {
 	RateLimitEscalationCookie string
 	// HealthCheckEnabled adds keepalive to the upstream block and
 	// proxy_next_upstream directives to the location blocks.
-	HealthCheckEnabled bool
-	UseEasyConfig      bool
+	HealthCheckEnabled  bool
+	UseEasyConfig       bool
 	UseCustomErrorPages bool
+	MTLSSnippet         string
 }
 
 type nginxHostMapEntry struct {
@@ -95,6 +97,7 @@ func RenderSiteUpstreamArtifacts(sites []SiteInput, upstreams []UpstreamInput) (
 		ErrorStatusCodes:         append([]int(nil), supportedErrorStatusCodes...),
 		HostMapEntries:           buildHostMapEntries(sortedSites),
 		ManagementAPIProxyTarget: managementAPIProxyTarget(),
+		UIProxyTarget:            uiProxyTarget(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("render nginx base template: %w", err)
@@ -120,6 +123,11 @@ func RenderSiteUpstreamArtifacts(sites []SiteInput, upstreams []UpstreamInput) (
 		}
 
 		upstream := upstreamByID[site.DefaultUpstreamID]
+		mtlsSnippet := ""
+		if site.ListenHTTPS {
+			mtlsSnippet = buildMTLSServerSnippet(site.MTLS)
+		}
+
 		siteContent, err := renderTemplate("templates/nginx/sites/site.conf.tmpl", nginxSiteData{
 			SiteID:                    site.ID,
 			SiteIDSlug:                slugSiteID(site.ID),
@@ -128,6 +136,7 @@ func RenderSiteUpstreamArtifacts(sites []SiteInput, upstreams []UpstreamInput) (
 			ListenHTTPS:               site.ListenHTTPS,
 			IsManagementSite:          isManagementSiteID(site.ID),
 			ManagementAPIProxyTarget:  managementAPIProxyTarget(),
+			UIProxyTarget:             uiProxyTarget(),
 			UpstreamName:              upstreamBlockName(site.ID, upstream.ID),
 			UpstreamAddress:           buildUpstreamAddress(upstream),
 			ProxyPassTarget:           "http://" + upstreamBlockName(site.ID, upstream.ID),
@@ -136,6 +145,7 @@ func RenderSiteUpstreamArtifacts(sites []SiteInput, upstreams []UpstreamInput) (
 			RateLimitEscalationCookie: rateLimitEscalationCookieName(site.ID),
 			UseEasyConfig:             site.UseEasyConfig,
 			UseCustomErrorPages:       site.UseCustomErrorPages,
+			MTLSSnippet:               mtlsSnippet,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("render site template for %s: %w", site.ID, err)
@@ -338,6 +348,8 @@ type nginxBaseData struct {
 	ErrorStatusCodes         []int
 	HostMapEntries           []nginxHostMapEntry
 	ManagementAPIProxyTarget string
+	TrustedProxyCIDRs        []string
+	UIProxyTarget            string
 }
 
 func managementAPIProxyTarget() string {
@@ -346,6 +358,13 @@ func managementAPIProxyTarget() string {
 		host = "control-plane"
 	}
 	return "http://" + host + ":8080"
+}
+
+func uiProxyTarget() string {
+	if v := strings.TrimSpace(os.Getenv("WAF_BOOTSTRAP_UI_UPSTREAM")); v != "" {
+		return v
+	}
+	return "http://ui:80"
 }
 
 func buildHostMapEntries(sites []SiteInput) []nginxHostMapEntry {

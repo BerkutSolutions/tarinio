@@ -160,6 +160,32 @@ function bindWidgetPickerAndDetails(refs, deps) {
 
   const modalBodyNode = container.querySelector("#dashboard-detail-content");
   modalBodyNode?.addEventListener("click", (event) => {
+    // Обработка кнопки dismiss ошибок сервиса.
+    const dismissBtn = event.target?.closest?.("[data-dismiss-service-error]");
+    if (dismissBtn) {
+      const serviceName = String(dismissBtn.dataset.serviceName || "").trim();
+      const errorId = String(dismissBtn.dataset.dismissServiceError || "").trim();
+      if (serviceName) {
+        const body = errorId ? JSON.stringify({ error_ids: [errorId] }) : undefined;
+        fetch(`/api/dashboard/services/${encodeURIComponent(serviceName)}/errors`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body
+        }).then(() => {
+          if (typeof deps.loadDashboardStats === "function") {
+            deps.loadDashboardStats();
+          }
+          const row = dismissBtn.closest(".service-error-row");
+          if (row) row.remove();
+          const errList = modalBodyNode?.querySelector(".service-errors-list");
+          if (errList && errList.children.length === 0) {
+            const errSection = errList.closest(".service-errors-section");
+            if (errSection) errSection.remove();
+          }
+        }).catch(() => {});
+      }
+      return;
+    }
     openDetailFromTarget(event.target);
   });
   modalBodyNode?.addEventListener("keydown", (event) => {

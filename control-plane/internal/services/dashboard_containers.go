@@ -728,6 +728,9 @@ func classifyContainerLogIssue(message string) (string, bool) {
 		"initdb: warning: enabling \"trust\" authentication for local connections",
 		"initdb: warning:",
 		"limiting requests, excess:",
+		"upstream timed out",
+		"upstream prematurely closed",
+		"no live upstreams while connecting",
 	}
 	for _, pattern := range benignPatterns {
 		if strings.Contains(lower, pattern) {

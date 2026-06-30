@@ -119,17 +119,21 @@ function renderServicesWidget(stats, ctx, deps) {
         <div class="dashboard-list dashboard-containers-list">
           ${sorted.map((item) => {
             const isUp     = Boolean(item?.up);
-            const tone     = isUp ? "success" : "warning";
+            const hasErrors = Boolean(item?.has_errors);
+            // Жёлтый если сервис работает но есть upstream ошибки, красный если down.
+            const tone     = !isUp ? "warning" : hasErrors ? "caution" : "success";
             const statusLbl = isUp ? ctx.t("dashboard.services.statusUp") : ctx.t("dashboard.services.statusDown");
             const checkedAt = formatCheckedAt(item?.checked_at);
+            const errorCount = Array.isArray(item?.upstream_errors) ? item.upstream_errors.length : 0;
             return `
               <button type="button" class="dashboard-list-row clickable container-status-${escapeHtml(tone)}" data-widget-action="service-detail" data-service-name="${escapeHtml(String(item?.name || ""))}">
                 <div class="dashboard-list-label">
                   <strong>${escapeHtml(String(item?.name || "-"))}</strong>
-                  <div class="muted">${escapeHtml(statusLbl)}${checkedAt ? ` · ${escapeHtml(checkedAt)}` : ""}</div>
+                  <div class="muted">${escapeHtml(statusLbl)}${checkedAt ? ` · ${escapeHtml(checkedAt)}` : ""}${errorCount > 0 ? ` · <span style="color:var(--color-warning)">${escapeHtml(String(errorCount))} ${escapeHtml(ctx.t("dashboard.services.errorsCount"))}</span>` : ""}</div>
                 </div>
                 <div class="dashboard-list-meta">
-                  <span class="badge badge-${escapeHtml(isUp ? "success" : "warning")}">${escapeHtml(statusLbl)}</span>
+                  <span class="badge badge-${escapeHtml(!isUp ? "warning" : hasErrors ? "caution" : "success")}">${escapeHtml(statusLbl)}</span>
+                  ${hasErrors ? `<span class="badge badge-caution">${escapeHtml(ctx.t("dashboard.services.hasErrors"))}</span>` : ""}
                 </div>
               </button>
             `;

@@ -63,8 +63,8 @@ func TestRenderAccessRateLimitArtifacts_ManifestCompatibleKinds(t *testing.T) {
 		t.Fatalf("render failed: %v", err)
 	}
 
-	if len(artifacts) != 3 {
-		t.Fatalf("expected 3 access/rate artifacts, got %d", len(artifacts))
+	if len(artifacts) != 4 {
+		t.Fatalf("expected 4 access/rate artifacts, got %d", len(artifacts))
 	}
 
 	for _, artifact := range artifacts {
