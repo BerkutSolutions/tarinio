@@ -163,10 +163,8 @@ if ($waf_auth_gate_guard = "0:0") { return 302 {{ .AuthGateLoginURI }}?return_ur
 {{- end }}
 
 {{- if .UseModSecurityEasyFile }}
-if ($uri !~ "^/static/") {
 modsecurity on;
 modsecurity_rules_file /etc/waf/modsecurity/easy/{{ .SiteID }}.conf;
-}
 {{- end }}
 
 {{- range .BlacklistIP }}
