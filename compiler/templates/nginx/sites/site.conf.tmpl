@@ -221,6 +221,7 @@ server {
     location = /preview/511 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/511.html; }
 {{- end }}
 
+{{- if not .IsManagementSite }}
     location ^~ /api/ {
         proxy_intercept_errors off;
 {{- if and (not .UseEasyConfig) (not .IsManagementSite) }}
@@ -228,21 +229,13 @@ server {
         modsecurity_rules_file /etc/waf/modsecurity/sites/{{ .SiteID }}.conf;
 {{- end }}
         include /etc/waf/nginx/ratelimits/{{ .SiteID }}.conf;
-{{- if .IsManagementSite }}
-        proxy_set_header Host $http_host;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Real-IP $remote_addr;
-        include /etc/waf/nginx/easy/{{ .SiteID }}.conf;
-        proxy_pass {{ .ManagementAPIProxyTarget }};
-{{- else }}
 {{- if .PassHostHeader }}
         proxy_set_header Host $http_host;
 {{- end }}
         include /etc/waf/nginx/easy/{{ .SiteID }}.conf;
         proxy_pass {{ .ProxyPassTarget }};
-{{- end }}
     }
+{{- end }}
 
     location / {
 {{- if and (not .UseEasyConfig) (not .IsManagementSite) }}

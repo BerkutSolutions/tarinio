@@ -187,6 +187,10 @@ func TestRenderEasyRateLimitArtifacts_ManagementHostRoutesAdminAPIToControlPlane
 	if !strings.Contains(locationsConf, "proxy_pass http://control-plane:8080;") {
 		t.Fatalf("expected management host api easy locations to proxy to control-plane, got: %s", locationsConf)
 	}
+	siteConf := byPath["nginx/sites/prewaf.hantico.ru.conf"]
+	if strings.Contains(siteConf, "location ^~ /api/ {") {
+		t.Fatalf("did not expect site template to emit catch-all /api location for management host, got: %s", siteConf)
+	}
 	if strings.Contains(locationsConf, "proxy_pass http://site_prewaf.hantico.ru_upstream_prewaf-upstream;") {
 		t.Fatalf("did not expect management host api easy locations to proxy to UI upstream, got: %s", locationsConf)
 	}

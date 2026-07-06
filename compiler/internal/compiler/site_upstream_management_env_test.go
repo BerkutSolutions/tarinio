@@ -40,11 +40,11 @@ func TestRenderSiteUpstreamArtifacts_ManagementSiteRoutesAPIToControlPlaneFromEn
 	if content == "" {
 		t.Fatal("expected site artifact for env-configured management site")
 	}
-	if !containsAll(content,
-		"location ^~ /api/ {",
-		"proxy_pass http://control-plane:8080;",
-	) {
-		t.Fatalf("expected env-configured management site to route /api to control-plane, got: %s", content)
+	if strings.Contains(content, "location ^~ /api/ {") {
+		t.Fatalf("did not expect env-configured management site to keep catch-all /api location in site template, got: %s", content)
+	}
+	if !strings.Contains(content, "include /etc/waf/nginx/easy-locations/ui.example.test.conf;") {
+		t.Fatalf("expected env-configured management site to include easy-locations for management APIs, got: %s", content)
 	}
 }
 
@@ -83,11 +83,11 @@ func TestRenderSiteUpstreamArtifacts_ManagementSiteRoutesAPIToConfiguredManageme
 	if content == "" {
 		t.Fatal("expected site artifact for configured management site")
 	}
-	if !containsAll(content,
-		"location ^~ /api/ {",
-		"proxy_pass http://control-plane-test:8080;",
-	) {
-		t.Fatalf("expected configured management site to route /api to control-plane-test, got: %s", content)
+	if strings.Contains(content, "location ^~ /api/ {") {
+		t.Fatalf("did not expect configured management site to keep catch-all /api location in site template, got: %s", content)
+	}
+	if !strings.Contains(content, "include /etc/waf/nginx/easy-locations/control-plane-access.conf;") {
+		t.Fatalf("expected configured management site to include easy-locations for management APIs, got: %s", content)
 	}
 }
 
