@@ -17,6 +17,7 @@
 - API easy-site профиля получил обратную совместимость с alias-полями верхнего уровня, которые используются e2e и legacy-клиентами: security mode, blacklist/exceptions, rate-limit, geo policy, custom limit rules, auth session TTL и virtual patches корректно раскладываются во вложенные структуры профиля.
 - `/api/requests` теперь явно помечает каждую строку типом `request` или `security`, чтобы UI мог отделять обычные запросы от ModSecurity и других событий безопасности одним общим фильтром.
 - Для `/api/requests` добавлен двусторонний compatibility-layer: handler принимает старые записи без `row_type`, восстанавливает тип из `stream`/`type`/`source_component`, сохраняет приоритет явных `row_type`/`rowType` и помечает временную legacy-поддержку полем `legacy_row_type_support=true`.
+- Control-plane runtime collectors теперь одновременно отправляют оба internal auth header (`X-WAF-Runtime-Token` и legacy `X-WAF-Internal-Token`), чтобы healthcheck, requests count/probe и security-events probe продолжали работать на стендах с legacy runtime token contract.
 
 ### UI
 
@@ -32,6 +33,7 @@
 - Compiler, service и UI-contract tests синхронизированы с текущими runtime-инвариантами: safe nginx guards без вложенных `if`, обязательный 429 для route rate-limit, compatibility easy-site profile и актуальные поля security telemetry.
 - Добавлены и обновлены regression tests на management-site path ownership, env-driven localhost semantics, coexistence HTTPS domain-site + IP-site, legacy/new rows в `/api/requests`, security summary/details modal и runtime-normalized `event_type`.
 - Live/runtime regression tests дополнительно закрепляют, что `transparent` и `monitor` не уводят `/admin` в antibot/auth redirect path, а behavioral/e2e runner выводит компактный expected/actual summary по каждому subtest с полным логом в `.work/logs`.
+- Добавлен regression test на runtime auth header compatibility: runtime request collector обязан выставлять и current, и legacy internal token header с trim токена.
 
 ### Документация
 

@@ -55,3 +55,19 @@ func TestHTTPRuntimeRequestCollectorCountFallsBackFromRuntimeHost(t *testing.T) 
 		t.Fatalf("expected count=9, got %d", count)
 	}
 }
+
+func TestSetRuntimeAuthHeaderSetsLegacyAndCurrentHeaders(t *testing.T) {
+	req, err := http.NewRequest(http.MethodGet, "http://example.test", nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+
+	setRuntimeAuthHeader(req, " runtime-secret ")
+
+	if got := req.Header.Get(runtimeAuthHeader); got != "runtime-secret" {
+		t.Fatalf("expected %s header to be trimmed token, got %q", runtimeAuthHeader, got)
+	}
+	if got := req.Header.Get(legacyRuntimeAuthHeader); got != "runtime-secret" {
+		t.Fatalf("expected %s header to be trimmed token, got %q", legacyRuntimeAuthHeader, got)
+	}
+}
