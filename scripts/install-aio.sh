@@ -538,6 +538,28 @@ probe_host_http() {
 }
 
 compile_and_apply_current_revision() {
+  admin_id="$(read_env_value CONTROL_PLANE_BOOTSTRAP_ADMIN_ID)"
+  admin_username="$(read_env_value CONTROL_PLANE_BOOTSTRAP_ADMIN_USERNAME)"
+  admin_password="$(read_env_value CONTROL_PLANE_BOOTSTRAP_ADMIN_PASSWORD)"
+
+  if [ -n "$admin_password" ] && { [ -n "$admin_id" ] || [ -n "$admin_username" ]; }; then
+    login_flag="--username"
+    login_value="$admin_username"
+    if [ -n "$admin_id" ]; then
+      login_flag="--id"
+      login_value="$admin_id"
+    fi
+
+    login_out="$($COMPOSE_CMD -f docker-compose.yml exec -T control-plane waf-cli login "$login_flag" "$login_value" --password "$admin_password" 2>&1)" || {
+      printf '%s\n' "$login_out" >>"$LOG_FILE"
+      return 1
+    }
+    printf '%s\n' "$login_out" >>"$LOG_FILE"
+  else
+    warn "bootstrap admin credentials are not configured in .env; skipping waf-cli authenticated compile/apply"
+    return 0
+  fi
+
   compile_out="$($COMPOSE_CMD -f docker-compose.yml exec -T control-plane waf-cli revisions compile 2>&1)" || {
     printf '%s\n' "$compile_out" >>"$LOG_FILE"
     return 1
