@@ -164,7 +164,7 @@ func RenderEasyRateLimitArtifacts(sites []SiteInput, upstreams []UpstreamInput, 
 		}
 		for index, rule := range rules {
 			canonicalPath := customLimitCanonicalPath(rule.Path)
-			isAdminAPIPath := isManagementSiteID(site.ID) && strings.HasPrefix(canonicalPath, "/api/")
+			isAdminAPIPath := isManagementSite(site) && strings.HasPrefix(canonicalPath, "/api/")
 			proxyPassTarget := "http://" + upstreamBlockName(site.ID, upstream.ID)
 			if isAdminAPIPath {
 				proxyPassTarget = managementAPIProxyTarget()
@@ -351,3 +351,4 @@ func expandCustomLimitRuleAliases(path, rate string) []CustomRateLimitRuleInput 
 func easyCustomLimitStatusCode(values []int) int {
 	return 429
 }
+

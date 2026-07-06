@@ -147,6 +147,51 @@ func TestRenderEasyRateLimitArtifacts_UsesConfiguredManagementAPIUpstream(t *tes
 	}
 }
 
+func TestRenderEasyRateLimitArtifacts_ManagementHostRoutesAdminAPIToControlPlane(t *testing.T) {
+	artifacts, err := RenderEasyRateLimitArtifacts(
+		[]SiteInput{{
+			ID:                "prewaf.hantico.ru",
+			Enabled:           true,
+			PrimaryHost:       "ui",
+			ListenHTTP:        true,
+			DefaultUpstreamID: "prewaf-upstream",
+		}},
+		[]UpstreamInput{{
+			ID:             "prewaf-upstream",
+			SiteID:         "prewaf.hantico.ru",
+			Name:           "prewaf-upstream",
+			Scheme:         "http",
+			Host:           "ui",
+			Port:           80,
+			BasePath:       "/",
+			PassHostHeader: true,
+		}},
+		[]EasyProfileInput{{
+			SiteID: "prewaf.hantico.ru",
+			CustomLimitRules: []CustomRateLimitRuleInput{
+				{Path: "/api/sites/", Rate: "80r/s"},
+				{Path: "/api/tls-configs/", Rate: "80r/s"},
+			},
+		}},
+	)
+	if err != nil {
+		t.Fatalf("render easy rate limit artifacts: %v", err)
+	}
+
+	byPath := map[string]string{}
+	for _, item := range artifacts {
+		byPath[item.Path] = string(item.Content)
+	}
+
+	locationsConf := byPath["nginx/easy-locations/prewaf.hantico.ru.conf"]
+	if !strings.Contains(locationsConf, "proxy_pass http://control-plane:8080;") {
+		t.Fatalf("expected management host api easy locations to proxy to control-plane, got: %s", locationsConf)
+	}
+	if strings.Contains(locationsConf, "proxy_pass http://site_prewaf.hantico.ru_upstream_prewaf-upstream;") {
+		t.Fatalf("did not expect management host api easy locations to proxy to UI upstream, got: %s", locationsConf)
+	}
+}
+
 func TestRenderEasyRateLimitArtifacts_SkipsReservedBaseLocations(t *testing.T) {
 	artifacts, err := RenderEasyRateLimitArtifacts(
 		[]SiteInput{{
@@ -336,3 +381,4 @@ func TestRenderEasyRateLimitArtifacts_CustomStatusIgnoresNon429Codes(t *testing.
 		t.Fatalf("expected custom route rate limit to return 429 independently of non-429 status codes, got: %s", locationsConf)
 	}
 }
+
