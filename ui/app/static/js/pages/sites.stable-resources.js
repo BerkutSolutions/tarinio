@@ -16,7 +16,7 @@ import {
   resolveACMEAccountEmail,
   upsertSiteResources as upsertSiteResourcesModule,
 } from "./sites.resource-pipeline.js";
-import { hydrateSiteDraft as hydrateSiteDraftModule } from "./sites.profile-hydration.js";
+import { hydrateSiteDraft as hydrateSiteDraftModule } from "./sites.draft-hydration.js";
 import { validateDraft as validateDraftModule } from "./sites.validation.js";
 import {
   deleteServiceWithResources as deleteServiceWithResourcesModule,
