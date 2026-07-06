@@ -54,13 +54,13 @@ func TestTLSAutoRenewService_UsesEasySiteProfileOptions(t *testing.T) {
 	service, err := NewTLSAutoRenewService(t.TempDir(), &fakeTLSAutoRenewCertificates{
 		items: []certificates.Certificate{{
 			ID:         "cert-a",
-			CommonName: "waf.hantico.ru",
+			CommonName: "ui.example.test",
 			Status:     "active",
 			NotAfter:   time.Now().UTC().Add(20 * 24 * time.Hour).Format(time.RFC3339),
 		}},
 	}, &fakeTLSAutoRenewConfigs{
 		items: []tlsconfigs.TLSConfig{{
-			SiteID:        "waf.hantico.ru",
+			SiteID:        "ui.example.test",
 			CertificateID: "cert-a",
 		}},
 	}, renewer)
@@ -69,12 +69,12 @@ func TestTLSAutoRenewService_UsesEasySiteProfileOptions(t *testing.T) {
 	}
 	service.SetEasySiteProfileReader(&fakeTLSAutoRenewProfiles{
 		items: map[string]easysiteprofiles.EasySiteProfile{
-			"waf.hantico.ru": {
-				SiteID: "waf.hantico.ru",
+			"ui.example.test": {
+				SiteID: "ui.example.test",
 				FrontService: easysiteprofiles.FrontServiceSettings{
 					AutoLetsEncrypt:            true,
 					CertificateAuthorityServer: "letsencrypt",
-					ACMEAccountEmail:           "a.keliberda@hantico.ru",
+					ACMEAccountEmail:           "renewals@example.test",
 					UseLetsEncryptStaging:      true,
 				},
 			},
@@ -90,7 +90,7 @@ func TestTLSAutoRenewService_UsesEasySiteProfileOptions(t *testing.T) {
 	if renewer.options == nil {
 		t.Fatal("expected renew options from easy profile")
 	}
-	if renewer.options.AccountEmail != "a.keliberda@hantico.ru" {
+	if renewer.options.AccountEmail != "renewals@example.test" {
 		t.Fatalf("expected profile email to be passed, got %#v", renewer.options)
 	}
 	if renewer.options.CertificateAuthorityServer != "letsencrypt" || !renewer.options.UseLetsEncryptStaging {

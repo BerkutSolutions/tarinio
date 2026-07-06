@@ -54,17 +54,17 @@ func TestNarrowScopeByTargets_FiltersToExplicitTargets(t *testing.T) {
 func TestNarrowScopeByTargets_BaselineRevisionScopesToTargetOnly(t *testing.T) {
 	scope := revisionSiteScope{
 		ChangedSites: []RevisionCatalogSite{
-			{SiteID: "sentry.hantico.ru", PrimaryHost: "sentry.hantico.ru"},
-			{SiteID: "waf.hantico.ru", PrimaryHost: "waf.hantico.ru"},
+			{SiteID: "logs.example.test", PrimaryHost: "logs.example.test"},
+			{SiteID: "ui.example.test", PrimaryHost: "ui.example.test"},
 		},
 		ActiveSiteIDs: nil,
 	}
 	siteRef := map[string]RevisionCatalogSite{
-		"sentry.hantico.ru": scope.ChangedSites[0],
-		"waf.hantico.ru":    scope.ChangedSites[1],
+		"logs.example.test": scope.ChangedSites[0],
+		"ui.example.test":   scope.ChangedSites[1],
 	}
-	sites, active := narrowScopeByTargets(scope, []string{"sentry.hantico.ru"}, siteRef)
-	if len(sites) != 1 || sites[0].SiteID != "sentry.hantico.ru" {
+	sites, active := narrowScopeByTargets(scope, []string{"logs.example.test"}, siteRef)
+	if len(sites) != 1 || sites[0].SiteID != "logs.example.test" {
 		t.Fatalf("baseline revision must still scope to the explicit target, got %+v", sites)
 	}
 	if len(active) != 0 {

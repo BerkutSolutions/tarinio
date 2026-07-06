@@ -583,8 +583,8 @@ func TestDashboardService_SkipsChallengeRequestsWithQueryString(t *testing.T) {
 					"ingested_at": now.Format(time.RFC3339),
 					"entry": map[string]any{
 						"timestamp": now.Format(time.RFC3339),
-						"site":      "waf_hantico_ru",
-						"host":      "waf.hantico.ru",
+						"site":      "ui_example_test",
+						"host":      "ui.example.test",
 						"uri":       "/challenge?return_uri=/login&return_args=",
 						"status":    200,
 						"client_ip": "203.0.113.10",

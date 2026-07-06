@@ -401,7 +401,7 @@ func (s *DashboardService) collectUpstreamErrors() map[string][]DashboardService
 }
 
 // extractNginxServerHost извлекает значение поля "server: <host>" из строки nginx лога.
-// Пример: "... server: n8n.hantico.com, request: ..." → "n8n.hantico.com"
+// Пример: "... server: automation.example.test, request: ..." → "automation.example.test"
 func extractNginxServerHost(message string) string {
 	const marker = "server: "
 	idx := strings.Index(strings.ToLower(message), marker)

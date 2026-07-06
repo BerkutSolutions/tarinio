@@ -97,14 +97,14 @@ func TestAdminScriptBuildEnvironmentCollectWAFEventsUsesNoAuthByDefault(t *testi
 	definition := service.catalog["collect-waf-events"]
 
 	env, err := service.buildEnvironment(definition, map[string]string{
-		"FILTER_SITE": "sentry.hantico.ru",
+		"FILTER_SITE": "logs.example.test",
 	}, t.TempDir())
 	if err != nil {
 		t.Fatalf("buildEnvironment failed: %v", err)
 	}
 
 	joined := strings.Join(env, "\n")
-	if !strings.Contains(joined, "FILTER_SITE=sentry.hantico.ru") {
+	if !strings.Contains(joined, "FILTER_SITE=logs.example.test") {
 		t.Fatalf("expected filter site in env, got %q", joined)
 	}
 	if !strings.Contains(joined, "SINCE=24h") {

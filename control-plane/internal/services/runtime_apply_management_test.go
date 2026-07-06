@@ -8,11 +8,11 @@ import (
 )
 
 func TestApplyAntiDDoSRateOverrides_SkipsConfiguredManagementSite(t *testing.T) {
-	t.Setenv("CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID", "waf.hantico.ru")
+	t.Setenv("CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID", "ui.example.test")
 
 	items := applyAntiDDoSRateOverrides(
 		[]pipeline.SiteInput{
-			{ID: "waf.hantico.ru", Enabled: true},
+			{ID: "ui.example.test", Enabled: true},
 			{ID: "site-a", Enabled: true},
 		},
 		nil,
@@ -25,7 +25,7 @@ func TestApplyAntiDDoSRateOverrides_SkipsConfiguredManagementSite(t *testing.T) 
 	)
 
 	for _, item := range items {
-		if item.SiteID == "waf.hantico.ru" {
+		if item.SiteID == "ui.example.test" {
 			t.Fatalf("did not expect anti-ddos override for configured management site: %+v", item)
 		}
 	}

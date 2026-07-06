@@ -44,8 +44,8 @@ func TestRequestArchiveLatestRespectsLocalDayTimezoneOffset(t *testing.T) {
 	source := newRequestStreamSource(logPath, 100, archiveRoot, 30)
 
 	lines := []byte(
-		"{\"timestamp\":\"2026-06-24T21:30:00Z\",\"request_id\":\"req-local\",\"client_ip\":\"1.1.1.1\",\"method\":\"GET\",\"uri\":\"/early\",\"status\":200,\"site\":\"sentry_hantico_ru\",\"host\":\"sentry.hantico.ru\"}\n" +
-			"{\"timestamp\":\"2026-06-25T21:30:00Z\",\"request_id\":\"req-next-day\",\"client_ip\":\"1.1.1.2\",\"method\":\"GET\",\"uri\":\"/late\",\"status\":200,\"site\":\"waf_hantico_ru\",\"host\":\"waf.hantico.ru\"}\n",
+		"{\"timestamp\":\"2026-06-24T21:30:00Z\",\"request_id\":\"req-local\",\"client_ip\":\"1.1.1.1\",\"method\":\"GET\",\"uri\":\"/early\",\"status\":200,\"site\":\"logs_example_test\",\"host\":\"logs.example.test\"}\n" +
+			"{\"timestamp\":\"2026-06-25T21:30:00Z\",\"request_id\":\"req-next-day\",\"client_ip\":\"1.1.1.2\",\"method\":\"GET\",\"uri\":\"/late\",\"status\":200,\"site\":\"ui_example_test\",\"host\":\"ui.example.test\"}\n",
 	)
 	if err := os.WriteFile(logPath, lines, 0o644); err != nil {
 		t.Fatalf("write log fixture: %v", err)

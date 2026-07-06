@@ -67,8 +67,8 @@ func TestSitesHandlerUpdateRejectsSiteIDRename(t *testing.T) {
 	}, stubSiteBanService{})
 
 	body, err := json.Marshal(map[string]any{
-		"id":           "prewaf.hantico.ru",
-		"primary_host": "prewaf.hantico.ru",
+		"id":           "panel.example.test",
+		"primary_host": "panel.example.test",
 		"enabled":      true,
 	})
 	if err != nil {

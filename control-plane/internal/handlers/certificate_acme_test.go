@@ -47,13 +47,13 @@ func TestCertificateACMEHandler_IssueSelfSigned(t *testing.T) {
 func TestCertificateACMEHandler_Renew(t *testing.T) {
 	service := &fakeCertificateACMEService{}
 	handler := NewCertificateACMEHandler(service, &fakeCertificateACMEService{})
-	req := httptest.NewRequest(http.MethodPost, "/api/certificates/acme/renew/cert-a", bytes.NewBufferString(`{"account_email":"admin@hantico.ru","certificate_authority_server":"letsencrypt","use_lets_encrypt_staging":true}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/certificates/acme/renew/cert-a", bytes.NewBufferString(`{"account_email":"admin@example.test","certificate_authority_server":"letsencrypt","use_lets_encrypt_staging":true}`))
 	resp := httptest.NewRecorder()
 	handler.ServeHTTP(resp, req)
 	if resp.Code != http.StatusCreated {
 		t.Fatalf("expected 201, got %d", resp.Code)
 	}
-	if service.renewOptions == nil || service.renewOptions.AccountEmail != "admin@hantico.ru" || !service.renewOptions.UseLetsEncryptStaging {
+	if service.renewOptions == nil || service.renewOptions.AccountEmail != "admin@example.test" || !service.renewOptions.UseLetsEncryptStaging {
 		t.Fatalf("expected renew options to be forwarded, got %#v", service.renewOptions)
 	}
 }

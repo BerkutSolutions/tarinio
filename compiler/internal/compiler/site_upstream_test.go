@@ -231,9 +231,9 @@ func TestRenderSiteUpstreamArtifacts_PrefersNamedHTTPSSitesBeforeIPHTTPSSites(t 
 				DefaultUpstreamID: "up-ip",
 			},
 			{
-				ID:                "prewaf.hantico.ru",
+				ID:                "panel.example.test",
 				Enabled:           true,
-				PrimaryHost:       "prewaf.hantico.ru",
+				PrimaryHost:       "panel.example.test",
 				ListenHTTP:        true,
 				ListenHTTPS:       true,
 				DefaultUpstreamID: "up-domain",
@@ -251,7 +251,7 @@ func TestRenderSiteUpstreamArtifacts_PrefersNamedHTTPSSitesBeforeIPHTTPSSites(t 
 			},
 			{
 				ID:             "up-domain",
-				SiteID:         "prewaf.hantico.ru",
+				SiteID:         "panel.example.test",
 				Scheme:         "http",
 				Host:           "app-domain",
 				Port:           8080,
@@ -272,7 +272,7 @@ func TestRenderSiteUpstreamArtifacts_PrefersNamedHTTPSSitesBeforeIPHTTPSSites(t 
 		}
 	}
 	nginxContent := string(nginxArtifact.Content)
-	if !strings.Contains(nginxContent, "include /etc/waf/tls/prewaf.hantico.ru.conf;") {
+	if !strings.Contains(nginxContent, "include /etc/waf/tls/panel.example.test.conf;") {
 		t.Fatalf("expected default HTTPS server to use domain TLS ref, got: %s", nginxContent)
 	}
 	if strings.Contains(nginxContent, "include /etc/waf/tls/135.136.191.54.conf;") {
@@ -288,7 +288,7 @@ func TestRenderSiteUpstreamArtifacts_PrefersNamedHTTPSSitesBeforeIPHTTPSSites(t 
 	if len(sitesInOrder) < 2 {
 		t.Fatalf("expected at least two site artifacts, got: %v", sitesInOrder)
 	}
-	if sitesInOrder[0] != "nginx/sites/prewaf.hantico.ru.conf" || sitesInOrder[1] != "nginx/sites/135.136.191.54.conf" {
+	if sitesInOrder[0] != "nginx/sites/panel.example.test.conf" || sitesInOrder[1] != "nginx/sites/135.136.191.54.conf" {
 		t.Fatalf("expected domain HTTPS site before IP HTTPS site, got: %v", sitesInOrder)
 	}
 }
@@ -352,7 +352,7 @@ func TestRenderSiteUpstreamArtifacts_MapsHostsToSiteIDsInBaseConfig(t *testing.T
 			{
 				ID:                "site-b",
 				Enabled:           true,
-				PrimaryHost:       "sentry.hantico.ru",
+				PrimaryHost:       "logs.example.test",
 				ListenHTTP:        true,
 				ListenHTTPS:       false,
 				DefaultUpstreamID: "up-b",
@@ -394,7 +394,7 @@ func TestRenderSiteUpstreamArtifacts_MapsHostsToSiteIDsInBaseConfig(t *testing.T
 	for _, fragment := range []string{
 		`a.example.com "site-a";`,
 		`www.a.example.com "site-a";`,
-		`sentry.hantico.ru "site-b";`,
+		`logs.example.test "site-b";`,
 		`default "_global";`,
 	} {
 		if !strings.Contains(content, fragment) {

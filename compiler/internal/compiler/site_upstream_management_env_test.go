@@ -6,20 +6,20 @@ import (
 )
 
 func TestRenderSiteUpstreamArtifacts_ManagementSiteRoutesAPIToControlPlaneFromEnvID(t *testing.T) {
-	t.Setenv("CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID", "waf.hantico.ru")
+	t.Setenv("CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID", "ui.example.test")
 
 	artifacts, err := RenderSiteUpstreamArtifacts(
 		[]SiteInput{{
-			ID:                "waf.hantico.ru",
+			ID:                "ui.example.test",
 			Enabled:           true,
-			PrimaryHost:       "waf.hantico.ru",
+			PrimaryHost:       "ui.example.test",
 			ListenHTTP:        true,
 			ListenHTTPS:       true,
 			DefaultUpstreamID: "mgmt-upstream",
 		}},
 		[]UpstreamInput{{
 			ID:             "mgmt-upstream",
-			SiteID:         "waf.hantico.ru",
+			SiteID:         "ui.example.test",
 			Scheme:         "http",
 			Host:           "ui",
 			Port:           80,
@@ -32,7 +32,7 @@ func TestRenderSiteUpstreamArtifacts_ManagementSiteRoutesAPIToControlPlaneFromEn
 
 	content := ""
 	for _, artifact := range artifacts {
-		if artifact.Path == "nginx/sites/waf.hantico.ru.conf" {
+		if artifact.Path == "nginx/sites/ui.example.test.conf" {
 			content = string(artifact.Content)
 			break
 		}
@@ -55,7 +55,7 @@ func TestRenderSiteUpstreamArtifacts_ManagementSiteRoutesAPIToConfiguredManageme
 		[]SiteInput{{
 			ID:                "control-plane-access",
 			Enabled:           true,
-			PrimaryHost:       "waf.hantico.ru",
+			PrimaryHost:       "ui.example.test",
 			ListenHTTP:        true,
 			ListenHTTPS:       true,
 			DefaultUpstreamID: "mgmt-upstream",
