@@ -36,27 +36,14 @@ else
 fi
 
 reset_screen() {
-  target=""
-  if tty -s 2>/dev/null && [ -c /dev/tty ] && [ -w /dev/tty ]; then
-    target="/dev/tty"
-  elif [ -t 1 ]; then
-    target="/dev/stdout"
-  fi
-  if [ -z "$target" ]; then
+  if [ ! -t 1 ]; then
     return
   fi
-  printf '\033c' >"$target" 2>/dev/null || true
-  printf '\033[H\033[2J\033[3J' >"$target" 2>/dev/null || true
-  if command -v tput >/dev/null 2>&1; then
-    tput reset >"$target" 2>/dev/null || true
-    tput clear >"$target" 2>/dev/null || true
+  if command -v clear >/dev/null 2>&1; then
+    clear 2>/dev/null || true
+    return
   fi
-  i=0
-  while [ "$i" -lt 120 ]; do
-    printf '\n' >"$target" 2>/dev/null || true
-    i=$((i + 1))
-  done
-  printf '\033[H\033[2J\033[3J\014' >"$target" 2>/dev/null || true
+  printf '\033[H\033[2J\033[3J' 2>/dev/null || true
 }
 
 section() {
@@ -69,11 +56,7 @@ step() {
 }
 
 step_inline() {
-  if [ -t 1 ]; then
-    printf "%s[%s..%s] %s" "$C_BOLD" "$C_BLUE" "$C_RESET" "$1"
-  else
-    printf "%s[%s..%s] %s\n" "$C_BOLD" "$C_BLUE" "$C_RESET" "$1"
-  fi
+  printf "%s[%s..%s] %s\n" "$C_BOLD" "$C_BLUE" "$C_RESET" "$1"
 }
 
 ok() {
