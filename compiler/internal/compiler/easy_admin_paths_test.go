@@ -52,6 +52,28 @@ func TestEasyAdminAntibotExclusionRulesForSite_ManagementSite(t *testing.T) {
 	}
 }
 
+func TestEasyAdminAuthExclusionRulesForSite_ManagementSite(t *testing.T) {
+	t.Setenv("CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID", "control-plane-access")
+	rules := easyAdminAuthExclusionRulesForSite(SiteInput{ID: "control-plane-access", PrimaryHost: "ui"})
+	if len(rules) == 0 {
+		t.Fatal("expected management site auth exclusions")
+	}
+	byPath := map[string][]string{}
+	for _, rule := range rules {
+		byPath[rule.Path] = append([]string(nil), rule.Methods...)
+	}
+	for _, path := range []string{"/api/", "/services", "/healthcheck"} {
+		methods, ok := byPath[path]
+		if !ok {
+			t.Fatalf("expected rule for %s", path)
+		}
+		joined := strings.Join(methods, ",")
+		if joined != "GET,HEAD,POST,PUT,PATCH,DELETE" {
+			t.Fatalf("expected write-capable methods for %s, got %#v", path, methods)
+		}
+	}
+}
+
 func TestAppendAntibotExclusionRules_DeduplicatesAndKeepsExistingRules(t *testing.T) {
 	base := []AntibotExclusionRuleInput{{Path: "/static/", Methods: []string{"HEAD", "GET"}}, {Path: "/custom", Methods: []string{"POST"}}}
 	extra := []AntibotExclusionRuleInput{{Path: "/static/", Methods: []string{"GET", "HEAD"}}, {Path: "/services", Methods: []string{"GET", "HEAD"}}}
@@ -70,4 +92,3 @@ func TestAppendAntibotExclusionRules_DeduplicatesAndKeepsExistingRules(t *testin
 		}
 	}
 }
-

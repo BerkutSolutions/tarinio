@@ -38,18 +38,34 @@ var easyAdminPrefixPaths = []string{
 }
 
 func easyAdminAntibotExclusionRulesForSite(site SiteInput) []AntibotExclusionRuleInput {
+	return easyAdminMethodExclusionRulesForSite(site, []string{"GET", "HEAD"})
+}
+
+func easyAdminAuthExclusionRulesForSite(site SiteInput) []AuthExclusionRuleInput {
+	raw := easyAdminMethodExclusionRulesForSite(site, []string{"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"})
+	if len(raw) == 0 {
+		return nil
+	}
+	rules := make([]AuthExclusionRuleInput, 0, len(raw))
+	for _, rule := range raw {
+		rules = append(rules, AuthExclusionRuleInput{Path: rule.Path, Methods: append([]string(nil), rule.Methods...)})
+	}
+	return rules
+}
+
+func easyAdminMethodExclusionRulesForSite(site SiteInput, methods []string) []AntibotExclusionRuleInput {
 	if !isManagementSite(site) {
 		return nil
 	}
 	rules := make([]AntibotExclusionRuleInput, 0, len(easyAdminExactPaths)+len(easyAdminPrefixPaths)+len(easyAdminSegmentPrefixes))
 	for _, exact := range easyAdminExactPaths {
-		rules = append(rules, AntibotExclusionRuleInput{Path: exact, Methods: []string{"GET", "HEAD"}})
+		rules = append(rules, AntibotExclusionRuleInput{Path: exact, Methods: methods})
 	}
 	for _, prefix := range easyAdminPrefixPaths {
-		rules = append(rules, AntibotExclusionRuleInput{Path: prefix, Methods: []string{"GET", "HEAD"}})
+		rules = append(rules, AntibotExclusionRuleInput{Path: prefix, Methods: methods})
 	}
 	for _, prefix := range easyAdminSegmentPrefixes {
-		rules = append(rules, AntibotExclusionRuleInput{Path: prefix, Methods: []string{"GET", "HEAD"}})
+		rules = append(rules, AntibotExclusionRuleInput{Path: prefix, Methods: methods})
 	}
 	return rules
 }

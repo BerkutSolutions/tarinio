@@ -9,19 +9,19 @@ func TestRenderEasyArtifacts_AuthTokenOrderAndExclusions(t *testing.T) {
 	artifacts, err := RenderEasyArtifacts(
 		[]SiteInput{{ID: "site-a", Enabled: true, PrimaryHost: "a.example.com", ListenHTTP: true, DefaultUpstreamID: "site-a-upstream"}},
 		[]EasyProfileInput{{
-			SiteID:           "site-a",
-			SecurityMode:     "block",
-			AllowedMethods:   []string{"GET", "POST"},
-			MaxClientSize:    "50m",
-			UseAuthBasic:     true,
-			AuthMode:         "basic_or_token",
-			AuthOrder:        "antibot_first",
-			AuthBasicText:    "Restricted area",
-			AuthUsers:        []ServiceAuthUserInput{{Username: "admin", Password: "secret", Enabled: true}},
+			SiteID:            "site-a",
+			SecurityMode:      "block",
+			AllowedMethods:    []string{"GET", "POST"},
+			MaxClientSize:     "50m",
+			UseAuthBasic:      true,
+			AuthMode:          "basic_or_token",
+			AuthOrder:         "antibot_first",
+			AuthBasicText:     "Restricted area",
+			AuthUsers:         []ServiceAuthUserInput{{Username: "admin", Password: "secret", Enabled: true}},
 			AuthServiceTokens: []ServiceAuthTokenInput{{ServiceName: "sentry-ingest", Token: "token-1", Enabled: true}},
 			AuthExclusionRules: []AuthExclusionRuleInput{{Path: "/api/public/", Methods: []string{"GET", "OPTIONS"}}},
-			AntibotChallenge: "javascript",
-			AntibotURI:       "/challenge",
+			AntibotChallenge:  "javascript",
+			AntibotURI:        "/challenge",
 		}},
 	)
 	if err != nil {
@@ -71,5 +71,35 @@ func TestRenderEasyArtifacts_AuthTokenOrderAndExclusions(t *testing.T) {
 	}
 	if !strings.Contains(authPage, `request("/auth/verify/token"`) || !strings.Contains(authPage, `request("/auth/verify/basic"`) {
 		t.Fatalf("expected auth page to support both verify flows, got: %s", authPage)
+	}
+}
+
+func TestRenderEasyArtifacts_ManagementSiteAuthBypassesWriteAPI(t *testing.T) {
+	artifacts, err := RenderEasyArtifacts(
+		[]SiteInput{{ID: "prewaf.hantico.ru", Enabled: true, PrimaryHost: "ui", ListenHTTP: true, DefaultUpstreamID: "prewaf-upstream"}},
+		[]EasyProfileInput{{
+			SiteID:           "prewaf.hantico.ru",
+			SecurityMode:     "block",
+			AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
+			MaxClientSize:    "50m",
+			UseAuthBasic:     true,
+			AuthMode:         "basic",
+			AuthOrder:        "auth_first",
+			AuthBasicText:    "Restricted area",
+			AuthUsers:        []ServiceAuthUserInput{{Username: "admin", Password: "secret", Enabled: true}},
+			AntibotChallenge: "javascript",
+			AntibotURI:       "/challenge",
+		}},
+	)
+	if err != nil {
+		t.Fatalf("render easy artifacts: %v", err)
+	}
+	byPath := mapArtifactsByPath(artifacts)
+	siteConf := byPath["nginx/easy/prewaf.hantico.ru.conf"]
+	if !strings.Contains(siteConf, `if ($waf_auth_exclusion_match ~* "^(?:DELETE|GET|HEAD|PATCH|POST|PUT):^/api/$")`) {
+		t.Fatalf("expected management auth exclusion for write api paths, got: %s", siteConf)
+	}
+	if !strings.Contains(siteConf, `if ($waf_auth_exclusion_match ~* "^(?:DELETE|GET|HEAD|PATCH|POST|PUT):^/services$")`) {
+		t.Fatalf("expected management auth exclusion for services pages, got: %s", siteConf)
 	}
 }

@@ -72,6 +72,7 @@ func renderEasySiteArtifacts(site SiteInput, profile EasyProfileInput) ([]Artifa
 	authBasicEnabled := authEnabled && authMode != authModeServiceToken && len(authUsers) > 0
 	authTokenEnabled := authEnabled && authMode != authModeBasic && len(authTokens) > 0
 	antibotExclusionRules := appendAntibotExclusionRules(profile.AntibotExclusionRules, easyAdminAntibotExclusionRulesForSite(site))
+	authExclusionRules := appendAuthExclusionRules(profile.AuthExclusionRules, easyAdminAuthExclusionRulesForSite(site))
 	data := easySiteData{
 		SiteID:                       site.ID,
 		RateLimitCookieVar:           rateLimitCookieVar(site.ID),
@@ -110,7 +111,7 @@ func renderEasySiteArtifacts(site SiteInput, profile EasyProfileInput) ([]Artifa
 		AuthGateCookieKey:            authGateCookieName(site.ID),
 		AuthGateCookieVal:            authGateCookieValue(site.ID, profile),
 		AuthGateCookieTTL:            authGateCookieTTLSeconds(profile),
-		AuthExclusionRules:           buildEasyAuthExclusionRuleData(profile.AuthExclusionRules),
+		AuthExclusionRules:           buildEasyAuthExclusionRuleData(authExclusionRules),
 		AuthTokenRules:               buildEasyAuthTokenRuleData(authTokens),
 		AntibotEnabled:               antibotEnabled,
 		AntibotTwoLayerEnabled:       antibotTwoLayer,

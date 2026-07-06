@@ -89,6 +89,31 @@ func buildEasyAuthExclusionRuleData(values []AuthExclusionRuleInput) []easyAuthE
 	return items
 }
 
+func appendAuthExclusionRules(base []AuthExclusionRuleInput, extra []AuthExclusionRuleInput) []AuthExclusionRuleInput {
+	if len(extra) == 0 {
+		return base
+	}
+	merged := make([]AuthExclusionRuleInput, 0, len(base)+len(extra))
+	merged = append(merged, base...)
+	merged = append(merged, extra...)
+	seen := make(map[string]struct{}, len(merged))
+	out := make([]AuthExclusionRuleInput, 0, len(merged))
+	for _, item := range merged {
+		path := strings.TrimSpace(item.Path)
+		if path == "" {
+			continue
+		}
+		methods := sortedUniqueUpper(item.Methods)
+		key := path + "\x00" + strings.Join(methods, ",")
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, AuthExclusionRuleInput{Path: path, Methods: methods})
+	}
+	return out
+}
+
 func buildEasyAuthTokenRuleData(values []ServiceAuthTokenInput) []easyAuthTokenRuleData {
 	if len(values) == 0 {
 		return nil
