@@ -106,14 +106,14 @@ func easyAdminBypassPathPattern() string {
 
 func isManagementSiteID(siteID string) bool {
 	normalized := strings.ToLower(strings.TrimSpace(siteID))
-	if normalized == "localhost" {
-		return true
-	}
 	switch normalized {
 	case "control-plane-access", "control-plane", "ui":
 		return true
 	default:
 		configuredID := strings.ToLower(strings.TrimSpace(os.Getenv("CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID")))
+		if normalized == "localhost" {
+			return configuredID == "localhost"
+		}
 		return configuredID != "" && normalized == configuredID
 	}
 }
@@ -208,3 +208,4 @@ func isReservedEasyLimitPath(path string) bool {
 	}
 	return false
 }
+

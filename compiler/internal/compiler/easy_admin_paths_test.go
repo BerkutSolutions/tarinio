@@ -8,8 +8,8 @@ import (
 func TestEasyAdminBypassPathPatternForSite_Localhost(t *testing.T) {
 	t.Setenv("CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID", "control-plane-access")
 	pattern := easyAdminBypassPathPatternForSite(SiteInput{ID: "localhost", PrimaryHost: "localhost"})
-	if pattern == "^$" {
-		t.Fatalf("expected localhost to keep management bypass paths for local stack, got %q", pattern)
+	if pattern != "^$" {
+		t.Fatalf("expected localhost to stay a regular site unless configured explicitly, got %q", pattern)
 	}
 }
 
@@ -70,3 +70,4 @@ func TestAppendAntibotExclusionRules_DeduplicatesAndKeepsExistingRules(t *testin
 		}
 	}
 }
+

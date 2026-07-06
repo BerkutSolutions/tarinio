@@ -99,3 +99,49 @@ func containsAll(content string, parts ...string) bool {
 	}
 	return true
 }
+
+func TestRenderSiteUpstreamArtifacts_LocalhostStaysRegularSiteWithoutExplicitManagementID(t *testing.T) {
+	t.Setenv("CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID", "control-plane-access")
+
+	artifacts, err := RenderSiteUpstreamArtifacts(
+		[]SiteInput{{
+			ID:                "localhost",
+			Enabled:           true,
+			PrimaryHost:       "localhost",
+			ListenHTTP:        true,
+			ListenHTTPS:       true,
+			DefaultUpstreamID: "site-upstream",
+		}},
+		[]UpstreamInput{{
+			ID:             "site-upstream",
+			SiteID:         "localhost",
+			Scheme:         "http",
+			Host:           "app",
+			Port:           8081,
+			PassHostHeader: true,
+		}},
+	)
+	if err != nil {
+		t.Fatalf("render failed: %v", err)
+	}
+
+	content := ""
+	for _, artifact := range artifacts {
+		if artifact.Path == "nginx/sites/localhost.conf" {
+			content = string(artifact.Content)
+			break
+		}
+	}
+	if content == "" {
+		t.Fatal("expected site artifact for localhost site")
+	}
+	if !containsAll(content,
+		"location ^~ /api/ {",
+		"proxy_pass http://site_localhost_upstream_site-upstream;",
+	) {
+		t.Fatalf("expected localhost site to keep /api on its own upstream, got: %s", content)
+	}
+	if strings.Contains(content, "proxy_pass http://control-plane:8080;") {
+		t.Fatalf("expected localhost site to avoid management API upstream, got: %s", content)
+	}
+}
