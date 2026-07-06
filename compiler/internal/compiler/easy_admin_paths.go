@@ -37,8 +37,8 @@ var easyAdminPrefixPaths = []string{
 	"/static/",
 }
 
-func easyAdminAntibotExclusionRulesForSite(siteID string) []AntibotExclusionRuleInput {
-	if !isManagementSiteID(siteID) {
+func easyAdminAntibotExclusionRulesForSite(site SiteInput) []AntibotExclusionRuleInput {
+	if !isManagementSite(site) {
 		return nil
 	}
 	rules := make([]AntibotExclusionRuleInput, 0, len(easyAdminExactPaths)+len(easyAdminPrefixPaths)+len(easyAdminSegmentPrefixes))
@@ -109,12 +109,6 @@ func isManagementSiteID(siteID string) bool {
 	if normalized == "localhost" {
 		return true
 	}
-	if normalized == "waf" || normalized == "prewaf" {
-		return true
-	}
-	if strings.HasPrefix(normalized, "waf.") || strings.HasPrefix(normalized, "prewaf.") {
-		return true
-	}
 	switch normalized {
 	case "control-plane-access", "control-plane", "ui":
 		return true
@@ -124,8 +118,36 @@ func isManagementSiteID(siteID string) bool {
 	}
 }
 
-func easyAdminBypassPathPatternForSite(siteID string) string {
-	if !isManagementSiteID(siteID) {
+func isManagementSite(site SiteInput) bool {
+	if isManagementSiteID(site.ID) {
+		return true
+	}
+	primaryHost := strings.ToLower(strings.TrimSpace(site.PrimaryHost))
+	if primaryHost == "" {
+		return false
+	}
+	if primaryHost == managementUIHost() {
+		return true
+	}
+	for _, alias := range site.Aliases {
+		if strings.ToLower(strings.TrimSpace(alias)) == managementUIHost() {
+			return true
+		}
+	}
+	return false
+}
+
+func managementUIHost() string {
+	target := strings.TrimSpace(strings.TrimPrefix(uiProxyTarget(), "http://"))
+	target = strings.TrimSpace(strings.TrimPrefix(target, "https://"))
+	if idx := strings.IndexByte(target, ':'); idx >= 0 {
+		target = target[:idx]
+	}
+	return strings.ToLower(strings.TrimSpace(target))
+}
+
+func easyAdminBypassPathPatternForSite(site SiteInput) string {
+	if !isManagementSite(site) {
 		return "^$"
 	}
 	return easyAdminBypassPathPattern()

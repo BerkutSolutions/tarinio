@@ -7,7 +7,7 @@ import (
 
 func TestEasyAdminBypassPathPatternForSite_Localhost(t *testing.T) {
 	t.Setenv("CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID", "control-plane-access")
-	pattern := easyAdminBypassPathPatternForSite("localhost")
+	pattern := easyAdminBypassPathPatternForSite(SiteInput{ID: "localhost", PrimaryHost: "localhost"})
 	if pattern == "^$" {
 		t.Fatalf("expected localhost to keep management bypass paths for local stack, got %q", pattern)
 	}
@@ -15,15 +15,22 @@ func TestEasyAdminBypassPathPatternForSite_Localhost(t *testing.T) {
 
 func TestEasyAdminBypassPathPatternForSite_ConfiguredManagementSiteID(t *testing.T) {
 	t.Setenv("CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID", "localhost")
-	pattern := easyAdminBypassPathPatternForSite("localhost")
+	pattern := easyAdminBypassPathPatternForSite(SiteInput{ID: "localhost", PrimaryHost: "localhost"})
 	if pattern == "^$" {
 		t.Fatalf("expected localhost to be treated as management site when configured explicitly")
 	}
 }
 
+func TestEasyAdminBypassPathPatternForSite_UIProxyPrimaryHost(t *testing.T) {
+	pattern := easyAdminBypassPathPatternForSite(SiteInput{ID: "site-a", PrimaryHost: "ui"})
+	if pattern == "^$" {
+		t.Fatalf("expected UI proxy primary host to be treated as management site")
+	}
+}
+
 func TestEasyAdminAntibotExclusionRulesForSite_ManagementSite(t *testing.T) {
 	t.Setenv("CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID", "control-plane-access")
-	rules := easyAdminAntibotExclusionRulesForSite("control-plane-access")
+	rules := easyAdminAntibotExclusionRulesForSite(SiteInput{ID: "control-plane-access", PrimaryHost: "ui"})
 	if len(rules) == 0 {
 		t.Fatal("expected management site antibot exclusions")
 	}
@@ -40,7 +47,7 @@ func TestEasyAdminAntibotExclusionRulesForSite_ManagementSite(t *testing.T) {
 			t.Fatalf("expected GET/HEAD methods for %s, got %#v", path, methods)
 		}
 	}
-	if extra := easyAdminAntibotExclusionRulesForSite("site-a"); len(extra) != 0 {
+	if extra := easyAdminAntibotExclusionRulesForSite(SiteInput{ID: "site-a", PrimaryHost: "example.com"}); len(extra) != 0 {
 		t.Fatalf("expected no management exclusions for regular site, got %#v", extra)
 	}
 }
