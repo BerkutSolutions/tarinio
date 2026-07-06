@@ -166,6 +166,7 @@ server {
 {{- end }}
 
     location ^~ /static/ {
+        allow all;
         proxy_intercept_errors off;
 {{- if .IsManagementSite }}
         modsecurity off;
