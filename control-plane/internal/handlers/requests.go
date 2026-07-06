@@ -12,6 +12,10 @@ type requestCollector interface {
 	Collect() ([]map[string]any, error)
 }
 
+type requestCounter interface {
+	CollectCount(values url.Values) (int, error)
+}
+
 type requestCollectorWithOptions interface {
 	CollectWithOptions(values url.Values) ([]map[string]any, error)
 }
@@ -53,6 +57,15 @@ func (h *RequestsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 		return
 	}
+	if isCountRequest(r.URL.Query()) {
+		count, err := h.collectCount(r.URL.Query())
+		if err != nil {
+			writeJSON(w, http.StatusBadGateway, map[string]any{"error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"count": count})
+		return
+	}
 	var (
 		items              []map[string]any
 		err                error
@@ -80,6 +93,7 @@ func (h *RequestsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !collectorPaginates {
 		items = applyOffsetLimit(items, r.URL.Query())
 	}
+	items = normalizeRequestRows(items)
 	h.storeRows(items)
 	writeJSON(w, http.StatusOK, items)
 }
@@ -134,4 +148,32 @@ func isProbeRequest(query url.Values) bool {
 	default:
 		return false
 	}
+}
+
+func isCountRequest(query url.Values) bool {
+	switch strings.ToLower(strings.TrimSpace(query.Get("count"))) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
+}
+
+func (h *RequestsHandler) collectCount(query url.Values) (int, error) {
+	if counter, ok := h.collector.(requestCounter); ok {
+		return counter.CollectCount(query)
+	}
+	var (
+		items []map[string]any
+		err   error
+	)
+	if advanced, ok := h.collector.(requestCollectorWithOptions); ok {
+		items, err = advanced.CollectWithOptions(query)
+	} else {
+		items, err = h.collector.Collect()
+	}
+	if err != nil {
+		return 0, err
+	}
+	return len(items), nil
 }

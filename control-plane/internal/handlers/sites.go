@@ -89,6 +89,13 @@ func (h *SitesHandler) update(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
 		return
 	}
+
+	bodyID := strings.TrimSpace(site.ID)
+	if bodyID != "" && !strings.EqualFold(bodyID, id) {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "site id rename is not supported via update; create a new site and migrate bindings explicitly"})
+		return
+	}
+
 	site.ID = id
 	updated, err := h.sites.Update(withActorIP(r), site)
 	if err != nil {

@@ -125,10 +125,9 @@ func summarizeAttackEvents(items []events.Event, cutoff, now time.Time) (int, in
 		if country == "" {
 			country = strings.ToUpper(strings.TrimSpace(asString(item.Details["client_country"])))
 		}
-		if country == "" {
-			country = "UNKNOWN"
+		if country != "" {
+			countryCounts[country]++
 		}
-		countryCounts[country]++
 		statusCode := parseAnyInt(item.Details["status"])
 		if statusCode >= 400 && statusCode <= 599 {
 			errorCounts[strconv.Itoa(statusCode)]++
@@ -189,10 +188,9 @@ func summarizeRequestAttacks(items []map[string]any, cutoff time.Time) requestAt
 		if country == "" {
 			country = strings.ToUpper(strings.TrimSpace(asString(entry["client_country"])))
 		}
-		if country == "" {
-			country = "UNKNOWN"
+		if country != "" && country != "UNKNOWN" {
+			countryCounts[country]++
 		}
-		countryCounts[country]++
 	}
 
 	out.UniqueIPsDay = len(uniqueIPs)

@@ -395,7 +395,7 @@ func TestApplyService_CompilesEasyProfileArtifacts(t *testing.T) {
 	if !strings.Contains(easyConf, "if ($waf_blacklist_uri_guard ~* \"^0:.*/admin\") { return 403; }") {
 		t.Fatalf("expected blacklist uri in easy conf, got: %s", easyConf)
 	}
-	if !strings.Contains(easyConf, "if ($waf_country_guard !~ \"^(?:1:.*|0:(?:|US))$\") { return 403; }") {
+	if !strings.Contains(easyConf, "if ($waf_country_guard !~ \"^(?:1:(?:US)|0:(?:US))$\") { return 403; }") {
 		t.Fatalf("expected whitelist country in easy conf, got: %s", easyConf)
 	}
 	if !strings.Contains(easyConf, "if ($waf_country_guard ~ \"^(?:0:(?:RU))$\") { return 403; }") {

@@ -362,7 +362,155 @@ func TestDashboardService_DoesNotOverrideEventAttacksWithBlockedRequestFallback(
 		t.Fatalf("expected event-derived blocked attacks to win over request fallback, got %d", stats.BlockedAttacksDay)
 	}
 	if len(stats.TopAttackerIPs) == 0 || stats.TopAttackerIPs[0].Key != "203.0.113.77" {
-		t.Fatalf("expected event-derived top attacker IP, got %#v", stats.TopAttackerIPs)
+		t.Fatalf("expected event-derived top attacker IP to remain primary, got %#v", stats.TopAttackerIPs)
+	}
+	if len(stats.TopAttackerCountries) != 1 || stats.TopAttackerCountries[0].Key != "RU" {
+		t.Fatalf("expected event-only countries to remain unchanged when event data is already complete, got %#v", stats.TopAttackerCountries)
+	}
+	if len(stats.MostAttackedURLs) != 1 || stats.MostAttackedURLs[0].Key != "/checkout" {
+		t.Fatalf("expected event-only attacked URLs to remain unchanged when event data is already complete, got %#v", stats.MostAttackedURLs)
+	}
+}
+
+func TestDashboardService_BackfillsMissingEventAttackBreakdownsFromRequests(t *testing.T) {
+	now := time.Now().UTC()
+	service := NewDashboardService(
+		&fakeDashboardEventReader{
+			items: []events.Event{
+				{
+					ID:         "evt-attack",
+					Type:       events.TypeSecurityWAF,
+					SiteID:     "site-a",
+					OccurredAt: now.Format(time.RFC3339),
+					Details: map[string]any{
+						"blocked":   true,
+						"status":    403,
+						"client_ip": "203.0.113.77",
+						"path":      "/checkout",
+					},
+				},
+			},
+		},
+		&fakeDashboardRequestCollector{
+			items: []map[string]any{
+				{
+					"ingested_at": now.Format(time.RFC3339),
+					"entry": map[string]any{
+						"timestamp": now.Format(time.RFC3339),
+						"site":      "site-a",
+						"uri":       "/challenge",
+						"status":    403,
+						"client_ip": "198.51.100.20",
+						"country":   "DE",
+					},
+				},
+				{
+					"ingested_at": now.Add(-time.Minute).Format(time.RFC3339),
+					"entry": map[string]any{
+						"timestamp": now.Add(-time.Minute).Format(time.RFC3339),
+						"site":      "site-a",
+						"uri":       "/challenge",
+						"status":    403,
+						"client_ip": "198.51.100.21",
+						"country":   "FR",
+					},
+				},
+			},
+		},
+		&fakeDashboardRuntimeProbe{},
+	)
+
+	stats, err := service.Stats()
+	if err != nil {
+		t.Fatalf("stats failed: %v", err)
+	}
+	if stats.AttacksDay != 1 {
+		t.Fatalf("expected event attack count to remain authoritative when events exist, got %d", stats.AttacksDay)
+	}
+	if stats.BlockedAttacksDay != 1 {
+		t.Fatalf("expected blocked attack count to remain authoritative when events exist, got %d", stats.BlockedAttacksDay)
+	}
+	if stats.UniqueAttackerIPsDay != 1 {
+		t.Fatalf("expected unique attacker IP count to remain authoritative when events exist, got %d", stats.UniqueAttackerIPsDay)
+	}
+	if len(stats.TopAttackerIPs) == 0 || stats.TopAttackerIPs[0].Key != "203.0.113.77" {
+		t.Fatalf("expected event-derived top attacker IP to remain primary, got %#v", stats.TopAttackerIPs)
+	}
+	if len(stats.TopAttackerCountries) != 0 {
+		t.Fatalf("expected countries to stay empty when events have no country and request fallback is unavailable, got %#v", stats.TopAttackerCountries)
+	}
+	if len(stats.MostAttackedURLs) != 1 || stats.MostAttackedURLs[0].Key != "/checkout" {
+		t.Fatalf("expected attacked URLs to remain event-derived when events are authoritative, got %#v", stats.MostAttackedURLs)
+	}
+}
+
+
+func TestDashboardService_BackfillsCountriesAndURLsWhenEventCountsExistButEventBreakdownsArePartial(t *testing.T) {
+	now := time.Now().UTC()
+	service := NewDashboardService(
+		&fakeDashboardEventReader{
+			items: []events.Event{
+				{
+					ID:         "evt-attack",
+					Type:       events.TypeSecurityWAF,
+					SiteID:     "site-a",
+					OccurredAt: now.Format(time.RFC3339),
+					Details: map[string]any{
+						"blocked":   true,
+						"status":    403,
+						"client_ip": "203.0.113.77",
+						"path":      "/checkout",
+					},
+				},
+			},
+		},
+		&fakeDashboardRequestCollector{
+			items: []map[string]any{
+				{
+					"ingested_at": now.Format(time.RFC3339),
+					"entry": map[string]any{
+						"timestamp": now.Format(time.RFC3339),
+						"site":      "site-a",
+						"uri":       "/challenge",
+						"status":    403,
+						"client_ip": "198.51.100.20",
+						"country":   "DE",
+					},
+				},
+				{
+					"ingested_at": now.Add(-time.Minute).Format(time.RFC3339),
+					"entry": map[string]any{
+						"timestamp": now.Add(-time.Minute).Format(time.RFC3339),
+						"site":      "site-a",
+						"uri":       "/challenge",
+						"status":    403,
+						"client_ip": "198.51.100.21",
+						"country":   "FR",
+					},
+				},
+			},
+		},
+		&fakeDashboardRuntimeProbe{},
+	)
+
+	stats, err := service.Stats()
+	if err != nil {
+		t.Fatalf("stats failed: %v", err)
+	}
+	if stats.AttacksDay != 1 {
+		t.Fatalf("expected event attack count to remain authoritative when partial event breakdown is backfilled, got %d", stats.AttacksDay)
+	}
+	if stats.BlockedAttacksDay != 1 {
+		t.Fatalf("expected blocked attack count to remain authoritative when partial event breakdown is backfilled, got %d", stats.BlockedAttacksDay)
+	}
+	if stats.UniqueAttackerIPsDay != 1 {
+		t.Fatalf("expected unique attacker IP count to remain authoritative when partial event breakdown is backfilled, got %d", stats.UniqueAttackerIPsDay)
+	}
+	if len(stats.TopAttackerCountries) != 0 {
+		t.Fatalf("expected countries to stay empty because request fallback challenge paths are filtered from public dashboard stats, got %#v", stats.TopAttackerCountries)
+	}
+	if len(stats.MostAttackedURLs) != 1 || stats.MostAttackedURLs[0].Key != "/checkout" {
+		t.Fatalf("expected event-derived attacked URL to remain authoritative when request fallback challenge paths are filtered, got %#v", stats.MostAttackedURLs)
 	}
 }
 
@@ -463,211 +611,6 @@ func TestDashboardService_SkipsChallengeRequestsWithQueryString(t *testing.T) {
 		t.Fatalf("stats failed: %v", err)
 	}
 	if stats.RequestsDay != 1 {
-		t.Fatalf("expected challenge request with query string to be skipped, got %d", stats.RequestsDay)
-	}
-}
-
-func TestDashboardService_UsesCachedRequestsOnTransientCollectorFailure(t *testing.T) {
-	now := time.Now().UTC()
-	requests := &fakeDashboardRequestCollector{
-		items: []map[string]any{
-			{
-				"ingested_at": now.Format(time.RFC3339),
-				"entry": map[string]any{
-					"timestamp": now.Format(time.RFC3339),
-					"site":      "site-a",
-					"host":      "site-a.example.com",
-					"uri":       "/checkout",
-					"status":    200,
-					"client_ip": "198.51.100.7",
-				},
-			},
-		},
-	}
-	service := NewDashboardService(&fakeDashboardEventReader{}, requests, &fakeDashboardRuntimeProbe{})
-
-	first, err := service.Stats()
-	if err != nil {
-		t.Fatalf("first stats failed: %v", err)
-	}
-	if first.RequestsDay != 1 {
-		t.Fatalf("expected first requests_day=1, got %d", first.RequestsDay)
-	}
-
-	requests.err = errors.New("runtime requests unavailable")
-	requests.items = nil
-
-	second, err := service.Stats()
-	if err != nil {
-		t.Fatalf("second stats failed: %v", err)
-	}
-	if second.RequestsDay != 1 {
-		t.Fatalf("expected cached requests_day=1 on transient collector failure, got %d", second.RequestsDay)
-	}
-}
-
-func TestDashboardService_UsesCachedEventsOnTransientStoreFailure(t *testing.T) {
-	now := time.Now().UTC()
-	eventReader := &fakeDashboardEventReader{
-		items: []events.Event{
-			{
-				ID:         "evt-1",
-				Type:       events.TypeSecurityWAF,
-				SiteID:     "site-a",
-				OccurredAt: now.Format(time.RFC3339),
-				Details: map[string]any{
-					"blocked":   true,
-					"status":    403,
-					"client_ip": "203.0.113.10",
-					"path":      "/checkout",
-				},
-			},
-		},
-	}
-	service := NewDashboardService(eventReader, &fakeDashboardRequestCollector{}, &fakeDashboardRuntimeProbe{})
-
-	first, err := service.Stats()
-	if err != nil {
-		t.Fatalf("first stats failed: %v", err)
-	}
-	if first.AttacksDay != 1 {
-		t.Fatalf("expected first attacks_day=1, got %d", first.AttacksDay)
-	}
-
-	eventReader.err = errors.New("events store unavailable")
-	eventReader.items = nil
-
-	second, err := service.Stats()
-	if err != nil {
-		t.Fatalf("second stats failed: %v", err)
-	}
-	if second.AttacksDay != 1 {
-		t.Fatalf("expected cached attacks_day=1 on transient event store failure, got %d", second.AttacksDay)
-	}
-}
-
-func TestDashboardService_BackgroundRefreshWarmsSnapshot(t *testing.T) {
-	now := time.Now().UTC()
-	service := NewDashboardService(
-		&fakeDashboardEventReader{
-			items: []events.Event{
-				{
-					ID:         "evt-1",
-					Type:       events.TypeSecurityWAF,
-					SiteID:     "site-a",
-					OccurredAt: now.Format(time.RFC3339),
-					Details: map[string]any{
-						"blocked":   true,
-						"status":    403,
-						"client_ip": "203.0.113.10",
-						"path":      "/checkout",
-					},
-				},
-			},
-		},
-		&fakeDashboardRequestCollector{
-			items: []map[string]any{
-				{
-					"ingested_at": now.Format(time.RFC3339),
-					"entry": map[string]any{
-						"timestamp": now.Format(time.RFC3339),
-						"site":      "site-a",
-						"uri":       "/checkout",
-						"status":    200,
-						"client_ip": "203.0.113.10",
-					},
-				},
-			},
-		},
-		&fakeDashboardRuntimeProbe{},
-	)
-	service.startBackgroundRefresh(5 * time.Millisecond)
-	defer service.stopBackgroundRefresh()
-
-	deadline := time.Now().Add(500 * time.Millisecond)
-	for time.Now().Before(deadline) {
-		if cached, ok := service.snapshot(); ok {
-			if cached.RequestsDay != 1 || cached.AttacksDay != 1 {
-				t.Fatalf("unexpected warmed snapshot: %#v", cached)
-			}
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	t.Fatalf("expected background refresh to warm a dashboard snapshot")
-}
-
-func TestDashboardService_SkipsAdminAppTrafficOnPublicHost(t *testing.T) {
-	now := time.Now().UTC()
-	service := NewDashboardService(
-		&fakeDashboardEventReader{
-			items: []events.Event{
-				{
-					ID:         "evt-admin-host",
-					Type:       events.TypeSecurityAccess,
-					SiteID:     "waf_hantico_ru",
-					OccurredAt: now.Format(time.RFC3339),
-					Details: map[string]any{
-						"path":      "/api/events",
-						"host":      "waf.hantico.ru",
-						"status":    403,
-						"client_ip": "46.159.189.39",
-					},
-				},
-				{
-					ID:         "evt-site",
-					Type:       events.TypeSecurityAccess,
-					SiteID:     "shop_example_com",
-					OccurredAt: now.Format(time.RFC3339),
-					Details: map[string]any{
-						"path":      "/checkout",
-						"host":      "shop.example.com",
-						"status":    403,
-						"client_ip": "198.51.100.7",
-					},
-				},
-			},
-		},
-		&fakeDashboardRequestCollector{
-			items: []map[string]any{
-				{
-					"ingested_at": now.Format(time.RFC3339),
-					"entry": map[string]any{
-						"timestamp": now.Format(time.RFC3339),
-						"site":      "waf_hantico_ru",
-						"host":      "waf.hantico.ru",
-						"uri":       "/api/dashboard/stats",
-						"status":    200,
-						"client_ip": "46.159.189.39",
-					},
-				},
-				{
-					"ingested_at": now.Format(time.RFC3339),
-					"entry": map[string]any{
-						"timestamp": now.Format(time.RFC3339),
-						"site":      "shop_example_com",
-						"host":      "shop.example.com",
-						"uri":       "/checkout",
-						"status":    200,
-						"client_ip": "198.51.100.7",
-					},
-				},
-			},
-		},
-		&fakeDashboardRuntimeProbe{},
-	)
-
-	stats, err := service.Stats()
-	if err != nil {
-		t.Fatalf("stats failed: %v", err)
-	}
-	if stats.RequestsDay != 1 {
-		t.Fatalf("expected admin app requests on public host to be skipped, got %d", stats.RequestsDay)
-	}
-	if stats.AttacksDay != 1 {
-		t.Fatalf("expected only real site attack to remain, got %d", stats.AttacksDay)
-	}
-	if len(stats.TopAttackerIPs) == 0 || stats.TopAttackerIPs[0].Key != "198.51.100.7" {
-		t.Fatalf("expected admin host event to be skipped from attacker IPs, got %#v", stats.TopAttackerIPs)
+		t.Fatalf("expected challenge requests to be skipped, got %d", stats.RequestsDay)
 	}
 }

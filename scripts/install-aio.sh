@@ -739,6 +739,7 @@ printf 'Installer log: %s\n' "$LOG_FILE"
 printf 'Backup dir: %s\n' "$BACKUP_DIR"
 echo "Backup limits: per-volume=${BACKUP_MAX_VOLUME_MB}MB, total=${BACKUP_MAX_TOTAL_MB}MB"
 echo "Compatibility contract: ${COMPAT_CONTRACT_VERSION}"
+printf '%s\n' "Need to rotate placeholder-like secrets on an existing stack? Run: scripts/rotate-env-secrets.sh"
 printf '\n'
 printf '%s\n' "Follow logs with:"
 printf '  cd %s/deploy/compose/%s\n' "$INSTALL_DIR" "$PROFILE"

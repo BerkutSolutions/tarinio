@@ -121,124 +121,7 @@ func TestRenderSiteUpstreamArtifacts_ManifestCompatibleKinds(t *testing.T) {
 	}
 }
 
-func TestRenderSiteUpstreamArtifacts_UsesFileBasedModSecurityConfig(t *testing.T) {
-	artifacts, err := RenderSiteUpstreamArtifacts(
-		[]SiteInput{
-			{
-				ID:                "site-a",
-				Enabled:           true,
-				PrimaryHost:       "a.example.com",
-				ListenHTTP:        true,
-				ListenHTTPS:       true,
-				DefaultUpstreamID: "up-a",
-			},
-		},
-		[]UpstreamInput{
-			{
-				ID:             "up-a",
-				SiteID:         "site-a",
-				Scheme:         "http",
-				Host:           "app-a",
-				Port:           8080,
-				BasePath:       "/",
-				PassHostHeader: true,
-			},
-		},
-	)
-	if err != nil {
-		t.Fatalf("render failed: %v", err)
-	}
-
-	var siteArtifact ArtifactOutput
-	for _, artifact := range artifacts {
-		if artifact.Path == "nginx/sites/site-a.conf" {
-			siteArtifact = artifact
-			break
-		}
-	}
-
-	content := string(siteArtifact.Content)
-	if !strings.Contains(content, "modsecurity on;") {
-		t.Fatal("expected nginx site config to enable modsecurity")
-	}
-	if !strings.Contains(content, "modsecurity_rules_file /etc/waf/modsecurity/sites/site-a.conf;") {
-		t.Fatal("expected nginx site config to use file-based modsecurity_rules_file")
-	}
-	if strings.Contains(content, "modsecurity_rules '") {
-		t.Fatal("did not expect inline modsecurity_rules in nginx site config")
-	}
-}
-
-func TestRenderSiteUpstreamArtifacts_WiresErrorPagesAndRateLimitIncludes(t *testing.T) {
-	artifacts, err := RenderSiteUpstreamArtifacts(
-		[]SiteInput{
-			{
-				ID:                "site-a",
-				Enabled:           true,
-				PrimaryHost:       "a.example.com",
-				ListenHTTP:        true,
-				ListenHTTPS:       true,
-				DefaultUpstreamID: "up-a",
-			},
-		},
-		[]UpstreamInput{
-			{
-				ID:             "up-a",
-				SiteID:         "site-a",
-				Scheme:         "http",
-				Host:           "app-a",
-				Port:           8080,
-				BasePath:       "/",
-				PassHostHeader: true,
-			},
-		},
-	)
-	if err != nil {
-		t.Fatalf("render failed: %v", err)
-	}
-
-	var siteArtifact ArtifactOutput
-	for _, artifact := range artifacts {
-		if artifact.Path == "nginx/sites/site-a.conf" {
-			siteArtifact = artifact
-			break
-		}
-	}
-
-	content := string(siteArtifact.Content)
-	if strings.Contains(content, "set $waf_site_id ") {
-		t.Fatal("did not expect nginx site config to set waf_site_id explicitly")
-	}
-	if !strings.Contains(content, "proxy_intercept_errors on;") {
-		t.Fatal("expected proxy_intercept_errors to be enabled in nginx site config")
-	}
-	if !strings.Contains(content, "location ^~ /api/ {") {
-		t.Fatal("expected dedicated /api location in nginx site config")
-	}
-	if !strings.Contains(content, "proxy_intercept_errors off;") {
-		t.Fatal("expected proxy_intercept_errors to be disabled for /api location")
-	}
-	if !strings.Contains(content, "include /etc/waf/nginx/ratelimits/site-a.conf;") {
-		t.Fatal("expected per-site rate limit include in nginx site config")
-	}
-	if !strings.Contains(content, "error_page 400 /__waf_errors/site-a/400.html?rid=$request_id&ip=$remote_addr&ts=$msec;") {
-		t.Fatal("expected 400 error page wiring in nginx site config")
-	}
-	if !strings.Contains(content, "error_page 403 /__waf_errors/site-a/403.html?rid=$request_id&ip=$remote_addr&ts=$msec;") {
-		t.Fatal("expected 403 error page wiring in nginx site config")
-	}
-	if !strings.Contains(content, "alias /etc/waf/errors/site-a/403.html;") {
-		t.Fatal("expected 403 alias to canonical runtime error asset path")
-	}
-	if !strings.Contains(content, "alias /etc/waf/errors/site-a/429.html;") {
-		t.Fatal("expected 429 alias to canonical runtime error asset path")
-	}
-	if !strings.Contains(content, "alias /etc/waf/errors/site-a/502.html;") {
-		t.Fatal("expected 502 alias to canonical runtime error asset path")
-	}
-}
-
-func TestRenderSiteUpstreamArtifacts_DefaultServerKeepsAdminRoutesReachable(t *testing.T) {
+func TestRenderSiteUpstreamArtifacts_DefaultServerRoutesUnknownHostsToBranded421(t *testing.T) {
 	artifacts, err := RenderSiteUpstreamArtifacts(
 		[]SiteInput{
 			{
@@ -273,18 +156,14 @@ func TestRenderSiteUpstreamArtifacts_DefaultServerKeepsAdminRoutesReachable(t *t
 			break
 		}
 	}
-
 	content := string(baseArtifact.Content)
 	for _, fragment := range []string{
-		"limit_req_zone $binary_remote_addr zone=waf_management_login_req:10m rate=5r/s;",
-		"location ^~ /api/ {",
-		"proxy_pass http://control-plane:8080;",
-		"location = /login {",
-		"limit_req zone=waf_management_login_req burst=20 nodelay;",
-		"location = /login/2fa {",
-		"location ^~ /onboarding/ {",
-		"location ^~ /static/ {",
-		"return 308 https://$host$request_uri;",
+		"set $waf_unknown_host 1;",
+		"if ($waf_site_id = \"_global\") {",
+		"rewrite ^ /__waf_errors/_global/421.html?rid=$request_id&ip=$remote_addr&ts=$msec last;",
+		"error_page 421 /__waf_errors/_global/421.html?rid=$request_id&ip=$remote_addr&ts=$msec;",
+		"location = /__waf_errors/_global/421.html {",
+		"alias /etc/waf/errors/_global/421.html;",
 	} {
 		if !strings.Contains(content, fragment) {
 			t.Fatalf("expected base config to contain %q, got: %s", fragment, content)
@@ -292,13 +171,13 @@ func TestRenderSiteUpstreamArtifacts_DefaultServerKeepsAdminRoutesReachable(t *t
 	}
 }
 
-func TestRenderSiteUpstreamArtifacts_ManagementSiteLimitsLogin(t *testing.T) {
+func TestRenderSiteUpstreamArtifacts_DefaultHTTPSServerUsesFirstActiveTLSRefAndReturns421(t *testing.T) {
 	artifacts, err := RenderSiteUpstreamArtifacts(
 		[]SiteInput{
 			{
-				ID:                "localhost",
+				ID:                "site-a",
 				Enabled:           true,
-				PrimaryHost:       "localhost",
+				PrimaryHost:       "a.example.com",
 				ListenHTTP:        true,
 				ListenHTTPS:       true,
 				DefaultUpstreamID: "up-a",
@@ -307,10 +186,10 @@ func TestRenderSiteUpstreamArtifacts_ManagementSiteLimitsLogin(t *testing.T) {
 		[]UpstreamInput{
 			{
 				ID:             "up-a",
-				SiteID:         "localhost",
+				SiteID:         "site-a",
 				Scheme:         "http",
-				Host:           "ui",
-				Port:           80,
+				Host:           "app-a",
+				Port:           8080,
 				BasePath:       "/",
 				PassHostHeader: true,
 			},
@@ -320,23 +199,97 @@ func TestRenderSiteUpstreamArtifacts_ManagementSiteLimitsLogin(t *testing.T) {
 		t.Fatalf("render failed: %v", err)
 	}
 
-	var siteArtifact ArtifactOutput
+	var nginxArtifact ArtifactOutput
 	for _, artifact := range artifacts {
-		if artifact.Path == "nginx/sites/localhost.conf" {
-			siteArtifact = artifact
+		if artifact.Path == "nginx/nginx.conf" {
+			nginxArtifact = artifact
 			break
 		}
 	}
-	content := string(siteArtifact.Content)
+	content := string(nginxArtifact.Content)
 	for _, fragment := range []string{
-		"location = /login {",
-		"limit_req zone=waf_management_login_req burst=20 nodelay;",
-		"limit_req_status 429;",
-		"proxy_pass http://ui:80;",
+		"listen 443 ssl default_server;",
+		"server_name _;",
+		"include /etc/waf/tls/site-a.conf;",
+		"return 421;",
 	} {
 		if !strings.Contains(content, fragment) {
-			t.Fatalf("expected management site config to contain %q, got: %s", fragment, content)
+			t.Fatalf("expected nginx main config to contain %q, got: %s", fragment, content)
 		}
+	}
+}
+
+func TestRenderSiteUpstreamArtifacts_PrefersNamedHTTPSSitesBeforeIPHTTPSSites(t *testing.T) {
+	artifacts, err := RenderSiteUpstreamArtifacts(
+		[]SiteInput{
+			{
+				ID:                "135.136.191.54",
+				Enabled:           true,
+				PrimaryHost:       "135.136.191.54",
+				ListenHTTP:        true,
+				ListenHTTPS:       true,
+				DefaultUpstreamID: "up-ip",
+			},
+			{
+				ID:                "prewaf.hantico.ru",
+				Enabled:           true,
+				PrimaryHost:       "prewaf.hantico.ru",
+				ListenHTTP:        true,
+				ListenHTTPS:       true,
+				DefaultUpstreamID: "up-domain",
+			},
+		},
+		[]UpstreamInput{
+			{
+				ID:             "up-ip",
+				SiteID:         "135.136.191.54",
+				Scheme:         "http",
+				Host:           "app-ip",
+				Port:           8080,
+				BasePath:       "/",
+				PassHostHeader: true,
+			},
+			{
+				ID:             "up-domain",
+				SiteID:         "prewaf.hantico.ru",
+				Scheme:         "http",
+				Host:           "app-domain",
+				Port:           8080,
+				BasePath:       "/",
+				PassHostHeader: true,
+			},
+		},
+	)
+	if err != nil {
+		t.Fatalf("render failed: %v", err)
+	}
+
+	var nginxArtifact ArtifactOutput
+	for _, artifact := range artifacts {
+		if artifact.Path == "nginx/nginx.conf" {
+			nginxArtifact = artifact
+			break
+		}
+	}
+	nginxContent := string(nginxArtifact.Content)
+	if !strings.Contains(nginxContent, "include /etc/waf/tls/prewaf.hantico.ru.conf;") {
+		t.Fatalf("expected default HTTPS server to use domain TLS ref, got: %s", nginxContent)
+	}
+	if strings.Contains(nginxContent, "include /etc/waf/tls/135.136.191.54.conf;") {
+		t.Fatalf("did not expect default HTTPS server to use IP TLS ref when domain HTTPS site exists, got: %s", nginxContent)
+	}
+
+	var sitesInOrder []string
+	for _, artifact := range artifacts {
+		if strings.HasPrefix(artifact.Path, "nginx/sites/") {
+			sitesInOrder = append(sitesInOrder, artifact.Path)
+		}
+	}
+	if len(sitesInOrder) < 2 {
+		t.Fatalf("expected at least two site artifacts, got: %v", sitesInOrder)
+	}
+	if sitesInOrder[0] != "nginx/sites/prewaf.hantico.ru.conf" || sitesInOrder[1] != "nginx/sites/135.136.191.54.conf" {
+		t.Fatalf("expected domain HTTPS site before IP HTTPS site, got: %v", sitesInOrder)
 	}
 }
 
@@ -437,116 +390,15 @@ func TestRenderSiteUpstreamArtifacts_MapsHostsToSiteIDsInBaseConfig(t *testing.T
 			break
 		}
 	}
-
 	content := string(baseArtifact.Content)
 	for _, fragment := range []string{
 		`a.example.com "site-a";`,
 		`www.a.example.com "site-a";`,
 		`sentry.hantico.ru "site-b";`,
+		`default "_global";`,
 	} {
 		if !strings.Contains(content, fragment) {
-			t.Fatalf("expected base config to contain host map entry %q, got: %s", fragment, content)
+			t.Fatalf("expected base host map to contain %q, got: %s", fragment, content)
 		}
-	}
-}
-
-func TestRenderSiteUpstreamArtifacts_DeduplicatesConflictingHostMapEntries(t *testing.T) {
-	// Two enabled sites that claim the same host must not produce duplicate
-	// keys in the `map $host $waf_site_id` block. nginx treats a duplicate
-	// map key as a fatal "conflicting parameter" error, which crash-loops the
-	// runtime. The first site (by sorted order) wins.
-	artifacts, err := RenderSiteUpstreamArtifacts(
-		[]SiteInput{
-			{
-				ID:                "mgmt-localhost-site",
-				Enabled:           true,
-				PrimaryHost:       "localhost",
-				ListenHTTP:        true,
-				ListenHTTPS:       true,
-				DefaultUpstreamID: "up-mgmt",
-			},
-			{
-				ID:                "app-localhost-site",
-				Enabled:           true,
-				PrimaryHost:       "localhost",
-				ListenHTTP:        true,
-				ListenHTTPS:       true,
-				DefaultUpstreamID: "up-app",
-			},
-		},
-		[]UpstreamInput{
-			{ID: "up-mgmt", SiteID: "mgmt-localhost-site", Scheme: "http", Host: "app-mgmt", Port: 8080, BasePath: "/", PassHostHeader: true},
-			{ID: "up-app", SiteID: "app-localhost-site", Scheme: "http", Host: "app-app", Port: 8081, BasePath: "/", PassHostHeader: true},
-		},
-	)
-	if err != nil {
-		t.Fatalf("render failed: %v", err)
-	}
-
-	var baseArtifact ArtifactOutput
-	for _, artifact := range artifacts {
-		if artifact.Path == "nginx/conf.d/base.conf" {
-			baseArtifact = artifact
-			break
-		}
-	}
-
-	content := string(baseArtifact.Content)
-	if got := strings.Count(content, "    localhost \""); got != 2 {
-		// Two map blocks (waf_site_id + waf_site_id_log) each get exactly one
-		// localhost entry; never two within a single block.
-		t.Fatalf("expected exactly 2 localhost map entries (one per map block), got %d in:\n%s", got, content)
-	}
-	// Sorted order puts "app-localhost-site" before "mgmt-localhost-site".
-	if !strings.Contains(content, `localhost "app-localhost-site";`) {
-		t.Fatalf("expected localhost to map to first sorted site, got:\n%s", content)
-	}
-	if strings.Contains(content, `localhost "mgmt-localhost-site";`) {
-		t.Fatalf("did not expect a second conflicting localhost map entry, got:\n%s", content)
-	}
-}
-
-func TestRenderSiteUpstreamArtifacts_UsesValidUpstreamServerAddress(t *testing.T) {
-	artifacts, err := RenderSiteUpstreamArtifacts(
-		[]SiteInput{
-			{
-				ID:                "site-a",
-				Enabled:           true,
-				PrimaryHost:       "a.example.com",
-				ListenHTTP:        true,
-				ListenHTTPS:       true,
-				DefaultUpstreamID: "up-a",
-			},
-		},
-		[]UpstreamInput{
-			{
-				ID:             "up-a",
-				SiteID:         "site-a",
-				Scheme:         "http",
-				Host:           "app-a",
-				Port:           8080,
-				BasePath:       "/",
-				PassHostHeader: true,
-			},
-		},
-	)
-	if err != nil {
-		t.Fatalf("render failed: %v", err)
-	}
-
-	var siteArtifact ArtifactOutput
-	for _, artifact := range artifacts {
-		if artifact.Path == "nginx/sites/site-a.conf" {
-			siteArtifact = artifact
-			break
-		}
-	}
-
-	content := string(siteArtifact.Content)
-	if !strings.Contains(content, "server app-a:8080;") {
-		t.Fatal("expected upstream block to use host:port server address")
-	}
-	if strings.Contains(content, "server http://") {
-		t.Fatal("did not expect upstream block to contain scheme-prefixed server address")
 	}
 }

@@ -259,8 +259,8 @@ func whitelistCountryGuardPattern(values []string) string {
 	}
 	if strings.HasPrefix(basePattern, "^(?:") && strings.HasSuffix(basePattern, ")$") {
 		core := strings.TrimSuffix(strings.TrimPrefix(basePattern, "^(?:"), ")$")
-		// Allow empty country code (GeoIP unavailable) to preserve existing behavior.
-		return "^(?:1:.*|0:(?:|" + core + "))$"
+		// GeoIP/header resolution can be unavailable in some runtime paths; whitelist must deny unknown country.
+		return "^(?:1:(?:" + core + ")|0:(?:" + core + "))$"
 	}
 	return ""
 }

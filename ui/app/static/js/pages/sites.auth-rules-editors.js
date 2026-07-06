@@ -41,7 +41,7 @@ export function normalizeAntibotChallengeRules(value, deps = {}) {
       path: String(item?.path || "").trim(),
       challenge: String(item?.challenge || "").trim().toLowerCase()
     }))
-    .filter((item) => item.path && item.challenge && item.challenge !== "no")
+    .filter((item) => item.path && item.challenge)
     .filter((item) => {
       const key = item.path.toLowerCase() + "\u0000" + item.challenge;
       if (seen.has(key)) {
@@ -240,7 +240,7 @@ export function renderCustomLimitRulesEditor(rules, ctx, deps = {}, disabled = f
 export function renderAntibotChallengeRulesEditor(rules, ctx, deps = {}) {
   const escapeHtml = deps.escapeHtml;
   const safeRules = normalizeAntibotChallengeRules(rules, deps);
-  const modes = ["cookie", "javascript", "captcha", "recaptcha", "hcaptcha", "turnstile", "mcaptcha"];
+  const modes = ["no", "cookie", "javascript", "captcha", "recaptcha", "hcaptcha", "turnstile", "mcaptcha"];
   return `
     <div class="waf-field full">
       <label>${escapeHtml(ctx.t("sites.easy.antibot.challengeRulesByUrl"))}</label>

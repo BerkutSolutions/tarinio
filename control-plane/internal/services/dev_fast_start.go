@@ -346,7 +346,11 @@ func (b *DevFastStartBootstrapper) ensureManagementResources(ctx context.Context
 			}
 			changed = true
 		} else if needsDevFastStartEasyProfileUpdate(existingProfile, desiredProfile) {
+			existingProfile.FrontService.SecurityMode = desiredProfile.FrontService.SecurityMode
 			existingProfile.HTTPBehavior.AllowedMethods = append([]string(nil), desiredProfile.HTTPBehavior.AllowedMethods...)
+			existingProfile.SecurityAntibot.AntibotChallenge = desiredProfile.SecurityAntibot.AntibotChallenge
+			existingProfile.SecurityModSecurity.UseModSecurity = desiredProfile.SecurityModSecurity.UseModSecurity
+			existingProfile.SecurityModSecurity.UseModSecurityCRSPlugins = desiredProfile.SecurityModSecurity.UseModSecurityCRSPlugins
 			existingProfile.SecurityBehaviorAndLimits.UseLimitReq = desiredProfile.SecurityBehaviorAndLimits.UseLimitReq
 			existingProfile.SecurityBehaviorAndLimits.UseLimitConn = desiredProfile.SecurityBehaviorAndLimits.UseLimitConn
 			existingProfile.SecurityBehaviorAndLimits.UseBadBehavior = desiredProfile.SecurityBehaviorAndLimits.UseBadBehavior
@@ -382,6 +386,18 @@ func defaultDevFastStartEasyProfile(siteID, host string) easysiteprofiles.EasySi
 }
 
 func needsDevFastStartEasyProfileUpdate(current, desired easysiteprofiles.EasySiteProfile) bool {
+	if current.FrontService.SecurityMode != desired.FrontService.SecurityMode {
+		return true
+	}
+	if current.SecurityModSecurity.UseModSecurity != desired.SecurityModSecurity.UseModSecurity {
+		return true
+	}
+	if current.SecurityModSecurity.UseModSecurityCRSPlugins != desired.SecurityModSecurity.UseModSecurityCRSPlugins {
+		return true
+	}
+	if current.SecurityAntibot.AntibotChallenge != desired.SecurityAntibot.AntibotChallenge {
+		return true
+	}
 	if !sameStringSet(current.HTTPBehavior.AllowedMethods, desired.HTTPBehavior.AllowedMethods) {
 		return true
 	}

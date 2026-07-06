@@ -308,8 +308,9 @@ type EasySiteProfile struct {
 
 func DefaultProfile(siteID string) EasySiteProfile {
 	allowedMethods := []string{"GET", "POST", "HEAD", "OPTIONS", "PUT", "PATCH", "DELETE"}
-	managementSiteID := normalizeID(envStringOrDefault("CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID", "control-plane-access"))
-	isManagementSite := normalizeID(siteID) == "control-plane-access" || (managementSiteID != "" && normalizeID(siteID) == managementSiteID)
+	managementSiteID := normalizeID(strings.TrimSpace(os.Getenv("CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID")))
+	normalizedSiteID := normalizeID(siteID)
+	isManagementSite := normalizedSiteID == "control-plane-access" || normalizedSiteID == "control-plane" || normalizedSiteID == "ui" || (managementSiteID != "" && normalizedSiteID == managementSiteID)
 	if isManagementSite {
 		allowedMethods = []string{"GET", "POST", "HEAD", "OPTIONS", "PUT", "PATCH", "DELETE"}
 	}
@@ -359,11 +360,21 @@ func DefaultProfile(siteID string) EasySiteProfile {
 		}
 	}
 
+	securityMode := SecurityModeBlock
+	defaultAntibotChallenge := AntibotChallengeNo
+	defaultUseModSecurity := true
+	defaultUseModSecurityCRSPlugins := true
+	if isManagementSite {
+		securityMode = SecurityModeTransparent
+		defaultUseModSecurity = false
+		defaultUseModSecurityCRSPlugins = false
+	}
+
 	return EasySiteProfile{
 		SiteID: siteID,
 		FrontService: FrontServiceSettings{
 			ServerName:                 siteID,
-			SecurityMode:               SecurityModeBlock,
+			SecurityMode:               securityMode,
 			Profile:                    ServiceProfileBalanced,
 			AdaptiveModelEnabled:       isManagementSite,
 			AutoLetsEncrypt:            true,
@@ -449,7 +460,7 @@ func DefaultProfile(siteID string) EasySiteProfile {
 			CustomLimitRules:            append([]CustomLimitRule(nil), customLimitRules...),
 		},
 		SecurityAntibot: SecurityAntibotSettings{
-			AntibotChallenge:           AntibotChallengeNo,
+			AntibotChallenge:           defaultAntibotChallenge,
 			AntibotURI:                 "/challenge",
 			ScannerAutoBanEnabled:      false,
 			AntibotRecaptchaScore:      0.7,
@@ -495,8 +506,8 @@ func DefaultProfile(siteID string) EasySiteProfile {
 			EndpointPolicies:       []APIPositiveEndpointPolicy{},
 		},
 		SecurityModSecurity: SecurityModSecuritySettings{
-			UseModSecurity:           true,
-			UseModSecurityCRSPlugins: true,
+			UseModSecurity:           defaultUseModSecurity,
+			UseModSecurityCRSPlugins: defaultUseModSecurityCRSPlugins,
 			UseCustomConfiguration:   false,
 			ModSecurityCRSVersion:    "4",
 			ModSecurityCRSPlugins:    []string{},
@@ -557,3 +568,4 @@ func allowedBadBehaviorStatusCodes() []int {
 func isAllowedBadBehaviorStatusCode(code int) bool {
 	return slices.Contains(allowedBadBehaviorStatusCodes(), code)
 }
+

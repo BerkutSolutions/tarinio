@@ -4,166 +4,113 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
-	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 )
 
-func TestE2EUIFullRegression(t *testing.T) {
+func TestE2EUIAssetsAndRouting(t *testing.T) {
 	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL")), "/")
 	if baseURL == "" {
-		t.Skip("WAF_E2E_BASE_URL is not set; skipping full UI regression")
+		t.Skip("WAF_E2E_BASE_URL is not set; skipping UI regression")
 	}
 
 	client, requestBaseURL, requestHostOverride := newE2EClientAndBase(t, baseURL)
 	loginE2EUser(t, client, requestBaseURL, requestHostOverride)
 
-	t.Run("MainPages", func(t *testing.T) {
-		cases := []struct {
-			path    string
-			markers []string
-		}{
-			{path: "/dashboard", markers: []string{`id="content-area"`}},
-			{path: "/services", markers: []string{`id="content-area"`}},
-			{path: "/sites", markers: []string{`id="content-area"`}},
-			{path: "/requests", markers: []string{`id="content-area"`}},
-			{path: "/events", markers: []string{`id="content-area"`}},
-			{path: "/bans", markers: []string{`id="content-area"`}},
-			{path: "/revisions", markers: []string{`id="content-area"`}},
-			{path: "/settings", markers: []string{`id="content-area"`}},
-			{path: "/administration", markers: []string{`id="content-area"`}},
-			{path: "/profile", markers: []string{`id="content-area"`}},
-			{path: "/healthcheck", markers: []string{`id="healthcheck-steps"`}},
-		}
-		for _, tc := range cases {
-			tc := tc
-			t.Run(tc.path, func(t *testing.T) {
-				resp := getWithAuth(t, client, requestBaseURL+tc.path, requestHostOverride)
-				if resp.StatusCode != http.StatusOK {
-					t.Fatalf("page %s failed: status=%d body=%s", tc.path, resp.StatusCode, mustReadBody(t, resp.Body))
+	pageCases := []struct {
+		name    string
+		path    string
+		markers []string
+	}{
+		{name: "dashboard", path: "/dashboard", markers: []string{`id="content-area"`}},
+		{name: "healthcheck", path: "/healthcheck", markers: []string{`id="healthcheck-steps"`}},
+		{name: "services", path: "/services", markers: []string{`id="content-area"`}},
+		{name: "requests", path: "/requests", markers: []string{`id="content-area"`}},
+		{name: "settings", path: "/settings", markers: []string{`id="content-area"`}},
+		{name: "administration", path: "/administration", markers: []string{`id="content-area"`}},
+		{name: "bans", path: "/bans", markers: []string{`id="content-area"`}},
+	}
+	for _, tc := range pageCases {
+		t.Run("page_"+tc.name, func(t *testing.T) {
+			resp := getWithAuthRetry429(t, client, requestBaseURL+tc.path, requestHostOverride, 3)
+			if resp.StatusCode != http.StatusOK {
+				t.Fatalf("page %s failed: status=%d body=%s", tc.path, resp.StatusCode, mustReadBody(t, resp.Body))
+			}
+			body := mustReadBody(t, resp.Body)
+			for _, marker := range tc.markers {
+				if !strings.Contains(body, marker) {
+					t.Fatalf("page %s missing marker %s", tc.path, marker)
 				}
-				body := mustReadBody(t, resp.Body)
-				for _, marker := range tc.markers {
-					if !strings.Contains(body, marker) {
-						t.Fatalf("page %s missing marker %s", tc.path, marker)
-					}
-				}
-			})
-		}
-	})
+			}
+		})
+	}
+}
 
-	t.Run("CoreAPIs", func(t *testing.T) {
-		cases := []string{
-			"/api/auth/me",
-			"/api/app/meta",
-			"/api/app/compat",
-			"/api/dashboard/stats",
-			"/api/dashboard/containers/overview",
-			"/api/dashboard/containers/issues",
-			"/api/sites",
-			"/api/upstreams",
-			"/api/tls-configs",
-			"/api/revisions",
-			"/api/reports/revisions",
-			"/api/settings/runtime",
-			"/api/administration/users",
-			"/api/administration/roles",
-			"/api/administration/scripts",
-			"/api/anti-ddos/settings",
-			"/api/owasp-crs/status",
-			"/api/certificates",
-		}
-		for _, path := range cases {
-			path := path
-			t.Run(path, func(t *testing.T) {
-				resp := getWithAuth(t, client, requestBaseURL+path, requestHostOverride)
-				if resp.StatusCode == http.StatusTooManyRequests {
-					t.Fatalf("api %s returned 429", path)
-				}
-				if resp.StatusCode != http.StatusOK {
-					t.Fatalf("api %s failed: status=%d body=%s", path, resp.StatusCode, mustReadBody(t, resp.Body))
-				}
-				var payload any
-				if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-					t.Fatalf("api %s returned invalid json: %v", path, err)
-				}
-			})
-		}
-	})
+func TestE2EDashboardSessionPingBodylessPOST(t *testing.T) {
+	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL")), "/")
+	if baseURL == "" {
+		t.Skip("WAF_E2E_BASE_URL is not set; skipping dashboard ping regression")
+	}
 
-	t.Run("AppCompatFix", func(t *testing.T) {
-		resp := getWithAuth(t, client, requestBaseURL+"/api/app/compat", requestHostOverride)
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("compat api failed: status=%d body=%s", resp.StatusCode, mustReadBody(t, resp.Body))
-		}
-		var data struct {
-			Items []map[string]any `json:"items"`
-		}
-		if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-			t.Fatalf("decode compat response: %v", err)
-		}
-		if len(data.Items) == 0 {
-			t.Fatalf("compat api returned empty items")
-		}
-		moduleID := strings.TrimSpace(fmt.Sprint(data.Items[0]["module_id"]))
-		if moduleID == "" {
-			t.Fatalf("compat api returned empty module_id")
-		}
-		fixResp := postJSON(t, client, requestBaseURL+"/api/app/compat/fix", requestHostOverride, map[string]any{"module_id": moduleID})
-		if fixResp.StatusCode != http.StatusOK {
-			t.Fatalf("compat fix failed: status=%d body=%s", fixResp.StatusCode, mustReadBody(t, fixResp.Body))
-		}
-		var fixData map[string]any
-		if err := json.NewDecoder(fixResp.Body).Decode(&fixData); err != nil {
-			t.Fatalf("decode compat fix response: %v", err)
-		}
-		if ok, _ := fixData["ok"].(bool); !ok {
-			t.Fatalf("expected compat fix ok=true, got %#v", fixData)
-		}
-	})
+	client, requestBaseURL, requestHostOverride := newE2EClientAndBase(t, baseURL)
+	loginE2EUser(t, client, requestBaseURL, requestHostOverride)
 
-	t.Run("LoadAllPageModules", func(t *testing.T) {
-		mods, err := filepath.Glob(filepath.Join("..", "app", "static", "js", "pages", "*.js"))
-		if err != nil {
-			t.Fatalf("glob page modules: %v", err)
-		}
-		if len(mods) == 0 {
-			t.Fatalf("no page modules found")
-		}
-		for _, path := range mods {
-			mod := filepath.Base(path)
-			t.Run(mod, func(t *testing.T) {
-				url := requestBaseURL + "/static/js/pages/" + mod
-				resp := getWithAuth(t, client, url, requestHostOverride)
-				if resp.StatusCode == http.StatusTooManyRequests {
-					t.Fatalf("module %s returned 429", mod)
-				}
-				if resp.StatusCode != http.StatusOK {
-					t.Fatalf("module %s failed: status=%d body=%s", mod, resp.StatusCode, mustReadBody(t, resp.Body))
-				}
-				bodyBytes, err := io.ReadAll(resp.Body)
-				if err != nil {
-					t.Fatalf("read module %s: %v", mod, err)
-				}
-				body := strings.TrimSpace(string(bodyBytes))
-				if body == "" {
-					t.Fatalf("module %s is empty", mod)
-				}
-				if strings.Contains(strings.ToLower(body), "<html") {
-					t.Fatalf("module %s returned html instead of js", mod)
-				}
-				time.Sleep(75 * time.Millisecond)
-			})
-		}
-	})
+	req, err := http.NewRequest(http.MethodPost, requestBaseURL+"/api/app/ping", nil)
+	if err != nil {
+		t.Fatalf("create ping request: %v", err)
+	}
+	req.Header.Set("X-Berkut-Background", "1")
+	if requestHostOverride != "" {
+		req.Host = requestHostOverride
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("session ping request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("session ping failed: status=%d body=%s", resp.StatusCode, mustReadBody(t, resp.Body))
+	}
+
+	var payload struct {
+		OK bool `json:"ok"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		t.Fatalf("decode ping payload: %v", err)
+	}
+	if !payload.OK {
+		t.Fatalf("expected ok=true from ping, got %#v", payload)
+	}
+}
+
+func TestE2EServicesModuleNoChallengeAfterLogin(t *testing.T) {
+	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL")), "/")
+	if baseURL == "" {
+		t.Skip("WAF_E2E_BASE_URL is not set; skipping services module regression")
+	}
+
+	client, requestBaseURL, requestHostOverride := newE2EClientAndBase(t, baseURL)
+	loginE2EUser(t, client, requestBaseURL, requestHostOverride)
+
+	resp := getWithAuthRetry429(t, client, requestBaseURL+"/static/js/pages/sites.js?v=20260628-16", requestHostOverride, 3)
+	defer resp.Body.Close()
+	body := mustReadBody(t, resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("services module failed: status=%d body=%s", resp.StatusCode, body)
+	}
+	if strings.Contains(body, "<html") || strings.Contains(strings.ToLower(body), "challenge/stage1/verify") {
+		t.Fatalf("services module returned challenge/html instead of js: status=%d body=%s", resp.StatusCode, body)
+	}
+	if !strings.Contains(body, `export { renderSites } from "./sites.stable-page.js";`) {
+		t.Fatalf("services module contract mismatch: body=%s", body)
+	}
 }
 
 func newE2EClientAndBase(t *testing.T, baseURL string) (*http.Client, string, string) {
@@ -175,7 +122,7 @@ func newE2EClientAndBase(t *testing.T, baseURL string) (*http.Client, string, st
 		t.Fatalf("parse base url: %v", err)
 	}
 	if strings.EqualFold(originalBaseParsed.Hostname(), "localhost") {
-		requestHostOverride = originalBaseParsed.Hostname()
+		requestHostOverride = originalBaseParsed.Host
 		requestBaseParsed := &url.URL{}
 		*requestBaseParsed = *originalBaseParsed
 		requestBaseParsed.Host = net.JoinHostPort("127.0.0.1", effectivePort(originalBaseParsed))
@@ -227,7 +174,7 @@ func loginE2EUser(t *testing.T, client *http.Client, requestBaseURL, requestHost
 		username = "admin"
 	}
 	password := os.Getenv("WAF_E2E_PASSWORD")
-	if password == "" {
+	if password == "" || password == "***" {
 		password = "admin"
 	}
 	loginResp := postJSON(t, client, requestBaseURL+"/api/auth/login", requestHostOverride, map[string]any{

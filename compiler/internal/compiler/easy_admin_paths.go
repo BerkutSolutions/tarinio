@@ -28,8 +28,6 @@ var easyAdminSegmentPrefixes = []string{
 
 var easyAdminExactPaths = []string{
 	"/",
-	"/login",
-	"/login/2fa",
 	"/auth",
 	"/auth/verify",
 }
@@ -37,6 +35,33 @@ var easyAdminExactPaths = []string{
 var easyAdminPrefixPaths = []string{
 	"/api/",
 	"/static/",
+}
+
+func easyAdminAntibotExclusionRulesForSite(siteID string) []AntibotExclusionRuleInput {
+	if !isManagementSiteID(siteID) {
+		return nil
+	}
+	rules := make([]AntibotExclusionRuleInput, 0, len(easyAdminExactPaths)+len(easyAdminPrefixPaths)+len(easyAdminSegmentPrefixes))
+	for _, exact := range easyAdminExactPaths {
+		rules = append(rules, AntibotExclusionRuleInput{Path: exact, Methods: []string{"GET", "HEAD"}})
+	}
+	for _, prefix := range easyAdminPrefixPaths {
+		rules = append(rules, AntibotExclusionRuleInput{Path: prefix, Methods: []string{"GET", "HEAD"}})
+	}
+	for _, prefix := range easyAdminSegmentPrefixes {
+		rules = append(rules, AntibotExclusionRuleInput{Path: prefix, Methods: []string{"GET", "HEAD"}})
+	}
+	return rules
+}
+
+func appendAntibotExclusionRules(base []AntibotExclusionRuleInput, extra []AntibotExclusionRuleInput) []AntibotExclusionRuleInput {
+	if len(extra) == 0 {
+		return base
+	}
+	merged := make([]AntibotExclusionRuleInput, 0, len(base)+len(extra))
+	merged = append(merged, base...)
+	merged = append(merged, extra...)
+	return normalizeCompilerAntibotExclusionRules(merged)
 }
 
 func isReservedAdminAppPath(path string) bool {
@@ -65,8 +90,6 @@ func isReservedAdminAppPath(path string) bool {
 func easyAdminBypassPathPattern() string {
 	parts := []string{
 		"",
-		"login",
-		"login/2fa",
 		"auth",
 		"auth/verify",
 	}
@@ -83,8 +106,11 @@ func easyAdminBypassPathPattern() string {
 
 func isManagementSiteID(siteID string) bool {
 	normalized := strings.ToLower(strings.TrimSpace(siteID))
+	if normalized == "localhost" {
+		return true
+	}
 	switch normalized {
-	case "control-plane-access", "control-plane", "ui", "localhost":
+	case "control-plane-access", "control-plane", "ui":
 		return true
 	default:
 		configuredID := strings.ToLower(strings.TrimSpace(os.Getenv("CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID")))
@@ -101,6 +127,8 @@ func easyAdminBypassPathPatternForSite(siteID string) string {
 
 var easyReservedLimitExactPaths = []string{
 	"/",
+	"/login",
+	"/login/2fa",
 	"/api/",
 	"/auth",
 	"/auth/verify",

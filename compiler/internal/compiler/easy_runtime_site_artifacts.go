@@ -71,6 +71,7 @@ func renderEasySiteArtifacts(site SiteInput, profile EasyProfileInput) ([]Artifa
 	authEnabled := profile.UseAuthBasic && (len(authUsers) > 0 || len(authTokens) > 0)
 	authBasicEnabled := authEnabled && authMode != authModeServiceToken && len(authUsers) > 0
 	authTokenEnabled := authEnabled && authMode != authModeBasic && len(authTokens) > 0
+	antibotExclusionRules := appendAntibotExclusionRules(profile.AntibotExclusionRules, easyAdminAntibotExclusionRulesForSite(site.ID))
 	data := easySiteData{
 		SiteID:                       site.ID,
 		RateLimitCookieVar:           rateLimitCookieVar(site.ID),
@@ -130,7 +131,7 @@ func renderEasySiteArtifacts(site SiteInput, profile EasyProfileInput) ([]Artifa
 		AntibotRecaptchaHint:         strings.TrimSpace(profile.AntibotRecaptchaKey),
 		AntibotHcaptchaHint:          strings.TrimSpace(profile.AntibotHcaptchaKey),
 		AntibotTurnstileHint:         strings.TrimSpace(profile.AntibotTurnstileKey),
-		AntibotExclusionRules:        buildEasyAntibotExclusionRuleData(profile.AntibotExclusionRules),
+		AntibotExclusionRules:        buildEasyAntibotExclusionRuleData(antibotExclusionRules),
 		AntibotRuleOverrides:         buildEasyAntibotRuleData(profile.AntibotChallengeRules, profile.AntibotURI),
 		AntibotScannerAutoBan:        profile.AntibotScannerAutoBan,
 		AntibotScannerPattern:        antibotScannerPattern(),

@@ -18,6 +18,7 @@ import (
 
 type nginxMainData struct {
 	SitesIncludeGlob string
+	DefaultTLSRef    string
 }
 
 type nginxSiteData struct {
@@ -87,6 +88,7 @@ func RenderSiteUpstreamArtifacts(sites []SiteInput, upstreams []UpstreamInput) (
 
 	mainContent, err := renderTemplate("templates/nginx/nginx.conf.tmpl", nginxMainData{
 		SitesIncludeGlob: "sites/*.conf",
+		DefaultTLSRef:    defaultTLSRefPath(sortedSites),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("render nginx main template: %w", err)
@@ -169,7 +171,7 @@ func RenderSiteUpstreamArtifacts(sites []SiteInput, upstreams []UpstreamInput) (
 func normalizeInputs(sites []SiteInput, upstreams []UpstreamInput) ([]SiteInput, map[string]UpstreamInput, error) {
 	sortedSites := append([]SiteInput(nil), sites...)
 	sort.Slice(sortedSites, func(i, j int) bool {
-		return sortedSites[i].ID < sortedSites[j].ID
+		return compareSiteCompileOrder(sortedSites[i], sortedSites[j]) < 0
 	})
 
 	upstreamByID := make(map[string]UpstreamInput, len(upstreams))
@@ -222,6 +224,44 @@ func collectServerNames(site SiteInput) []string {
 	return sortedUnique(names)
 }
 
+func compareSiteCompileOrder(left, right SiteInput) int {
+	leftClass := siteTLSSelectionClass(left)
+	rightClass := siteTLSSelectionClass(right)
+	if leftClass != rightClass {
+		if leftClass < rightClass {
+			return -1
+		}
+		return 1
+	}
+	if left.ID < right.ID {
+		return -1
+	}
+	if left.ID > right.ID {
+		return 1
+	}
+	return 0
+}
+
+func siteTLSSelectionClass(site SiteInput) int {
+	if !site.ListenHTTPS {
+		return 2
+	}
+	if sitePrimaryHostLooksLikeIPAddress(site.PrimaryHost) {
+		return 1
+	}
+	return 0
+}
+
+func sitePrimaryHostLooksLikeIPAddress(host string) bool {
+	host = strings.TrimSpace(host)
+	if host == "" {
+		return false
+	}
+	return strings.Count(host, ".") == 3 && strings.IndexFunc(host, func(r rune) bool {
+		return (r < '0' || r > '9') && r != '.'
+	}) == -1
+}
+
 func sortedUnique(values []string) []string {
 	seen := make(map[string]struct{}, len(values))
 	var out []string
@@ -254,6 +294,16 @@ func rateLimitCookieName(siteID string) string {
 
 func rateLimitEscalationCookieName(siteID string) string {
 	return "waf_rate_limited_escalated_" + slugSiteID(siteID)
+}
+
+func defaultTLSRefPath(sites []SiteInput) string {
+	for _, site := range sites {
+		if !site.Enabled || !site.ListenHTTPS {
+			continue
+		}
+		return fmt.Sprintf("/etc/waf/tls/%s.conf", site.ID)
+	}
+	return ""
 }
 
 func slugSiteID(siteID string) string {

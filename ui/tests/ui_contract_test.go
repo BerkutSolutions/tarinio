@@ -147,11 +147,17 @@ func TestUIContract_OnboardingAndSidebarMarkers(t *testing.T) {
 		},
 		{
 			name:  "requests",
-			files: []string{filepath.Join("..", "app", "static", "js", "pages", "requests.js")},
+			files: []string{
+				filepath.Join("..", "app", "static", "js", "pages", "requests.js"),
+				filepath.Join("..", "app", "static", "js", "pages", "requests.security.js"),
+			},
 			markers: []string{
 				`export async function renderRequests`,
 				`data-sort-col=`,
 				`/api/requests`,
+				`legacy_row_type_support`,
+				`inferLegacyRequestRowType`,
+				`requests.securityReason.modsecurity`,
 			},
 		},
 		{

@@ -3,10 +3,13 @@ package tests
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"net/http/cookiejar"
 	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestE2ESecurityModesReality(t *testing.T) {
@@ -54,6 +57,7 @@ func TestE2ESecurityModesReality(t *testing.T) {
 			if rateEnabled != tc.expectRateEnabled {
 				t.Fatalf("%s mode: rate-limit policy enabled=%v, want %v", tc.mode, rateEnabled, tc.expectRateEnabled)
 			}
+			e2eAssertModeDoesNotBlockChallengeFlow(t, requestBaseURL, siteID, tc.mode)
 		})
 	}
 }
@@ -231,4 +235,68 @@ func mapGetOrCreate(parent map[string]any, key string) map[string]any {
 func boolValue(value any) bool {
 	v, _ := value.(bool)
 	return v
+}
+
+func e2eAssertModeDoesNotBlockChallengeFlow(t *testing.T, requestBaseURL, siteID, mode string) {
+	t.Helper()
+	runtimeURL := strings.TrimSpace(os.Getenv("WAF_E2E_RUNTIME_URL"))
+	if runtimeURL == "" {
+		t.Skipf("WAF_E2E_RUNTIME_URL not set; skipping runtime assertion for %s mode", mode)
+	}
+
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatalf("cookie jar: %v", err)
+	}
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+		Jar:     jar,
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	host := e2eRuntimeHostForSite(t, requestBaseURL, siteID)
+	req, err := http.NewRequest(http.MethodGet, strings.TrimRight(runtimeURL, "/")+"/admin", nil)
+	if err != nil {
+		t.Fatalf("runtime request: %v", err)
+	}
+	req.Host = host
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("runtime request failed for %s: %v", mode, err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	bodyStr := string(body)
+	location := resp.Header.Get("Location")
+
+	if mode == "transparent" || mode == "monitor" {
+		if resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusSeeOther {
+			if strings.Contains(location, "/challenge") || strings.Contains(location, "/auth") {
+				t.Fatalf("%s mode must not block via challenge/auth redirect: status=%d location=%q body=%.300s", mode, resp.StatusCode, location, bodyStr)
+			}
+		}
+		if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusUnavailableForLegalReasons {
+			t.Fatalf("%s mode must not apply blocking security response: status=%d body=%.300s", mode, resp.StatusCode, bodyStr)
+		}
+	}
+}
+
+func e2eRuntimeHostForSite(t *testing.T, requestBaseURL, siteID string) string {
+	t.Helper()
+	resp := requestRaw(t, http.DefaultClient, http.MethodGet, requestBaseURL+"/api/sites/"+siteID, "", nil)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("get site %s failed: status=%d body=%s", siteID, resp.StatusCode, mustReadBody(t, resp.Body))
+	}
+	var site map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&site); err != nil {
+		t.Fatalf("decode site %s: %v", siteID, err)
+	}
+	for _, key := range []string{"primary_host", "host", "hostname"} {
+		if host := strings.TrimSpace(fmt.Sprint(site[key])); host != "" && host != "<nil>" {
+			return host
+		}
+	}
+	t.Fatalf("site %s has no primary host in payload", siteID)
+	return ""
 }

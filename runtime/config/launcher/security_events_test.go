@@ -185,6 +185,80 @@ func TestSecurityEventSourceThreatIntelEmitsReputationEvent(t *testing.T) {
 	}
 }
 
+func TestSecurityEventSourceClassifiesAntibotChallengeEvents(t *testing.T) {
+	lines := []string{
+		mustMarshalAccessLogLine(t, map[string]any{
+			"timestamp":  "2026-07-01T12:00:00Z",
+			"client_ip":  "198.51.100.10",
+			"method":     "GET",
+			"uri":        "/challenge",
+			"status":     302,
+			"site":       "shop_example_com",
+			"host":       "shop.example.com",
+			"country":    "DE",
+			"user_agent": "Mozilla/5.0",
+		}),
+		mustMarshalAccessLogLine(t, map[string]any{
+			"timestamp":  "2026-07-01T12:00:01Z",
+			"client_ip":  "198.51.100.10",
+			"method":     "GET",
+			"uri":        "/captcha/verify",
+			"status":     403,
+			"site":       "shop_example_com",
+			"host":       "shop.example.com",
+			"country":    "DE",
+			"user_agent": "Mozilla/5.0",
+		}),
+	}
+
+	events := readSecurityEventsFromLines(t, lines)
+	if len(events) != 1 {
+		t.Fatalf("expected 1 emitted antibot security event from blocked leg, got %+v", events)
+	}
+	if got := events[0].Summary; got != "antibot challenge blocked" {
+		t.Fatalf("expected antibot blocked summary, got %q", got)
+	}
+}
+
+func TestSecurityEventSourceAddsNormalizedEventTypeForBlockedAccess(t *testing.T) {
+	cases := []struct {
+		name     string
+		uri      string
+		expected string
+	}{
+		{name: "modsecurity", uri: "/waf/modsecurity/block", expected: "modsecurity"},
+		{name: "auth", uri: "/auth/login", expected: "auth"},
+		{name: "geo", uri: "/geo-blocked", expected: "geo"},
+		{name: "generic", uri: "/checkout", expected: "access_blocked"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			lines := []string{
+				mustMarshalAccessLogLine(t, map[string]any{
+					"timestamp":  "2026-07-01T12:10:00Z",
+					"client_ip":  "198.51.100.20",
+					"method":     "GET",
+					"uri":        tc.uri,
+					"status":     403,
+					"site":       "shop_example_com",
+					"host":       "shop.example.com",
+					"country":    "DE",
+					"user_agent": "Mozilla/5.0",
+				}),
+			}
+			events := readSecurityEventsFromLines(t, lines)
+			if len(events) != 1 {
+				t.Fatalf("expected single blocked access event, got %+v", events)
+			}
+			if got := asString(events[0].Details["event_type"]); got != tc.expected {
+				t.Fatalf("expected event_type %q, got %q", tc.expected, got)
+			}
+		})
+	}
+}
+
+
 func readSecurityEventsFromLines(t *testing.T, lines []string) []securityEvent {
 	t.Helper()
 	root := t.TempDir()

@@ -148,6 +148,7 @@ func TestRenderEasyArtifacts_GeneratesSiteAndAuthBasicFiles(t *testing.T) {
 }
 
 func TestRenderEasyArtifacts_AdminBypassOnlyForManagementSites(t *testing.T) {
+	t.Setenv("CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID", "control-plane-access")
 	artifacts, err := RenderEasyArtifacts(
 		[]SiteInput{
 			{ID: "control-plane-access", Enabled: true, PrimaryHost: "localhost", ListenHTTP: true},
@@ -174,8 +175,14 @@ func TestRenderEasyArtifacts_AdminBypassOnlyForManagementSites(t *testing.T) {
 	if siteConf == "" {
 		t.Fatal("expected easy site conf for management site")
 	}
-	if !strings.Contains(siteConf, `if ($uri ~* "^/(`) || !strings.Contains(siteConf, `dashboard(?:/.*)?`) || !strings.Contains(siteConf, `login/2fa`) {
+	if !strings.Contains(siteConf, `if ($uri ~* "^/(?:`) || !strings.Contains(siteConf, `dashboard(?:/.*)?`) || !strings.Contains(siteConf, `api/.*`) || !strings.Contains(siteConf, `static/.*`) {
 		t.Fatalf("expected admin bypass guard for management site, got: %s", siteConf)
+	}
+	if !strings.Contains(siteConf, `if ($waf_antibot_exclusion_match ~* "^(?:GET|HEAD):/static/") { set $waf_antibot_exception_guard 1; }`) {
+		t.Fatalf("expected management static assets to bypass antibot challenge, got: %s", siteConf)
+	}
+	if !strings.Contains(siteConf, `if ($waf_antibot_exclusion_match ~* "^(?:GET|HEAD):/services$") { set $waf_antibot_exception_guard 1; }`) {
+		t.Fatalf("expected management services route to bypass antibot challenge, got: %s", siteConf)
 	}
 }
 

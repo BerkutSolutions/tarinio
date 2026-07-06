@@ -110,14 +110,14 @@ func (s *securityEventSource) next() ([]securityEvent, error) {
 		}
 
 		switch item.status {
-		case 429:
+		case 302, 429:
 			out = append(out, securityEvent{
 				Type:            "security_rate_limit",
 				Severity:        "warning",
 				SiteID:          item.siteID,
 				SourceComponent: "runtime-nginx",
 				OccurredAt:      item.when.UTC().Format(time.RFC3339Nano),
-				Summary:         "rate limit triggered",
+				Summary:         securitySummaryForAccess(item, "rate limit triggered"),
 				Details: map[string]any{
 					"status":     item.status,
 					"method":     item.method,
@@ -131,24 +131,29 @@ func (s *securityEventSource) next() ([]securityEvent, error) {
 				},
 			})
 		case 403, 444:
+			details := map[string]any{
+				"status":     item.status,
+				"method":     item.method,
+				"path":       item.path,
+				"client_ip":  item.ip,
+				"country":    item.country,
+				"city":       item.city,
+				"host":       item.host,
+				"referer":    item.referer,
+				"user_agent": item.userAgent,
+			}
+			eventType := classifyAccessSecurityEventType(item)
+			if eventType != "" {
+				details["event_type"] = eventType
+			}
 			out = append(out, securityEvent{
 				Type:            "security_access",
 				Severity:        "warning",
 				SiteID:          item.siteID,
 				SourceComponent: "runtime-nginx",
 				OccurredAt:      item.when.UTC().Format(time.RFC3339Nano),
-				Summary:         "access blocked",
-				Details: map[string]any{
-					"status":     item.status,
-					"method":     item.method,
-					"path":       item.path,
-					"client_ip":  item.ip,
-					"country":    item.country,
-					"city":       item.city,
-					"host":       item.host,
-					"referer":    item.referer,
-					"user_agent": item.userAgent,
-				},
+				Summary:         securitySummaryForAccess(item, "access blocked"),
+				Details:         details,
 			})
 		}
 	}
@@ -206,4 +211,65 @@ func (s *securityEventSource) next() ([]securityEvent, error) {
 	}
 
 	return out, nil
+}
+
+func securitySummaryForAccess(item parsedAccess, fallback string) string {
+	path := strings.ToLower(strings.TrimSpace(item.path))
+	if path == "" || path == "-" {
+		return fallback
+	}
+	if isAntibotRuntimePath(path) {
+		switch item.status {
+		case 429:
+			return "antibot challenge throttled"
+		case 403, 444:
+			return "antibot challenge blocked"
+		}
+	}
+	if looksLikeModSecurityPath(path) {
+		switch item.status {
+		case 403, 444:
+			return "modsecurity blocked request"
+		case 429:
+			return "modsecurity-related rate limit"
+		}
+	}
+	return fallback
+}
+
+func classifyAccessSecurityEventType(item parsedAccess) string {
+	path := strings.ToLower(strings.TrimSpace(item.path))
+	if path == "" || path == "-" {
+		return "access_blocked"
+	}
+	if isAntibotRuntimePath(path) {
+		return "antibot"
+	}
+	if looksLikeModSecurityPath(path) {
+		return "modsecurity"
+	}
+	if looksLikeAuthRuntimePath(path) {
+		return "auth"
+	}
+	if looksLikeGeoBlockedPath(path) {
+		return "geo"
+	}
+	return "access_blocked"
+}
+
+func isAntibotRuntimePath(path string) bool {
+	return path == "/challenge" || path == "/captcha" ||
+		strings.HasPrefix(path, "/challenge/") || strings.HasPrefix(path, "/captcha/")
+}
+
+func looksLikeModSecurityPath(path string) bool {
+	return strings.Contains(path, "modsecurity") || strings.Contains(path, "waf")
+}
+
+func looksLikeAuthRuntimePath(path string) bool {
+	return path == "/auth" || strings.HasPrefix(path, "/auth/") || strings.Contains(path, "login")
+}
+
+func looksLikeGeoBlockedPath(path string) bool {
+	return strings.Contains(path, "geo") && strings.Contains(path, "block")
 }

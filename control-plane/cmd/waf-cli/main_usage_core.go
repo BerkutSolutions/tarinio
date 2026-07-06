@@ -15,6 +15,7 @@ func printUsageCoreCommands() {
 		"  ban <ip> [--site control-plane-access]",
 		"  unban <ip> [--site control-plane-access]",
 		"  bans list [--site control-plane-access]",
+		"  maintenance",
 		"  access-policies list",
 		"  waf-policies list",
 		"  rate-limit-policies list",

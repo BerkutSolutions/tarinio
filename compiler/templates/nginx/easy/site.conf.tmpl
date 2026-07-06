@@ -183,6 +183,8 @@ if ($waf_blacklist_uri_guard ~* "^0:.*{{ . }}") { return 403; }
 
 {{- if .WhitelistCountryGuardPattern }}
 set $waf_country_guard "$waf_easy_exception_guard:$waf_country_code";
+add_header X-WAF-Country-Code "$waf_country_code" always;
+add_header X-WAF-Country-Guard "$waf_country_guard" always;
 {{- if .ShowGeoBlockPage }}
 if ($waf_country_guard !~ "{{ .WhitelistCountryGuardPattern }}") { return 451; }
 {{- else }}
@@ -192,6 +194,8 @@ if ($waf_country_guard !~ "{{ .WhitelistCountryGuardPattern }}") { return 403; }
 
 {{- if .BlacklistCountryGuardPattern }}
 set $waf_country_guard "$waf_easy_exception_guard:$waf_country_code";
+add_header X-WAF-Country-Code "$waf_country_code" always;
+add_header X-WAF-Country-Guard "$waf_country_guard" always;
 {{- if .ShowGeoBlockPage }}
 if ($waf_country_guard ~ "{{ .BlacklistCountryGuardPattern }}") { return 451; }
 {{- else }}
@@ -234,6 +238,10 @@ set $waf_antibot_verified 0;
 if ($cookie_{{ .AntibotCookieName }} = "{{ .AntibotCookieValue }}") { set $waf_antibot_verified 1; }
 set $waf_antibot_stage1_verified 0;
 if ($cookie_{{ .AntibotStage1CookieName }} = "{{ .AntibotStage1CookieValue }}") { set $waf_antibot_stage1_verified 1; }
+if ($waf_antibot_exception_guard = 1) {
+    set $waf_rate_limited_active 0;
+    set $waf_rate_limited_escalated 0;
+}
 set $waf_antibot_safe_method 0;
 if ($request_method = GET) { set $waf_antibot_safe_method 1; }
 if ($request_method = HEAD) { set $waf_antibot_safe_method 1; }

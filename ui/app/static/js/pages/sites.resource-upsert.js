@@ -104,6 +104,13 @@ export async function upsertSiteResources(draft, ctx, existingSite, existingUpst
     return isAutoApplyFailureError(error);
   };
   const isNotFound = (error) => error?.status === 404;
+  const normalizedExistingSiteID = deps.normalizeSiteID(existingSite?.id);
+  const normalizedTargetSiteID = deps.normalizeSiteID(sitePayload.id);
+  const siteIDChanged = Boolean(normalizedExistingSiteID) && normalizedExistingSiteID !== normalizedTargetSiteID;
+  const normalizedExistingUpstreamID = deps.normalizeSiteID(existingUpstream?.id);
+  const normalizedTargetUpstreamID = deps.normalizeSiteID(upstreamPayload.id);
+  const upstreamIDChanged = Boolean(normalizedExistingUpstreamID) && normalizedExistingUpstreamID !== normalizedTargetUpstreamID;
+  const existingTLSBoundToOldSite = Boolean(existingTLSConfig) && deps.normalizeSiteID(existingTLSConfig?.site_id) !== normalizedTargetSiteID;
   const deleteIgnoreNotFound = async (path) => {
     try {
       await ctx.api.delete(path, requestOptions);
@@ -136,7 +143,7 @@ export async function upsertSiteResources(draft, ctx, existingSite, existingUpst
   };
 
   try {
-    if (existingSite) {
+    if (existingSite && !siteIDChanged) {
       try {
         await ctx.api.put(`/api/sites/${encodeURIComponent(sitePayload.id)}`, sitePayload, requestOptions);
       } catch (error) {
@@ -184,7 +191,7 @@ export async function upsertSiteResources(draft, ctx, existingSite, existingUpst
       }
     }
 
-    if (existingUpstream) {
+    if (existingUpstream && !upstreamIDChanged) {
       try {
         await ctx.api.put(`/api/upstreams/${encodeURIComponent(upstreamPayload.id)}`, upstreamPayload, requestOptions);
       } catch (error) {
@@ -266,7 +273,7 @@ export async function upsertSiteResources(draft, ctx, existingSite, existingUpst
         rollbackable(async () => deleteIgnoreNotFound(`/api/certificates/${encodeURIComponent(certificateID)}`));
       }
       const tlsPayload = { site_id: sitePayload.id, certificate_id: certificateID };
-      if (existingTLSConfig) {
+      if (existingTLSConfig && !existingTLSBoundToOldSite) {
         try {
           await ctx.api.put(`/api/tls-configs/${encodeURIComponent(sitePayload.id)}`, tlsPayload, requestOptions);
         } catch (error) {

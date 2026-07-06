@@ -18,6 +18,7 @@ CONTAINER_PROBE_ATTEMPTS="${CONTAINER_PROBE_ATTEMPTS:-45}"
 HOST_PROBE_ATTEMPTS="${HOST_PROBE_ATTEMPTS:-45}"
 ENV_CREATED=0
 FAILED=0
+IS_UPGRADE=0
 
 if [ -t 1 ]; then
   C_RESET="$(printf '\033[0m')"
@@ -124,6 +125,11 @@ write_env_value() {
   key="$1"
   value="$2"
   tmp_file=".env.tmp.$$"
+  if [ ! -f .env ]; then
+    printf '%s=%s\n' "$key" "$value" >"$tmp_file"
+    mv "$tmp_file" .env
+    return 0
+  fi
   awk -F= -v key="$key" -v value="$value" '
     BEGIN { written = 0 }
     $1 == key {
@@ -155,6 +161,12 @@ is_placeholder_secret() {
 
 ensure_secure_env_defaults() {
   changed=0
+  needs_clickhouse=0
+  case "$PROFILE" in
+    enterprise|ha-lab)
+      needs_clickhouse=1
+      ;;
+  esac
 
   postgres_user="$(read_env_value POSTGRES_USER)"
   postgres_db="$(read_env_value POSTGRES_DB)"
@@ -162,6 +174,7 @@ ensure_secure_env_defaults() {
   clickhouse_password="$(read_env_value CLICKHOUSE_PASSWORD)"
   opensearch_password="$(read_env_value OPENSEARCH_PASSWORD)"
   security_pepper="$(read_env_value CONTROL_PLANE_SECURITY_PEPPER)"
+  runtime_api_token="$(read_env_value WAF_RUNTIME_API_TOKEN)"
   postgres_dsn="$(read_env_value POSTGRES_DSN)"
 
   if [ -z "$postgres_user" ]; then
@@ -174,29 +187,45 @@ ensure_secure_env_defaults() {
     write_env_value POSTGRES_DB "$postgres_db"
     changed=1
   fi
-  if [ "$ENV_CREATED" -eq 1 ] && is_placeholder_secret "$postgres_password"; then
+  if [ "$IS_UPGRADE" -eq 0 ] && is_placeholder_secret "$postgres_password"; then
     postgres_password="$(generate_secret 40)"
     write_env_value POSTGRES_PASSWORD "$postgres_password"
     changed=1
     ok "generated secure POSTGRES_PASSWORD"
+  elif [ "$IS_UPGRADE" -eq 1 ] && is_placeholder_secret "$postgres_password"; then
+    warn "existing .env keeps placeholder-like POSTGRES_PASSWORD; use scripts/rotate-env-secrets.sh for explicit secret rotation"
   fi
-  if [ "$ENV_CREATED" -eq 1 ] && is_placeholder_secret "$clickhouse_password"; then
+  if [ "$IS_UPGRADE" -eq 0 ] && [ "$needs_clickhouse" -eq 1 ] && is_placeholder_secret "$clickhouse_password"; then
     clickhouse_password="$(generate_secret 40)"
     write_env_value CLICKHOUSE_PASSWORD "$clickhouse_password"
     changed=1
     ok "generated secure CLICKHOUSE_PASSWORD"
+  elif [ "$IS_UPGRADE" -eq 1 ] && [ "$needs_clickhouse" -eq 1 ] && is_placeholder_secret "$clickhouse_password"; then
+    warn "existing .env keeps placeholder-like CLICKHOUSE_PASSWORD; use scripts/rotate-env-secrets.sh for explicit secret rotation"
   fi
-  if [ "$ENV_CREATED" -eq 1 ] && is_placeholder_secret "$opensearch_password"; then
+  if [ "$IS_UPGRADE" -eq 0 ] && is_placeholder_secret "$opensearch_password"; then
     opensearch_password="$(generate_secret 40)"
     write_env_value OPENSEARCH_PASSWORD "$opensearch_password"
     changed=1
     ok "generated secure OPENSEARCH_PASSWORD"
+  elif [ "$IS_UPGRADE" -eq 1 ] && is_placeholder_secret "$opensearch_password"; then
+    warn "existing .env keeps placeholder-like OPENSEARCH_PASSWORD; use scripts/rotate-env-secrets.sh for explicit secret rotation"
   fi
-  if [ "$ENV_CREATED" -eq 1 ] && is_placeholder_secret "$security_pepper"; then
+  if [ "$IS_UPGRADE" -eq 0 ] && is_placeholder_secret "$security_pepper"; then
     security_pepper="$(generate_secret 64)"
     write_env_value CONTROL_PLANE_SECURITY_PEPPER "$security_pepper"
     changed=1
     ok "generated secure CONTROL_PLANE_SECURITY_PEPPER"
+  elif [ "$IS_UPGRADE" -eq 1 ] && is_placeholder_secret "$security_pepper"; then
+    warn "existing .env keeps placeholder-like CONTROL_PLANE_SECURITY_PEPPER; use scripts/rotate-env-secrets.sh for explicit secret rotation"
+  fi
+  if [ "$IS_UPGRADE" -eq 0 ] && is_placeholder_secret "$runtime_api_token"; then
+    runtime_api_token="$(generate_secret 48)"
+    write_env_value WAF_RUNTIME_API_TOKEN "$runtime_api_token"
+    changed=1
+    ok "generated secure WAF_RUNTIME_API_TOKEN"
+  elif [ "$IS_UPGRADE" -eq 1 ] && is_placeholder_secret "$runtime_api_token"; then
+    warn "existing .env keeps placeholder-like WAF_RUNTIME_API_TOKEN; use scripts/rotate-env-secrets.sh for explicit secret rotation"
   fi
 
   target_postgres_dsn="postgres://${postgres_user}:${postgres_password}@postgres:5432/${postgres_db}?sslmode=disable"
@@ -495,7 +524,7 @@ trap on_exit EXIT
 
 mkdir -p "$(dirname "$LOG_FILE")"
 : >"$LOG_FILE"
-reset_screen()
+reset_screen
 
 section "TARINIO AIO Installer"
 step "Checking required tools"
@@ -575,6 +604,7 @@ if [ ! -f .env ]; then
   ENV_CREATED=1
   ok ".env created"
 else
+  IS_UPGRADE=1
   ok ".env already exists"
 fi
 step "Normalizing runtime secrets and secure defaults"
@@ -583,6 +613,7 @@ ensure_secure_env_defaults
 section "Build And Start"
 EXISTING_CONTAINERS="$($COMPOSE_CMD -f docker-compose.yml ps -aq 2>/dev/null || true)"
 if [ -n "$EXISTING_CONTAINERS" ]; then
+  IS_UPGRADE=1
   if [ "$COMPOSE_LEGACY" -eq 1 ]; then
     step "Legacy docker-compose detected: removing old project containers to avoid recreate bug (without volumes)"
     if run_logged $COMPOSE_CMD -f docker-compose.yml down --remove-orphans; then
@@ -644,6 +675,7 @@ printf 'Installer log: %s\n' "$LOG_FILE"
 printf 'Backup dir: %s\n' "$BACKUP_DIR"
 echo "Backup limits: per-volume=${BACKUP_MAX_VOLUME_MB}MB, total=${BACKUP_MAX_TOTAL_MB}MB"
 echo "Compatibility contract: ${COMPAT_CONTRACT_VERSION}"
+printf '%s\n' "Need to rotate placeholder-like secrets on an existing stack? Run: scripts/rotate-env-secrets.sh"
 printf '\n'
 printf '%s\n' "Follow logs with:"
 printf '  cd %s/deploy/compose/%s\n' "$INSTALL_DIR" "$PROFILE"

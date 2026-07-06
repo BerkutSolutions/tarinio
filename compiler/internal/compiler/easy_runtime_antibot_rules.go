@@ -15,7 +15,7 @@ func normalizeCompilerAntibotRules(values []AntibotChallengeRuleInput) []Antibot
 	for _, value := range values {
 		path := strings.TrimSpace(value.Path)
 		challenge := strings.ToLower(strings.TrimSpace(value.Challenge))
-		if path == "" || challenge == "" || challenge == "no" {
+		if path == "" || challenge == "" {
 			continue
 		}
 		key := strings.ToLower(path) + "\x00" + challenge
@@ -100,10 +100,17 @@ func buildEasyAntibotRuleData(rules []AntibotChallengeRuleInput, challengeURI st
 		out = append(out, easyAntibotRuleData{
 			GuardPattern: pattern,
 			Challenge:    rule.Challenge,
-			RedirectURI:  antibotRedirectURI(rule.Challenge, challengeURI),
+			RedirectURI:  antibotRuleRedirectURI(rule.Challenge, challengeURI),
 		})
 	}
 	return out
+}
+
+func antibotRuleRedirectURI(mode string, challengeURI string) string {
+	if strings.EqualFold(strings.TrimSpace(mode), "no") {
+		return ""
+	}
+	return antibotRedirectURI(mode, challengeURI)
 }
 
 func buildEasyAntibotExclusionRuleData(rules []AntibotExclusionRuleInput) []easyAntibotExclusionRuleData {

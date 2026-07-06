@@ -222,7 +222,7 @@ server {
 
     location ^~ /api/ {
         proxy_intercept_errors off;
-{{- if not .UseEasyConfig }}
+{{- if and (not .UseEasyConfig) (not .IsManagementSite) }}
         modsecurity on;
         modsecurity_rules_file /etc/waf/modsecurity/sites/{{ .SiteID }}.conf;
 {{- end }}
@@ -244,7 +244,7 @@ server {
     }
 
     location / {
-{{- if not .UseEasyConfig }}
+{{- if and (not .UseEasyConfig) (not .IsManagementSite) }}
         modsecurity on;
         modsecurity_rules_file /etc/waf/modsecurity/sites/{{ .SiteID }}.conf;
 {{- end }}

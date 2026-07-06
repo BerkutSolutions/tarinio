@@ -1,11 +1,65 @@
 package compiler
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestEasyAdminBypassPathPatternForSite_Localhost(t *testing.T) {
+	t.Setenv("CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID", "control-plane-access")
 	pattern := easyAdminBypassPathPatternForSite("localhost")
 	if pattern == "^$" {
-		t.Fatalf("expected management bypass pattern for localhost")
+		t.Fatalf("expected localhost to keep management bypass paths for local stack, got %q", pattern)
 	}
 }
 
+func TestEasyAdminBypassPathPatternForSite_ConfiguredManagementSiteID(t *testing.T) {
+	t.Setenv("CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID", "localhost")
+	pattern := easyAdminBypassPathPatternForSite("localhost")
+	if pattern == "^$" {
+		t.Fatalf("expected localhost to be treated as management site when configured explicitly")
+	}
+}
+
+func TestEasyAdminAntibotExclusionRulesForSite_ManagementSite(t *testing.T) {
+	t.Setenv("CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID", "control-plane-access")
+	rules := easyAdminAntibotExclusionRulesForSite("control-plane-access")
+	if len(rules) == 0 {
+		t.Fatal("expected management site antibot exclusions")
+	}
+	byPath := map[string][]string{}
+	for _, rule := range rules {
+		byPath[rule.Path] = append([]string(nil), rule.Methods...)
+	}
+	for _, path := range []string{"/", "/api/", "/static/", "/services", "/dashboard", "/auth", "/auth/verify"} {
+		methods, ok := byPath[path]
+		if !ok {
+			t.Fatalf("expected antibot exclusion for %s, got %#v", path, byPath)
+		}
+		if len(methods) != 2 || methods[0] != "GET" || methods[1] != "HEAD" {
+			t.Fatalf("expected GET/HEAD methods for %s, got %#v", path, methods)
+		}
+	}
+	if extra := easyAdminAntibotExclusionRulesForSite("site-a"); len(extra) != 0 {
+		t.Fatalf("expected no management exclusions for regular site, got %#v", extra)
+	}
+}
+
+func TestAppendAntibotExclusionRules_DeduplicatesAndKeepsExistingRules(t *testing.T) {
+	base := []AntibotExclusionRuleInput{{Path: "/static/", Methods: []string{"HEAD", "GET"}}, {Path: "/custom", Methods: []string{"POST"}}}
+	extra := []AntibotExclusionRuleInput{{Path: "/static/", Methods: []string{"GET", "HEAD"}}, {Path: "/services", Methods: []string{"GET", "HEAD"}}}
+	merged := appendAntibotExclusionRules(base, extra)
+	if len(merged) != 3 {
+		t.Fatalf("expected deduplicated merge, got %#v", merged)
+	}
+	joined := make([]string, 0, len(merged))
+	for _, rule := range merged {
+		joined = append(joined, rule.Path+":"+strings.Join(rule.Methods, ","))
+	}
+	actual := strings.Join(joined, "|")
+	for _, expected := range []string{"/static/:GET,HEAD", "/services:GET,HEAD", "/custom:POST"} {
+		if !strings.Contains(actual, expected) {
+			t.Fatalf("expected merged exclusions to contain %s, got %s", expected, actual)
+		}
+	}
+}

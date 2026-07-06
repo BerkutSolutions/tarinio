@@ -1,80 +1,113 @@
-import { escapeHtml, formatDate, setError, setLoading } from "../ui.js";
+import {
+  buildRequestDetailsMeta,
+  buildSecurityDetailSummary,
+  buildRequestEntry,
+  buildSecurityBadge,
+  inferLegacyRequestRowType,
+  normalizeSecurityReason,
+  requestRowTypeLabelKey,
+  requestRowTypeSortValue,
+} from "./requests.security.js";
 
-const DEFAULT_REQUESTS_FETCH_LIMIT = 200;
+const DEFAULT_REQUESTS_FETCH_LIMIT = 500;
 
-function normalizeList(value) {
-  return Array.isArray(value) ? value : [];
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
-function normalizeToken(value) {
-  return String(value || "").trim().toLowerCase();
+function setLoading(container, message) {
+  container.innerHTML = `<div class="waf-empty">${escapeHtml(message)}</div>`;
 }
 
-function normalizeHostLike(value) {
-  return String(value || "").trim().toLowerCase();
-}
-
-function isInternalGlobalService(value) {
-  const normalized = normalizeToken(value).replace(/^_+/, "");
-  return normalized === "global" || normalized === ".global";
+function setError(container, message) {
+  container.innerHTML = `<div class="waf-empty">${escapeHtml(message)}</div>`;
 }
 
 function buildPageButtons(totalPages, currentPage, dataAttr) {
+  if (totalPages <= 1) {
+    return "";
+  }
   const pages = [];
-  for (let page = 1; page <= Math.min(10, totalPages); page += 1) {
+  const pushPage = (page) => {
     pages.push(`<button type="button" class="btn ghost btn-sm${page === currentPage ? " active" : ""}" ${dataAttr}="${page}">${page}</button>`);
+  };
+  if (totalPages <= 7) {
+    for (let page = 1; page <= totalPages; page += 1) {
+      pushPage(page);
+    }
+    return pages.join("");
   }
-  if (totalPages > 10) {
+  pushPage(1);
+  if (currentPage > 4) {
     pages.push(`<span class="muted">...</span>`);
-    pages.push(`<button type="button" class="btn ghost btn-sm${totalPages === currentPage ? " active" : ""}" ${dataAttr}="${totalPages}">${totalPages}</button>`);
   }
+  const start = Math.max(2, currentPage - 1);
+  const end = Math.min(totalPages - 1, currentPage + 1);
+  for (let page = start; page <= end; page += 1) {
+    pushPage(page);
+  }
+  if (currentPage < totalPages - 3) {
+    pages.push(`<span class="muted">...</span>`);
+  }
+  pages.push(`<button type="button" class="btn ghost btn-sm${totalPages === currentPage ? " active" : ""}" ${dataAttr}="${totalPages}">${totalPages}</button>`);
   return pages.join("");
+}
+
+function normalizeList(payload) {
+  if (Array.isArray(payload)) {
+    return payload.filter((row) => row && typeof row === "object");
+  }
+  return [];
 }
 
 function normalizeRequestRowsPayload(payload) {
   if (Array.isArray(payload)) {
     return payload.filter((row) => row && typeof row === "object");
   }
-  const raw = String(payload || "").trim();
-  if (!raw) {
-    return [];
-  }
-  if (raw.startsWith("[")) {
+  if (typeof payload === "string") {
     try {
-      const parsed = JSON.parse(raw);
+      const parsed = JSON.parse(payload);
       return Array.isArray(parsed) ? parsed.filter((row) => row && typeof row === "object") : [];
     } catch (_error) {
       return [];
     }
   }
-  const rows = [];
-  for (const sourceLine of raw.split(/\r?\n/)) {
-    const line = String(sourceLine || "").trim();
-    if (!line) {
-      continue;
+  if (payload && typeof payload === "object") {
+    if (Array.isArray(payload.requests)) {
+      return payload.requests.filter((row) => row && typeof row === "object");
     }
-    try {
-      const parsed = JSON.parse(line);
-      if (parsed && typeof parsed === "object") {
-        rows.push(parsed);
-      }
-    } catch (_error) {
-      return [];
-    }
+    return [];
   }
-  return rows;
+  return [];
 }
 
-function compareValues(left, right, mode) {
-  if (mode === "number") {
-    return Number(left || 0) - Number(right || 0);
-  }
-  return String(left || "").localeCompare(String(right || ""), undefined, { sensitivity: "base" });
+function normalizeHostLike(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function normalizeToken(value) {
+  return String(value || "").trim().toLowerCase();
 }
 
 function parseTimestamp(value) {
   const stamp = Date.parse(String(value || ""));
-  return Number.isFinite(stamp) ? new Date(stamp) : null;
+  if (!Number.isFinite(stamp)) {
+    return null;
+  }
+  return new Date(stamp);
+}
+
+function formatDate(value) {
+  const date = parseTimestamp(value);
+  if (!(date instanceof Date)) {
+    return "";
+  }
+  return date.toLocaleString();
 }
 
 function toDateKeyLocal(date) {
@@ -87,19 +120,31 @@ function toDateKeyLocal(date) {
   return `${year}-${month}-${day}`;
 }
 
-function normalizeTimePreset(value) {
-  const allowed = new Set(["all", "minute", "day", "month", "date", "datetime"]);
-  const preset = String(value || "all").trim().toLowerCase();
-  return allowed.has(preset) ? preset : "all";
-}
-
 function todayDateKeyLocal() {
   return toDateKeyLocal(new Date());
+}
+
+function normalizeTimePreset(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  const allowed = new Set(["all", "minute", "day", "month", "date", "datetime"]);
+  return allowed.has(raw) ? raw : "date";
 }
 
 function currentTimezoneOffsetMinutes() {
   const offset = new Date().getTimezoneOffset();
   return Number.isFinite(offset) ? String(offset) : "0";
+}
+
+function compareValues(left, right, mode) {
+  if (mode === "number") {
+    return Number(left || 0) - Number(right || 0);
+  }
+  return String(left || "").localeCompare(String(right || ""), undefined, { sensitivity: "base" });
+}
+
+function isInternalGlobalService(value) {
+  const raw = normalizeHostLike(value);
+  return raw === "global" || raw === "system" || raw === "control-plane";
 }
 
 export async function renderRequests(container, ctx) {
@@ -115,6 +160,7 @@ export async function renderRequests(container, ctx) {
     pageSize: 10,
     page: 1,
     fetchLimit: DEFAULT_REQUESTS_FETCH_LIMIT,
+    selectedType: "",
     selectedService: "",
     selectedMethod: "",
     selectedStatus: "",
@@ -123,12 +169,15 @@ export async function renderRequests(container, ctx) {
     selectedDateTime: "",
     storageLogsDays: 14,
     loggingSummary: null,
+    typeOptions: [],
     serviceOptions: [],
     methodOptions: [],
     statusOptions: []
   };
 
   const columns = [
+    { id: "row_type", labelKey: "requests.col.type", mode: "string", value: (row) => requestRowTypeSortValue(row) },
+    { id: "security_reason", labelKey: "requests.col.securityReason", mode: "string", value: (row) => String(row?.securityReason || "") },
     { id: "service", labelKey: "requests.col.service", mode: "string", value: (row) => String(row?.serviceDisplay || "") },
     { id: "timestamp", labelKey: "requests.col.time", mode: "string", value: (row) => String(row?.entry?.timestamp || row?.ingested_at || "") },
     { id: "request_id", labelKey: "requests.col.requestId", mode: "string", value: (row) => String(row?.entry?.request_id || "") },
@@ -179,13 +228,18 @@ export async function renderRequests(container, ctx) {
   };
 
   const rebuildOptions = () => {
+    const types = new Set();
     const services = new Set();
     const methods = new Set();
     const statuses = new Set();
     for (const row of state.rows) {
+      const rowType = String(row?.rowType || "request").trim();
       const service = String(row?.serviceDisplay || "").trim();
       const method = String(row?.entry?.method || "").trim().toUpperCase();
       const status = String(row?.entry?.status ?? "").trim();
+      if (rowType) {
+        types.add(rowType);
+      }
       if (service && service !== "-") {
         services.add(service);
       }
@@ -196,9 +250,13 @@ export async function renderRequests(container, ctx) {
         statuses.add(status);
       }
     }
+    state.typeOptions = Array.from(types).sort((left, right) => left.localeCompare(right, undefined, { sensitivity: "base" }));
     state.serviceOptions = Array.from(services).sort((left, right) => left.localeCompare(right, undefined, { sensitivity: "base" }));
     state.methodOptions = Array.from(methods).sort((left, right) => left.localeCompare(right, undefined, { sensitivity: "base" }));
     state.statusOptions = Array.from(statuses).sort((left, right) => Number(left) - Number(right));
+    if (state.selectedType && !state.typeOptions.includes(state.selectedType)) {
+      state.selectedType = "";
+    }
     if (state.selectedService && !state.serviceOptions.includes(state.selectedService)) {
       state.selectedService = "";
     }
@@ -253,10 +311,14 @@ export async function renderRequests(container, ctx) {
     const sortColumn = columns.find((column) => column.id === state.sortBy) || columns[0];
     const factor = state.sortDirection === "asc" ? 1 : -1;
     const filtered = state.rows.filter((row) => {
+      const rowType = String(row?.rowType || "request").trim();
       const service = String(row?.serviceDisplay || "").trim();
       const method = String(row?.entry?.method || "").trim().toUpperCase();
       const status = String(row?.entry?.status ?? "").trim();
       const rowDate = row?.timestampDate || null;
+      if (state.selectedType && rowType !== state.selectedType) {
+        return false;
+      }
       if (state.selectedService && service !== state.selectedService) {
         return false;
       }
@@ -273,6 +335,8 @@ export async function renderRequests(container, ctx) {
         return true;
       }
       const haystack = [
+        row?.rowType,
+        row?.securityReason,
         row?.serviceDisplay,
         row?.entry?.request_id,
         row?.entry?.method,
@@ -300,7 +364,10 @@ export async function renderRequests(container, ctx) {
 
     const renderRequestDetail = (row) => {
       const entry = row?.entry && typeof row.entry === "object" ? row.entry : {};
+      const securitySummary = buildSecurityDetailSummary(row, ctx);
+      const detailsMeta = buildRequestDetailsMeta(row, ctx);
       const fields = [
+        ["requests.detail.type", ctx.t(requestRowTypeLabelKey(row?.rowType))],
         ["requests.detail.time", formatDate(String(entry.timestamp || row?.ingested_at || "")) || "-"],
         ["requests.detail.service", String(row?.serviceDisplay || "-")],
         ["requests.detail.requestId", String(entry.request_id || "-")],
@@ -313,11 +380,15 @@ export async function renderRequests(container, ctx) {
         ["requests.detail.referer", String(entry.referer || "-")],
         ["requests.detail.userAgent", String(entry.user_agent || "-")]
       ];
+      const allFields = fields.concat(detailsMeta);
       return `
+        ${securitySummary
+          ? `<div class="waf-note"><div class="waf-inline"><strong>${escapeHtml(ctx.t("requests.detail.securitySummary"))}:</strong><span class="waf-badge waf-badge-warning">${escapeHtml(securitySummary.typeLabel || ctx.t("requests.type.security"))}</span><span class="waf-badge waf-badge-warning">${escapeHtml(securitySummary.reasonLabel || ctx.t("requests.securityBadge"))}</span>${securitySummary.legacyCompatibility ? `<span class="waf-badge">${escapeHtml(ctx.t("requests.detail.legacyCompatibilityBadge"))}</span>` : ""}</div></div>`
+          : ""}
         <div class="waf-table-wrap">
           <table class="waf-table waf-detail-table">
             <tbody>
-              ${fields.map(([labelKey, value]) => `
+              ${allFields.map(([labelKey, value]) => `
                 <tr>
                   <th>${escapeHtml(ctx.t(labelKey))}</th>
                   <td><pre class="waf-code">${escapeHtml(value)}</pre></td>
@@ -385,6 +456,13 @@ export async function renderRequests(container, ctx) {
               </div>
             </div>
             <div class="waf-form-grid requests-filter-row requests-filter-row-secondary">
+              <div class="waf-field">
+                <label for="requests-filter-type">${escapeHtml(ctx.t("requests.filter.type"))}</label>
+                <select id="requests-filter-type">
+                  <option value="">${escapeHtml(ctx.t("requests.filter.all"))}</option>
+                  ${state.typeOptions.map((item) => `<option value="${escapeHtml(item)}"${state.selectedType === item ? " selected" : ""}>${escapeHtml(ctx.t(requestRowTypeLabelKey(item)))}</option>`).join("")}
+                </select>
+              </div>
               <div class="waf-field${timePreset === "date" ? "" : " waf-hidden"}">
                 <label for="requests-filter-date">${escapeHtml(ctx.t("requests.filter.date"))}</label>
                 <input id="requests-filter-date" type="date" value="${escapeHtml(state.selectedDate)}">
@@ -415,6 +493,8 @@ export async function renderRequests(container, ctx) {
                 ${pageRows.length
                   ? pageRows.map((row, index) => `
                     <tr class="waf-table-row-clickable" data-request-row="${meta.start + index}" tabindex="0" role="button">
+                      <td>${escapeHtml(ctx.t(requestRowTypeLabelKey(row?.rowType)))}</td>
+                      <td>${buildSecurityBadge(row, ctx, escapeHtml) || "-"}</td>
                       <td>${escapeHtml(String(row?.serviceDisplay || "-"))}</td>
                       <td>${escapeHtml(formatDate(String(row?.entry?.timestamp || row?.ingested_at || "")))}</td>
                       <td><span class="waf-code">${escapeHtml(String(row?.entry?.request_id || "-"))}</span></td>
@@ -497,6 +577,11 @@ export async function renderRequests(container, ctx) {
         await load();
         return;
       }
+      render();
+    });
+    container.querySelector("#requests-filter-type")?.addEventListener("change", (event) => {
+      state.selectedType = String(event.target?.value || "");
+      state.page = 1;
       render();
     });
     container.querySelector("#requests-filter-date")?.addEventListener("change", async (event) => {
@@ -673,10 +758,12 @@ export async function renderRequests(container, ctx) {
         }
       }
       state.rows = normalizeRequestRowsPayload(payload).map((row) => {
-        const entry = row?.entry && typeof row.entry === "object" ? row.entry : {};
+        const entry = buildRequestEntry(row);
         const serviceDisplay = resolveServiceDisplay(entry.site, entry.host, siteHostMap);
         const timestampDate = parseTimestamp(entry.timestamp || row?.ingested_at);
-        return { ...row, entry, serviceDisplay, timestampDate };
+        const rowType = inferLegacyRequestRowType(row);
+        const securityReason = normalizeSecurityReason(row);
+        return { ...row, entry, serviceDisplay, timestampDate, rowType, securityReason };
       }).filter((row) => !isInternalGlobalService(row?.entry?.site || row?.serviceDisplay));
       rebuildOptions();
       state.page = 1;

@@ -115,6 +115,15 @@ server {
     }
 {{- end }}
 
+    set $waf_unknown_host 0;
+    if ($waf_site_id = "_global") {
+        set $waf_unknown_host 1;
+    }
+
+    if ($waf_unknown_host = 1) {
+        rewrite ^ /__waf_errors/_global/421.html?rid=$request_id&ip=$remote_addr&ts=$msec last;
+    }
+
     location ^~ /.well-known/acme-challenge/ {
         default_type text/plain;
         log_not_found off;

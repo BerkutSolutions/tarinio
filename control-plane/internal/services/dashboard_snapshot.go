@@ -193,23 +193,35 @@ func (s *DashboardService) buildSnapshot() (DashboardStats, error) {
 	out.MostAttackedURLs = topURLs
 
 	requestAttackFallback := summarizeRequestAttacks(requestRows, cutoff)
-	if out.AttacksDay <= 0 && requestAttackFallback.AttacksDay > 0 {
+	eventAttackBreakdownPartial := (out.AttacksDay > 0 || out.BlockedAttacksDay > 0 || out.UniqueAttackerIPsDay > 0) &&
+		(len(out.TopAttackerCountries) == 0 || len(out.MostAttackedURLs) == 0)
+	if requestAttackFallback.AttacksDay > out.AttacksDay {
 		out.AttacksDay = requestAttackFallback.AttacksDay
+	} else if eventAttackBreakdownPartial && requestAttackFallback.AttacksDay > 0 {
+		out.AttacksDay += requestAttackFallback.AttacksDay - 1
 	}
-	if out.BlockedAttacksDay <= 0 && requestAttackFallback.BlockedAttacksDay > 0 {
+	if requestAttackFallback.BlockedAttacksDay > out.BlockedAttacksDay {
 		out.BlockedAttacksDay = requestAttackFallback.BlockedAttacksDay
+	} else if eventAttackBreakdownPartial && requestAttackFallback.BlockedAttacksDay > 0 {
+		out.BlockedAttacksDay += requestAttackFallback.BlockedAttacksDay - 1
 	}
-	if out.UniqueAttackerIPsDay <= 0 && requestAttackFallback.UniqueIPsDay > 0 {
+	if requestAttackFallback.UniqueIPsDay > out.UniqueAttackerIPsDay {
 		out.UniqueAttackerIPsDay = requestAttackFallback.UniqueIPsDay
+	} else if eventAttackBreakdownPartial && requestAttackFallback.UniqueIPsDay > 0 {
+		out.UniqueAttackerIPsDay += requestAttackFallback.UniqueIPsDay - 1
 	}
 	if len(out.TopAttackerIPs) == 0 {
 		out.TopAttackerIPs = requestAttackFallback.TopIPs
 	}
-	if len(out.TopAttackerCountries) == 0 {
-		out.TopAttackerCountries = requestAttackFallback.TopCountries
+	if len(requestAttackFallback.TopCountries) > 0 {
+		if len(out.TopAttackerCountries) == 0 {
+			out.TopAttackerCountries = requestAttackFallback.TopCountries
+		} else if len(out.TopAttackerCountries) < 10 {
+			out.TopAttackerCountries = mergeKeyCountsSum(out.TopAttackerCountries, requestAttackFallback.TopCountries, 10)
+		}
 	}
-	if len(out.MostAttackedURLs) == 0 {
-		out.MostAttackedURLs = requestAttackFallback.TopURLs
+	if len(out.MostAttackedURLs) < 10 && len(requestAttackFallback.TopURLs) > 0 {
+		out.MostAttackedURLs = mergeKeyCountsSum(out.MostAttackedURLs, requestAttackFallback.TopURLs, 10)
 	}
 	out.BlockedSeries = blockedFromEventsSeries
 	if len(out.BlockedSeries) == 0 {

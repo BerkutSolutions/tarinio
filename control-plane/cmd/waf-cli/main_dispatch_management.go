@@ -22,6 +22,8 @@ func dispatchManagementRoutes(c *cli, args []string, noAuth bool) (bool, error) 
 		return true, cmdRevisions(c, append([]string{"apply"}, args[1:]...), noAuth)
 	case "api":
 		return true, cmdAPI(c, args[1:], noAuth)
+	case "maintenance":
+		return true, cmdMaintenance(c, args[1:], noAuth)
 	default:
 		return false, nil
 	}

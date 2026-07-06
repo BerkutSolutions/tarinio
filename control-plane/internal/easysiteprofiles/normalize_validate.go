@@ -440,7 +440,7 @@ func validateProfile(profile EasySiteProfile) error {
 		if rule.Path == "" || !strings.HasPrefix(rule.Path, "/") {
 			return errors.New("easy site profile security_antibot.challenge_rules.path must start with /")
 		}
-		if rule.Challenge == AntibotChallengeNo || !slices.Contains(antibotModes, rule.Challenge) {
+		if !slices.Contains(antibotModes, rule.Challenge) {
 			return errors.New("easy site profile security_antibot.challenge_rules.challenge has unsupported mode")
 		}
 	}

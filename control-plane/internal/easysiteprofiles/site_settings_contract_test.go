@@ -346,6 +346,7 @@ func allFieldsProfile(siteID string) EasySiteProfile {
 	profile.SecurityAntibot.ChallengeEscalationEnabled = true
 	profile.SecurityAntibot.ChallengeEscalationMode = AntibotChallengeTurnstile
 	profile.SecurityAntibot.ChallengeRules = []AntibotChallengeRule{
+		{Path: "/captcha", Challenge: AntibotChallengeNo},
 		{Path: "/login", Challenge: AntibotChallengeRecaptcha},
 		{Path: "/api/auth/", Challenge: AntibotChallengeCookie},
 	}

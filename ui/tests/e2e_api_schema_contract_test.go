@@ -37,6 +37,35 @@ func TestE2EAPISchemaContracts(t *testing.T) {
 			t.Fatalf("decode dashboard/stats: %v", err)
 		}
 		requireKeys(t, m, "services_up", "services_down", "requests_day", "attacks_day", "blocked_attacks_day", "services")
+		requireKeys(t, m, "top_attacker_ips", "top_attacker_countries", "most_attacked_urls")
+		if _, ok := m["top_attacker_ips"].([]any); !ok {
+			t.Fatalf("dashboard/stats top_attacker_ips has unexpected type: %#v", m["top_attacker_ips"])
+		}
+		if _, ok := m["top_attacker_countries"].([]any); !ok {
+			t.Fatalf("dashboard/stats top_attacker_countries has unexpected type: %#v", m["top_attacker_countries"])
+		}
+		if _, ok := m["most_attacked_urls"].([]any); !ok {
+			t.Fatalf("dashboard/stats most_attacked_urls has unexpected type: %#v", m["most_attacked_urls"])
+		}
+		attackCount := asIntContract(t, m["attacks_day"])
+		blockedCount := asIntContract(t, m["blocked_attacks_day"])
+		ips := m["top_attacker_ips"].([]any)
+		countries := m["top_attacker_countries"].([]any)
+		urls := m["most_attacked_urls"].([]any)
+		if len(ips) > 0 {
+			if attackCount <= 0 {
+				t.Fatalf("dashboard/stats inconsistent: top_attacker_ips present but attacks_day=%d", attackCount)
+			}
+			if blockedCount <= 0 {
+				t.Fatalf("dashboard/stats inconsistent: top_attacker_ips present but blocked_attacks_day=%d", blockedCount)
+			}
+			if len(countries) == 0 {
+				t.Fatalf("dashboard/stats inconsistent: top_attacker_ips present but top_attacker_countries empty")
+			}
+			if len(urls) == 0 {
+				t.Fatalf("dashboard/stats inconsistent: top_attacker_ips present but most_attacked_urls empty")
+			}
+		}
 	})
 
 	t.Run("EventsContract", func(t *testing.T) {
@@ -84,5 +113,22 @@ func requireKeys(t *testing.T, data map[string]any, keys ...string) {
 		if _, ok := data[k]; !ok {
 			t.Fatalf("missing key %q in %#v", k, data)
 		}
+	}
+}
+
+func asIntContract(t *testing.T, v any) int {
+	t.Helper()
+	switch n := v.(type) {
+	case float64:
+		return int(n)
+	case int:
+		return n
+	case int32:
+		return int(n)
+	case int64:
+		return int(n)
+	default:
+		t.Fatalf("expected numeric dashboard contract value, got %T (%v)", v, v)
+		return 0
 	}
 }

@@ -647,7 +647,11 @@ function startSessionPing() {
   }
   const run = async () => {
     try {
-      await api.post("/api/app/ping", {}, { headers: { "X-Berkut-Background": "1" } });
+      await api.post("/api/app/ping", null, {
+        headers: {
+          "X-Berkut-Background": "1",
+        },
+      });
     } catch (error) {
       const status = Number(error?.status || 0);
       const message = String(error?.message || "").toLowerCase();

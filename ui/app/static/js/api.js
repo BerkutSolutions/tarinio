@@ -148,11 +148,16 @@ async function request(path, options = {}) {
 export const api = {
   get: (path, options = {}) => request(path, { method: "GET", ...options }),
   post: (path, body, options = {}) =>
-    request(path, {
-      method: "POST",
-      body: body instanceof FormData ? body : JSON.stringify(body || {}),
-      ...options,
-    }),
+    request(path, body === null
+      ? {
+          method: "POST",
+          ...options,
+        }
+      : {
+          method: "POST",
+          body: body instanceof FormData ? body : JSON.stringify(body || {}),
+          ...options,
+        }),
   put: (path, body, options = {}) => request(path, { method: "PUT", body: JSON.stringify(body || {}), ...options }),
   delete: (path, options = {}) => request(path, { method: "DELETE", ...options }),
 };

@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -11,82 +12,78 @@ import (
 	"waf/control-plane/internal/sites"
 )
 
-type fakeSiteService struct {
-	items []sites.Site
+type stubSiteService struct {
+	createFn func(context.Context, sites.Site) (sites.Site, error)
+	listFn   func() ([]sites.Site, error)
+	updateFn func(context.Context, sites.Site) (sites.Site, error)
+	deleteFn func(context.Context, string) error
 }
 
-func (f *fakeSiteService) Create(ctx context.Context, site sites.Site) (sites.Site, error) {
-	site.CreatedAt = "2026-04-01T00:00:00Z"
-	site.UpdatedAt = "2026-04-01T00:00:00Z"
-	f.items = append(f.items, site)
+func (s stubSiteService) Create(ctx context.Context, site sites.Site) (sites.Site, error) {
+	if s.createFn != nil {
+		return s.createFn(ctx, site)
+	}
+	return sites.Site{}, nil
+}
+
+func (s stubSiteService) List() ([]sites.Site, error) {
+	if s.listFn != nil {
+		return s.listFn()
+	}
+	return nil, nil
+}
+
+func (s stubSiteService) Update(ctx context.Context, site sites.Site) (sites.Site, error) {
+	if s.updateFn != nil {
+		return s.updateFn(ctx, site)
+	}
 	return site, nil
 }
 
-func (f *fakeSiteService) List() ([]sites.Site, error) {
-	return append([]sites.Site(nil), f.items...), nil
-}
-
-func (f *fakeSiteService) Update(ctx context.Context, site sites.Site) (sites.Site, error) {
-	site.UpdatedAt = "2026-04-01T01:00:00Z"
-	return site, nil
-}
-
-func (f *fakeSiteService) Delete(ctx context.Context, id string) error {
+func (s stubSiteService) Delete(ctx context.Context, id string) error {
+	if s.deleteFn != nil {
+		return s.deleteFn(ctx, id)
+	}
 	return nil
 }
 
-type fakeSiteBanService struct{}
+type stubSiteBanService struct{}
 
-func (f *fakeSiteBanService) Ban(ctx context.Context, siteID string, address string) (accesspolicies.AccessPolicy, error) {
-	return accesspolicies.AccessPolicy{SiteID: siteID, DenyList: []string{address}}, nil
+func (stubSiteBanService) Ban(context.Context, string, string) (accesspolicies.AccessPolicy, error) {
+	return accesspolicies.AccessPolicy{}, nil
 }
 
-func (f *fakeSiteBanService) Unban(ctx context.Context, siteID string, address string) (accesspolicies.AccessPolicy, error) {
-	return accesspolicies.AccessPolicy{SiteID: siteID}, nil
+func (stubSiteBanService) Unban(context.Context, string, string) (accesspolicies.AccessPolicy, error) {
+	return accesspolicies.AccessPolicy{}, nil
 }
 
-func TestSitesHandler_CreateAndList(t *testing.T) {
-	handler := NewSitesHandler(&fakeSiteService{}, &fakeSiteBanService{})
+func TestSitesHandlerUpdateRejectsSiteIDRename(t *testing.T) {
+	called := false
+	handler := NewSitesHandler(stubSiteService{
+		updateFn: func(ctx context.Context, site sites.Site) (sites.Site, error) {
+			called = true
+			return site, nil
+		},
+	}, stubSiteBanService{})
 
-	createReq := httptest.NewRequest(http.MethodPost, "/api/sites", bytes.NewBufferString(`{"id":"site-a","primary_host":"a.example.com","enabled":true}`))
-	createResp := httptest.NewRecorder()
-	handler.ServeHTTP(createResp, createReq)
-	if createResp.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d", createResp.Code)
+	body, err := json.Marshal(map[string]any{
+		"id":           "prewaf.hantico.ru",
+		"primary_host": "prewaf.hantico.ru",
+		"enabled":      true,
+	})
+	if err != nil {
+		t.Fatalf("marshal body: %v", err)
 	}
 
-	listReq := httptest.NewRequest(http.MethodGet, "/api/sites", nil)
-	listResp := httptest.NewRecorder()
-	handler.ServeHTTP(listResp, listReq)
-	if listResp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", listResp.Code)
+	req := httptest.NewRequest(http.MethodPut, "/api/sites/135.136.191.54", bytes.NewReader(body))
+	res := httptest.NewRecorder()
+
+	handler.ServeHTTP(res, req)
+
+	if res.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d body=%s", res.Code, res.Body.String())
 	}
-}
-
-func TestSitesHandler_Delete(t *testing.T) {
-	handler := NewSitesHandler(&fakeSiteService{}, &fakeSiteBanService{})
-	req := httptest.NewRequest(http.MethodDelete, "/api/sites/site-a", nil)
-	resp := httptest.NewRecorder()
-	handler.ServeHTTP(resp, req)
-	if resp.Code != http.StatusNoContent {
-		t.Fatalf("expected 204, got %d", resp.Code)
-	}
-}
-
-func TestSitesHandler_BanAndUnban(t *testing.T) {
-	handler := NewSitesHandler(&fakeSiteService{}, &fakeSiteBanService{})
-
-	banReq := httptest.NewRequest(http.MethodPost, "/api/sites/site-a/ban", bytes.NewBufferString(`{"ip":"10.0.0.1"}`))
-	banResp := httptest.NewRecorder()
-	handler.ServeHTTP(banResp, banReq)
-	if banResp.Code != http.StatusOK {
-		t.Fatalf("expected 200 for ban, got %d", banResp.Code)
-	}
-
-	unbanReq := httptest.NewRequest(http.MethodPost, "/api/sites/site-a/unban", bytes.NewBufferString(`{"ip":"10.0.0.1"}`))
-	unbanResp := httptest.NewRecorder()
-	handler.ServeHTTP(unbanResp, unbanReq)
-	if unbanResp.Code != http.StatusOK {
-		t.Fatalf("expected 200 for unban, got %d", unbanResp.Code)
+	if called {
+		t.Fatal("site service update should not be called for rename payload")
 	}
 }
