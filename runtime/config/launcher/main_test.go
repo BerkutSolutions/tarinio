@@ -264,4 +264,18 @@ func TestRuntimeHandlers_RequireTokenWhenConfigured(t *testing.T) {
 		t.Fatalf("expected 200 with runtime token, got %d", resp.StatusCode)
 	}
 	_ = resp.Body.Close()
+
+	req, err = http.NewRequest(http.MethodGet, server.URL+"/readyz", nil)
+	if err != nil {
+		t.Fatalf("new legacy-header request failed: %v", err)
+	}
+	req.Header.Set(legacyRuntimeAuthHeader, "runtime-secret")
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request with legacy runtime token failed: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 with legacy runtime token, got %d", resp.StatusCode)
+	}
+	_ = resp.Body.Close()
 }

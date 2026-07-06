@@ -20,6 +20,7 @@ import (
 const defaultRuntimeRoot = "/var/lib/waf"
 const defaultHealthAddr = "127.0.0.1:8081"
 const runtimeAuthHeader = "X-WAF-Runtime-Token"
+const legacyRuntimeAuthHeader = "X-WAF-Internal-Token"
 const defaultBootstrapUIUpstream = "http://ui:80"
 
 func bootstrapUIUpstream() string {
@@ -497,7 +498,11 @@ func runtimeRequestAuthorized(r *http.Request) bool {
 	}
 	expectedToken := strings.TrimSpace(os.Getenv("WAF_RUNTIME_API_TOKEN"))
 	if expectedToken != "" {
-		return subtleConstantTimeEqual(strings.TrimSpace(r.Header.Get(runtimeAuthHeader)), expectedToken)
+		presentedToken := strings.TrimSpace(r.Header.Get(runtimeAuthHeader))
+		if presentedToken == "" {
+			presentedToken = strings.TrimSpace(r.Header.Get(legacyRuntimeAuthHeader))
+		}
+		return subtleConstantTimeEqual(presentedToken, expectedToken)
 	}
 	return requestFromLoopback(r)
 }
