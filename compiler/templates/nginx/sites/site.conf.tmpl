@@ -167,9 +167,7 @@ server {
 
     location ^~ /static/ {
         proxy_intercept_errors off;
-{{- if not .UseEasyConfig }}
         modsecurity off;
-{{- end }}
 {{- if .PassHostHeader }}
         proxy_set_header Host $http_host;
 {{- end }}
