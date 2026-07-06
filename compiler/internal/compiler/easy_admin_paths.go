@@ -109,6 +109,9 @@ func isManagementSiteID(siteID string) bool {
 	if normalized == "localhost" {
 		return true
 	}
+	if strings.HasPrefix(normalized, "waf") || strings.HasPrefix(normalized, "prewaf") {
+		return true
+	}
 	switch normalized {
 	case "control-plane-access", "control-plane", "ui":
 		return true
