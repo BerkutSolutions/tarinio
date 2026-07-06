@@ -130,13 +130,14 @@ func RenderSiteUpstreamArtifacts(sites []SiteInput, upstreams []UpstreamInput) (
 			mtlsSnippet = buildMTLSServerSnippet(site.MTLS)
 		}
 
+		isManagement := isManagementSite(site)
 		siteContent, err := renderTemplate("templates/nginx/sites/site.conf.tmpl", nginxSiteData{
 			SiteID:                    site.ID,
 			SiteIDSlug:                slugSiteID(site.ID),
 			ServerNames:               collectServerNames(site),
 			ListenHTTP:                site.ListenHTTP,
 			ListenHTTPS:               site.ListenHTTPS,
-			IsManagementSite:          isManagementSiteID(site.ID),
+			IsManagementSite:          isManagement,
 			ManagementAPIProxyTarget:  managementAPIProxyTarget(),
 			UIProxyTarget:             uiProxyTarget(),
 			UpstreamName:              upstreamBlockName(site.ID, upstream.ID),
