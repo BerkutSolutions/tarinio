@@ -68,6 +68,14 @@ step() {
   printf "%s[%s..%s] %s\n" "$C_BOLD" "$C_BLUE" "$C_RESET" "$1"
 }
 
+step_inline() {
+  if [ -t 1 ]; then
+    printf "%s[%s..%s] %s" "$C_BOLD" "$C_BLUE" "$C_RESET" "$1"
+  else
+    printf "%s[%s..%s] %s\n" "$C_BOLD" "$C_BLUE" "$C_RESET" "$1"
+  fi
+}
+
 ok() {
   printf "%s[%sOK%s] %s\n" "$C_BOLD" "$C_GREEN" "$C_RESET" "$1"
 }
@@ -586,6 +594,10 @@ reset_screen
 section "TARINIO AIO Installer"
 step "Checking required tools"
 
+if [ ! -t 1 ]; then
+  echo "Installer started. Detailed log: $LOG_FILE"
+fi
+
 if command -v docker >/dev/null 2>&1; then
   ok "docker detected"
 else
@@ -690,11 +702,11 @@ else
   ok "no existing containers from this profile"
 fi
 
-step "Building images (details are written to log)"
+step_inline "Building images (details are written to log; this can take several minutes)"
 run_logged $COMPOSE_CMD -f docker-compose.yml build
 ok "images built"
 
-step "Starting containers"
+step_inline "Starting containers"
 run_logged $COMPOSE_CMD -f docker-compose.yml up -d
 ok "containers started"
 

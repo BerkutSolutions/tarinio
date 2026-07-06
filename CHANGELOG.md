@@ -40,7 +40,7 @@
 
 ### Инфраструктура
 
-- Версия синхронизирована на 1.4.7 через штатный механизм: метаданные приложения, npm package metadata и i18n `app.version` во всех поддерживаемых локалях обновлены единообразно.
+- Версия синхронизирована на 1.4.8 через штатный механизм: метаданные приложения, npm package metadata и i18n `app.version` во всех поддерживаемых локалях обновлены единообразно.
 - Install/upgrade scripts больше не ротируют существующие placeholder-like секреты автоматически при апгрейде уже развернутого стека: существующий `.env` сохраняется как источник истины, а инсталлеры выводят явную подсказку использовать `scripts/rotate-env-secrets.sh` для осознанной аварийной ротации.
 - Добавлен `scripts/rotate-env-secrets.sh`: аварийный и операционный сценарий ротации `POSTGRES_PASSWORD`, `POSTGRES_DSN`, `OPENSEARCH_PASSWORD`, `CONTROL_PLANE_SECURITY_PEPPER` и `WAF_RUNTIME_API_TOKEN` с синхронизацией Postgres-пароля и обязательной health-проверкой control-plane/runtime после перезапуска.
 - App-compat contract tests теперь страхуют installer-путь: оба инсталлера обязаны маркировать upgrade-flow, ссылаться на script ротации секретов, а `rotate-env-secrets.sh` обязан реально ротировать Postgres и проверять работоспособность стека после ротации.
