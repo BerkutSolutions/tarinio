@@ -37,7 +37,7 @@ fi
 
 reset_screen() {
   target=""
-  if [ -c /dev/tty ] && [ -w /dev/tty ]; then
+  if tty -s 2>/dev/null && [ -c /dev/tty ] && [ -w /dev/tty ]; then
     target="/dev/tty"
   elif [ -t 1 ]; then
     target="/dev/stdout"
