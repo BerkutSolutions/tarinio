@@ -118,6 +118,9 @@ func TestUIContract_OnboardingAndSidebarMarkers(t *testing.T) {
 				filepath.Join("..", "app", "static", "js", "pages", "sites.detail-submit-delete.js"),
 				filepath.Join("..", "app", "static", "js", "pages", "sites.auth-extended-editors.js"),
 				filepath.Join("..", "app", "static", "js", "pages", "sites.page-main-actions-runtime.js"),
+				filepath.Join("..", "app", "static", "js", "pages", "sites.detail-draft-builder.js"),
+				filepath.Join("..", "app", "static", "js", "pages", "sites.modsec-exclusion-editors.js"),
+				filepath.Join("..", "app", "static", "js", "pages", "sites.draft-core.js"),
 			},
 			markers: []string{
 				`function computeUpstreamID(siteID)`,
@@ -143,6 +146,12 @@ func TestUIContract_OnboardingAndSidebarMarkers(t *testing.T) {
 				`buildGeoCatalogFallback`,
 				`normalizeGeoCatalogPayload`,
 				`pendingImportedDraftRef`,
+				`normalizeModSecurityExclusionRules`,
+				`modsecurity_exclusion_rules`,
+				`use_modsecurity_custom_configuration`,
+				`security_modsecurity: {`,
+				`custom_configuration: {`,
+				`state.rawEnvText = draftToEnvText`,
 			},
 		},
 		{

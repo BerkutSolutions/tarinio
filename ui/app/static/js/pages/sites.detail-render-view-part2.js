@@ -1,5 +1,5 @@
 export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
-  const { escapeHtml, renderListEditor, getQuickListTemplates, normalizeStringArray, renderStatusCodesEditor, renderCustomLimitRulesEditor, renderAntibotExclusionRulesEditor, normalizeBanEscalationStages, formatBanDurationSeconds, renderAntibotChallengeRulesEditor, renderAuthSessionTtlOptions, renderAuthUsersEditor, renderCountryEditor, renderAuthExclusionRulesEditor, renderAuthServiceTokensEditor, renderAuthHelpModal, renderAntibotHelpModal, renderTrafficBadBehaviorHelpModal, renderTrafficBlacklistHelpModal, renderTrafficAllowlistHelpModal, renderTrafficLimitsHelpModal, renderTrafficDnsblHelpModal, renderHeadersChapterHelpModal, renderBlockingChapterHelpModal, renderAntibotChapterHelpModal, renderGeoChapterHelpModal, renderModsecChapterHelpModal, renderGeoTimeWindowsEditor, normalizeAuthMode, renderVirtualPatchesEditor, renderWebSocketChapterHelpModal, renderVirtualPatchesChapterHelpModal, renderErrorPagesTab } = deps;
+  const { escapeHtml, renderListEditor, getQuickListTemplates, normalizeStringArray, renderStatusCodesEditor, renderCustomLimitRulesEditor, renderAntibotExclusionRulesEditor, renderModSecurityExclusionRulesEditor, normalizeBanEscalationStages, formatBanDurationSeconds, renderAntibotChallengeRulesEditor, renderAuthSessionTtlOptions, renderAuthUsersEditor, renderCountryEditor, renderAuthExclusionRulesEditor, renderAuthServiceTokensEditor, renderAuthHelpModal, renderAntibotHelpModal, renderTrafficBadBehaviorHelpModal, renderTrafficBlacklistHelpModal, renderTrafficAllowlistHelpModal, renderTrafficLimitsHelpModal, renderTrafficDnsblHelpModal, renderHeadersChapterHelpModal, renderBlockingChapterHelpModal, renderAntibotChapterHelpModal, renderGeoChapterHelpModal, renderModsecChapterHelpModal, renderGeoTimeWindowsEditor, normalizeAuthMode, renderVirtualPatchesEditor, renderWebSocketChapterHelpModal, renderVirtualPatchesChapterHelpModal, renderErrorPagesTab } = deps;
   const authMode = normalizeAuthMode(draft.auth_mode);
   return `
 
@@ -415,6 +415,7 @@ export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
                     <label for="service-modsecurity-custom-content">${escapeHtml(ctx.t("sites.easy.modsec.customContent"))}</label>
                     <textarea id="service-modsecurity-custom-content" rows="6">${escapeHtml(draft.modsecurity_custom_content)}</textarea>
                   </div>
+                  ${renderModSecurityExclusionRulesEditor(draft.modsecurity_exclusion_rules, ctx)}
                 </div>
               </section>
 

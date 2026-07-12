@@ -13,6 +13,7 @@ func buildEasyModSecurityRules(
 	useCRSPlugins bool,
 	crsVersion string,
 	plugins []string,
+	exclusionRules []ModSecurityExclusionRuleInput,
 	useCustomConfiguration bool,
 	customPath,
 	customContent string,
@@ -51,6 +52,9 @@ func buildEasyModSecurityRules(
 			lines = append(lines, fmt.Sprintf("Include /etc/waf/modsecurity/crs-overrides/%s.conf", strings.TrimSpace(plugin)))
 		}
 	}
+	if len(exclusionRules) > 0 {
+		lines = append(lines, buildModSecurityExclusionRules(exclusionRules)...)
+	}
 	if useCustomConfiguration && strings.TrimSpace(customPath) != "" {
 		lines = append(lines, "# custom_path: "+strings.TrimSpace(customPath))
 	}
@@ -64,6 +68,60 @@ func buildEasyModSecurityRules(
 		lines = append(lines, buildVirtualPatchModSecurityRules(virtualPatches)...)
 	}
 	return strings.Join(lines, "\n") + "\n"
+}
+
+func buildModSecurityExclusionRules(rules []ModSecurityExclusionRuleInput) []string {
+	lines := []string{"# structured_exclusion_rules"}
+	ruleID := 191000
+	for _, rule := range rules {
+		matcher, matcherOperator := buildExclusionPathMatcher(rule)
+		if matcher == "" {
+			continue
+		}
+		methodsPattern := strings.Join(rule.Methods, "|")
+		actions := []string{"t:none"}
+		if len(rule.Targets) > 0 {
+			for _, target := range rule.Targets {
+				for _, excludedRuleID := range rule.RuleIDs {
+					actions = append(actions, fmt.Sprintf("ctl:ruleRemoveTargetById=%d;%s", excludedRuleID, target))
+				}
+			}
+		} else {
+			for _, excludedRuleID := range rule.RuleIDs {
+				actions = append(actions, fmt.Sprintf("ctl:ruleRemoveById=%d", excludedRuleID))
+			}
+		}
+		lines = append(lines,
+			fmt.Sprintf("# exclusion_comment: %s", strings.TrimSpace(rule.Comment)),
+			fmt.Sprintf(`SecRule REQUEST_METHOD "@rx ^(?:%s)$" "id:%d,phase:1,t:none,chain,pass,nolog"`, methodsPattern, ruleID),
+			fmt.Sprintf(`SecRule REQUEST_URI "%s %s" "%s"`, matcherOperator, matcher, strings.Join(actions, ",")),
+		)
+		ruleID += 1
+	}
+	return lines
+}
+
+func buildExclusionPathMatcher(rule ModSecurityExclusionRuleInput) (string, string) {
+	mode := strings.ToLower(strings.TrimSpace(rule.Mode))
+	switch mode {
+	case "regex":
+		if strings.TrimSpace(rule.PathPattern) == "" {
+			return "", ""
+		}
+		return strings.TrimSpace(rule.PathPattern), "@rx"
+	case "prefix":
+		path := strings.TrimSpace(rule.Path)
+		if path == "" {
+			return "", ""
+		}
+		return "^" + regexp.QuoteMeta(path) + "(?:$|/)", "@rx"
+	default:
+		path := strings.TrimSpace(rule.Path)
+		if path == "" {
+			return "", ""
+		}
+		return "^" + regexp.QuoteMeta(path) + "$", "@rx"
+	}
 }
 
 func buildAPIPositiveModSecurityRules(siteID, schemaRef, enforcementMode, defaultAction string, policies []APIPositiveEndpointPolicyInput) []string {

@@ -7,6 +7,7 @@ import {
   normalizeStringArray,
 } from "./sites.normalize.js";
 import { renderAntibotExclusionRulesEditor as renderAntibotExclusionRulesEditorModule } from "./sites.antibot-exclusion-editors.js";
+import { renderModSecurityExclusionRulesEditor as renderModSecurityExclusionRulesEditorModule } from "./sites.modsec-exclusion-editors.js";
 import {
   normalizeAuthExclusionRules,
   normalizeAuthMode,
@@ -155,6 +156,10 @@ function renderAntibotExclusionRulesEditor(rules, ctx) {
   return renderAntibotExclusionRulesEditorModule(rules, ctx, { escapeHtml, normalizeArray });
 }
 
+function renderModSecurityExclusionRulesEditor(rules, ctx) {
+  return renderModSecurityExclusionRulesEditorModule(rules, ctx, { escapeHtml, normalizeArray });
+}
+
 const renderAuthHelpModalSafe = (ctx) => renderAuthHelpModal(ctx, { escapeHtml });
 const renderAntibotHelpModalSafe = (ctx) => renderAntibotHelpModal(ctx, { escapeHtml });
 const renderTrafficBadBehaviorHelpModalSafe = (ctx) => renderTrafficBadBehaviorHelpModal(ctx, escapeHtml);
@@ -194,6 +199,7 @@ export function renderDetailView(state, ctx) {
     renderStatusCodesEditor,
     renderCustomLimitRulesEditor,
     renderAntibotExclusionRulesEditor,
+    renderModSecurityExclusionRulesEditor,
     normalizeBanEscalationStages,
     formatBanDurationSeconds,
     renderAntibotChallengeRulesEditor,

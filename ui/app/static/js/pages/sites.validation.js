@@ -26,7 +26,6 @@ export function validateDraft(draft, ctx) {
   if (draft.use_limit_req && !String(draft.limit_req_rate || "").trim()) return ctx.t("sites.validation.limitReqRateRequired");
   if (draft.use_limit_req && !/^\d+r\/[sm]$/i.test(String(draft.limit_req_rate || "").trim().replace(/\s+/g, ""))) return ctx.t("sites.validation.limitReqRateFormat");
   if (normalizeCustomLimitRules(draft.custom_limit_rules, { normalizeArray }).length > 32) return ctx.t("sites.validation.customLimitRulesLimit");
-  if (draft.antibot_challenge === "no" && normalizeAntibotExclusionRules(draft.antibot_exclusion_rules).length) return ctx.t("sites.validation.antibotExclusionsRequireEnabled");
   if (draft.hsts_enabled && (!Number.isFinite(draft.hsts_max_age_seconds) || Number(draft.hsts_max_age_seconds) <= 0)) return ctx.t("sites.validation.hstsMaxAgePositive");
   if (draft.hsts_preload && !draft.hsts_enabled) return ctx.t("sites.validation.hstsPreloadNeedsEnabled");
   if (draft.hsts_include_subdomains && !draft.hsts_enabled) return ctx.t("sites.validation.hstsPreloadNeedsEnabled");

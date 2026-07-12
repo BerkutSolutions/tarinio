@@ -320,9 +320,7 @@ func TestFront_SecurityMode_Disabled_NoModSec(t *testing.T) {
 	}
 }
 
-func TestFront_SecurityMode_Monitor_NoModSecArtifact(t *testing.T) {
-	// monitor режим не генерирует modsec артефакт — SecRuleEngine DetectionOnly
-	// задаётся только когда UseModSecurity=true в block режиме.
+func TestFront_SecurityMode_Monitor_DetectionOnlyModSecArtifact(t *testing.T) {
 	artifacts, err := RenderEasyArtifacts(
 		[]SiteInput{{ID: "sec-monitor", Enabled: true, PrimaryHost: "sec-monitor.example.com", ListenHTTP: true}},
 		[]EasyProfileInput{{
@@ -337,8 +335,16 @@ func TestFront_SecurityMode_Monitor_NoModSecArtifact(t *testing.T) {
 		t.Fatalf("RenderEasyArtifacts: %v", err)
 	}
 	byPath := artifactsByPath(artifacts)
-	if _, ok := byPath["modsecurity/easy/sec-monitor.conf"]; ok {
-		t.Fatal("did not expect modsecurity/easy artifact for monitor mode")
+	modsec, ok := byPath["modsecurity/easy/sec-monitor.conf"]
+	if !ok {
+		t.Fatal("expected modsecurity/easy artifact for monitor mode")
+	}
+	if !strings.Contains(string(modsec.Content), "SecRuleEngine DetectionOnly") {
+		t.Fatalf("expected detection-only modsecurity engine for monitor mode, got:\n%s", string(modsec.Content))
+	}
+	siteConf := string(byPath["nginx/easy/sec-monitor.conf"].Content)
+	if !strings.Contains(siteConf, "modsecurity_rules_file /etc/waf/modsecurity/easy/sec-monitor.conf;") {
+		t.Fatalf("expected monitor mode site conf to reference easy modsecurity rules, got:\n%s", siteConf)
 	}
 }
 

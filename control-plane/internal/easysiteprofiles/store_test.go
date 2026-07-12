@@ -241,6 +241,39 @@ func TestStore_CreateRejectsInvalidModSecurityCRSVersion(t *testing.T) {
 	}
 }
 
+func TestStore_CreateRejectsInvalidModSecurityExclusionRuleID(t *testing.T) {
+	store, err := NewStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	profile := DefaultProfile("site-a")
+	profile.SecurityModSecurity.ExclusionRules = []ModSecurityExclusionRule{{
+		Path:    "/api/",
+		Methods: []string{"GET"},
+		RuleIDs: []int{0},
+	}}
+	if _, err := store.Create(profile); err == nil {
+		t.Fatal("expected validation error for invalid modsecurity exclusion rule id")
+	}
+}
+
+func TestStore_CreateRejectsInvalidModSecurityExclusionTarget(t *testing.T) {
+	store, err := NewStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	profile := DefaultProfile("site-a")
+	profile.SecurityModSecurity.ExclusionRules = []ModSecurityExclusionRule{{
+		Path:    "/api/",
+		Methods: []string{"GET"},
+		RuleIDs: []int{949110},
+		Targets: []string{"INVALID"},
+	}}
+	if _, err := store.Create(profile); err == nil {
+		t.Fatal("expected validation error for invalid modsecurity exclusion target")
+	}
+}
+
 func TestStore_UpdateAutoRepairsControlPlaneAccessAPIMethods(t *testing.T) {
 	store, err := NewStore(t.TempDir())
 	if err != nil {

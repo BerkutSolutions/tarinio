@@ -2,6 +2,7 @@ package compiler
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -44,13 +45,11 @@ func buildEasyProfileBySite(profiles []EasyProfileInput) (map[string]EasyProfile
 		}
 		profile.AuthUsers = normalizeAuthUsers(profile.AuthUsers)
 		if len(profile.AuthUsers) == 0 && profile.AuthBasicUser != "" {
-			profile.AuthUsers = []ServiceAuthUserInput{
-				{
-					Username: profile.AuthBasicUser,
-					Password: profile.AuthBasicPassword,
-					Enabled:  true,
-				},
-			}
+			profile.AuthUsers = []ServiceAuthUserInput{{
+				Username: profile.AuthBasicUser,
+				Password: profile.AuthBasicPassword,
+				Enabled:  true,
+			}}
 		}
 		if profile.AuthBasicUser == "" && len(profile.AuthUsers) > 0 {
 			profile.AuthBasicUser = profile.AuthUsers[0].Username
@@ -93,6 +92,7 @@ func buildEasyProfileBySite(profiles []EasyProfileInput) (map[string]EasyProfile
 			profile.ModSecurityCRSVersion = "4"
 		}
 		profile.ModSecurityCRSPlugins = sortedUnique(profile.ModSecurityCRSPlugins)
+		profile.ModSecurityExclusionRules = normalizeCompilerModSecurityExclusionRules(profile.ModSecurityExclusionRules)
 		profile.ModSecurityCustomPath = strings.TrimSpace(profile.ModSecurityCustomPath)
 		if profile.ModSecurityCustomPath == "" {
 			profile.ModSecurityCustomPath = "modsec/anomaly_score.conf"
@@ -133,10 +133,10 @@ func applySecurityModePolicy(profile EasyProfileInput) EasyProfileInput {
 	mode := strings.ToLower(strings.TrimSpace(profile.SecurityMode))
 	switch mode {
 	case "transparent":
-		// Transparent mode is fully passive: disable all active protection modules.
 		profile.UseModSecurity = false
 		profile.UseModSecurityCRSPlugins = false
 		profile.UseModSecurityCustomConfiguration = false
+		profile.ModSecurityExclusionRules = nil
 		profile.UseAPIPositiveSecurity = false
 		profile.UseLimitConn = false
 		profile.UseLimitReq = false
@@ -158,10 +158,6 @@ func applySecurityModePolicy(profile EasyProfileInput) EasyProfileInput {
 		profile.AntibotChallengeRules = nil
 		profile.UseAuthBasic = false
 	case "monitor":
-		// Monitor mode is passive: do not apply security policies, keep only generic request logging.
-		profile.UseModSecurity = false
-		profile.UseModSecurityCRSPlugins = false
-		profile.UseModSecurityCustomConfiguration = false
 		profile.UseLimitConn = false
 		profile.UseLimitReq = false
 		profile.CustomLimitRules = nil
@@ -181,7 +177,55 @@ func applySecurityModePolicy(profile EasyProfileInput) EasyProfileInput {
 		profile.AntibotExclusionRules = nil
 		profile.AntibotChallengeRules = nil
 		profile.UseAuthBasic = false
-		profile.UseAPIPositiveSecurity = false
 	}
 	return profile
+}
+
+func normalizeCompilerModSecurityExclusionRules(value []ModSecurityExclusionRuleInput) []ModSecurityExclusionRuleInput {
+	items := make([]ModSecurityExclusionRuleInput, 0, len(value))
+	seen := make(map[string]struct{}, len(value))
+	for _, item := range value {
+		rule := ModSecurityExclusionRuleInput{
+			Path:        strings.TrimSpace(item.Path),
+			PathPattern: strings.TrimSpace(item.PathPattern),
+			Methods:     sortedUniqueUpper(item.Methods),
+			Mode:        strings.ToLower(strings.TrimSpace(item.Mode)),
+			RuleIDs:     normalizeCompilerPositiveInts(item.RuleIDs),
+			Targets:     sortedUnique(item.Targets),
+			Comment:     strings.TrimSpace(item.Comment),
+		}
+		if rule.Mode == "" {
+			rule.Mode = "exact"
+		}
+		if len(rule.Methods) == 0 || slices.Contains(rule.Methods, "*") {
+			rule.Methods = []string{"*"}
+		}
+		key := strings.ToLower(rule.Path) + "\x00" + rule.PathPattern + "\x00" + rule.Mode + "\x00" + strings.Join(rule.Methods, ",") + "\x00" + joinCompilerInts(rule.RuleIDs) + "\x00" + strings.Join(rule.Targets, ",")
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		items = append(items, rule)
+	}
+	return items
+}
+
+func normalizeCompilerPositiveInts(values []int) []int {
+	items := make([]int, 0, len(values))
+	for _, value := range values {
+		if value <= 0 {
+			continue
+		}
+		items = append(items, value)
+	}
+	slices.Sort(items)
+	return slices.Compact(items)
+}
+
+func joinCompilerInts(values []int) string {
+	parts := make([]string, 0, len(values))
+	for _, value := range values {
+		parts = append(parts, fmt.Sprintf("%d", value))
+	}
+	return strings.Join(parts, ",")
 }

@@ -1,5 +1,6 @@
 import { readAntibotExclusionDraftRows } from "./sites.antibot-exclusion-editors.js";
 import { readAuthExclusionDraftRows } from "./sites.auth-extended-editors.js";
+import { readModSecurityExclusionDraftRows } from "./sites.modsec-exclusion-editors.js";
 
 export function bindDetailListEditors(container, state, deps) {
   const {
@@ -12,6 +13,7 @@ export function bindDetailListEditors(container, state, deps) {
     normalizeAuthBasicUsers,
     normalizeAuthExclusionRules,
     normalizeAuthServiceTokens,
+    normalizeModSecurityExclusionRules,
     syncAuthPasswordToggle,
     normalizeArray,
     parseBanDurationSeconds,
@@ -302,6 +304,36 @@ export function bindDetailListEditors(container, state, deps) {
       const nextVisible = input.type !== "text";
       input.type = nextVisible ? "text" : "password";
       syncAuthPasswordToggle(button, nextVisible, ctx);
+    });
+  });
+
+  const syncModSecurityExclusionDraftRows = () => {
+    syncStateDraftFromForm();
+    state.draft.modsecurity_exclusion_rules = readModSecurityExclusionDraftRows(container, { normalizeArray });
+    return state.draft.modsecurity_exclusion_rules;
+  };
+  container.querySelector("[data-modsec-exclusion-add]")?.addEventListener("click", () => {
+    const current = syncModSecurityExclusionDraftRows();
+    state.draft.modsecurity_exclusion_rules = [...current, {
+      path: "",
+      path_pattern: "",
+      methods: ["*"],
+      mode: "exact",
+      rule_ids: [],
+      targets: [],
+      comment: "",
+    }];
+    render();
+  });
+  container.querySelectorAll("[data-modsec-exclusion-remove]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const index = Number.parseInt(String(button.dataset.modsecExclusionRemove || "-1"), 10);
+      if (!Number.isInteger(index) || index < 0) return;
+      const current = syncModSecurityExclusionDraftRows();
+      if (index >= current.length) return;
+      current.splice(index, 1);
+      state.draft.modsecurity_exclusion_rules = normalizeModSecurityExclusionRules(current, { normalizeArray });
+      render();
     });
   });
 

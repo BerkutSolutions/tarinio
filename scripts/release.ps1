@@ -414,6 +414,55 @@ function Invoke-LabTerraformNoTraceCheck {
   Invoke-Checked -Command "powershell" -Arguments @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $scriptPath)
 }
 
+function Get-GitBashPath {
+  $gitBash = @(
+    "C:\Program Files\Git\bin\bash.exe",
+    "C:\Program Files\Git\usr\bin\bash.exe",
+    "$env:ProgramFiles\Git\bin\bash.exe"
+  ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+  if (-not $gitBash) {
+    $gitBash = Get-Command bash -ErrorAction SilentlyContinue | Where-Object { $_.Source -notmatch "WindowsApps|wsl" } | Select-Object -First 1 -ExpandProperty Source
+  }
+  if (-not $gitBash) {
+    throw "Git bash not found; install Git for Windows"
+  }
+  return $gitBash
+}
+
+function Invoke-E2ERuntimeSuite {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Filter
+  )
+
+  $repoRoot = (Get-Location).Path
+  $scriptPath = Join-Path $repoRoot "scripts\run-e2e-tests.sh"
+  if (-not (Test-Path $scriptPath)) {
+    throw "run-e2e-tests.sh not found at $scriptPath"
+  }
+
+  $gitBash = Get-GitBashPath
+  $scriptMsys = $scriptPath -replace '\\','/' -replace '^([A-Za-z]):','/$1'
+  $repoMsys = $repoRoot -replace '\\','/' -replace '^([A-Za-z]):','/$1'
+
+  try {
+    $env:E2E_FILTER = $Filter
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $gitBash
+    $psi.Arguments = "--login `"$scriptMsys`" `"$repoMsys`""
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardOutput = $false
+    $psi.RedirectStandardError = $false
+    $proc = [System.Diagnostics.Process]::Start($psi)
+    $proc.WaitForExit()
+    if ($proc.ExitCode -ne 0) {
+      throw "e2e suite failed (filter=$Filter, exit $($proc.ExitCode))"
+    }
+  } finally {
+    Remove-Item Env:\E2E_FILTER -ErrorAction SilentlyContinue
+  }
+}
+
 function Run-StartupChecks {
   $results = @()
   $checks = @(
@@ -433,51 +482,27 @@ function Run-StartupChecks {
     @{ Name = "tab feature tests (ban escalation, tab 5)"; Action = { Invoke-Checked -Command "go" -Arguments @("test", "./control-plane/internal/easysiteprofiles/", "-run", "^TestBanEscalation_", "-count=1") } },
     @{ Name = "go test ./..."; Action = { Invoke-Checked -Command "go" -Arguments @("test", "./...", "-count=1") } },
     @{ Name = "ui i18n quality"; Action = { Invoke-Checked -Command "go" -Arguments @("test", "./ui/tests", "-run", "TestI18NValuesNonEmpty", "-count=1") } },
-    @{ Name = "ui e2e security modes reality"; Action = { Invoke-Checked -Command "go" -Arguments @("test", "./ui/tests", "-run", "TestE2ESecurityModesReality", "-count=1") } },
-    @{ Name = "e2e behavioral suite (full runtime stack)"; Action = {
-        $repoRoot = (Get-Location).Path
-        $scriptPath = Join-Path $repoRoot "scripts\run-e2e-tests.sh"
-        if (-not (Test-Path $scriptPath)) { throw "run-e2e-tests.sh not found at $scriptPath" }
-        # Ищем Git bash явно — WSL relay не подходит (нет /bin/bash внутри).
-        $gitBash = @(
-            "C:\Program Files\Git\bin\bash.exe",
-            "C:\Program Files\Git\usr\bin\bash.exe",
-            "$env:ProgramFiles\Git\bin\bash.exe"
-        ) | Where-Object { Test-Path $_ } | Select-Object -First 1
-        if (-not $gitBash) {
-            $gitBash = Get-Command bash -ErrorAction SilentlyContinue | Where-Object { $_.Source -notmatch "WindowsApps|wsl" } | Select-Object -First 1 -ExpandProperty Source
-        }
-        if (-not $gitBash) { throw "Git bash not found; install Git for Windows" }
-        # Конвертируем Windows путь в MSYS путь для bash.
-        $scriptMsys = $scriptPath -replace '\\','/' -replace '^([A-Za-z]):','/$1'
-        $repoMsys   = $repoRoot   -replace '\\','/' -replace '^([A-Za-z]):','/$1'
-        $env:E2E_FILTER = "TestE2EBehavioral"
-        # Запускаем через Start-Process чтобы избежать двойного экранирования кавычек
-        # при передаче JSON через -c "...". bash читает скрипт напрямую как файл.
-        $psi = New-Object System.Diagnostics.ProcessStartInfo
-        $psi.FileName = $gitBash
-        $psi.Arguments = "--login `"$scriptMsys`" `"$repoMsys`""
-        $psi.UseShellExecute = $false
-        $psi.RedirectStandardOutput = $false
-        $psi.RedirectStandardError = $false
-        $proc = [System.Diagnostics.Process]::Start($psi)
-        $proc.WaitForExit()
-        Remove-Item Env:\E2E_FILTER -ErrorAction SilentlyContinue
-        if ($proc.ExitCode -ne 0) { throw "e2e behavioral suite failed (exit $($proc.ExitCode))" }
-    } },
+    @{ Name = "ui e2e security modes reality (full runtime stack)"; Action = { Invoke-E2ERuntimeSuite -Filter "TestE2ESecurityModesReality" } },
+    @{ Name = "e2e behavioral suite (full runtime stack)"; Action = { Invoke-E2ERuntimeSuite -Filter "TestE2EBehavioral" } },
     @{ Name = "docs ru wiki quality"; Action = { Invoke-Checked -Command "go" -Arguments @("test", "./ui/tests", "-run", "TestDocsRuWikiNoMixedEnglish", "-count=1") } },
     @{ Name = "lab k8s no-trace preflight"; Action = { Invoke-LabK8sNoTraceCheck } },
     @{ Name = "lab terraform no-trace preflight"; Action = { Invoke-LabTerraformNoTraceCheck } }
   )
   foreach ($check in $checks) {
+    Write-Status "RUN" $check.Name
     $ok = $false
     $errText = ""
     try {
       & $check.Action | Out-Null
       $ok = $true
+      Write-Status "OK" $check.Name
     } catch {
       $ok = $false
       $errText = $_.Exception.Message
+      Write-Status "FAIL" $check.Name
+      if (-not [string]::IsNullOrWhiteSpace($errText)) {
+        Write-Info ("      " + $errText)
+      }
     }
     $results += [PSCustomObject]@{
       Name  = $check.Name
@@ -485,7 +510,7 @@ function Run-StartupChecks {
       Error = $errText
     }
   }
-  return $results
+  return @($results)
 }
 
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
@@ -529,19 +554,23 @@ Write-KeyValue "Release tag" $tag
 Write-KeyValue "Docker image" $ghcrVersion
 
 Write-Title "Startup Test Checks"
-$startupResults = Run-StartupChecks
-$allStartupChecksPassed = $true
-foreach ($result in $startupResults) {
-  if ($result.Ok) {
-    Write-Status "OK" $result.Name
-  } else {
-    Write-Status "FAIL" $result.Name
-    if (-not [string]::IsNullOrWhiteSpace($result.Error)) {
-      Write-Info ("      " + $result.Error)
-    }
-    $allStartupChecksPassed = $false
-  }
+$expectedStartupCheckCount = 13
+$startupResults = @(Run-StartupChecks)
+$executedStartupCheckCount = @($startupResults).Count
+$passedStartupCheckCount = @($startupResults | Where-Object { $_.Ok }).Count
+$failedStartupCheckCount = $executedStartupCheckCount - $passedStartupCheckCount
+
+Write-Title "Startup Test Summary"
+Write-KeyValue "Expected checks" ([string]$expectedStartupCheckCount)
+Write-KeyValue "Executed checks" ([string]$executedStartupCheckCount)
+Write-KeyValue "Passed checks" ([string]$passedStartupCheckCount)
+Write-KeyValue "Failed checks" ([string]$failedStartupCheckCount)
+
+if ($executedStartupCheckCount -ne $expectedStartupCheckCount) {
+  throw "startup test check count mismatch: expected $expectedStartupCheckCount, executed $executedStartupCheckCount"
 }
+
+$allStartupChecksPassed = ($failedStartupCheckCount -eq 0)
 
 $normalizedArgMode = Normalize-Mode $Mode
 $interactiveModeSelection = [string]::IsNullOrWhiteSpace($normalizedArgMode)

@@ -2,6 +2,7 @@ package services
 
 import (
 	"testing"
+	"time"
 
 	"waf/control-plane/internal/events"
 	"waf/control-plane/internal/jobs"
@@ -27,6 +28,44 @@ func (f *fakeReportRevisionStore) List() ([]revisions.Revision, error) {
 }
 
 func (f *fakeReportRevisionStore) CurrentActive() (revisions.Revision, bool, error) {
+	return f.active, f.ok, nil
+}
+
+type countingReportEventStore struct {
+	items     []events.Event
+	listCalls int
+}
+
+func (f *countingReportEventStore) List() ([]events.Event, error) {
+	f.listCalls++
+	return append([]events.Event(nil), f.items...), nil
+}
+
+type countingReportJobStore struct {
+	items     []jobs.Job
+	listCalls int
+}
+
+func (f *countingReportJobStore) List() ([]jobs.Job, error) {
+	f.listCalls++
+	return append([]jobs.Job(nil), f.items...), nil
+}
+
+type countingReportRevisionStore struct {
+	items       []revisions.Revision
+	active      revisions.Revision
+	ok          bool
+	listCalls   int
+	activeCalls int
+}
+
+func (f *countingReportRevisionStore) List() ([]revisions.Revision, error) {
+	f.listCalls++
+	return append([]revisions.Revision(nil), f.items...), nil
+}
+
+func (f *countingReportRevisionStore) CurrentActive() (revisions.Revision, bool, error) {
+	f.activeCalls++
 	return f.active, f.ok, nil
 }
 
@@ -73,5 +112,51 @@ func TestReportService_RevisionSummary(t *testing.T) {
 	}
 	if summary.RevisionApply.ActiveRevisionID != "rev-2" || summary.RevisionApply.TotalApplyJobs != 2 {
 		t.Fatalf("unexpected revision/apply summary: %+v", summary.RevisionApply)
+	}
+}
+
+func TestReportService_RevisionSummaryCachesShortLivedResult(t *testing.T) {
+	eventStore := &countingReportEventStore{
+		items: []events.Event{
+			{ID: "evt-1", Type: events.TypeApplySucceeded, Severity: events.SeverityInfo, SourceComponent: "apply-runner", OccurredAt: "2026-04-01T10:03:00Z", Summary: "ok", RelatedRevisionID: "rev-2", RelatedJobID: "job-2", SiteID: "site-a"},
+		},
+	}
+	jobStore := &countingReportJobStore{
+		items: []jobs.Job{
+			{ID: "job-2", Type: jobs.TypeApply, Status: jobs.StatusSucceeded},
+		},
+	}
+	revisionStore := &countingReportRevisionStore{
+		items: []revisions.Revision{
+			{ID: "rev-2", Version: 2, Status: revisions.StatusActive},
+		},
+		active: revisions.Revision{ID: "rev-2", Version: 2, Status: revisions.StatusActive},
+		ok:     true,
+	}
+
+	currentTime := time.Date(2026, 7, 11, 12, 0, 0, 0, time.UTC)
+
+	service := NewReportService(eventStore, jobStore, revisionStore)
+	service.now = func() time.Time { return currentTime }
+
+	if _, err := service.RevisionSummary(); err != nil {
+		t.Fatalf("first summary failed: %v", err)
+	}
+	if _, err := service.RevisionSummary(); err != nil {
+		t.Fatalf("second summary failed: %v", err)
+	}
+
+	if eventStore.listCalls != 1 || jobStore.listCalls != 1 || revisionStore.listCalls != 1 || revisionStore.activeCalls != 1 {
+		t.Fatalf("expected cached reads after second call, got event=%d jobs=%d revisions=%d active=%d", eventStore.listCalls, jobStore.listCalls, revisionStore.listCalls, revisionStore.activeCalls)
+	}
+
+	currentTime = currentTime.Add(reportSummaryCacheTTL + time.Second)
+
+	if _, err := service.RevisionSummary(); err != nil {
+		t.Fatalf("third summary failed: %v", err)
+	}
+
+	if eventStore.listCalls != 2 || jobStore.listCalls != 2 || revisionStore.listCalls != 2 || revisionStore.activeCalls != 2 {
+		t.Fatalf("expected cache refresh after ttl, got event=%d jobs=%d revisions=%d active=%d", eventStore.listCalls, jobStore.listCalls, revisionStore.listCalls, revisionStore.activeCalls)
 	}
 }

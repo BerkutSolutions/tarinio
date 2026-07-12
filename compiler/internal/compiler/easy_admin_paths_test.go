@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -13,6 +14,14 @@ func TestEasyAdminBypassPathPatternForSite_Localhost(t *testing.T) {
 	}
 }
 
+func TestEasyModSecurityBypassPathPatternForSite_Localhost(t *testing.T) {
+	t.Setenv("CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID", "control-plane-access")
+	pattern := easyModSecurityBypassPathPatternForSite(SiteInput{ID: "localhost", PrimaryHost: "localhost"})
+	if pattern != "" {
+		t.Fatalf("expected localhost to skip ModSecurity bypass unless configured explicitly, got %q", pattern)
+	}
+}
+
 func TestEasyAdminBypassPathPatternForSite_ConfiguredManagementSiteID(t *testing.T) {
 	t.Setenv("CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID", "localhost")
 	pattern := easyAdminBypassPathPatternForSite(SiteInput{ID: "localhost", PrimaryHost: "localhost"})
@@ -21,10 +30,51 @@ func TestEasyAdminBypassPathPatternForSite_ConfiguredManagementSiteID(t *testing
 	}
 }
 
+func TestEasyModSecurityBypassPathPatternForSite_ConfiguredManagementSiteID(t *testing.T) {
+	t.Setenv("CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID", "localhost")
+	pattern := easyModSecurityBypassPathPatternForSite(SiteInput{ID: "localhost", PrimaryHost: "localhost"})
+	if pattern == "" {
+		t.Fatalf("expected localhost ModSecurity bypass when configured explicitly as management site")
+	}
+}
+
+func TestEasyModSecurityBypassPathPatternForSite_MatchesAppPingOnlyForManagementSite(t *testing.T) {
+	managementPattern := easyModSecurityBypassPathPatternForSite(SiteInput{ID: "management-site", PrimaryHost: "ui"})
+	if !regexp.MustCompile(managementPattern).MatchString("/api/app/ping") {
+		t.Fatalf("expected management ModSecurity bypass to match /api/app/ping, got %q", managementPattern)
+	}
+	if ordinaryPattern := easyModSecurityBypassPathPatternForSite(SiteInput{ID: "site-a", PrimaryHost: "app.example.com"}); ordinaryPattern != "" {
+		t.Fatalf("expected ordinary site to have no ModSecurity bypass, got %q", ordinaryPattern)
+	}
+}
+
 func TestEasyAdminBypassPathPatternForSite_UIProxyPrimaryHost(t *testing.T) {
 	pattern := easyAdminBypassPathPatternForSite(SiteInput{ID: "site-a", PrimaryHost: "ui"})
 	if pattern == "^$" {
 		t.Fatalf("expected UI proxy primary host to be treated as management site")
+	}
+}
+
+func TestEasyAdminBypassPathPatternForSite_MatchesManagementMutationEndpoints(t *testing.T) {
+	pattern := easyAdminBypassPathPatternForSite(SiteInput{ID: "management-site", PrimaryHost: "ui"})
+	if pattern == "^$" {
+		t.Fatal("expected management site bypass pattern")
+	}
+	re := regexp.MustCompile(pattern)
+	for _, path := range []string{"/api/sites/service-1", "/api/access-policies/policy-1", "/services/service-1", "/dashboard"} {
+		if !re.MatchString(path) {
+			t.Fatalf("expected management bypass pattern to match %q, got %q", path, pattern)
+		}
+	}
+	for _, path := range []string{"/login", "/login/2fa"} {
+		if !re.MatchString(path) {
+			t.Fatalf("expected management bypass pattern to protect %q, got %q", path, pattern)
+		}
+	}
+	for _, path := range []string{"/apiary", "/service-worker.js", "/foo/bar"} {
+		if re.MatchString(path) {
+			t.Fatalf("expected management bypass pattern not to match %q, got %q", path, pattern)
+		}
 	}
 }
 

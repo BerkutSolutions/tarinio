@@ -149,6 +149,7 @@ export function applyEasyProfileToDraft(draft, profile, deps) {
     use_modsecurity_custom_configuration: Boolean(modsecurity.use_modsecurity_custom_configuration ?? draft.use_modsecurity_custom_configuration),
     modsecurity_crs_version: String(modsecurity.modsecurity_crs_version || draft.modsecurity_crs_version),
     modsecurity_crs_plugins: deps.normalizeStringArray(modsecurity.modsecurity_crs_plugins),
+    modsecurity_exclusion_rules: deps.normalizeModSecurityExclusionRules(modsecurity.exclusion_rules || draft.modsecurity_exclusion_rules),
     modsecurity_custom_path: modsecurity.custom_configuration?.path || draft.modsecurity_custom_path,
     modsecurity_custom_content: modsecurity.custom_configuration?.content || draft.modsecurity_custom_content
   };

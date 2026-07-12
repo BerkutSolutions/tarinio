@@ -13,7 +13,7 @@ import (
 
 func TestVirtualPatches_Block_URI_Rule(t *testing.T) {
 	rules := buildEasyModSecurityRules(
-		"vp-site", "block", false, "", nil, false, "", "", false, "", "", "", nil,
+		"vp-site", "block", false, "", nil, nil, false, "", "", false, "", "", "", nil,
 		[]VirtualPatchInput{
 			{ID: "vp-uri-1", Pattern: `/admin/secret`, Target: "uri", Action: "block"},
 		},
@@ -30,7 +30,7 @@ func TestVirtualPatches_Block_URI_Rule(t *testing.T) {
 
 func TestVirtualPatches_Block_Body_Rule(t *testing.T) {
 	rules := buildEasyModSecurityRules(
-		"vp-site", "block", false, "", nil, false, "", "", false, "", "", "", nil,
+		"vp-site", "block", false, "", nil, nil, false, "", "", false, "", "", "", nil,
 		[]VirtualPatchInput{
 			{ID: "vp-body-1", Pattern: `DROP\s+TABLE`, Target: "body", Action: "block"},
 		},
@@ -47,7 +47,7 @@ func TestVirtualPatches_Block_Body_Rule(t *testing.T) {
 
 func TestVirtualPatches_Block_Header_Rule(t *testing.T) {
 	rules := buildEasyModSecurityRules(
-		"vp-site", "block", false, "", nil, false, "", "", false, "", "", "", nil,
+		"vp-site", "block", false, "", nil, nil, false, "", "", false, "", "", "", nil,
 		[]VirtualPatchInput{
 			{ID: "vp-hdr-1", Pattern: `evilbot`, Target: "header", Action: "block"},
 		},
@@ -64,7 +64,7 @@ func TestVirtualPatches_Block_Header_Rule(t *testing.T) {
 
 func TestVirtualPatches_Monitor_URI_Rule(t *testing.T) {
 	rules := buildEasyModSecurityRules(
-		"vp-site", "block", false, "", nil, false, "", "", false, "", "", "", nil,
+		"vp-site", "block", false, "", nil, nil, false, "", "", false, "", "", "", nil,
 		[]VirtualPatchInput{
 			{ID: "vp-mon-1", Pattern: `/suspicious`, Target: "uri", Action: "monitor"},
 		},
@@ -84,7 +84,7 @@ func TestVirtualPatches_Monitor_URI_Rule(t *testing.T) {
 
 func TestVirtualPatches_Monitor_Body_Rule(t *testing.T) {
 	rules := buildEasyModSecurityRules(
-		"vp-site", "block", false, "", nil, false, "", "", false, "", "", "", nil,
+		"vp-site", "block", false, "", nil, nil, false, "", "", false, "", "", "", nil,
 		[]VirtualPatchInput{
 			{ID: "vp-mon-body", Pattern: `(?i)union.*select`, Target: "body", Action: "monitor"},
 		},
@@ -101,7 +101,7 @@ func TestVirtualPatches_Monitor_Body_Rule(t *testing.T) {
 
 func TestVirtualPatches_ID_InRuleMsg(t *testing.T) {
 	rules := buildEasyModSecurityRules(
-		"vp-site", "block", false, "", nil, false, "", "", false, "", "", "", nil,
+		"vp-site", "block", false, "", nil, nil, false, "", "", false, "", "", "", nil,
 		[]VirtualPatchInput{
 			{ID: "patch-42", Pattern: `/exploit`, Target: "uri", Action: "block"},
 		},
@@ -115,7 +115,7 @@ func TestVirtualPatches_ID_InRuleMsg(t *testing.T) {
 
 func TestVirtualPatches_Multiple_Rules(t *testing.T) {
 	rules := buildEasyModSecurityRules(
-		"vp-site", "block", false, "", nil, false, "", "", false, "", "", "", nil,
+		"vp-site", "block", false, "", nil, nil, false, "", "", false, "", "", "", nil,
 		[]VirtualPatchInput{
 			{ID: "vp-a", Pattern: `/path-a`, Target: "uri", Action: "block"},
 			{ID: "vp-b", Pattern: `/path-b`, Target: "uri", Action: "monitor"},
@@ -133,7 +133,7 @@ func TestVirtualPatches_Multiple_Rules(t *testing.T) {
 
 func TestVirtualPatches_Empty_NoRules(t *testing.T) {
 	rules := buildEasyModSecurityRules(
-		"vp-site", "block", false, "", nil, false, "", "", false, "", "", "", nil,
+		"vp-site", "block", false, "", nil, nil, false, "", "", false, "", "", "", nil,
 		nil,
 	)
 	if strings.Contains(rules, "Virtual patch") {

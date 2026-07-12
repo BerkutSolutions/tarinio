@@ -132,6 +132,16 @@ type AntibotExclusionRuleInput struct {
 	Methods []string
 }
 
+type ModSecurityExclusionRuleInput struct {
+	Path        string
+	PathPattern string
+	Methods     []string
+	Mode        string
+	RuleIDs     []int
+	Targets     []string
+	Comment     string
+}
+
 type AuthExclusionRuleInput struct {
 	Path    string
 	Methods []string
@@ -230,6 +240,7 @@ type EasyProfileInput struct {
 	UseModSecurityCustomConfiguration bool
 	ModSecurityCRSVersion             string
 	ModSecurityCRSPlugins             []string
+	ModSecurityExclusionRules         []ModSecurityExclusionRuleInput
 	ModSecurityCustomPath             string
 	ModSecurityCustomContent          string
 

@@ -6,7 +6,6 @@ export function renderModeTabs(activeMode, ctx) {
   return `
     <div class="waf-mode-switch">
       <button class="btn ${mode === "easy" ? "primary" : "ghost"} btn-sm" type="button" data-mode-tab="easy">${escapeHtml(ctx.t("sites.mode.easy"))}</button>
-      <button class="btn ghost btn-sm" type="button" disabled>${escapeHtml(ctx.t("sites.mode.advanced"))}</button>
       <button class="btn ${mode === "raw" ? "primary" : "ghost"} btn-sm" type="button" data-mode-tab="raw">${escapeHtml(ctx.t("sites.mode.raw"))}</button>
     </div>
     ${mode === "raw" ? "" : `<div class="waf-note">${escapeHtml(ctx.t("sites.mode.note"))}</div>`}

@@ -32,6 +32,7 @@ type easySiteData struct {
 	SendXRealIP            bool
 	RateLimitBanSeconds    int
 	AdminBypassPathPattern string
+	ModSecurityBypassPathPattern string
 
 	AuthEnabled            bool
 	AuthBasicEnabled       bool

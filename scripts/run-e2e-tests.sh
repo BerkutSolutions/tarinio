@@ -1,21 +1,21 @@
 #!/usr/bin/env sh
-# run-e2e-tests.sh — spin up isolated e2e stack, run ui/tests e2e suites, tear down.
+# run-e2e-tests.sh - spin up isolated e2e stack, run ui/tests e2e suites, tear down.
 # Exits non-zero on any failure. Containers + volumes removed after run.
 #
 # Usage:  sh scripts/run-e2e-tests.sh [/path/to/repo]
 #
 # Env overrides:
-#   E2E_PORT         host port for control-plane (default: 18080)
-#   E2E_RT_PORT      host port for runtime HTTP (default: 10080)
+#   E2E_PORT          host port for control-plane (default: 18080)
+#   E2E_RT_PORT       host port for runtime HTTP (default: 10080)
 #   E2E_RT_HTTPS_PORT host port for runtime HTTPS (default: 10443)
-#   E2E_RT_HLT_PORT  host port for runtime health (default: 18081)
-#   E2E_USER         admin username (default: e2e-admin)
-#   E2E_PASS         admin credential (default: e2e-password-1234)
-#   E2E_TIMEOUT      seconds to wait for healthcheck (default: 180)
-#   E2E_FILTER       go test -run filter (default: TestE2E)
-#   COMPOSE_CMD      docker compose command (auto-detected)
-#   GO_CMD           go binary (default: go)
-#   E2E_KEEP_STACK   set to 1 to skip teardown (debug)
+#   E2E_RT_HLT_PORT   host port for runtime health (default: 18081)
+#   E2E_USER          admin username (default: e2e-admin)
+#   E2E_PASS          admin credential (default: e2e-password-1234)
+#   E2E_TIMEOUT       seconds to wait for healthcheck (default: 180)
+#   E2E_FILTER        go test -run filter (default: TestE2E)
+#   COMPOSE_CMD       docker compose command (auto-detected)
+#   GO_CMD            go binary (default: go)
+#   E2E_KEEP_STACK    set to 1 to skip teardown (debug)
 
 set -eu
 
@@ -46,10 +46,10 @@ else
   C_RESET=""; C_GREEN=""; C_RED=""; C_YELLOW=""; C_CYAN=""; C_GRAY=""
 fi
 
-step() { printf "%s[e2e] ▶ %s%s\n" "$C_CYAN" "$1" "$C_RESET"; }
-ok() { printf "%s[e2e] ✓ %s%s\n" "$C_GREEN" "$1" "$C_RESET"; }
-warn() { printf "%s[e2e] ! %s%s\n" "$C_YELLOW" "$1" "$C_RESET"; }
-fail_msg() { printf "%s[e2e] ✗ %s%s\n" "$C_RED" "$1" "$C_RESET" >&2; }
+step() { printf "%s[e2e] [RUN] %s%s\n" "$C_CYAN" "$1" "$C_RESET"; }
+ok() { printf "%s[e2e] [OK] %s%s\n" "$C_GREEN" "$1" "$C_RESET"; }
+warn() { printf "%s[e2e] [WARN] %s%s\n" "$C_YELLOW" "$1" "$C_RESET"; }
+fail_msg() { printf "%s[e2e] [FAIL] %s%s\n" "$C_RED" "$1" "$C_RESET" >&2; }
 info() { printf "%s[e2e]   %s%s\n" "$C_GRAY" "$1" "$C_RESET"; }
 
 show_log_tail() {
@@ -87,12 +87,16 @@ summarize_go_e2e_json() {
     return 0
   fi
   E2E_SUMMARY_FILE="$file" E2E_C_GREEN="$C_GREEN" E2E_C_RED="$C_RED" E2E_C_RESET="$C_RESET" "$py" - <<'PY'
-import json, os, re
+import json, os, re, sys
 
 path = os.environ["E2E_SUMMARY_FILE"]
 green = os.environ.get("E2E_C_GREEN", "")
 red = os.environ.get("E2E_C_RED", "")
 reset = os.environ.get("E2E_C_RESET", "")
+
+ok_marker = "[OK]"
+fail_marker = "[FAIL]"
+skip_marker = "[SKIP]"
 
 def expectation(name: str) -> str:
     leaf = name.split("/")[-1]
@@ -120,21 +124,36 @@ def actual_for(status: str, expected: str) -> str:
         return "skipped"
     return "failed"
 
+def display_name(name: str) -> str:
+    leaf = name.split("/")[-1]
+    if leaf.startswith("TestE2E"):
+        leaf = leaf[len("TestE2E"):]
+    elif leaf.startswith("Test"):
+        leaf = leaf[len("Test"):]
+    return leaf.lstrip("_") or name
+
+def suite_name(name: str) -> str:
+    return f"{display_name(name)} suite"
+
 seen = {}
 order = []
 outputs = {}
+parents = set()
 for line in open(path, encoding="utf-8", errors="replace"):
     try:
         item = json.loads(line)
     except Exception:
         continue
     test = item.get("Test") or ""
-    if not test.startswith("TestE2E") or "/" not in test:
+    if not test.startswith("TestE2E"):
         continue
+    if "/" in test:
+        parents.add(test.split("/", 1)[0])
     action = item.get("Action")
     if action == "run":
+        if test not in seen:
+            order.append(test)
         seen[test] = "run"
-        order.append(test)
     elif action in ("pass", "fail", "skip"):
         seen[test] = action
     elif action == "output":
@@ -142,15 +161,24 @@ for line in open(path, encoding="utf-8", errors="replace"):
 
 for test in order:
     status = seen.get(test, "run")
-    leaf = test.split("/")[-1]
     expected = expectation(test)
     actual = actual_for(status, expected)
+    name = display_name(test)
     if status == "pass":
-        print(f"{green}[e2e] ✓ {leaf}: expected={expected}; actual={actual}{reset}")
+        if "/" not in test and test in parents:
+            print(f"{green}[e2e] {ok_marker} {suite_name(test)} completed{reset}")
+        else:
+            print(f"{green}[e2e] {ok_marker} {name}: expected={expected}; actual={actual}{reset}")
     elif status == "skip":
-        print(f"[e2e] ! {leaf}: expected={expected}; actual={actual}")
+        if "/" not in test and test in parents:
+            print(f"[e2e] {skip_marker} {suite_name(test)} skipped")
+        else:
+            print(f"[e2e] {skip_marker} {name}: expected={expected}; actual={actual}")
     elif status == "fail":
-        print(f"{red}[e2e] ✗ {leaf}: expected={expected}; actual={actual}{reset}")
+        if "/" not in test and test in parents:
+            print(f"{red}[e2e] {fail_marker} {suite_name(test)} failed{reset}")
+        else:
+            print(f"{red}[e2e] {fail_marker} {name}: expected={expected}; actual={actual}{reset}")
         for out in outputs.get(test, [])[-8:]:
             if out:
                 print(f"{red}[e2e]   {out}{reset}")
@@ -178,11 +206,13 @@ flt = os.environ.get("E2E_FILTER", "TestE2E")
 green = os.environ.get("E2E_C_GREEN", "")
 red = os.environ.get("E2E_C_RED", "")
 yellow = os.environ.get("E2E_C_YELLOW", "")
-cyan = os.environ.get("E2E_C_CYAN", "")
 reset = os.environ.get("E2E_C_RESET", "")
 
-cmd = [go_cmd, "test", "-json", "-v", "-count=1", "-timeout", "600s", "-run", flt, "./ui/tests/..."]
+ok_marker = "[OK]"
+fail_marker = "[FAIL]"
+skip_marker = "[SKIP]"
 
+cmd = [go_cmd, "test", "-json", "-v", "-count=1", "-timeout", "600s", "-run", flt, "./ui/tests/..."]
 
 def expectation(name: str) -> str:
     leaf = name.split("/")[-1]
@@ -203,7 +233,6 @@ def expectation(name: str) -> str:
             return value
     return "expected behavior"
 
-
 def actual_for(status: str, expected: str) -> str:
     if status == "pass":
         return expected
@@ -211,8 +240,24 @@ def actual_for(status: str, expected: str) -> str:
         return "skipped"
     return "failed"
 
+def display_name(name: str) -> str:
+    leaf = name.split("/")[-1]
+    if leaf.startswith("TestE2E"):
+        leaf = leaf[len("TestE2E"):]
+    elif leaf.startswith("Test"):
+        leaf = leaf[len("Test"):]
+    return leaf.lstrip("_") or name
+
+def suite_name(name: str) -> str:
+    return f"{display_name(name)} suite"
+
 outputs = {}
 summary = ""
+parents = set()
+started_tests = set()
+passed_tests = set()
+skipped_tests = set()
+failed_tests = set()
 proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", bufsize=1)
 with open(log_path, "w", encoding="utf-8", errors="replace") as log:
     try:
@@ -229,22 +274,41 @@ with open(log_path, "w", encoding="utf-8", errors="replace") as log:
                 elapsed = item.get("Elapsed")
                 summary = f"ok waf/ui/tests {elapsed}s" if elapsed is not None else "ok waf/ui/tests"
                 continue
-            if not test.startswith("TestE2E") or "/" not in test:
+            if not test.startswith("TestE2E"):
                 continue
-            leaf = test.split("/")[-1]
+            if action == "run":
+                started_tests.add(test)
+            if "/" in test:
+                parents.add(test.split("/", 1)[0])
+            name = display_name(test)
             expected = expectation(test)
             if action == "output":
                 out = (item.get("Output") or "").strip()
                 if out:
                     outputs.setdefault(test, []).append(out)
             elif action in ("pass", "fail", "skip"):
+                if action == "pass":
+                    passed_tests.add(test)
+                elif action == "skip":
+                    skipped_tests.add(test)
+                else:
+                    failed_tests.add(test)
                 actual = actual_for(action, expected)
                 if action == "pass":
-                    print(f"{green}[e2e] ✓ {leaf}: expected={expected}; actual={actual}{reset}", flush=True)
+                    if "/" not in test and test in parents:
+                        print(f"{green}[e2e] {ok_marker} {suite_name(test)} completed{reset}", flush=True)
+                    else:
+                        print(f"{green}[e2e] {ok_marker} {name}: expected={expected}; actual={actual}{reset}", flush=True)
                 elif action == "skip":
-                    print(f"{yellow}[e2e] ! {leaf}: expected={expected}; actual={actual}{reset}", flush=True)
+                    if "/" not in test and test in parents:
+                        print(f"{yellow}[e2e] {skip_marker} {suite_name(test)} skipped{reset}", flush=True)
+                    else:
+                        print(f"{yellow}[e2e] {skip_marker} {name}: expected={expected}; actual={actual}{reset}", flush=True)
                 else:
-                    print(f"{red}[e2e] ✗ {leaf}: expected={expected}; actual={actual}{reset}", flush=True)
+                    if "/" not in test and test in parents:
+                        print(f"{red}[e2e] {fail_marker} {suite_name(test)} failed{reset}", flush=True)
+                    else:
+                        print(f"{red}[e2e] {fail_marker} {name}: expected={expected}; actual={actual}{reset}", flush=True)
                     for out in outputs.get(test, [])[-8:]:
                         print(f"{red}[e2e]   {out}{reset}", flush=True)
     except KeyboardInterrupt:
@@ -255,6 +319,13 @@ with open(log_path, "w", encoding="utf-8", errors="replace") as log:
             proc.kill()
         sys.exit(130)
 rc = proc.wait()
+completed_tests = len(passed_tests) + len(skipped_tests) + len(failed_tests)
+counter_color = green if rc == 0 and len(started_tests) == completed_tests else red
+print(
+    f"{counter_color}[e2e] Test count: started={len(started_tests)}; passed={len(passed_tests)}; "
+    f"skipped={len(skipped_tests)}; failed={len(failed_tests)}; completed={completed_tests}{reset}",
+    flush=True,
+)
 if summary and summary_out:
     with open(summary_out, "w", encoding="utf-8") as f:
         f.write(summary + "\n")
@@ -262,14 +333,15 @@ sys.exit(rc)
 PY
 }
 
-# ── detect compose ────────────────────────────────────────────────────────────
+# Detect docker compose command.
 if [ -z "${COMPOSE_CMD:-}" ]; then
   if docker compose version >/dev/null 2>&1; then
     COMPOSE_CMD="docker compose"
   elif command -v docker-compose >/dev/null 2>&1; then
     COMPOSE_CMD="docker-compose"
   else
-    echo "[e2e] ERROR: no docker compose found" >&2; exit 1
+    echo "[e2e] ERROR: no docker compose found" >&2
+    exit 1
   fi
 fi
 
@@ -281,7 +353,7 @@ STACK_DOWN_DONE=0
 
 cleanup() {
   [ "$E2E_KEEP_STACK" = "1" ] && {
-    warn "E2E_KEEP_STACK=1 — skipping teardown"
+    warn "E2E_KEEP_STACK=1 - skipping teardown"
     info "Control-plane: $E2E_BASE_URL"
     info "Runtime:       $E2E_RUNTIME_URL"
     return
@@ -295,7 +367,7 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-# ── bring up ──────────────────────────────────────────────────────────────────
+# Bring up stack.
 step "Starting e2e stack (control-plane=:$E2E_PORT runtime=:$E2E_RT_PORT)"
 info "Detailed log: $E2E_LOG_FILE"
 cd "$E2E_COMPOSE_DIR"
@@ -303,7 +375,7 @@ $COMPOSE_CMD -f docker-compose.yml down --volumes --remove-orphans >>"$E2E_LOG_F
 run_quiet "Build and start containers" $COMPOSE_CMD -f docker-compose.yml up -d --build
 ok "Containers are up"
 
-# ── wait for control-plane health ─────────────────────────────────────────────
+# Wait for control-plane health.
 step "Waiting for control-plane healthz (timeout ${E2E_TIMEOUT}s)"
 elapsed=0
 until curl -fsS "$E2E_BASE_URL/healthz" >/dev/null 2>&1; do
@@ -312,23 +384,28 @@ until curl -fsS "$E2E_BASE_URL/healthz" >/dev/null 2>&1; do
     $COMPOSE_CMD -f docker-compose.yml logs --tail=80 >&2
     exit 1
   }
-  sleep 2; elapsed=$((elapsed + 2))
+  sleep 2
+  elapsed=$((elapsed + 2))
 done
 ok "Control-plane healthy after ${elapsed}s"
 
-# ── wait for bootstrap admin ──────────────────────────────────────────────────
+# Wait for bootstrap admin.
 step "Waiting for bootstrap admin"
 elapsed=0
 until curl -fsS -X POST "$E2E_BASE_URL/api/auth/login" \
     -H "Content-Type: application/json" \
     -d "{\"username\":\"${E2E_USER}\",\"password\":\"${E2E_PASS}\"}" \
     >/dev/null 2>&1; do
-  [ "$elapsed" -ge 30 ] && { fail_msg "admin login timeout"; exit 1; }
-  sleep 2; elapsed=$((elapsed + 2))
+  [ "$elapsed" -ge 30 ] && {
+    fail_msg "admin login timeout"
+    exit 1
+  }
+  sleep 2
+  elapsed=$((elapsed + 2))
 done
 ok "Admin ready"
 
-# ── wait for runtime health ────────────────────────────────────────────────────
+# Wait for runtime health.
 step "Waiting for runtime healthz (timeout ${E2E_TIMEOUT}s)"
 elapsed=0
 until curl -fsS "$E2E_RUNTIME_HEALTH_URL/healthz" >/dev/null 2>&1; do
@@ -337,11 +414,12 @@ until curl -fsS "$E2E_RUNTIME_HEALTH_URL/healthz" >/dev/null 2>&1; do
     $COMPOSE_CMD -f docker-compose.yml logs runtime --tail=50 >&2
     exit 1
   }
-  sleep 2; elapsed=$((elapsed + 2))
+  sleep 2
+  elapsed=$((elapsed + 2))
 done
 ok "Runtime healthy after ${elapsed}s"
 
-# ── initial compile+apply so runtime has a valid revision ────────────────────
+# Initial compile+apply so runtime has a valid revision.
 step "Compiling and applying initial revision"
 CP_COOKIE_JAR="$(mktemp)"
 curl -sS -c "$CP_COOKIE_JAR" -X POST "$E2E_BASE_URL/api/auth/login" \
@@ -364,7 +442,7 @@ fi
 rm -f "$CP_COOKIE_JAR"
 ok "Initial revision ready (id=$REV_ID)"
 
-# ── run tests ─────────────────────────────────────────────────────────────────
+# Run tests.
 step "Running tests: $E2E_FILTER"
 cd "$REPO_ROOT"
 TEST_EXIT=0
@@ -392,7 +470,3 @@ fi
 rm -f "$TEST_LOG"
 ok "Tests passed: ${TEST_SUMMARY:-$E2E_FILTER}"
 ok "All e2e checks passed"
-
-
-
-

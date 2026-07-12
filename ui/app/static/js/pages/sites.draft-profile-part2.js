@@ -199,6 +199,7 @@ export function draftToEasyProfilePart2(draft, deps) {
       use_modsecurity_custom_configuration: draft.use_modsecurity_custom_configuration,
       modsecurity_crs_version: draft.modsecurity_crs_version,
       modsecurity_crs_plugins: draft.modsecurity_crs_plugins,
+      exclusion_rules: deps.normalizeModSecurityExclusionRules(draft.modsecurity_exclusion_rules),
       custom_configuration: {
         path: customPath,
         content: draft.modsecurity_custom_content
@@ -373,6 +374,24 @@ export function validateDraftPart2(draft, ctx, deps) {
   }
   if (draft.use_modsecurity_custom_configuration && !String(draft.modsecurity_custom_path || "").trim()) {
     return ctx.t("sites.validation.modsecCustomPathRequired");
+  }
+  const modsecExclusions = deps.normalizeModSecurityExclusionRules(draft.modsecurity_exclusion_rules);
+  if (modsecExclusions.length > 64) {
+    return ctx.t("sites.validation.modsecExclusionRulesLimit");
+  }
+  for (const rule of modsecExclusions) {
+    if (!rule.path && !rule.path_pattern) {
+      return ctx.t("sites.validation.modsecExclusionPathRequired");
+    }
+    if (rule.path && !rule.path.startsWith("/")) {
+      return ctx.t("sites.validation.modsecExclusionPathFormat");
+    }
+    if (!rule.rule_ids.length) {
+      return ctx.t("sites.validation.modsecExclusionRuleIdsRequired");
+    }
+    if (rule.methods.includes("*") && rule.methods.length !== 1) {
+      return ctx.t("sites.validation.modsecExclusionMethodsInvalid");
+    }
   }
   return "";
 }

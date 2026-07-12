@@ -64,9 +64,17 @@ func TestEasySecurityMode_TransparentAndMonitorDisableActiveProtection(t *testin
 				if _, ok := byPath["modsecurity/easy/"+site.ID+".conf"]; ok {
 					t.Fatalf("transparent mode must not emit modsecurity easy artifact")
 				}
-			}
-			if _, ok := byPath["modsecurity/easy/"+site.ID+".conf"]; ok {
-				t.Fatalf("%s mode must not emit modsecurity easy artifact", mode)
+			} else {
+				modsec := byPath["modsecurity/easy/"+site.ID+".conf"]
+				if modsec == "" {
+					t.Fatalf("monitor mode must emit modsecurity easy artifact")
+				}
+				if !strings.Contains(modsec, "SecRuleEngine DetectionOnly") {
+					t.Fatalf("monitor mode must keep modsecurity in detection-only mode, got: %s", modsec)
+				}
+				if !strings.Contains(siteConf, "modsecurity_rules_file /etc/waf/modsecurity/easy/"+site.ID+".conf;") {
+					t.Fatalf("monitor mode must attach easy modsecurity rules, got: %s", siteConf)
+				}
 			}
 
 			if strings.Contains(siteConf, "if ($waf_antibot_guard") {
@@ -81,8 +89,10 @@ func TestEasySecurityMode_TransparentAndMonitorDisableActiveProtection(t *testin
 			if strings.Contains(siteConf, "return 302 /auth") {
 				t.Fatalf("%s mode must disable auth gate enforcement, got: %s", mode, siteConf)
 			}
-			if strings.Contains(siteConf, "modsecurity on;") || strings.Contains(siteConf, "modsecurity_rules_file") {
-				t.Fatalf("%s mode must not attach modsecurity directives, got: %s", mode, siteConf)
+			if mode == "transparent" {
+				if strings.Contains(siteConf, "modsecurity on;") || strings.Contains(siteConf, "modsecurity_rules_file") {
+					t.Fatalf("transparent mode must not attach modsecurity directives, got: %s", siteConf)
+				}
 			}
 			if !strings.Contains(siteConf, "set $waf_rate_limited_max_age 0;") {
 				t.Fatalf("%s mode must disable bad-behavior ban gate, got: %s", mode, siteConf)

@@ -76,9 +76,9 @@ func TestRenderEasyArtifacts_AuthTokenOrderAndExclusions(t *testing.T) {
 
 func TestRenderEasyArtifacts_ManagementSiteAuthBypassesWriteAPI(t *testing.T) {
 	artifacts, err := RenderEasyArtifacts(
-		[]SiteInput{{ID: "prewaf.hantico.ru", Enabled: true, PrimaryHost: "ui", ListenHTTP: true, DefaultUpstreamID: "prewaf-upstream"}},
+		[]SiteInput{{ID: "management-site", Enabled: true, PrimaryHost: "ui", ListenHTTP: true, DefaultUpstreamID: "management-upstream"}},
 		[]EasyProfileInput{{
-			SiteID:           "prewaf.hantico.ru",
+			SiteID:           "management-site",
 			SecurityMode:     "block",
 			AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
 			MaxClientSize:    "50m",
@@ -95,11 +95,14 @@ func TestRenderEasyArtifacts_ManagementSiteAuthBypassesWriteAPI(t *testing.T) {
 		t.Fatalf("render easy artifacts: %v", err)
 	}
 	byPath := mapArtifactsByPath(artifacts)
-	siteConf := byPath["nginx/easy/prewaf.hantico.ru.conf"]
+	siteConf := byPath["nginx/easy/management-site.conf"]
 	if !strings.Contains(siteConf, `if ($waf_auth_exclusion_match ~* "^(?:DELETE|GET|HEAD|PATCH|POST|PUT):^/api/$")`) {
 		t.Fatalf("expected management auth exclusion for write api paths, got: %s", siteConf)
 	}
 	if !strings.Contains(siteConf, `if ($waf_auth_exclusion_match ~* "^(?:DELETE|GET|HEAD|PATCH|POST|PUT):^/services$")`) {
 		t.Fatalf("expected management auth exclusion for services pages, got: %s", siteConf)
+	}
+	if !strings.Contains(siteConf, `modsecurity off;`) && !strings.Contains(siteConf, `ctl:ruleEngine=Off`) {
+		t.Fatalf("expected management modsecurity self-bypass safeguard rule, got: %s", siteConf)
 	}
 }

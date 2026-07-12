@@ -165,6 +165,12 @@ if ($waf_auth_gate_guard = "0:0") { return 302 {{ .AuthGateLoginURI }}?return_ur
 {{- if .UseModSecurityEasyFile }}
 modsecurity on;
 modsecurity_rules_file /etc/waf/modsecurity/easy/{{ .SiteID }}.conf;
+{{- if .ModSecurityBypassPathPattern }}
+modsecurity_rules '
+SecRuleEngine On
+SecRule REQUEST_URI "@rx {{ .ModSecurityBypassPathPattern }}" "id:100001,phase:1,pass,nolog,ctl:ruleEngine=Off"
+';
+{{- end }}
 {{- end }}
 
 {{- range .BlacklistIP }}

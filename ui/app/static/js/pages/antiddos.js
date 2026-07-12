@@ -104,6 +104,8 @@ export async function renderAntiDDoS(container, ctx) {
   };
 
   let logsTimer = null;
+  let logsVisibilityHandler = null;
+  let logsRefreshPromise = null;
   const helpRows = [
     { labelKey: "antiddos.model.enabled", defaultValue: "true", hintKey: "antiddos.help.modelEnabled" },
     { labelKey: "antiddos.model.poll", defaultValue: "2", hintKey: "antiddos.help.modelPoll" },
@@ -124,96 +126,137 @@ export async function renderAntiDDoS(container, ctx) {
     { labelKey: "antiddos.model.weightEmergencySingle", defaultValue: "4.0", hintKey: "antiddos.help.modelWeightEmergencySingle" }
   ];
 
-  const renderLogs = async () => {
-    const node = container.querySelector("#antiddos-model-logs");
-    if (!node) {
+  const clearLogsTimer = () => {
+    if (logsTimer) {
+      window.clearInterval(logsTimer);
+      logsTimer = null;
+    }
+  };
+
+  const isPageVisible = () => typeof document === "undefined" || document.visibilityState !== "hidden";
+
+  const startLogsPolling = () => {
+    clearLogsTimer();
+    if (!container.isConnected || !isPageVisible()) {
       return;
     }
-    try {
-      const payload = await ctx.api.get("/api/events");
-      const events = Array.isArray(payload?.events) ? payload.events : [];
-      const rows = events
-        .filter((item) => ["security_waf", "security_rate_limit", "security_access"].includes(String(item?.type || "")))
-        .sort((a, b) => {
-          const left = Date.parse(String(a?.occurred_at || "")) || 0;
-          const right = Date.parse(String(b?.occurred_at || "")) || 0;
-          return right - left;
-        })
-        .slice(0, 80);
-      if (!rows.length) {
-        node.innerHTML = `<div class="waf-empty">${escapeHtml(ctx.t("antiddos.model.logs.empty"))}</div>`;
+    logsTimer = window.setInterval(() => {
+      if (!container.isConnected) {
+        stopLogsPolling();
         return;
       }
-      node.innerHTML = `
-        <div class="waf-table-wrap">
-          <table class="waf-table">
-            <thead>
-              <tr>
-                <th>${escapeHtml(ctx.t("antiddos.model.logs.col.time"))}</th>
-                <th>${escapeHtml(ctx.t("antiddos.model.logs.col.type"))}</th>
-                <th>${escapeHtml(ctx.t("antiddos.model.logs.col.site"))}</th>
-                <th>${escapeHtml(ctx.t("antiddos.model.logs.col.summary"))}</th>
-                <th>${escapeHtml(ctx.t("antiddos.model.logs.col.ip"))}</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rows.map((item, index) => `
-                <tr class="waf-table-row-clickable" data-log-index="${index}" tabindex="0" role="button">
-                  <td>${escapeHtml(formatDate(String(item?.occurred_at || "")))}</td>
-                  <td>${escapeHtml(translateEventType(String(item?.type || "")))}</td>
-                  <td>${escapeHtml(String(item?.site_name || item?.site_id || "-"))}</td>
-                  <td>${escapeHtml(translateEventSummary(item) || "-")}</td>
-                  <td>${escapeHtml(String(item?.details?.client_ip || item?.details?.ip || "-"))}</td>
+      renderLogs().catch(() => {});
+    }, 3000);
+  };
+
+  const stopLogsPolling = () => {
+    clearLogsTimer();
+    if (logsVisibilityHandler && typeof document !== "undefined") {
+      document.removeEventListener("visibilitychange", logsVisibilityHandler);
+      logsVisibilityHandler = null;
+    }
+  };
+
+  const renderLogs = async () => {
+    if (logsRefreshPromise) {
+      return logsRefreshPromise;
+    }
+    logsRefreshPromise = (async () => {
+      const node = container.querySelector("#antiddos-model-logs");
+      if (!node) {
+        return;
+      }
+      try {
+        const payload = await ctx.api.get("/api/events");
+        const events = Array.isArray(payload?.events) ? payload.events : [];
+        const rows = events
+          .filter((item) => ["security_waf", "security_rate_limit", "security_access"].includes(String(item?.type || "")))
+          .sort((a, b) => {
+            const left = Date.parse(String(a?.occurred_at || "")) || 0;
+            const right = Date.parse(String(b?.occurred_at || "")) || 0;
+            return right - left;
+          })
+          .slice(0, 80);
+        if (!rows.length) {
+          node.innerHTML = `<div class="waf-empty">${escapeHtml(ctx.t("antiddos.model.logs.empty"))}</div>`;
+          return;
+        }
+        node.innerHTML = `
+          <div class="waf-table-wrap">
+            <table class="waf-table">
+              <thead>
+                <tr>
+                  <th>${escapeHtml(ctx.t("antiddos.model.logs.col.time"))}</th>
+                  <th>${escapeHtml(ctx.t("antiddos.model.logs.col.type"))}</th>
+                  <th>${escapeHtml(ctx.t("antiddos.model.logs.col.site"))}</th>
+                  <th>${escapeHtml(ctx.t("antiddos.model.logs.col.summary"))}</th>
+                  <th>${escapeHtml(ctx.t("antiddos.model.logs.col.ip"))}</th>
                 </tr>
-              `).join("")}
-            </tbody>
-          </table>
-        </div>
-      `;
-      const modalNode = container.querySelector("#antiddos-model-log-detail-modal");
-      const modalBody = container.querySelector("#antiddos-model-log-detail-content");
-      const openDetails = (item) => {
-        if (!modalNode || !modalBody) {
-          return;
-        }
-        modalBody.innerHTML = renderLogDetail(item);
-        modalNode.classList.remove("waf-hidden");
-        modalNode.focus();
-      };
-      const openRowFromTarget = (target) => {
-        const rowNode = target?.closest?.("[data-log-index]");
-        if (!rowNode) {
-          return;
-        }
-        const index = Number(rowNode.dataset.logIndex || "-1");
-        if (index < 0 || index >= rows.length) {
-          return;
-        }
-        openDetails(rows[index]);
-      };
-      const bodyNode = node.querySelector("tbody");
-      bodyNode?.addEventListener("click", (event) => {
-        openRowFromTarget(event.target);
-      });
-      bodyNode?.addEventListener("pointerup", (event) => {
-        if (event.button !== 0) {
-          return;
-        }
-        openRowFromTarget(event.target);
-      });
-      bodyNode?.addEventListener("keydown", (event) => {
-        if (event.key !== "Enter" && event.key !== " ") {
-          return;
-        }
-        const rowNode = event.target?.closest?.("[data-log-index]");
-        if (!rowNode) {
-          return;
-        }
-        event.preventDefault();
-        openRowFromTarget(rowNode);
-      });
-    } catch (error) {
-      setError(node, ctx.t("antiddos.model.logs.error"));
+              </thead>
+              <tbody>
+                ${rows.map((item, index) => `
+                  <tr class="waf-table-row-clickable" data-log-index="${index}" tabindex="0" role="button">
+                    <td>${escapeHtml(formatDate(String(item?.occurred_at || "")))}</td>
+                    <td>${escapeHtml(translateEventType(String(item?.type || "")))}</td>
+                    <td>${escapeHtml(String(item?.site_name || item?.site_id || "-"))}</td>
+                    <td>${escapeHtml(translateEventSummary(item) || "-")}</td>
+                    <td>${escapeHtml(String(item?.details?.client_ip || item?.details?.ip || "-"))}</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+          </div>
+        `;
+        const modalNode = container.querySelector("#antiddos-model-log-detail-modal");
+        const modalBody = container.querySelector("#antiddos-model-log-detail-content");
+        const openDetails = (item) => {
+          if (!modalNode || !modalBody) {
+            return;
+          }
+          modalBody.innerHTML = renderLogDetail(item);
+          modalNode.classList.remove("waf-hidden");
+          modalNode.focus();
+        };
+        const openRowFromTarget = (target) => {
+          const rowNode = target?.closest?.("[data-log-index]");
+          if (!rowNode) {
+            return;
+          }
+          const index = Number(rowNode.dataset.logIndex || "-1");
+          if (index < 0 || index >= rows.length) {
+            return;
+          }
+          openDetails(rows[index]);
+        };
+        const bodyNode = node.querySelector("tbody");
+        bodyNode?.addEventListener("click", (event) => {
+          openRowFromTarget(event.target);
+        });
+        bodyNode?.addEventListener("pointerup", (event) => {
+          if (event.button !== 0) {
+            return;
+          }
+          openRowFromTarget(event.target);
+        });
+        bodyNode?.addEventListener("keydown", (event) => {
+          if (event.key !== "Enter" && event.key !== " ") {
+            return;
+          }
+          const rowNode = event.target?.closest?.("[data-log-index]");
+          if (!rowNode) {
+            return;
+          }
+          event.preventDefault();
+          openRowFromTarget(rowNode);
+        });
+      } catch (_error) {
+        setError(node, ctx.t("antiddos.model.logs.error"));
+      }
+    })();
+    try {
+      await logsRefreshPromise;
+    } finally {
+      logsRefreshPromise = null;
     }
   };
 
@@ -506,16 +549,26 @@ export async function renderAntiDDoS(container, ctx) {
       }
     });
 
-    container.querySelector("#antiddos-model-logs-refresh")?.addEventListener("click", renderLogs);
-    renderLogs();
-    logsTimer = window.setInterval(() => {
-      if (!container.isConnected) {
-        clearInterval(logsTimer);
-        logsTimer = null;
-        return;
-      }
-      renderLogs();
-    }, 3000);
+    container.querySelector("#antiddos-model-logs-refresh")?.addEventListener("click", () => {
+      renderLogs().catch(() => {});
+    });
+    if (!logsVisibilityHandler && typeof document !== "undefined") {
+      logsVisibilityHandler = () => {
+        if (!container.isConnected) {
+          stopLogsPolling();
+          return;
+        }
+        if (!isPageVisible()) {
+          clearLogsTimer();
+          return;
+        }
+        renderLogs().catch(() => {});
+        startLogsPolling();
+      };
+      document.addEventListener("visibilitychange", logsVisibilityHandler);
+    }
+    renderLogs().catch(() => {});
+    startLogsPolling();
   };
 
   const settings = await ctx.api.get("/api/anti-ddos/settings");

@@ -258,6 +258,16 @@ type ModSecurityCustomConfiguration struct {
 	Content string `json:"content"`
 }
 
+type ModSecurityExclusionRule struct {
+	Path        string   `json:"path,omitempty"`
+	PathPattern string   `json:"path_pattern,omitempty"`
+	Methods     []string `json:"methods"`
+	MatchMode   string   `json:"mode"`
+	RuleIDs     []int    `json:"rule_ids"`
+	Targets     []string `json:"targets,omitempty"`
+	Comment     string   `json:"comment,omitempty"`
+}
+
 // SecurityWebSocketSettings controls WebSocket frame inspection via OpenResty/Lua.
 // Inspection is active only when UseWSInspection=true AND ReverseProxyWebsocket=true.
 type SecurityWebSocketSettings struct {
@@ -273,6 +283,7 @@ type SecurityModSecuritySettings struct {
 	UseCustomConfiguration   bool                           `json:"use_modsecurity_custom_configuration"`
 	ModSecurityCRSVersion    string                         `json:"modsecurity_crs_version"`
 	ModSecurityCRSPlugins    []string                       `json:"modsecurity_crs_plugins"`
+	ExclusionRules           []ModSecurityExclusionRule     `json:"exclusion_rules,omitempty"`
 	CustomConfiguration      ModSecurityCustomConfiguration `json:"custom_configuration"`
 }
 
@@ -511,6 +522,7 @@ func DefaultProfile(siteID string) EasySiteProfile {
 			UseCustomConfiguration:   false,
 			ModSecurityCRSVersion:    "4",
 			ModSecurityCRSPlugins:    []string{},
+			ExclusionRules:           []ModSecurityExclusionRule{},
 			CustomConfiguration: ModSecurityCustomConfiguration{
 				Path:    "modsec/anomaly_score.conf",
 				Content: "",

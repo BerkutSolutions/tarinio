@@ -58,15 +58,20 @@ jobs:
       - name: Wait for control-plane and ui
         shell: bash
         run: |
+          browser_ua='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
           for i in $(seq 1 60); do
-            if curl -kfsS --resolve localhost:443:127.0.0.1 https://localhost/login >/dev/null 2>&1; then
+            if curl -kfsS -A "$browser_ua" --resolve localhost:443:127.0.0.1 https://localhost/login >/dev/null 2>&1; then
+              exit 0
+            fi
+            if curl -kfsS -A "$browser_ua" --resolve localhost:443:127.0.0.1 https://localhost/challenge >/dev/null 2>&1; then
               exit 0
             fi
             sleep 2
           done
           echo "ui login endpoint did not become ready in time"
           curl -I http://127.0.0.1/login || true
-          curl -kI --resolve localhost:443:127.0.0.1 https://localhost/login || true
+          curl -kI -A "$browser_ua" --resolve localhost:443:127.0.0.1 https://localhost/login || true
+          curl -kI -A "$browser_ua" --resolve localhost:443:127.0.0.1 https://localhost/challenge || true
           docker compose -f deploy/compose/auto-start/docker-compose.yml ps
           exit 1
 

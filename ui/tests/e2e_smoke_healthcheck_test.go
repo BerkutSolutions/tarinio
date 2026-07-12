@@ -2,14 +2,10 @@ package tests
 
 import (
 	"bytes"
-	"context"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
-	"net/http/cookiejar"
 	"net/url"
 	"os"
 	"strings"
@@ -17,25 +13,21 @@ import (
 	"time"
 )
 
+const defaultE2EBrowserUserAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+
 func TestE2ESmoke_LoginHealthcheckDashboard(t *testing.T) {
-	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL")), "/")
+	baseURL := strings.TrimRight(strings.TrimSpace(firstNonEmpty(os.Getenv("WAF_E2E_ANTIBOT_BASE_URL"), os.Getenv("WAF_E2E_BASE_URL"))), "/")
 	if baseURL == "" {
 		t.Skip("WAF_E2E_BASE_URL is not set; skipping e2e smoke test")
 	}
-	requestBaseURL := baseURL
-	requestHostOverride := ""
-	originalBaseParsed, err := url.Parse(baseURL)
+	challengeURI := normalizeChallengeURI(strings.TrimSpace(os.Getenv("WAF_E2E_ANTIBOT_CHALLENGE_URI")))
+
+	endpoint, err := resolveAntibotEndpoint(baseURL)
 	if err != nil {
-		t.Fatalf("parse base url: %v", err)
+		t.Fatalf("resolve e2e endpoint: %v", err)
 	}
-	requestBaseParsed := originalBaseParsed
-	if strings.EqualFold(originalBaseParsed.Hostname(), "localhost") {
-		requestHostOverride = originalBaseParsed.Hostname()
-		requestBaseParsed = &url.URL{}
-		*requestBaseParsed = *originalBaseParsed
-		requestBaseParsed.Host = net.JoinHostPort("127.0.0.1", effectivePort(originalBaseParsed))
-		requestBaseURL = strings.TrimRight(requestBaseParsed.String(), "/")
-	}
+	requestBaseURL := endpoint.requestBaseURL
+	requestHostOverride := endpoint.hostOverride
 	username := strings.TrimSpace(os.Getenv("WAF_E2E_USERNAME"))
 	if username == "" {
 		username = "admin"
@@ -45,48 +37,23 @@ func TestE2ESmoke_LoginHealthcheckDashboard(t *testing.T) {
 		password = "admin"
 	}
 
-	jar, err := cookiejar.New(nil)
-	if err != nil {
-		t.Fatalf("cookie jar init failed: %v", err)
-	}
-	client := &http.Client{
-		Timeout: 15 * time.Second,
-		Jar:     jar,
-	}
-	if strings.HasPrefix(strings.ToLower(requestBaseURL), "https://") {
-		transport := &http.Transport{
-			Proxy:                 nil,
-			ForceAttemptHTTP2:     false,
-			TLSHandshakeTimeout:   15 * time.Second,
-			ResponseHeaderTimeout: 15 * time.Second,
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-				ServerName:         "localhost",
-			},
-		}
-		dialer := &net.Dialer{Timeout: 15 * time.Second}
-		transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
-			host, port, err := net.SplitHostPort(addr)
-			if err != nil {
-				return dialer.DialContext(ctx, network, addr)
-			}
-			if strings.EqualFold(host, "localhost") {
-				host = "127.0.0.1"
-			}
-			return dialer.DialContext(ctx, network, net.JoinHostPort(host, port))
-		}
-		client.Transport = transport
-	}
+	client := newE2EHTTPClient(requestBaseURL, true)
 
 	if err := waitForHTTP(client, requestBaseURL+"/login", requestHostOverride, 90*time.Second); err != nil {
 		t.Fatalf("ui is not ready: %v", err)
 	}
+	ensureManagementLoginAccess(t, client, requestBaseURL, requestHostOverride, challengeURI)
 
 	loginPayload := map[string]any{
 		"username": username,
 		"password": password,
 	}
 	loginResp := postJSON(t, client, requestBaseURL+"/api/auth/login", requestHostOverride, loginPayload)
+	if loginResp.StatusCode == http.StatusFound || loginResp.StatusCode == http.StatusForbidden || loginResp.StatusCode == http.StatusTooManyRequests {
+		_ = loginResp.Body.Close()
+		ensureManagementLoginAccess(t, client, requestBaseURL, requestHostOverride, challengeURI)
+		loginResp = postJSON(t, client, requestBaseURL+"/api/auth/login", requestHostOverride, loginPayload)
+	}
 	if loginResp.StatusCode != http.StatusOK {
 		t.Fatalf("login failed: status=%d body=%s", loginResp.StatusCode, mustReadBody(t, loginResp.Body))
 	}
@@ -111,11 +78,11 @@ func TestE2ESmoke_LoginHealthcheckDashboard(t *testing.T) {
 	}
 
 	if requestHostOverride != "" {
-		jar.SetCookies(requestBaseParsed, loginResp.Cookies())
+		client.Jar.SetCookies(endpoint.requestParsed, loginResp.Cookies())
 	}
-	cookies := jar.Cookies(originalBaseParsed)
+	cookies := client.Jar.Cookies(endpoint.originalParsed)
 	if len(cookies) == 0 {
-		cookies = jar.Cookies(requestBaseParsed)
+		cookies = client.Jar.Cookies(endpoint.requestParsed)
 	}
 	hasSession := false
 	for _, c := range cookies {
@@ -191,18 +158,66 @@ func TestE2ESmoke_LoginHealthcheckDashboard(t *testing.T) {
 	}
 }
 
+func ensureManagementLoginAccess(t *testing.T, client *http.Client, requestBaseURL, requestHostOverride, challengeURI string) {
+	t.Helper()
+
+	loginURL := requestBaseURL + "/login"
+	resp, err := doE2ERequest(client, http.MethodGet, loginURL, requestHostOverride, "text/html,application/json", nil, false)
+	if err != nil {
+		t.Fatalf("open login entry: %v", err)
+	}
+
+	challengeLocation, challenged := extractChallengeLocation(resp, challengeURI)
+	if !challenged {
+		if resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusBadRequest {
+			return
+		}
+		t.Fatalf("unexpected login entry response: status=%d location=%q", resp.StatusCode, strings.TrimSpace(resp.Header.Get("Location")))
+	}
+
+	challengePageURL := absolutizeLocation(requestBaseURL, challengeLocation)
+	challengeResp, err := doE2ERequest(client, http.MethodGet, challengePageURL, requestHostOverride, "text/html", nil, false)
+	if err != nil {
+		t.Fatalf("open challenge page: %v", err)
+	}
+	if challengeResp.StatusCode != http.StatusOK {
+		t.Fatalf("challenge page failed: status=%d body=%s", challengeResp.StatusCode, mustReadBody(t, challengeResp.Body))
+	}
+	challengeBody := strings.ToLower(mustReadBody(t, challengeResp.Body))
+	if !strings.Contains(challengeBody, "verification") && !strings.Contains(challengeBody, "challenge") {
+		t.Fatalf("challenge page contract mismatch")
+	}
+
+	verifyURL, err := buildVerifyURL(requestBaseURL, challengeLocation, antibotVerifyURI(challengeURI))
+	if err != nil {
+		t.Fatalf("build challenge verify url: %v", err)
+	}
+	verifyResp, err := doE2ERequest(client, http.MethodGet, verifyURL, requestHostOverride, "text/html", nil, false)
+	if err != nil {
+		t.Fatalf("verify challenge: %v", err)
+	}
+	if verifyResp.StatusCode != http.StatusFound {
+		t.Fatalf("challenge verify failed: status=%d body=%s", verifyResp.StatusCode, mustReadBody(t, verifyResp.Body))
+	}
+	_ = verifyResp.Body.Close()
+
+	postVerifyResp, err := doE2ERequest(client, http.MethodGet, loginURL, requestHostOverride, "text/html,application/json", nil, false)
+	if err != nil {
+		t.Fatalf("re-open login entry after challenge: %v", err)
+	}
+	if _, stillChallenged := extractChallengeLocation(postVerifyResp, challengeURI); stillChallenged {
+		t.Fatalf("login entry is still challenged after verify")
+	}
+	if postVerifyResp.StatusCode < http.StatusOK || postVerifyResp.StatusCode >= http.StatusBadRequest {
+		t.Fatalf("login entry is still unavailable after verify: status=%d location=%q", postVerifyResp.StatusCode, strings.TrimSpace(postVerifyResp.Header.Get("Location")))
+	}
+}
+
 func waitForHTTP(client *http.Client, target string, hostOverride string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	lastErr := ""
 	for time.Now().Before(deadline) {
-		req, err := http.NewRequest(http.MethodGet, target, nil)
-		if err != nil {
-			return fmt.Errorf("create readiness request: %w", err)
-		}
-		if hostOverride != "" {
-			req.Host = hostOverride
-		}
-		resp, err := client.Do(req)
+		resp, err := doE2ERequest(client, http.MethodGet, target, hostOverride, "text/html,application/json", nil, true)
 		if err == nil {
 			_ = resp.Body.Close()
 			if resp.StatusCode >= 200 && resp.StatusCode < 500 {
@@ -226,16 +241,12 @@ func postJSON(t *testing.T, client *http.Client, endpoint string, hostOverride s
 	if err != nil {
 		t.Fatalf("marshal payload for %s: %v", endpoint, err)
 	}
-	req, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewReader(body))
+	req, err := newE2ERequest(http.MethodPost, endpoint, hostOverride, "application/json", bytes.NewReader(body))
 	if err != nil {
 		t.Fatalf("create request %s: %v", endpoint, err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-	if hostOverride != "" {
-		req.Host = hostOverride
-	}
-	resp, err := client.Do(req)
+	resp, err := doPreparedE2ERequest(client, req, true)
 	if err != nil {
 		t.Fatalf("request failed %s: %v", endpoint, err)
 	}
@@ -244,19 +255,50 @@ func postJSON(t *testing.T, client *http.Client, endpoint string, hostOverride s
 
 func getWithAuth(t *testing.T, client *http.Client, endpoint string, hostOverride string) *http.Response {
 	t.Helper()
-	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	req, err := newE2ERequest(http.MethodGet, endpoint, hostOverride, "application/json,text/html", nil)
 	if err != nil {
 		t.Fatalf("create request %s: %v", endpoint, err)
 	}
-	req.Header.Set("Accept", "application/json,text/html")
-	if hostOverride != "" {
-		req.Host = hostOverride
-	}
-	resp, err := client.Do(req)
+	resp, err := doPreparedE2ERequest(client, req, true)
 	if err != nil {
 		t.Fatalf("request failed %s: %v", endpoint, err)
 	}
 	return resp
+}
+
+func newE2ERequest(method, endpoint, hostOverride, accept string, body io.Reader) (*http.Request, error) {
+	req, err := http.NewRequest(method, endpoint, body)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(accept) != "" {
+		req.Header.Set("Accept", accept)
+	}
+	req.Header.Set("User-Agent", defaultE2EBrowserUserAgent)
+	if hostOverride != "" {
+		req.Host = hostOverride
+	}
+	return req, nil
+}
+
+func doE2ERequest(client *http.Client, method, endpoint, hostOverride, accept string, body io.Reader, follow bool) (*http.Response, error) {
+	req, err := newE2ERequest(method, endpoint, hostOverride, accept, body)
+	if err != nil {
+		return nil, err
+	}
+	return doPreparedE2ERequest(client, req, follow)
+}
+
+func doPreparedE2ERequest(client *http.Client, req *http.Request, follow bool) (*http.Response, error) {
+	requestClient := client
+	if !follow {
+		tmp := *client
+		tmp.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		}
+		requestClient = &tmp
+	}
+	return requestClient.Do(req)
 }
 
 func effectivePort(u *url.URL) string {

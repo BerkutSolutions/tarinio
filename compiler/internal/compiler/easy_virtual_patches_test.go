@@ -10,7 +10,7 @@ func TestVirtualPatch_BlockRuleInModSecurity(t *testing.T) {
 		{ID: "vp-1", Pattern: "/test-vuln-path", Target: "uri", Action: "block"},
 	}
 	rules := buildEasyModSecurityRules(
-		"site-1", "block", false, "", nil, false, "", "", false, "", "", "", nil, patches,
+		"site-1", "block", false, "", nil, nil, false, "", "", false, "", "", "", nil, patches,
 	)
 	if !strings.Contains(rules, `SecRule REQUEST_URI "@rx /test-vuln-path"`) {
 		t.Errorf("expected REQUEST_URI rule, got:\n%s", rules)
@@ -28,7 +28,7 @@ func TestVirtualPatch_MonitorRuleInModSecurity(t *testing.T) {
 		{ID: "vp-2", Pattern: `DROP\s+TABLE`, Target: "body", Action: "monitor"},
 	}
 	rules := buildEasyModSecurityRules(
-		"site-1", "block", false, "", nil, false, "", "", false, "", "", "", nil, patches,
+		"site-1", "block", false, "", nil, nil, false, "", "", false, "", "", "", nil, patches,
 	)
 	if !strings.Contains(rules, "REQUEST_BODY") {
 		t.Errorf("expected REQUEST_BODY target, got:\n%s", rules)
@@ -43,7 +43,7 @@ func TestVirtualPatch_MonitorRuleInModSecurity(t *testing.T) {
 
 func TestVirtualPatch_NoPatchesNoSection(t *testing.T) {
 	rules := buildEasyModSecurityRules(
-		"site-1", "block", false, "", nil, false, "", "", false, "", "", "", nil, nil,
+		"site-1", "block", false, "", nil, nil, false, "", "", false, "", "", "", nil, nil,
 	)
 	if strings.Contains(rules, "Virtual Patch rules") {
 		t.Errorf("expected no virtual patch section when patches is nil, got:\n%s", rules)
@@ -56,7 +56,7 @@ func TestVirtualPatch_ExpiredPatchSkipped(t *testing.T) {
 		{ID: "vp-empty", Pattern: "", Target: "uri", Action: "block"},
 	}
 	rules := buildEasyModSecurityRules(
-		"site-1", "block", false, "", nil, false, "", "", false, "", "", "", nil, patches,
+		"site-1", "block", false, "", nil, nil, false, "", "", false, "", "", "", nil, patches,
 	)
 	if strings.Contains(rules, "vp-empty") {
 		t.Errorf("empty pattern patch should be skipped, got:\n%s", rules)
@@ -68,7 +68,7 @@ func TestVirtualPatch_HeaderTarget(t *testing.T) {
 		{ID: "vp-h", Pattern: "X-Evil.*", Target: "header", Action: "block"},
 	}
 	rules := buildEasyModSecurityRules(
-		"site-1", "block", false, "", nil, false, "", "", false, "", "", "", nil, patches,
+		"site-1", "block", false, "", nil, nil, false, "", "", false, "", "", "", nil, patches,
 	)
 	if !strings.Contains(rules, "REQUEST_HEADERS") {
 		t.Errorf("expected REQUEST_HEADERS target, got:\n%s", rules)

@@ -21,6 +21,7 @@ export function bindDetailRuntime(deps) {
     normalizeAuthServiceTokens,
     normalizeAuthSessionTTLMinutes,
     normalizeAPIPositiveEndpointPolicies,
+    normalizeModSecurityExclusionRules,
     buildDetailDraftFromForm,
     syncStateDraftFromFormModule,
     BAN_SCOPE_VALUES,
@@ -96,7 +97,8 @@ export function bindDetailRuntime(deps) {
     normalizeAuthOrder,
     normalizeAuthServiceTokens,
     normalizeAuthSessionTTLMinutes,
-    normalizeAPIPositiveEndpointPolicies
+    normalizeAPIPositiveEndpointPolicies,
+    normalizeModSecurityExclusionRules
   });
 
   const syncStateDraftFromForm = () => syncStateDraftFromFormModule(state, getDraft, {
@@ -206,6 +208,7 @@ export function bindDetailRuntime(deps) {
     normalizeAuthExclusionRules,
     normalizeAuthServiceTokens,
     normalizeArray,
+    normalizeModSecurityExclusionRules,
   });
 
   bindDetailRuleEvents({

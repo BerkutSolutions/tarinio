@@ -8,6 +8,7 @@ import {
   normalizeStringArray,
   normalizeGeoTimeWindows,
 } from "./sites.normalize.js";
+import { normalizeModSecurityExclusionRules } from "./sites.modsec-exclusion-editors.js";
 import { normalizeAuthBasicUsers, normalizeAuthSessionTTLMinutes } from "./sites.auth-geo.js";
 import {
   BAN_SCOPE_VALUES,
@@ -39,7 +40,7 @@ export function defaultSiteDraft() {
     auth_basic_text: "Restricted area", auth_basic_users: [{ username: "changeme", password: "", enabled: true, last_login_at: "" }], auth_basic_session_inactivity_minutes: 60,
     blacklist_country: [], whitelist_country: [], geo_time_windows: [], api_positive_security_enabled: false, api_positive_openapi_schema_ref: "", api_positive_enforcement_mode: "monitor",
     api_positive_default_action: "allow", api_positive_endpoint_policies: [], use_modsecurity: true, use_modsecurity_crs_plugins: true, use_modsecurity_custom_configuration: false,
-    modsecurity_crs_version: "4", modsecurity_crs_plugins: [], modsecurity_custom_path: "modsec/anomaly_score.conf", modsecurity_custom_content: "",
+    modsecurity_crs_version: "4", modsecurity_crs_plugins: [], modsecurity_exclusion_rules: [], modsecurity_custom_path: "modsec/anomaly_score.conf", modsecurity_custom_content: "",
     use_ws_inspection: false, ws_block_patterns: [], ws_max_message_bytes: 0, ws_rate_msg_per_sec: 0,
     mtls_enabled: false, mtls_optional: false, mtls_verify_depth: 2, mtls_client_ca_ref: "", mtls_pass_headers: false,
     upstream_mtls_enabled: false, upstream_mtls_cert_ref: "", upstream_mtls_key_ref: "", upstream_mtls_ca_ref: "",
@@ -119,7 +120,8 @@ export function draftToEasyProfile(draft) {
     },
     security_modsecurity: {
       use_modsecurity: draft.use_modsecurity, use_modsecurity_crs_plugins: draft.use_modsecurity_crs_plugins, use_modsecurity_custom_configuration: draft.use_modsecurity_custom_configuration,
-      modsecurity_crs_version: draft.modsecurity_crs_version, modsecurity_crs_plugins: draft.modsecurity_crs_plugins, custom_configuration: { path: customPath, content: draft.modsecurity_custom_content }
+      modsecurity_crs_version: draft.modsecurity_crs_version, modsecurity_crs_plugins: draft.modsecurity_crs_plugins,
+      exclusion_rules: normalizeModSecurityExclusionRules(draft.modsecurity_exclusion_rules), custom_configuration: { path: customPath, content: draft.modsecurity_custom_content }
     },
     use_custom_error_pages: Boolean(draft.use_custom_error_pages ?? true),
     disabled_error_pages: Array.isArray(draft.disabled_error_pages) ? draft.disabled_error_pages : [],

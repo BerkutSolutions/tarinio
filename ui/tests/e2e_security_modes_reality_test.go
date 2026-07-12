@@ -1,11 +1,11 @@
 package tests
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"net/http/cookiejar"
 	"os"
 	"strings"
 	"testing"
@@ -13,29 +13,41 @@ import (
 )
 
 func TestE2ESecurityModesReality(t *testing.T) {
-	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL")), "/")
-	if baseURL == "" {
-		t.Skip("WAF_E2E_BASE_URL is not set; skipping security modes e2e")
+	requestURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL")), "/")
+	runtimeURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_RUNTIME_URL")), "/")
+	if requestURL == "" || runtimeURL == "" {
+		t.Skip("WAF_E2E_BASE_URL and WAF_E2E_RUNTIME_URL are required; skipping security modes e2e")
 	}
 
-	client, requestBaseURL, requestHostOverride := newE2EClientAndBase(t, baseURL)
+	client, requestBaseURL, requestHostOverride := newE2EClientAndBase(t, requestURL)
 	loginE2EUser(t, client, requestBaseURL, requestHostOverride)
 
-	siteID := e2ePickSiteID(t, client, requestBaseURL, requestHostOverride)
+	const (
+		siteID     = "e2e-security-modes-site"
+		upstreamID = "e2e-security-modes-upstream"
+		host       = "e2e-security-modes.test"
+	)
+
+	t.Cleanup(func() {
+		resp := requestE2EJSON(t, client, http.MethodDelete, requestBaseURL+"/api/sites/"+siteID+"?auto_apply=false", requestHostOverride, nil)
+		_ = resp.Body.Close()
+		resp = requestE2EJSON(t, client, http.MethodDelete, requestBaseURL+"/api/upstreams/"+upstreamID+"?auto_apply=false", requestHostOverride, nil)
+		_ = resp.Body.Close()
+	})
+
+	createE2ESecurityModesSite(t, client, requestBaseURL, requestHostOverride, siteID, upstreamID, host)
 	original := e2eGetProfile(t, client, requestBaseURL, requestHostOverride, siteID)
-	defer e2ePutProfile(t, client, requestBaseURL, requestHostOverride, siteID, original)
 
 	cases := []struct {
 		mode                string
-		expectModSecurity   bool
-		expectBlocking      bool
 		expectWAFEnabled    bool
 		expectAccessEnabled bool
 		expectRateEnabled   bool
+		expectBlocking      bool
 	}{
-		{mode: "transparent", expectModSecurity: false, expectBlocking: false, expectWAFEnabled: false, expectAccessEnabled: false, expectRateEnabled: false},
-		{mode: "monitor", expectModSecurity: true, expectBlocking: false, expectWAFEnabled: true, expectAccessEnabled: false, expectRateEnabled: false},
-		{mode: "block", expectModSecurity: true, expectBlocking: true, expectWAFEnabled: true, expectAccessEnabled: true, expectRateEnabled: true},
+		{mode: "transparent", expectWAFEnabled: false, expectAccessEnabled: true, expectRateEnabled: true, expectBlocking: false},
+		{mode: "monitor", expectWAFEnabled: false, expectAccessEnabled: true, expectRateEnabled: true, expectBlocking: false},
+		{mode: "block", expectWAFEnabled: false, expectAccessEnabled: true, expectRateEnabled: true, expectBlocking: true},
 	}
 
 	for _, tc := range cases {
@@ -43,7 +55,12 @@ func TestE2ESecurityModesReality(t *testing.T) {
 		t.Run(tc.mode, func(t *testing.T) {
 			profile := e2eBuildModeStressProfile(original, tc.mode)
 			updated := e2ePutProfile(t, client, requestBaseURL, requestHostOverride, siteID, profile)
-			e2eAssertProfileModeReality(t, updated, tc.expectModSecurity, tc.expectBlocking)
+			e2eAssertProfileModeReality(t, updated)
+
+			revisionID := e2eCompileAndApply(t, client, requestBaseURL, requestHostOverride)
+			if revisionID == "" {
+				t.Fatal("compile+apply returned an empty revision ID")
+			}
 
 			wafEnabled := e2ePolicyEnabledForSite(t, client, requestBaseURL, requestHostOverride, "/api/waf-policies", siteID)
 			accessEnabled := e2ePolicyEnabledForSite(t, client, requestBaseURL, requestHostOverride, "/api/access-policies", siteID)
@@ -57,29 +74,44 @@ func TestE2ESecurityModesReality(t *testing.T) {
 			if rateEnabled != tc.expectRateEnabled {
 				t.Fatalf("%s mode: rate-limit policy enabled=%v, want %v", tc.mode, rateEnabled, tc.expectRateEnabled)
 			}
-			e2eAssertModeDoesNotBlockChallengeFlow(t, requestBaseURL, siteID, tc.mode)
+
+			e2eAssertSecurityModeRuntimeBehavior(t, runtimeURL, host, tc.mode, tc.expectBlocking)
 		})
 	}
 }
 
-func e2ePickSiteID(t *testing.T, client *http.Client, requestBaseURL, requestHostOverride string) string {
+func createE2ESecurityModesSite(t *testing.T, client *http.Client, requestBaseURL, requestHostOverride, siteID, upstreamID, host string) {
 	t.Helper()
-	resp := getWithAuth(t, client, requestBaseURL+"/api/sites", requestHostOverride)
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("list sites failed: status=%d body=%s", resp.StatusCode, mustReadBody(t, resp.Body))
+	site := postJSON(t, client, requestBaseURL+"/api/sites?auto_apply=false", requestHostOverride, map[string]any{
+		"id":                  siteID,
+		"primary_host":        host,
+		"enabled":             true,
+		"default_upstream_id": upstreamID,
+		"listen_http":         true,
+		"listen_https":        false,
+		"use_easy_config":     true,
+	})
+	siteBody, _ := io.ReadAll(site.Body)
+	_ = site.Body.Close()
+	if site.StatusCode != http.StatusCreated && site.StatusCode != http.StatusOK {
+		t.Fatalf("create site: status=%d body=%s", site.StatusCode, string(siteBody))
 	}
-	var items []map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&items); err != nil {
-		t.Fatalf("decode sites list: %v", err)
+
+	upstream := postJSON(t, client, requestBaseURL+"/api/upstreams?auto_apply=false", requestHostOverride, map[string]any{
+		"id":               upstreamID,
+		"site_id":          siteID,
+		"name":             upstreamID,
+		"scheme":           "http",
+		"host":             "upstream-echo",
+		"port":             8888,
+		"base_path":        "/",
+		"pass_host_header": false,
+	})
+	upstreamBody, _ := io.ReadAll(upstream.Body)
+	_ = upstream.Body.Close()
+	if upstream.StatusCode != http.StatusCreated && upstream.StatusCode != http.StatusOK {
+		t.Fatalf("create upstream: status=%d body=%s", upstream.StatusCode, string(upstreamBody))
 	}
-	for _, item := range items {
-		id := strings.TrimSpace(fmt.Sprint(item["id"]))
-		if id != "" {
-			return id
-		}
-	}
-	t.Fatal("no sites found for e2e security modes")
-	return ""
 }
 
 func e2eGetProfile(t *testing.T, client *http.Client, requestBaseURL, requestHostOverride, siteID string) map[string]any {
@@ -123,72 +155,39 @@ func e2eBuildModeStressProfile(base map[string]any, mode string) map[string]any 
 	behavior["blacklist_ip"] = []any{"198.51.100.10"}
 	behavior["custom_limit_rules"] = []any{map[string]any{"path": "/stress", "rate": "5r/s"}}
 
-	antibot := mapGetOrCreate(profile, "security_antibot")
-	antibot["antibot_challenge"] = "javascript"
-	antibot["scanner_auto_ban_enabled"] = true
-	antibot["challenge_escalation_enabled"] = true
-	antibot["challenge_escalation_mode"] = "captcha"
-	antibot["challenge_rules"] = []any{map[string]any{"path": "/admin", "challenge": "captcha"}}
-
-	auth := mapGetOrCreate(profile, "security_auth_basic")
-	auth["use_auth_basic"] = true
-	auth["auth_basic_user"] = "admin"
-	auth["auth_basic_password"] = "admin"
-	auth["users"] = []any{map[string]any{"username": "admin", "password": "admin", "enabled": true}}
-
-	apiPositive := mapGetOrCreate(profile, "security_api_positive")
-	apiPositive["use_api_positive_security"] = true
-	apiPositive["enforcement_mode"] = "block"
-	apiPositive["default_action"] = "deny"
-	apiPositive["endpoint_policies"] = []any{map[string]any{"path": "/api/private", "methods": []any{"GET"}, "mode": "block"}}
-
 	modsec := mapGetOrCreate(profile, "security_modsecurity")
 	modsec["use_modsecurity"] = true
-	modsec["use_modsecurity_crs_plugins"] = true
-
-	country := mapGetOrCreate(profile, "security_country_policy")
-	country["blacklist_country"] = []any{"RU"}
-	country["whitelist_country"] = []any{}
+	modsec["use_modsecurity_crs_plugins"] = false
+	modsec["use_modsecurity_custom_configuration"] = true
+	modsec["custom_configuration"] = map[string]any{
+		"path":    "modsec/e2e-security-modes.conf",
+		"content": `SecRule REQUEST_URI "@streq /mode-check" "id:100002,phase:2,deny,status:403,log"`,
+	}
 
 	return profile
 }
 
-func e2eAssertProfileModeReality(t *testing.T, profile map[string]any, expectModSecurity, expectBlocking bool) {
+func e2eAssertProfileModeReality(t *testing.T, profile map[string]any) {
 	t.Helper()
+	front := mapGetOrCreate(profile, "front_service")
 	behavior := mapGetOrCreate(profile, "security_behavior_and_limits")
-	antibot := mapGetOrCreate(profile, "security_antibot")
-	auth := mapGetOrCreate(profile, "security_auth_basic")
-	apiPositive := mapGetOrCreate(profile, "security_api_positive")
 	modsec := mapGetOrCreate(profile, "security_modsecurity")
 
-	if boolValue(modsec["use_modsecurity"]) != expectModSecurity {
-		t.Fatalf("use_modsecurity=%v, want %v", boolValue(modsec["use_modsecurity"]), expectModSecurity)
+	if !boolValue(modsec["use_modsecurity"]) {
+		t.Fatal("saving a non-block mode must preserve the ModSecurity setting")
 	}
-	if boolValue(behavior["use_limit_req"]) != expectBlocking {
-		t.Fatalf("use_limit_req=%v, want %v", boolValue(behavior["use_limit_req"]), expectBlocking)
+	if strings.TrimSpace(fmt.Sprint(front["security_mode"])) == "" {
+		t.Fatal("saved profile must keep security_mode")
 	}
-	if boolValue(behavior["use_limit_conn"]) != expectBlocking {
-		t.Fatalf("use_limit_conn=%v, want %v", boolValue(behavior["use_limit_conn"]), expectBlocking)
+	if !boolValue(behavior["use_limit_req"]) || !boolValue(behavior["use_limit_conn"]) || !boolValue(behavior["use_bad_behavior"]) || !boolValue(behavior["use_blacklist"]) {
+		t.Fatal("saving a non-block mode must preserve traffic protection settings")
 	}
-	if boolValue(behavior["use_bad_behavior"]) != expectBlocking {
-		t.Fatalf("use_bad_behavior=%v, want %v", boolValue(behavior["use_bad_behavior"]), expectBlocking)
+	customConfiguration, ok := modsec["custom_configuration"].(map[string]any)
+	if !ok {
+		t.Fatal("saved profile must keep custom ModSecurity configuration")
 	}
-	if boolValue(behavior["use_blacklist"]) != expectBlocking {
-		t.Fatalf("use_blacklist=%v, want %v", boolValue(behavior["use_blacklist"]), expectBlocking)
-	}
-	if boolValue(auth["use_auth_basic"]) != expectBlocking {
-		t.Fatalf("use_auth_basic=%v, want %v", boolValue(auth["use_auth_basic"]), expectBlocking)
-	}
-	if boolValue(apiPositive["use_api_positive_security"]) != expectBlocking {
-		t.Fatalf("use_api_positive_security=%v, want %v", boolValue(apiPositive["use_api_positive_security"]), expectBlocking)
-	}
-	challenge := strings.TrimSpace(fmt.Sprint(antibot["antibot_challenge"]))
-	wantChallenge := "no"
-	if expectBlocking {
-		wantChallenge = "javascript"
-	}
-	if challenge != wantChallenge {
-		t.Fatalf("antibot_challenge=%q, want %q", challenge, wantChallenge)
+	if !strings.Contains(fmt.Sprint(customConfiguration["content"]), `REQUEST_URI "@streq /mode-check"`) {
+		t.Fatalf("saved ModSecurity custom configuration lost runtime trigger: %v", customConfiguration["content"])
 	}
 }
 
@@ -237,66 +236,76 @@ func boolValue(value any) bool {
 	return v
 }
 
-func e2eAssertModeDoesNotBlockChallengeFlow(t *testing.T, requestBaseURL, siteID, mode string) {
+func e2eAssertSecurityModeRuntimeBehavior(t *testing.T, runtimeURL, host, mode string, expectBlocking bool) {
 	t.Helper()
-	runtimeURL := strings.TrimSpace(os.Getenv("WAF_E2E_RUNTIME_URL"))
-	if runtimeURL == "" {
-		t.Skipf("WAF_E2E_RUNTIME_URL not set; skipping runtime assertion for %s mode", mode)
+	deadline := time.Now().Add(20 * time.Second)
+	var lastStatus int
+	var lastLocation string
+	var lastBody string
+	for time.Now().Before(deadline) {
+		status, location, body := e2eSecurityModeRuntimeProbe(t, runtimeURL, host, mode)
+		lastStatus = status
+		lastLocation = location
+		lastBody = body
+		if e2eSecurityModeBehaviorMatches(mode, expectBlocking, status, location, body) {
+			return
+		}
+		time.Sleep(500 * time.Millisecond)
 	}
 
-	jar, err := cookiejar.New(nil)
-	if err != nil {
-		t.Fatalf("cookie jar: %v", err)
+	if expectBlocking {
+		t.Fatalf("%s mode must reactivate blocking after compile/apply: status=%d location=%q body=%.300s", mode, lastStatus, lastLocation, lastBody)
 	}
-	client := &http.Client{
-		Timeout: 10 * time.Second,
-		Jar:     jar,
-		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
-	host := e2eRuntimeHostForSite(t, requestBaseURL, siteID)
-	req, err := http.NewRequest(http.MethodGet, strings.TrimRight(runtimeURL, "/")+"/admin", nil)
+	t.Fatalf("%s mode must preserve settings without enforcing them after compile/apply: status=%d location=%q body=%.300s", mode, lastStatus, lastLocation, lastBody)
+}
+
+func e2eSecurityModeRuntimeProbe(t *testing.T, runtimeURL, host, mode string) (int, string, string) {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodGet, runtimeURL+"/mode-check", nil)
 	if err != nil {
 		t.Fatalf("runtime request: %v", err)
 	}
 	req.Host = host
-	resp, err := client.Do(req)
+	req.Header.Set("X-E2E-Security-Mode", mode)
+
+	resp, err := (&http.Client{
+		Timeout: 10 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}).Do(req)
 	if err != nil {
-		t.Fatalf("runtime request failed for %s: %v", mode, err)
+		t.Fatalf("runtime request failed: %v", err)
 	}
+
 	body, _ := io.ReadAll(resp.Body)
 	_ = resp.Body.Close()
-	bodyStr := string(body)
-	location := resp.Header.Get("Location")
-
-	if mode == "transparent" || mode == "monitor" {
-		if resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusSeeOther {
-			if strings.Contains(location, "/challenge") || strings.Contains(location, "/auth") {
-				t.Fatalf("%s mode must not block via challenge/auth redirect: status=%d location=%q body=%.300s", mode, resp.StatusCode, location, bodyStr)
-			}
-		}
-		if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusUnavailableForLegalReasons {
-			t.Fatalf("%s mode must not apply blocking security response: status=%d body=%.300s", mode, resp.StatusCode, bodyStr)
-		}
-	}
+	return resp.StatusCode, resp.Header.Get("Location"), string(body)
 }
 
-func e2eRuntimeHostForSite(t *testing.T, requestBaseURL, siteID string) string {
-	t.Helper()
-	resp := requestRaw(t, http.DefaultClient, http.MethodGet, requestBaseURL+"/api/sites/"+siteID, "", nil)
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("get site %s failed: status=%d body=%s", siteID, resp.StatusCode, mustReadBody(t, resp.Body))
-	}
-	var site map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&site); err != nil {
-		t.Fatalf("decode site %s: %v", siteID, err)
-	}
-	for _, key := range []string{"primary_host", "host", "hostname"} {
-		if host := strings.TrimSpace(fmt.Sprint(site[key])); host != "" && host != "<nil>" {
-			return host
+func e2eSecurityModeBehaviorMatches(mode string, expectBlocking bool, status int, location, body string) bool {
+	isBlocking := status == http.StatusUnauthorized ||
+		status == http.StatusForbidden ||
+		status == http.StatusTooManyRequests ||
+		status == http.StatusUnavailableForLegalReasons
+	if status == http.StatusFound || status == http.StatusSeeOther {
+		if strings.Contains(location, "/challenge") || strings.Contains(location, "/auth") {
+			isBlocking = true
 		}
 	}
-	t.Fatalf("site %s has no primary host in payload", siteID)
-	return ""
+	if expectBlocking {
+		return isBlocking
+	}
+
+	if isBlocking || status != http.StatusOK {
+		return false
+	}
+
+	lowerBody := strings.ToLower(body)
+	return strings.Contains(lowerBody, "/mode-check") &&
+		strings.Contains(lowerBody, "x-e2e-security-mode") &&
+		strings.Contains(lowerBody, strings.ToLower(mode))
 }

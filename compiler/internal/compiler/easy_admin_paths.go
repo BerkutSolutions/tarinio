@@ -37,6 +37,15 @@ var easyAdminPrefixPaths = []string{
 	"/static/",
 }
 
+func easyManagementProtectedPaths() []string {
+	paths := make([]string, 0, len(easyAdminExactPaths)+len(easyAdminPrefixPaths)+len(easyAdminSegmentPrefixes)+2)
+	paths = append(paths, easyAdminExactPaths...)
+	paths = append(paths, easyAdminPrefixPaths...)
+	paths = append(paths, easyAdminSegmentPrefixes...)
+	paths = append(paths, "/login", "/login/2fa")
+	return paths
+}
+
 func easyAdminAntibotExclusionRulesForSite(site SiteInput) []AntibotExclusionRuleInput {
 	return easyAdminMethodExclusionRulesForSite(site, []string{"GET", "HEAD"})
 }
@@ -104,18 +113,18 @@ func isReservedAdminAppPath(path string) bool {
 }
 
 func easyAdminBypassPathPattern() string {
-	parts := []string{
-		"",
-		"auth",
-		"auth/verify",
-	}
-	for _, prefix := range easyAdminSegmentPrefixes {
-		trimmed := strings.TrimPrefix(prefix, "/")
-		parts = append(parts, regexp.QuoteMeta(trimmed)+"(?:/.*)?")
-	}
-	for _, prefix := range easyAdminPrefixPaths {
-		trimmed := strings.TrimSuffix(strings.TrimPrefix(prefix, "/"), "/")
-		parts = append(parts, regexp.QuoteMeta(trimmed)+"/.*")
+	parts := make([]string, 0, len(easyManagementProtectedPaths()))
+	for _, path := range easyManagementProtectedPaths() {
+		switch {
+		case path == "/":
+			parts = append(parts, "")
+		case strings.HasSuffix(path, "/"):
+			trimmed := strings.TrimSuffix(strings.TrimPrefix(path, "/"), "/")
+			parts = append(parts, regexp.QuoteMeta(trimmed)+"/.*")
+		default:
+			trimmed := strings.TrimPrefix(path, "/")
+			parts = append(parts, regexp.QuoteMeta(trimmed)+"(?:/.*)?")
+		}
 	}
 	return "^/(?:" + strings.Join(parts, "|") + ")$"
 }
@@ -165,6 +174,13 @@ func managementUIHost() string {
 func easyAdminBypassPathPatternForSite(site SiteInput) string {
 	if !isManagementSite(site) {
 		return "^$"
+	}
+	return easyAdminBypassPathPattern()
+}
+
+func easyModSecurityBypassPathPatternForSite(site SiteInput) string {
+	if !isManagementSite(site) {
+		return ""
 	}
 	return easyAdminBypassPathPattern()
 }
@@ -224,4 +240,3 @@ func isReservedEasyLimitPath(path string) bool {
 	}
 	return false
 }
-

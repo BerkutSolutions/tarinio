@@ -155,75 +155,10 @@ func normalizeProfile(profile EasySiteProfile) EasySiteProfile {
 
 	profile.SecurityModSecurity.ModSecurityCRSVersion = strings.TrimSpace(profile.SecurityModSecurity.ModSecurityCRSVersion)
 	profile.SecurityModSecurity.ModSecurityCRSPlugins = normalizeTrimmedList(profile.SecurityModSecurity.ModSecurityCRSPlugins)
+	profile.SecurityModSecurity.ExclusionRules = normalizeModSecurityExclusionRules(profile.SecurityModSecurity.ExclusionRules)
 	profile.SecurityModSecurity.CustomConfiguration.Path = strings.TrimSpace(profile.SecurityModSecurity.CustomConfiguration.Path)
 	profile.SecurityModSecurity.CustomConfiguration.Content = strings.TrimSpace(profile.SecurityModSecurity.CustomConfiguration.Content)
 
-	profile = applySecurityModePolicy(profile)
-
-	return profile
-}
-
-func applySecurityModePolicy(profile EasySiteProfile) EasySiteProfile {
-	switch profile.FrontService.SecurityMode {
-	case SecurityModeTransparent:
-		profile.SecurityModSecurity.UseModSecurity = false
-		profile.SecurityModSecurity.UseModSecurityCRSPlugins = false
-		profile.SecurityModSecurity.UseCustomConfiguration = false
-		profile.SecurityBehaviorAndLimits.UseLimitConn = false
-		profile.SecurityBehaviorAndLimits.UseLimitReq = false
-		profile.SecurityBehaviorAndLimits.CustomLimitRules = nil
-		profile.SecurityBehaviorAndLimits.UseBadBehavior = false
-		profile.SecurityBehaviorAndLimits.UseBlacklist = false
-		profile.SecurityBehaviorAndLimits.BlacklistIP = nil
-		profile.SecurityBehaviorAndLimits.BlacklistRDNS = nil
-		profile.SecurityBehaviorAndLimits.BlacklistASN = nil
-		profile.SecurityBehaviorAndLimits.BlacklistUserAgent = nil
-		profile.SecurityBehaviorAndLimits.BlacklistURI = nil
-		profile.SecurityBehaviorAndLimits.BlacklistIPURLs = nil
-		profile.SecurityBehaviorAndLimits.BlacklistRDNSURLs = nil
-		profile.SecurityBehaviorAndLimits.BlacklistASNURLs = nil
-		profile.SecurityBehaviorAndLimits.BlacklistUserAgentURLs = nil
-		profile.SecurityBehaviorAndLimits.BlacklistURIURLs = nil
-		profile.SecurityCountryPolicy.BlacklistCountry = nil
-		profile.SecurityCountryPolicy.WhitelistCountry = nil
-		profile.SecurityAntibot.AntibotChallenge = AntibotChallengeNo
-		profile.SecurityAntibot.ScannerAutoBanEnabled = false
-		profile.SecurityAntibot.ChallengeEscalationEnabled = false
-		profile.SecurityAntibot.ChallengeEscalationMode = AntibotChallengeNo
-		profile.SecurityAntibot.ExclusionRules = nil
-		profile.SecurityAntibot.ChallengeRules = nil
-		profile.SecurityAuthBasic.UseAuthBasic = false
-		profile.SecurityAPIPositive.UseAPIPositiveSecurity = false
-	case SecurityModeMonitor:
-		profile.SecurityModSecurity.UseModSecurity = false
-		profile.SecurityModSecurity.UseModSecurityCRSPlugins = false
-		profile.SecurityModSecurity.UseCustomConfiguration = false
-		profile.SecurityBehaviorAndLimits.UseLimitConn = false
-		profile.SecurityBehaviorAndLimits.UseLimitReq = false
-		profile.SecurityBehaviorAndLimits.CustomLimitRules = nil
-		profile.SecurityBehaviorAndLimits.UseBadBehavior = false
-		profile.SecurityBehaviorAndLimits.UseBlacklist = false
-		profile.SecurityBehaviorAndLimits.BlacklistIP = nil
-		profile.SecurityBehaviorAndLimits.BlacklistRDNS = nil
-		profile.SecurityBehaviorAndLimits.BlacklistASN = nil
-		profile.SecurityBehaviorAndLimits.BlacklistUserAgent = nil
-		profile.SecurityBehaviorAndLimits.BlacklistURI = nil
-		profile.SecurityBehaviorAndLimits.BlacklistIPURLs = nil
-		profile.SecurityBehaviorAndLimits.BlacklistRDNSURLs = nil
-		profile.SecurityBehaviorAndLimits.BlacklistASNURLs = nil
-		profile.SecurityBehaviorAndLimits.BlacklistUserAgentURLs = nil
-		profile.SecurityBehaviorAndLimits.BlacklistURIURLs = nil
-		profile.SecurityCountryPolicy.BlacklistCountry = nil
-		profile.SecurityCountryPolicy.WhitelistCountry = nil
-		profile.SecurityAntibot.AntibotChallenge = AntibotChallengeNo
-		profile.SecurityAntibot.ScannerAutoBanEnabled = false
-		profile.SecurityAntibot.ChallengeEscalationEnabled = false
-		profile.SecurityAntibot.ChallengeEscalationMode = AntibotChallengeNo
-		profile.SecurityAntibot.ExclusionRules = nil
-		profile.SecurityAntibot.ChallengeRules = nil
-		profile.SecurityAuthBasic.UseAuthBasic = false
-		profile.SecurityAPIPositive.UseAPIPositiveSecurity = false
-	}
 	return profile
 }
 
@@ -382,8 +317,6 @@ func validateProfile(profile EasySiteProfile) error {
 		if profile.SecurityAntibot.AntibotURI == "" || !strings.HasPrefix(profile.SecurityAntibot.AntibotURI, "/") {
 			return errors.New("easy site profile security_antibot.antibot_uri must start with / when antibot is enabled")
 		}
-	} else if len(profile.SecurityAntibot.ExclusionRules) > 0 || len(profile.SecurityAntibot.ChallengeRules) > 0 {
-		return errors.New("easy site profile security_antibot.exclusion_rules and challenge_rules require antibot enabled")
 	}
 	if profile.SecurityAntibot.AntibotRecaptchaScore < 0 || profile.SecurityAntibot.AntibotRecaptchaScore > 1 {
 		return errors.New("easy site profile security_antibot.antibot_recaptcha_score must be between 0 and 1")
@@ -426,9 +359,6 @@ func validateProfile(profile EasySiteProfile) error {
 		}
 	}
 	if profile.SecurityAntibot.ChallengeEscalationEnabled {
-		if profile.SecurityAntibot.AntibotChallenge == AntibotChallengeNo {
-			return errors.New("easy site profile security_antibot.challenge_escalation_enabled requires antibot enabled")
-		}
 		if profile.SecurityAntibot.ChallengeEscalationMode == AntibotChallengeNo || !slices.Contains(antibotModes, profile.SecurityAntibot.ChallengeEscalationMode) {
 			return errors.New("easy site profile security_antibot.challenge_escalation_mode has unsupported mode")
 		}
@@ -635,8 +565,131 @@ func validateProfile(profile EasySiteProfile) error {
 	if !crsVersionRegexp.MatchString(profile.SecurityModSecurity.ModSecurityCRSVersion) {
 		return errors.New("easy site profile security_modsecurity.modsecurity_crs_version must be numeric")
 	}
+	if len(profile.SecurityModSecurity.ExclusionRules) > 64 {
+		return errors.New("easy site profile security_modsecurity.exclusion_rules supports at most 64 rules")
+	}
+	for idx, rule := range profile.SecurityModSecurity.ExclusionRules {
+		if rule.Path == "" && rule.PathPattern == "" {
+			return fmt.Errorf("easy site profile security_modsecurity.exclusion_rules[%d] requires path or path_pattern", idx)
+		}
+		if rule.Path != "" && !strings.HasPrefix(rule.Path, "/") {
+			return fmt.Errorf("easy site profile security_modsecurity.exclusion_rules[%d].path must start with /", idx)
+		}
+		if rule.PathPattern != "" {
+			if _, err := regexp.Compile(rule.PathPattern); err != nil {
+				return fmt.Errorf("easy site profile security_modsecurity.exclusion_rules[%d].path_pattern must be valid regexp: %w", idx, err)
+			}
+		}
+		if rule.MatchMode != "exact" && rule.MatchMode != "prefix" && rule.MatchMode != "regex" {
+			return fmt.Errorf("easy site profile security_modsecurity.exclusion_rules[%d].mode must be exact, prefix, or regex", idx)
+		}
+		if len(rule.Methods) == 0 {
+			return fmt.Errorf("easy site profile security_modsecurity.exclusion_rules[%d].methods must not be empty", idx)
+		}
+		for _, method := range rule.Methods {
+			if !isAllowedHTTPMethodOrWildcard(method) {
+				return fmt.Errorf("easy site profile security_modsecurity.exclusion_rules[%d].methods contains unsupported method %s", idx, method)
+			}
+		}
+		if len(rule.RuleIDs) == 0 {
+			return fmt.Errorf("easy site profile security_modsecurity.exclusion_rules[%d].rule_ids must not be empty", idx)
+		}
+		for _, ruleID := range rule.RuleIDs {
+			if ruleID < 1 || ruleID > 999999999 {
+				return fmt.Errorf("easy site profile security_modsecurity.exclusion_rules[%d].rule_ids contains invalid id %d", idx, ruleID)
+			}
+		}
+		for _, target := range rule.Targets {
+			if !isValidModSecurityTarget(target) {
+				return fmt.Errorf("easy site profile security_modsecurity.exclusion_rules[%d].targets contains invalid target %s", idx, target)
+			}
+		}
+	}
 
 	return nil
+}
+
+func normalizeModSecurityExclusionRules(value []ModSecurityExclusionRule) []ModSecurityExclusionRule {
+	items := make([]ModSecurityExclusionRule, 0, len(value))
+	seen := make(map[string]struct{}, len(value))
+	for _, item := range value {
+		rule := ModSecurityExclusionRule{
+			Path:        strings.TrimSpace(item.Path),
+			PathPattern: strings.TrimSpace(item.PathPattern),
+			Methods:     normalizeUpperList(item.Methods),
+			MatchMode:   strings.ToLower(strings.TrimSpace(item.MatchMode)),
+			RuleIDs:     normalizePositiveIntList(item.RuleIDs),
+			Targets:     normalizeTrimmedList(item.Targets),
+			Comment:     strings.TrimSpace(item.Comment),
+		}
+		if rule.MatchMode == "" {
+			rule.MatchMode = "exact"
+		}
+		if len(rule.Methods) == 0 {
+			rule.Methods = []string{"*"}
+		}
+		if slices.Contains(rule.Methods, "*") {
+			rule.Methods = []string{"*"}
+		}
+		key := strings.ToLower(rule.Path) + "\x00" + rule.PathPattern + "\x00" + rule.MatchMode + "\x00" + strings.Join(rule.Methods, ",") + "\x00" + joinInts(rule.RuleIDs) + "\x00" + strings.Join(rule.Targets, ",")
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		items = append(items, rule)
+	}
+	return items
+}
+
+func normalizePositiveIntList(values []int) []int {
+	items := make([]int, 0, len(values))
+	for _, value := range values {
+		if value <= 0 {
+			continue
+		}
+		items = append(items, value)
+	}
+	sort.Ints(items)
+	return slices.Compact(items)
+}
+
+func joinInts(values []int) string {
+	parts := make([]string, 0, len(values))
+	for _, value := range values {
+		parts = append(parts, strconv.Itoa(value))
+	}
+	return strings.Join(parts, ",")
+}
+
+func isAllowedHTTPMethodOrWildcard(value string) bool {
+	switch strings.ToUpper(strings.TrimSpace(value)) {
+	case "*", "GET", "POST", "HEAD", "OPTIONS", "PUT", "PATCH", "DELETE":
+		return true
+	default:
+		return false
+	}
+}
+
+func isValidModSecurityTarget(value string) bool {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" || strings.ContainsAny(trimmed, "\r\n	\"'") {
+		return false
+	}
+	parts := strings.SplitN(trimmed, ":", 2)
+	if len(parts) != 2 {
+		return false
+	}
+	collection := strings.ToUpper(strings.TrimSpace(parts[0]))
+	member := strings.TrimSpace(parts[1])
+	if member == "" {
+		return false
+	}
+	switch collection {
+	case "ARGS", "ARGS_NAMES", "REQUEST_HEADERS", "REQUEST_HEADERS_NAMES", "REQUEST_COOKIES", "REQUEST_COOKIES_NAMES", "REQUEST_URI", "REQUEST_BODY", "XML", "TX":
+		return true
+	default:
+		return false
+	}
 }
 
 func isValidIPOrCIDR(value string) bool {

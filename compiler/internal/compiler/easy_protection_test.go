@@ -89,12 +89,13 @@ func TestRenderEasyArtifacts_ProtectionModesPerSite(t *testing.T) {
 		t.Fatalf("expected block mode easy snippet to include modsecurity_rules_file, got: %s", blockNginx)
 	}
 
-	if _, ok := byPath["modsecurity/easy/site-monitor.conf"]; ok {
-		t.Fatal("did not expect modsecurity/easy artifact for monitor mode")
+	monitorRules := byPath["modsecurity/easy/site-monitor.conf"]
+	if !strings.Contains(monitorRules, "SecRuleEngine DetectionOnly") {
+		t.Fatalf("expected monitor mode to keep modsecurity in detection-only mode, got: %s", monitorRules)
 	}
 	monitorNginx := byPath["nginx/easy/site-monitor.conf"]
-	if !strings.Contains(monitorNginx, "modsecurity off;") {
-		t.Fatalf("expected monitor mode to disable modsecurity in nginx config, got: %s", monitorNginx)
+	if !strings.Contains(monitorNginx, "modsecurity_rules_file /etc/waf/modsecurity/easy/site-monitor.conf;") {
+		t.Fatalf("expected monitor mode to attach modsecurity rules file, got: %s", monitorNginx)
 	}
 
 	if _, ok := byPath["modsecurity/easy/site-transparent.conf"]; ok {

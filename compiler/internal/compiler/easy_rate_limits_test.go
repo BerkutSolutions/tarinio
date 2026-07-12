@@ -150,16 +150,16 @@ func TestRenderEasyRateLimitArtifacts_UsesConfiguredManagementAPIUpstream(t *tes
 func TestRenderEasyRateLimitArtifacts_ManagementHostRoutesAdminAPIToControlPlane(t *testing.T) {
 	artifacts, err := RenderEasyRateLimitArtifacts(
 		[]SiteInput{{
-			ID:                "prewaf.hantico.ru",
+			ID:                "management-site",
 			Enabled:           true,
 			PrimaryHost:       "ui",
 			ListenHTTP:        true,
-			DefaultUpstreamID: "prewaf-upstream",
+			DefaultUpstreamID: "management-upstream",
 		}},
 		[]UpstreamInput{{
-			ID:             "prewaf-upstream",
-			SiteID:         "prewaf.hantico.ru",
-			Name:           "prewaf-upstream",
+			ID:             "management-upstream",
+			SiteID:         "management-site",
+			Name:           "management-upstream",
 			Scheme:         "http",
 			Host:           "ui",
 			Port:           80,
@@ -167,7 +167,7 @@ func TestRenderEasyRateLimitArtifacts_ManagementHostRoutesAdminAPIToControlPlane
 			PassHostHeader: true,
 		}},
 		[]EasyProfileInput{{
-			SiteID: "prewaf.hantico.ru",
+			SiteID: "management-site",
 			CustomLimitRules: []CustomRateLimitRuleInput{
 				{Path: "/api/sites/", Rate: "80r/s"},
 				{Path: "/api/tls-configs/", Rate: "80r/s"},
@@ -183,15 +183,15 @@ func TestRenderEasyRateLimitArtifacts_ManagementHostRoutesAdminAPIToControlPlane
 		byPath[item.Path] = string(item.Content)
 	}
 
-	locationsConf := byPath["nginx/easy-locations/prewaf.hantico.ru.conf"]
+	locationsConf := byPath["nginx/easy-locations/management-site.conf"]
 	if !strings.Contains(locationsConf, "proxy_pass http://control-plane:8080;") {
 		t.Fatalf("expected management host api easy locations to proxy to control-plane, got: %s", locationsConf)
 	}
-	siteConf := byPath["nginx/sites/prewaf.hantico.ru.conf"]
+	siteConf := byPath["nginx/sites/management-site.conf"]
 	if strings.Contains(siteConf, "location ^~ /api/ {") {
 		t.Fatalf("did not expect site template to emit catch-all /api location for management host, got: %s", siteConf)
 	}
-	if strings.Contains(locationsConf, "proxy_pass http://site_prewaf.hantico.ru_upstream_prewaf-upstream;") {
+	if strings.Contains(locationsConf, "proxy_pass http://site_management-site_upstream_management-upstream;") {
 		t.Fatalf("did not expect management host api easy locations to proxy to UI upstream, got: %s", locationsConf)
 	}
 }

@@ -246,6 +246,8 @@ func loginE2EUserWithRetry(t *testing.T, client *http.Client, requestBaseURL, re
 	if err := waitForHTTP(client, requestBaseURL+"/login", requestHostOverride, 90*time.Second); err != nil {
 		t.Fatalf("ui is not ready: %v", err)
 	}
+	challengeURI := normalizeChallengeURI(strings.TrimSpace(os.Getenv("WAF_E2E_ANTIBOT_CHALLENGE_URI")))
+	ensureManagementLoginAccess(t, client, requestBaseURL, requestHostOverride, challengeURI)
 	username := strings.TrimSpace(os.Getenv("WAF_E2E_USERNAME"))
 	if username == "" {
 		username = "admin"
@@ -261,6 +263,12 @@ func loginE2EUserWithRetry(t *testing.T, client *http.Client, requestBaseURL, re
 			"username": username,
 			"password": password,
 		})
+		if resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusTooManyRequests {
+			_ = resp.Body.Close()
+			ensureManagementLoginAccess(t, client, requestBaseURL, requestHostOverride, challengeURI)
+			time.Sleep(2 * time.Second)
+			continue
+		}
 		if resp.StatusCode == http.StatusOK {
 			_ = resp.Body.Close()
 			return

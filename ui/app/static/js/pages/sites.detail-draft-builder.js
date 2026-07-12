@@ -14,7 +14,8 @@ export function buildDetailDraftFromForm(container, state, deps = {}) {
     normalizeAuthSessionTTLMinutes,
     normalizeAPIPositiveEndpointPolicies,
     normalizeGeoTimeWindows,
-    normalizeWSBlockPatterns
+    normalizeWSBlockPatterns,
+    normalizeModSecurityExclusionRules,
   } = deps;
   return {
     id: container.querySelector("#service-id").value.trim().toLowerCase(),
@@ -215,6 +216,7 @@ export function buildDetailDraftFromForm(container, state, deps = {}) {
     use_modsecurity_custom_configuration: container.querySelector("#service-use-modsecurity-custom-configuration").checked,
     modsecurity_crs_version: container.querySelector("#service-modsecurity-crs-version").value.trim(),
     modsecurity_crs_plugins: normalizeStringArray(state.draft.modsecurity_crs_plugins),
+    modsecurity_exclusion_rules: normalizeModSecurityExclusionRules(state.draft.modsecurity_exclusion_rules),
     modsecurity_custom_path: container.querySelector("#service-modsecurity-custom-path").value.trim(),
     modsecurity_custom_content: container.querySelector("#service-modsecurity-custom-content").value,
     use_ws_inspection: Boolean(container.querySelector("#service-use-ws-inspection")?.checked),

@@ -34,6 +34,37 @@ export function clearOnboardingRedirecting() {
   window.sessionStorage.removeItem(onboardingRedirectMarkerKey);
 }
 
+function normalizeReturnPath(path = "/") {
+  const value = String(path || "/").trim() || "/";
+  return value.startsWith("/") ? value : `/${value}`;
+}
+
+function normalizeReturnArgs(args = "") {
+  if (args instanceof URLSearchParams) {
+    return args.toString();
+  }
+  const value = String(args || "").trim();
+  return value.startsWith("?") ? value.slice(1) : value;
+}
+
+export function buildChallengeUrl(returnPath = "/", returnArgs = "") {
+  const params = new URLSearchParams();
+  params.set("return_uri", normalizeReturnPath(returnPath));
+  const normalizedArgs = normalizeReturnArgs(returnArgs);
+  if (normalizedArgs) {
+    params.set("return_args", normalizedArgs);
+  }
+  return secureAppUrl(`/challenge?${params.toString()}`);
+}
+
+export function buildLoginChallengeUrl(reason = "session_invalid") {
+  const params = new URLSearchParams();
+  if (String(reason || "").trim()) {
+    params.set("reason", String(reason).trim());
+  }
+  return buildChallengeUrl("/login", params);
+}
+
 function clearSessionCookieClient() {
   const variants = [
     `${encodeURIComponent("waf_session")}=; Path=/; Max-Age=0; SameSite=Strict`,
@@ -57,7 +88,7 @@ export async function forceRelogin(reason = "session_invalid") {
   } catch {
     // best-effort only
   }
-  const target = secureAppUrl(`/login?reason=${encodeURIComponent(reason)}`);
+  const target = buildLoginChallengeUrl(reason);
   if (window.location.pathname.startsWith("/login")) {
     return;
   }
@@ -150,11 +181,11 @@ export async function checkEntryAccess(mode) {
       return { setup, user, allowed: true };
     }
     if (onboardingRedirecting) {
-      replace(secureAppUrl("/login"));
+      replace(buildLoginChallengeUrl("onboarding_complete"));
       return { setup, user, allowed: false };
     }
     user = await getCurrentUserQuiet();
-    replace(user ? secureAppUrl("/healthcheck") : secureAppUrl("/login"));
+    replace(user ? secureAppUrl("/healthcheck") : buildLoginChallengeUrl("session_missing"));
     return { setup, user, allowed: false };
   }
 

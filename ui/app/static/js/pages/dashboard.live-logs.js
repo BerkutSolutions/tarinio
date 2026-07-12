@@ -3,13 +3,31 @@ import { escapeHtml } from "../ui.js";
 function createLiveLogsController(container, modalBodyNode, ctx, fetchContainerLogs) {
   let liveLogsTimer = null;
   let liveLogsState = null;
+  let visibilityHandler = null;
+  let pollPromise = null;
 
-  const stop = () => {
+  const clearTimer = () => {
     if (liveLogsTimer) {
-      clearInterval(liveLogsTimer);
+      window.clearInterval(liveLogsTimer);
       liveLogsTimer = null;
     }
+  };
+
+  const isVisible = () => typeof document === "undefined" || document.visibilityState !== "hidden";
+
+  const isModalOpen = () => {
+    const modalNode = container.querySelector("#dashboard-detail-modal");
+    return Boolean(modalNode) && !modalNode.classList.contains("waf-hidden");
+  };
+
+  const stop = () => {
+    clearTimer();
+    if (visibilityHandler && typeof document !== "undefined") {
+      document.removeEventListener("visibilitychange", visibilityHandler);
+      visibilityHandler = null;
+    }
     liveLogsState = null;
+    pollPromise = null;
   };
 
   const renderBody = () => {
@@ -50,41 +68,60 @@ function createLiveLogsController(container, modalBodyNode, ctx, fetchContainerL
   };
 
   const poll = async () => {
-    if (!liveLogsState || !liveLogsState.container) {
-      return;
+    if (pollPromise) {
+      return pollPromise;
     }
-    const payload = await fetchContainerLogs(liveLogsState.container, liveLogsState.since || "", liveLogsState.since ? 0 : 1500);
-    const rows = Array.isArray(payload?.lines) ? payload.lines : [];
-    if (rows.length) {
-      rows.forEach((row) => {
-        const key = `${String(row?.timestamp || "")}|${String(row?.message || "")}`;
-        if (liveLogsState.seen?.has(key)) {
-          return;
+    pollPromise = (async () => {
+      const state = liveLogsState;
+      if (!state || !state.container) {
+        return;
+      }
+      const payload = await fetchContainerLogs(state.container, state.since || "", state.since ? 0 : 1500);
+      if (state !== liveLogsState) {
+        return;
+      }
+      const rows = Array.isArray(payload?.lines) ? payload.lines : [];
+      if (rows.length) {
+        rows.forEach((row) => {
+          const key = `${String(row?.timestamp || "")}|${String(row?.message || "")}`;
+          if (state.seen?.has(key)) {
+            return;
+          }
+          state.seen?.add(key);
+          state.lines.push(row);
+        });
+        if (state.lines.length > 8000) {
+          state.lines = state.lines.slice(state.lines.length - 8000);
+          if (state.seen) {
+            state.seen = new Set(state.lines.map((line) => `${String(line?.timestamp || "")}|${String(line?.message || "")}`));
+          }
         }
-        liveLogsState.seen?.add(key);
-        liveLogsState.lines.push(row);
-      });
-      if (liveLogsState.lines.length > 8000) {
-        liveLogsState.lines = liveLogsState.lines.slice(liveLogsState.lines.length - 8000);
-        if (liveLogsState.seen) {
-          liveLogsState.seen = new Set(liveLogsState.lines.map((line) => `${String(line?.timestamp || "")}|${String(line?.message || "")}`));
+        const lastTs = rows[rows.length - 1]?.timestamp;
+        if (lastTs) {
+          state.since = lastTs;
         }
       }
-      const lastTs = rows[rows.length - 1]?.timestamp;
-      if (lastTs) {
-        liveLogsState.since = lastTs;
-      }
+      updateModalBody();
+    })();
+    try {
+      await pollPromise;
+    } finally {
+      pollPromise = null;
     }
-    updateModalBody();
   };
 
-  const start = async (containerName) => {
-    liveLogsState = { container: containerName, since: "", lines: [], seen: new Set() };
-    await poll();
+  const startPolling = () => {
+    clearTimer();
+    if (!liveLogsState || !isModalOpen() || !isVisible()) {
+      return;
+    }
     liveLogsTimer = window.setInterval(async () => {
-      const modalNode = container.querySelector("#dashboard-detail-modal");
-      if (!modalNode || modalNode.classList.contains("waf-hidden")) {
+      if (!isModalOpen()) {
         stop();
+        return;
+      }
+      if (!isVisible()) {
+        clearTimer();
         return;
       }
       try {
@@ -93,6 +130,39 @@ function createLiveLogsController(container, modalBodyNode, ctx, fetchContainerL
         // silent live retry
       }
     }, 2000);
+  };
+
+  const ensureVisibilityListener = () => {
+    if (visibilityHandler || typeof document === "undefined") {
+      return;
+    }
+    visibilityHandler = () => {
+      if (!liveLogsState) {
+        clearTimer();
+        return;
+      }
+      if (!isVisible()) {
+        clearTimer();
+        return;
+      }
+      if (!isModalOpen()) {
+        stop();
+        return;
+      }
+      poll().catch(() => {});
+      startPolling();
+    };
+    document.addEventListener("visibilitychange", visibilityHandler);
+  };
+
+  const start = async (containerName) => {
+    stop();
+    liveLogsState = { container: containerName, since: "", lines: [], seen: new Set() };
+    ensureVisibilityListener();
+    if (isVisible()) {
+      await poll();
+    }
+    startPolling();
   };
 
   return {

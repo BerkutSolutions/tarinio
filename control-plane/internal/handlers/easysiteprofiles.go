@@ -142,6 +142,9 @@ func applyEasyProfileTopLevelAliases(rawBody []byte, item *easysiteprofiles.Easy
 	if value, ok := raw["virtual_patches"]; ok {
 		_ = json.Unmarshal(value, &item.VirtualPatches)
 	}
+	if value, ok := raw["modsecurity_exclusion_rules"]; ok {
+		_ = json.Unmarshal(value, &item.SecurityModSecurity.ExclusionRules)
+	}
 }
 
 func applyRawString(raw map[string]json.RawMessage, key string, target *string) {

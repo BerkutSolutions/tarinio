@@ -2,11 +2,15 @@ package services
 
 import (
 	"sort"
+	"sync"
+	"time"
 
 	"waf/control-plane/internal/events"
 	"waf/control-plane/internal/jobs"
 	"waf/control-plane/internal/revisions"
 )
+
+const reportSummaryCacheTTL = 5 * time.Second
 
 type reportEventReader interface {
 	List() ([]events.Event, error)
@@ -70,6 +74,12 @@ type ReportService struct {
 	events    reportEventReader
 	jobs      reportJobReader
 	revisions reportRevisionReader
+
+	now        func() time.Time
+	mu         sync.Mutex
+	cached     ReportSummary
+	cacheUntil time.Time
+	cacheValid bool
 }
 
 func NewReportService(events reportEventReader, jobs reportJobReader, revisions reportRevisionReader) *ReportService {
@@ -77,10 +87,20 @@ func NewReportService(events reportEventReader, jobs reportJobReader, revisions 
 		events:    events,
 		jobs:      jobs,
 		revisions: revisions,
+		now:       time.Now,
 	}
 }
 
 func (s *ReportService) RevisionSummary() (ReportSummary, error) {
+	s.mu.Lock()
+	now := s.now()
+	if s.cacheValid && now.Before(s.cacheUntil) {
+		cached := s.cached
+		s.mu.Unlock()
+		return cached, nil
+	}
+	s.mu.Unlock()
+
 	eventItems, err := s.events.List()
 	if err != nil {
 		return ReportSummary{}, err
@@ -208,7 +228,7 @@ func (s *ReportService) RevisionSummary() (ReportSummary, error) {
 		}
 	}
 
-	return ReportSummary{
+	result := ReportSummary{
 		ApplySuccessCount:   applySuccessCount,
 		ApplyFailureCount:   applyFailureCount,
 		RecentFailedApplies: recentFailed,
@@ -216,5 +236,13 @@ func (s *ReportService) RevisionSummary() (ReportSummary, error) {
 		EventCountsByType:   eventCountsByType,
 		TopAffectedSites:    topAffectedSites,
 		RevisionApply:       summary,
-	}, nil
+	}
+
+	s.mu.Lock()
+	s.cached = result
+	s.cacheUntil = s.now().Add(reportSummaryCacheTTL)
+	s.cacheValid = true
+	s.mu.Unlock()
+
+	return result, nil
 }

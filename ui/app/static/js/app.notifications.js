@@ -11,6 +11,7 @@ function timestamp(value) {
 
 export function createNotificationCenter(ctx) {
   let timer = null;
+  let visibilityHandler = null;
   let items = [];
   const dismissed = new Set();
 
@@ -62,20 +63,49 @@ export function createNotificationCenter(ctx) {
     setItems(next);
   };
 
-  const start = () => {
+  const clearTimer = () => {
     if (timer) {
       window.clearInterval(timer);
+      timer = null;
     }
-    refresh().catch(() => {});
+  };
+
+  const isVisible = () => typeof document === "undefined" || document.visibilityState !== "hidden";
+
+  const startPolling = () => {
+    clearTimer();
+    if (!isVisible()) {
+      return;
+    }
     timer = window.setInterval(() => {
       refresh().catch(() => {});
     }, POLL_MS);
   };
 
+  const start = () => {
+    if (!visibilityHandler && typeof document !== "undefined") {
+      visibilityHandler = () => {
+        if (!isVisible()) {
+          clearTimer();
+          return;
+        }
+        refresh().catch(() => {});
+        startPolling();
+      };
+      document.addEventListener("visibilitychange", visibilityHandler);
+    }
+
+    if (isVisible()) {
+      refresh().catch(() => {});
+    }
+    startPolling();
+  };
+
   const stop = () => {
-    if (timer) {
-      window.clearInterval(timer);
-      timer = null;
+    clearTimer();
+    if (visibilityHandler && typeof document !== "undefined") {
+      document.removeEventListener("visibilitychange", visibilityHandler);
+      visibilityHandler = null;
     }
   };
 

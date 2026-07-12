@@ -1,49 +1,31 @@
-## [1.4.8] - 30.06.2026
-
-### Безопасность
-
-- Восстановлена полная работа WAF в runtime e2e: чёрные списки IP, User-Agent и URI снова блокируют трафик, ModSecurity/CRS реально останавливает SQLi и XSS, виртуальные патчи применяются как SecRule, scanner auto-ban блокирует сигнатуры сканеров независимо от основной antibot-логики, а режимы transparent и monitor не оставляют активные блокирующие правила.
-- Для `/login` панели управления выделен отдельный edge rate-limit с HTTP 429, чтобы endpoint оставался под первой линией защиты и не включал self-ban или escalation для операторов.
+## [1.4.9] - 30.06.2026
 
 ### Ядро
 
-- Компилятор easy runtime теперь явно включает `modsecurity on` только рядом с easy ModSecurity rules file и не подмешивает legacy `modsecurity/sites/<site>.conf` в custom route locations. Это устраняет рассинхронизацию между easy-профилем и legacy-политиками и возвращает предсказуемое поведение CRS, виртуальных патчей и режимов безопасности.
-- Scanner auto-ban отделён от основного antibot challenge: защита от сканеров теперь генерирует самостоятельный guard и продолжает работать даже при отключённом интерактивном challenge.
-- Уточнена генерация management/admin bypass paths: `/login` и `/login/2fa` больше не попадают в management easy bypass pattern, а `localhost` считается management-site только при явном `CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID`. Это устраняет регрессии с duplicate `location "/login"` и ложным management-режимом для обычного `localhost` site.
-- Генерация HTTPS-сайтов сделана детерминированной для одновременного существования domain-host и IP-host: named TLS-sites теперь рендерятся раньше IP-based TLS-sites, поэтому default HTTPS TLS ref и порядок `sites/*.conf` больше не подсовывают IP-certificate доменному SNI.
-
-### Сервисы
-
-- API easy-site профиля получил обратную совместимость с alias-полями верхнего уровня, которые используются e2e и legacy-клиентами: security mode, blacklist/exceptions, rate-limit, geo policy, custom limit rules, auth session TTL и virtual patches корректно раскладываются во вложенные структуры профиля.
-- `/api/requests` теперь явно помечает каждую строку типом `request` или `security`, чтобы UI мог отделять обычные запросы от ModSecurity и других событий безопасности одним общим фильтром.
-- Для `/api/requests` добавлен двусторонний compatibility-layer: handler принимает старые записи без `row_type`, восстанавливает тип из `stream`/`type`/`source_component`, сохраняет приоритет явных `row_type`/`rowType` и помечает временную legacy-поддержку полем `legacy_row_type_support=true`.
-- Runtime internal auth снова совместим с legacy token header `X-WAF-Internal-Token`: control-plane collectors отправляют оба заголовка, а runtime launcher принимает и current `X-WAF-Runtime-Token`, и legacy header, поэтому healthcheck, requests count/probe и security-events probe продолжают работать на mixed/legacy стендах.
+- Release preflight теперь печатает и валидирует ожидаемое, фактически выполненное и успешно пройденное число startup-проверок. Это не позволяет скрыть удаление или пропуск целой проверки в release-скрипте.
+- В режиме `monitor` ModSecurity больше не отключается из runtime-конфигурации: профиль и rules file остаются подключёнными с `SecRuleEngine DetectionOnly`. Это сохраняет детектирование и журналирование событий без блокировки запросов; режим `transparent` по-прежнему полностью отключает ModSecurity.
+- Для management/UI host добавлен жёсткий self-management safeguard: `/login`, `/login/2fa`, admin UI routes и `/api/*` самой панели теперь всегда считаются защищёнными внутренними route-исключениями и не должны попадать под собственный ModSecurity/CRS blocking path, чтобы WAF не мог заблокировать собственные mutation endpoints.
+- Уточнена генерация management/admin protected paths: `localhost` считается management-site только при явном `CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID`, а шаблоны внутренних management-маршрутов нормализуются без дублирования. Это устраняет ложный management-режим для обычного `localhost` site и регрессии с duplicate `location` для внутренних admin/login route.
 
 ### UI
 
-- Во вкладке запросов добавлен первый столбец `Тип`, фильтр по security/request событиям и нормализованные метки причин безопасности, чтобы ModSecurity, SQLi/XSS, rate-limit, geo, auth и challenge-события одинаково читались и в новых, и в legacy-полях.
-- Модалка details во вкладке Requests теперь показывает security rows в нормализованном request-like виде, выводит компактное summary в header и явно помечает legacy-compatibility для старых записей без `row_type`.
-- Frontend Requests переведён на единый контракт `event_type` и `security_reason` из `/api/requests` с fallback на legacy `details`, поэтому UI и backend выровнены по одной модели security telemetry.
-- Behavioral UI/runtime e2e обновлён под реальный контракт: dashboard stats проверяются по актуальным ключам API, captcha challenge flow больше не ломается на абсолютном redirect Location, а unknown-host проверяется по брендированной `421`-странице без утечки raw nginx страницы.
-- UI full regression e2e стабилизирован для localhost-routing и окружений с placeholder secret: ключевые страницы проходят через 429-aware helper, а login flow не ломается из-за masked password `***`.
+- Логи Anti-DDoS событий и live-логи Dashboard теперь ставят polling на паузу в скрытых вкладках, не допускают наложения параллельных refresh-запросов и чисто возобновляют обновление после возврата вкладки в фокус, снижая лишнюю нагрузку на UI/API.
+
+- Истекшие management-сессии теперь возвращают пользователя через antibot challenge перед показом логина, а устаревшие вкладки `login` и `login-2fa` автоматически обновляют доступ к challenge, чтобы CSS и сам вход не деградировали до страницы без стилей или позднего `403` после простоя.
+
+- Настройки безопасности easy-site теперь можно редактировать и сохранять даже при отключенном antibot или когда сайт работает в режимах `transparent`/`monitor`. Они по-прежнему хранятся как preset профиля и применяются к runtime только в режиме `block`.
+
+- Добавлен live regression-сценарий для ModSecurity, который проверяет цикл enable → disable → re-enable через Services API и реальный runtime compile/apply, включая структурированное exclusion-правило, разрешающее только предназначенный для него URI.
+
+- Management UI ModSecurity safeguard теперь имеет явное regression-покрытие для аутентифицированного `POST /api/app/ping`: кастомное deny-правило не может заблокировать доступ администраторам, при этом обычные сайты не получают management-bypass.
+- Во вкладке Services → Site editor → ModSecurity добавлен полноценный редактор exclusion rules с добавлением/удалением строк без перезагрузки: UI теперь сохраняет path/path pattern, mode, methods, rule IDs, targets и comment в draft-состоянии вместо потери данных при ререндере.
+- Для нового ModSecurity exclusions UI добавлены строки локализации во всех поддерживаемых языках (`ru`, `en`, `de`, `sr`, `zh`), чтобы подписи и help-тексты не выпадали в raw i18n keys.
+- Для ModSecurity exclusions UI дополнительно выровнены validation keys во всех поддерживаемых языках, а русские help-строки очищены от английских слов, чтобы UI проходил i18n quality gate без raw keys и language-artifact предупреждений.
 
 ### Тесты
 
-- Полный `TestE2EBehavioral` снова проходит на runtime-stack без skip: подтверждены контракт dashboard, captcha flow, брендированные geo block branches и брендированный unknown-host fallback.
-- Compiler, service и UI-contract tests синхронизированы с текущими runtime-инвариантами: safe nginx guards без вложенных `if`, обязательный 429 для route rate-limit, compatibility easy-site profile и актуальные поля security telemetry.
-- Добавлены и обновлены regression tests на management-site path ownership, env-driven localhost semantics, coexistence HTTPS domain-site + IP-site, legacy/new rows в `/api/requests`, security summary/details modal и runtime-normalized `event_type`.
-- Live/runtime regression tests дополнительно закрепляют, что `transparent` и `monitor` не уводят `/admin` в antibot/auth redirect path, а behavioral/e2e runner выводит компактный expected/actual summary по каждому subtest с полным логом в `.work/logs`.
-- Добавлены regression tests на runtime auth header compatibility: control-plane request collector обязан выставлять current и legacy internal token header с trim токена, а runtime launcher обязан принимать оба варианта.
-
-### Документация
-
-- Актуализирована доказательная база WAF UI и runtime-поведения: tab01–tab11 описывают статические гарантии компилятора, а `TestE2EBehavioral` закреплён как эталон end-to-end работы WAF в Docker Compose stack.
-- Changelog очищен от старых пошаговых формулировок, англоязычных хвостов и номеров задач; записи сгруппированы по подсистемам в продуктовом формате.
-
-### Инфраструктура
-
-- Версия синхронизирована на 1.4.8 через штатный механизм: метаданные приложения, npm package metadata и i18n `app.version` во всех поддерживаемых локалях обновлены единообразно.
-- Install/upgrade scripts больше не ротируют существующие placeholder-like секреты автоматически при апгрейде уже развернутого стека: существующий `.env` сохраняется как источник истины, а инсталлеры выводят явную подсказку использовать `scripts/rotate-env-secrets.sh` для осознанной аварийной ротации.
-- Добавлен `scripts/rotate-env-secrets.sh`: аварийный и операционный сценарий ротации `POSTGRES_PASSWORD`, `POSTGRES_DSN`, `OPENSEARCH_PASSWORD`, `CONTROL_PLANE_SECURITY_PEPPER` и `WAF_RUNTIME_API_TOKEN` с синхронизацией Postgres-пароля и обязательной health-проверкой control-plane/runtime после перезапуска.
-- App-compat contract tests теперь страхуют installer-путь: оба инсталлера обязаны маркировать upgrade-flow, ссылаться на script ротации секретов, а `rotate-env-secrets.sh` обязан реально ротировать Postgres и проверять работоспособность стека после ротации.
-- AIO installer теперь запускает `scripts/post-upgrade-smoke.sh` через `bash`, когда он доступен, чтобы strict post-upgrade validation не падала на системах, где `/bin/sh` не понимает bash-специфичный синтаксис smoke-скрипта.
+- Compiler/runtime regression-покрытие для security modes теперь фиксирует, что `monitor` публикует и подключает ModSecurity rules file с `DetectionOnly`, а `transparent` не публикует ModSecurity-артефакт. Для Windows добавлен PowerShell entrypoint штатного Docker e2e-стека.
+- Добавлены regression tests на self-management bypass pattern: management-site обязан покрывать `/login`, `/login/2fa`, `/dashboard`, `/services`, `/api/sites/*` и `/api/access-policies/*`, при этом обычные site routes не получают такой bypass автоматически.
+- UI contract tests переведены на актуальные маркеры модульного frontend/runtime-контракта: проверяются onboarding guard и auto-apply flow, sidebar/menu, anti-ddos и requests routes, dashboard widget/frame markers, settings storage/logging panels и stable/modular sites page markers вместо устаревших строк старого UI.
+- Compiler regression tests для ModSecurity дополнительно фиксируют, что management-site получает self-management safeguard только в management nginx config, safeguard исчезает при `UseModSecurity=false`, CRS-версии и plugin toggles не ломают internal bypass contract, а обычные сайты не наследуют management safeguard markers автоматически.
+- Live/runtime regression tests теперь прогоняют `transparent`/`monitor`/`block` на выделенном easy-site через реальный compile/apply и детерминированный ModSecurity trigger: неблокирующие режимы обязаны сохранять профиль без runtime-deny, а возврат в `block` снова включает реальную блокировку по probe-запросу.

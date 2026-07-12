@@ -12,6 +12,7 @@ import {
   normalizeServiceProfile,
   normalizeStringArray,
 } from "./sites.normalize.js";
+import { normalizeModSecurityExclusionRules } from "./sites.modsec-exclusion-editors.js";
 import {
   normalizeAuthBasicUsers,
   normalizeAuthSessionTTLMinutes,
@@ -87,6 +88,7 @@ export function bindStableDetail(container, state, ctx, deps) {
     normalizeAPIPositiveEndpointPolicies,
     normalizeGeoTimeWindows,
     normalizeWSBlockPatterns,
+    normalizeModSecurityExclusionRules,
   });
   const syncStateDraftFromForm = () => syncStateDraftFromFormModule(state, getDraft, {
     normalizeArray,
@@ -134,6 +136,7 @@ export function bindStableDetail(container, state, ctx, deps) {
     normalizeAuthBasicUsers,
     normalizeAuthExclusionRules,
     normalizeAuthServiceTokens,
+    normalizeModSecurityExclusionRules,
     syncAuthPasswordToggle,
     normalizeArray,
     parseBanDurationSeconds,
