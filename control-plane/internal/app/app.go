@@ -440,7 +440,8 @@ func New(cfg config.Config) (*App, error) {
 	}, auditService)
 	handlers.SetSessionCookieTTL(sessionTTL)
 	revisionCompileService.SetGovernance(enterpriseService)
-	siteService := services.NewSiteService(siteStore, auditService)
+	siteMigration := services.NewSiteMigration(siteStore, upstreamStore, certificateStore, certificateMaterialStore, tlsConfigStore, wafPolicyStore, accessPolicyStore, rateLimitPolicyStore, easySiteProfileStore, virtualPatchStore, managementHostsStore)
+	siteService := services.NewSiteService(siteStore, auditService, siteMigration)
 	manualBanService := services.NewManualBanService(accessPolicyStore, siteStore, auditService)
 	var sentinelBanSyncService *services.SentinelBanSyncService
 	if cfg.SentinelBanSync.Enabled {

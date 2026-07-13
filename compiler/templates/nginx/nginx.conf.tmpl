@@ -23,7 +23,16 @@ http {
         ssl_session_cache shared:SSL:10m;
         ssl_session_tickets off;
         ssl_ecdh_curve X25519:secp384r1;
-        error_page 497 =307 https://$http_host$request_uri;
+{{- range .ErrorStatusCodes }}
+        error_page {{ . }} /__waf_errors/_global/{{ . }}.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- range .ErrorStatusCodes }}
+        location = /__waf_errors/_global/{{ . }}.html {
+            internal;
+            allow all;
+            alias /etc/waf/errors/_global/{{ . }}.html;
+        }
+{{- end }}
         return 421;
     }
 {{- end }}

@@ -52,6 +52,17 @@ func shouldSkipInternalManagementRequest(item parsedAccess) bool {
 	return host == "" || isInternalManagementHost(host) || sanitizeSiteID(item.siteID) == ""
 }
 
+// shouldSkipRequestTelemetry excludes only traffic that originates from the
+// private control-plane endpoints. A public management host is still a WAF
+// site: its requests must be visible in traffic metrics after a host rename.
+func shouldSkipRequestTelemetry(item parsedAccess) bool {
+	if shouldSkipInternalSite(item.siteID) {
+		return true
+	}
+	host := strings.ToLower(strings.TrimSpace(item.host))
+	return host == "" || isInternalManagementHost(host) || sanitizeSiteID(item.siteID) == ""
+}
+
 func isTarinioAdminAppPath(path string) bool {
 	canonical := normalizeBurstPath(path)
 	if canonical == "" {

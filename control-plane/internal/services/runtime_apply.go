@@ -800,6 +800,7 @@ func mapSiteUpstreamInputs(siteItems []sites.Site, upstreamItems []upstreams.Ups
 	for _, host := range managementHosts {
 		managementHostSet[strings.ToLower(strings.TrimSpace(host))] = struct{}{}
 	}
+	legacyManagementSiteIDs := legacyManagementUIProxySiteIDs(sortedSites, sortedUpstreams, managementConfigured)
 	for _, item := range easyItems {
 		easySites[item.SiteID] = struct{}{}
 		customErrorPagesBySite[item.SiteID] = item.UseCustomErrorPages
@@ -811,6 +812,9 @@ func mapSiteUpstreamInputs(siteItems []sites.Site, upstreamItems []upstreams.Ups
 		_, hasEasy := easySites[item.ID]
 		mtls := mtlsBySite[item.ID]
 		_, management := managementHostSet[strings.ToLower(strings.TrimSpace(item.PrimaryHost))]
+		if _, legacyManagement := legacyManagementSiteIDs[item.ID]; legacyManagement {
+			management = true
+		}
 		siteInputs = append(siteInputs, pipeline.SiteInput{
 			ID:                   item.ID,
 			Name:                 item.ID,

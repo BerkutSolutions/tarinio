@@ -346,7 +346,7 @@
   "app.sites": "Сервисы",
   "app.tls": "TLS / Сертификаты",
   "app.user.noRoles": "Нет ролей",
-  "app.version": "Версия 1.5.0",
+  "app.version": "Версия 1.5.1",
   "auth.2fa.challengeMissing": "Запрос 2FA отсутствует. Пожалуйста, войдите снова.",
   "auth.2fa.code": "Код 2FA",
   "auth.2fa.codeRequired": "Нужен код 2FA",
@@ -2323,4 +2323,12 @@
   ,"settings.managementHosts.drift": "Внимание: активный артефакт среды выполнения не содержит ожидаемую защиту. Используйте внутренний CLI и примените исправленную ревизию."
   ,"sites.tls.confirmRebind": "Заменить привязку сертификата для {{site}} на {{certificate}}?"
   ,"sites.tls.rebindCancelled": "Перепривязка TLS-сертификата отменена."
+  ,"sites.easy.errorpages.category.client": "Ошибки клиента"
+  ,"sites.easy.errorpages.category.server": "Ошибки сервера"
+  ,"sites.easy.errorpages.category.proxy": "Ошибки proxy / Nginx"
+  ,"sites.easy.errorpages.category.upstream": "Ошибки upstream / CDN"
+  ,"sites.easy.errorpages.category.waf": "Страницы блокировок WAF"
+  ,"sites.easy.errorpages.vendor": "специфично для вендора"
+  ,"sites.easy.errorpages.diagnostic": "только диагностика"
+  ,"sites.easy.errorpages.extended.451":"451 Недоступно по юридическим причинам","sites.easy.errorpages.extended.494":"494 Слишком большой заголовок запроса","sites.easy.errorpages.extended.495":"495 Ошибка SSL-сертификата","sites.easy.errorpages.extended.496":"496 Требуется SSL-сертификат","sites.easy.errorpages.extended.497":"497 HTTP-запрос отправлен на HTTPS-порт","sites.easy.errorpages.extended.499":"499 Клиент закрыл запрос","sites.easy.errorpages.extended.506":"506 Вариант также согласовывается","sites.easy.errorpages.extended.520":"520 Неизвестная ошибка","sites.easy.errorpages.extended.521":"521 Веб-сервер недоступен","sites.easy.errorpages.extended.522":"522 Время подключения истекло","sites.easy.errorpages.extended.523":"523 Источник недоступен","sites.easy.errorpages.extended.524":"524 Произошёл тайм-аут","sites.easy.errorpages.extended.525":"525 Ошибка SSL-рукопожатия","sites.easy.errorpages.extended.526":"526 Недействительный SSL-сертификат"
 }

@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 
 	"waf/control-plane/internal/audits"
 	"waf/control-plane/internal/sites"
@@ -17,10 +18,22 @@ type SiteStore interface {
 type SiteService struct {
 	store  SiteStore
 	audits *AuditService
+	migration *SiteMigration
 }
 
-func NewSiteService(store SiteStore, audits *AuditService) *SiteService {
-	return &SiteService{store: store, audits: audits}
+func NewSiteService(store SiteStore, audits *AuditService, migration ...*SiteMigration) *SiteService {
+	service := &SiteService{store: store, audits: audits}
+	if len(migration) > 0 { service.migration = migration[0] }
+	return service
+}
+
+func (s *SiteService) Rename(ctx context.Context, oldID string, site sites.Site) (updated sites.Site, err error) {
+	defer func() { recordAudit(ctx, s.audits, audits.AuditEvent{Action: "site.migrate", ResourceType: "site", ResourceID: site.ID, SiteID: site.ID, Status: auditStatus(err), Summary: "site identity migration"}) }()
+	if s.migration == nil { return sites.Site{}, fmt.Errorf("site migration is not configured") }
+	updated, err = s.migration.Rename(ctx, oldID, site)
+	if err != nil { return updated, err }
+	if applyErr := runAutoApply(ctx); applyErr != nil { return sites.Site{}, applyErr }
+	return updated, nil
 }
 
 func (s *SiteService) Create(ctx context.Context, site sites.Site) (created sites.Site, err error) {

@@ -11,47 +11,61 @@ import (
 // errorPagePreviewAllowedSlugs is the set of valid preview slugs.
 // Keys must match *.preview.html filenames under compiler/templates/errors/.
 var errorPagePreviewAllowedSlugs = map[string]string{
-	"400":        "400.preview.html",
-	"401":        "401.preview.html",
-	"402":        "402.preview.html",
-	"403":        "403.preview.html",
-	"404":        "404.preview.html",
-	"405":        "405.preview.html",
-	"406":        "406.preview.html",
-	"407":        "407.preview.html",
-	"408":        "408.preview.html",
-	"409":        "409.preview.html",
-	"410":        "410.preview.html",
-	"411":        "411.preview.html",
-	"412":        "412.preview.html",
-	"413":        "413.preview.html",
-	"414":        "414.preview.html",
-	"415":        "415.preview.html",
-	"416":        "416.preview.html",
-	"417":        "417.preview.html",
-	"418":        "418.preview.html",
-	"421":        "421.preview.html",
-	"422":        "422.preview.html",
-	"423":        "423.preview.html",
-	"424":        "424.preview.html",
-	"425":        "425.preview.html",
-	"426":        "426.preview.html",
-	"428":        "428.preview.html",
-	"429":        "429.preview.html",
-	"431":        "431.preview.html",
-	"444":        "444.preview.html",
-	"451":        "geo_block.preview.html",
-	"500":        "500.preview.html",
-	"501":        "501.preview.html",
-	"502":        "502.preview.html",
-	"503":        "503.preview.html",
-	"504":        "504.preview.html",
-	"505":        "505.preview.html",
-	"507":        "507.preview.html",
-	"508":        "508.preview.html",
-	"510":        "510.preview.html",
-	"511":        "511.preview.html",
-	"geo-block":  "geo_block.preview.html",
+	"400":       "400.preview.html",
+	"401":       "401.preview.html",
+	"402":       "402.preview.html",
+	"403":       "403.preview.html",
+	"404":       "404.preview.html",
+	"405":       "405.preview.html",
+	"406":       "406.preview.html",
+	"407":       "407.preview.html",
+	"408":       "408.preview.html",
+	"409":       "409.preview.html",
+	"410":       "410.preview.html",
+	"411":       "411.preview.html",
+	"412":       "412.preview.html",
+	"413":       "413.preview.html",
+	"414":       "414.preview.html",
+	"415":       "415.preview.html",
+	"416":       "416.preview.html",
+	"417":       "417.preview.html",
+	"418":       "418.preview.html",
+	"421":       "421.preview.html",
+	"422":       "422.preview.html",
+	"423":       "423.preview.html",
+	"424":       "424.preview.html",
+	"425":       "425.preview.html",
+	"426":       "426.preview.html",
+	"428":       "428.preview.html",
+	"429":       "429.preview.html",
+	"431":       "431.preview.html",
+	"444":       "444.preview.html",
+	"451":       "451.preview.html",
+	"494":       "400.preview.html",
+	"495":       "400.preview.html",
+	"496":       "400.preview.html",
+	"497":       "400.preview.html",
+	"499":       "400.preview.html",
+	"500":       "500.preview.html",
+	"501":       "501.preview.html",
+	"502":       "502.preview.html",
+	"503":       "503.preview.html",
+	"504":       "504.preview.html",
+	"505":       "505.preview.html",
+	"506":       "500.preview.html",
+	"507":       "507.preview.html",
+	"508":       "508.preview.html",
+	"510":       "510.preview.html",
+	"511":       "511.preview.html",
+	"520":       "500.preview.html",
+	"521":       "500.preview.html",
+	"522":       "500.preview.html",
+	"523":       "500.preview.html",
+	"524":       "500.preview.html",
+	"525":       "500.preview.html",
+	"526":       "500.preview.html",
+	"geo_block": "geo_block.preview.html",
+	"geo-block": "geo_block.preview.html",
 	// antibot challenge page variants
 	"antibot-v1": "antibot-v1.preview.html",
 	"antibot-v2": "antibot-v2.preview.html",
@@ -66,7 +80,7 @@ var errorPagePreviewAllowedSlugs = map[string]string{
 	"captcha-v5": "captcha-v5.preview.html",
 }
 
-var reSlug = regexp.MustCompile(`^[a-z0-9\-]+$`)
+var reSlug = regexp.MustCompile(`^[a-z0-9_-]+$`)
 
 // ErrorPagePreviewHandler serves WAF error page HTML previews from the
 // embedded TemplatesFS. No filesystem access at runtime — previews work
@@ -93,6 +107,10 @@ func (h *ErrorPagePreviewHandler) ServeHTTP(w http.ResponseWriter, r *http.Reque
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	if data, ok := compiler.GeneratedErrorPage(slug); ok {
+		writeErrorPagePreview(w, data)
+		return
+	}
 
 	filename, ok := errorPagePreviewAllowedSlugs[slug]
 	if !ok {
@@ -107,6 +125,10 @@ func (h *ErrorPagePreviewHandler) ServeHTTP(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	writeErrorPagePreview(w, compiler.NormalizeErrorPageRouteLabels(data))
+}
+
+func writeErrorPagePreview(w http.ResponseWriter, data []byte) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Frame-Options", "SAMEORIGIN")

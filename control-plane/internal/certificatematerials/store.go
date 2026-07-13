@@ -165,6 +165,23 @@ func (s *Store) Get(certificateID string) (MaterialRecord, error) {
 	return MaterialRecord{}, fmt.Errorf("certificate material %s not found", certificateID)
 }
 
+// Delete removes certificate material after a successful identity migration.
+func (s *Store) Delete(certificateID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	certificateID = normalizeID(certificateID)
+	if err := validateMaterialID(certificateID); err != nil { return err }
+	current, err := s.loadLocked(); if err != nil { return err }
+	for i := range current.Materials {
+		if current.Materials[i].CertificateID != certificateID { continue }
+		if err := s.resetMaterialFiles(certificateID); err != nil { return err }
+		current.Materials = append(current.Materials[:i], current.Materials[i+1:]...)
+		sortMaterials(current.Materials)
+		return s.saveLocked(current)
+	}
+	return fmt.Errorf("certificate material %s not found", certificateID)
+}
+
 func (s *Store) Read(certificateID string) (MaterialRecord, []byte, []byte, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

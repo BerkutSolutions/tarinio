@@ -14,6 +14,7 @@ type siteService interface {
 	Create(ctx context.Context, site sites.Site) (sites.Site, error)
 	List() ([]sites.Site, error)
 	Update(ctx context.Context, site sites.Site) (sites.Site, error)
+	Rename(ctx context.Context, oldID string, site sites.Site) (sites.Site, error)
 	Delete(ctx context.Context, id string) error
 }
 
@@ -92,7 +93,9 @@ func (h *SitesHandler) update(w http.ResponseWriter, r *http.Request) {
 
 	bodyID := strings.TrimSpace(site.ID)
 	if bodyID != "" && !strings.EqualFold(bodyID, id) {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "site id rename is not supported via update; create a new site and migrate bindings explicitly"})
+		updated, err := h.sites.Rename(withActorIP(r), id, site)
+		if err != nil { writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()}); return }
+		writeJSON(w, http.StatusOK, updated)
 		return
 	}
 

@@ -180,7 +180,7 @@ func (s *requestStreamSource) ingestArchiveLocked(retentionDays int) error {
 			}
 			continue
 		}
-		if shouldSkipInternalManagementRequest(item) {
+		if shouldSkipRequestTelemetry(item) {
 			if errors.Is(readErr, io.EOF) {
 				break
 			}

@@ -19,7 +19,6 @@ server {
     ssl_session_cache shared:SSL:10m;
     ssl_session_tickets off;
     ssl_ecdh_curve X25519:secp384r1;
-    error_page 497 =307 https://$http_host$request_uri;
 {{- end }}
 {{- if .MTLSSnippet }}
 {{ .MTLSSnippet }}
@@ -37,19 +36,10 @@ server {
     proxy_intercept_errors on;
 {{- end }}
 {{- if not .UseEasyConfig }}
-    error_page 400 /__waf_errors/{{ .SiteID }}/400.html?rid=$request_id&ip=$remote_addr&ts=$msec;
-    error_page 401 /__waf_errors/{{ .SiteID }}/401.html?rid=$request_id&ip=$remote_addr&ts=$msec;
-    error_page 403 /__waf_errors/{{ .SiteID }}/403.html?rid=$request_id&ip=$remote_addr&ts=$msec;
-    error_page 404 /__waf_errors/{{ .SiteID }}/404.html?rid=$request_id&ip=$remote_addr&ts=$msec;
-    error_page 405 /__waf_errors/{{ .SiteID }}/405.html?rid=$request_id&ip=$remote_addr&ts=$msec;
-    error_page 408 /__waf_errors/{{ .SiteID }}/408.html?rid=$request_id&ip=$remote_addr&ts=$msec;
-    error_page 421 /__waf_errors/{{ .SiteID }}/421.html?rid=$request_id&ip=$remote_addr&ts=$msec;
-    error_page 429 /__waf_errors/{{ .SiteID }}/429.html?rid=$request_id&ip=$remote_addr&ts=$msec;
-    error_page 451 /__waf_errors/_global/geo_block.html?rid=$request_id&ip=$remote_addr&ts=$msec&cc=$waf_country_code;
-    error_page 500 /__waf_errors/{{ .SiteID }}/500.html?rid=$request_id&ip=$remote_addr&ts=$msec;
-    error_page 502 /__waf_errors/{{ .SiteID }}/502.html?rid=$request_id&ip=$remote_addr&ts=$msec;
-    error_page 503 /__waf_errors/{{ .SiteID }}/503.html?rid=$request_id&ip=$remote_addr&ts=$msec;
-    error_page 504 /__waf_errors/{{ .SiteID }}/504.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- range .ErrorStatusCodes }}
+    error_page {{ . }} /__waf_errors/{{ $.SiteID }}/{{ . }}.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+    error_page 599 =403 /__waf_errors/_global/geo_block.html?rid=$request_id&ip=$remote_addr&ts=$msec&cc=$waf_country_code;
 {{- end }}
 
     location = /__waf_errors/{{ .SiteID }}/400.html {
@@ -108,6 +98,14 @@ server {
         internal;
         allow all;
         alias /etc/waf/errors/_global/geo_block.html;
+    }
+
+    # Canonical error artifacts are generated per site. This catch-all keeps
+    # newly registered pages available without adding unsafe public paths.
+    location ~ ^/__waf_errors/([a-zA-Z0-9_-]+)/([0-9]+\.html)$ {
+        internal;
+        allow all;
+        alias /etc/waf/errors/$1/$2;
     }
 
     location = /__waf_errors/{{ .SiteID }}/500.html {

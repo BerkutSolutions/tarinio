@@ -346,7 +346,7 @@
   "app.sites": "Услуге",
   "app.tls": "ТЛС / сертификати",
   "app.user.noRoles": "Нема улога",
-  "app.version": "в1.5.0",
+  "app.version": "в1.5.1",
   "auth.2fa.challengeMissing": "2ФА изазов недостаје. Пријавите се поново.",
   "auth.2fa.code": "2ФА код",
   "auth.2fa.codeRequired": "Потребан је 2ФА код",
@@ -2324,4 +2324,12 @@
   ,"settings.managementHosts.drift": "Upozorenje: aktivni runtime artefakt nema očekivani safeguard upravljanja. Koristite interni CLI i primenite ispravljenu reviziju."
   ,"sites.tls.confirmRebind": "Zameniti TLS vezu sertifikata za {{site}} sertifikatom {{certificate}}?"
   ,"sites.tls.rebindCancelled": "TLS ponovno povezivanje je otkazano."
+  ,"sites.easy.errorpages.category.client": "Greške klijenta"
+  ,"sites.easy.errorpages.category.server": "Greške servera"
+  ,"sites.easy.errorpages.category.proxy": "Proxy / Nginx greške"
+  ,"sites.easy.errorpages.category.upstream": "Upstream / CDN greške"
+  ,"sites.easy.errorpages.category.waf": "WAF stranice blokiranja"
+  ,"sites.easy.errorpages.vendor": "specifično za dobavljača"
+  ,"sites.easy.errorpages.diagnostic": "samo dijagnostika"
+  ,"sites.easy.errorpages.extended.451":"451 Nedostupno iz pravnih razloga","sites.easy.errorpages.extended.494":"494 Zaglavlje zahteva je preveliko","sites.easy.errorpages.extended.495":"495 Greška SSL sertifikata","sites.easy.errorpages.extended.496":"496 SSL sertifikat je obavezan","sites.easy.errorpages.extended.497":"497 HTTP zahtev je poslat na HTTPS port","sites.easy.errorpages.extended.499":"499 Klijent je zatvorio zahtev","sites.easy.errorpages.extended.506":"506 Varijanta takođe pregovara","sites.easy.errorpages.extended.520":"520 Nepoznata greška","sites.easy.errorpages.extended.521":"521 Veb server nije dostupan","sites.easy.errorpages.extended.522":"522 Vreme povezivanja je isteklo","sites.easy.errorpages.extended.523":"523 Origin nije dostupan","sites.easy.errorpages.extended.524":"524 Došlo je do prekoračenja vremena","sites.easy.errorpages.extended.525":"525 SSL rukovanje nije uspelo","sites.easy.errorpages.extended.526":"526 Nevažeći SSL sertifikat"
 }

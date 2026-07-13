@@ -16,7 +16,13 @@ type stubSiteService struct {
 	createFn func(context.Context, sites.Site) (sites.Site, error)
 	listFn   func() ([]sites.Site, error)
 	updateFn func(context.Context, sites.Site) (sites.Site, error)
+	renameFn func(context.Context, string, sites.Site) (sites.Site, error)
 	deleteFn func(context.Context, string) error
+}
+
+func (s stubSiteService) Rename(ctx context.Context, oldID string, site sites.Site) (sites.Site, error) {
+	if s.renameFn != nil { return s.renameFn(ctx, oldID, site) }
+	return site, nil
 }
 
 func (s stubSiteService) Create(ctx context.Context, site sites.Site) (sites.Site, error) {
@@ -57,10 +63,11 @@ func (stubSiteBanService) Unban(context.Context, string, string) (accesspolicies
 	return accesspolicies.AccessPolicy{}, nil
 }
 
-func TestSitesHandlerUpdateRejectsSiteIDRename(t *testing.T) {
+func TestSitesHandlerUpdateMigratesSiteID(t *testing.T) {
 	called := false
 	handler := NewSitesHandler(stubSiteService{
-		updateFn: func(ctx context.Context, site sites.Site) (sites.Site, error) {
+		renameFn: func(ctx context.Context, oldID string, site sites.Site) (sites.Site, error) {
+			if oldID != "198.51.100.54" { t.Fatalf("unexpected source id: %s", oldID) }
 			called = true
 			return site, nil
 		},
@@ -75,15 +82,15 @@ func TestSitesHandlerUpdateRejectsSiteIDRename(t *testing.T) {
 		t.Fatalf("marshal body: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPut, "/api/sites/135.136.191.54", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPut, "/api/sites/198.51.100.54", bytes.NewReader(body))
 	res := httptest.NewRecorder()
 
 	handler.ServeHTTP(res, req)
 
-	if res.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d body=%s", res.Code, res.Body.String())
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", res.Code, res.Body.String())
 	}
-	if called {
-		t.Fatal("site service update should not be called for rename payload")
+	if !called {
+		t.Fatal("site rename should be called for a changed id")
 	}
 }

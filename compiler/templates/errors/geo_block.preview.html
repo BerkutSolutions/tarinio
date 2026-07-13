@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>451 Access Restricted</title>
+  <title>403 Geo Block</title>
   <style>
     :root {
       color-scheme: dark;
@@ -211,7 +211,7 @@
 
   <div class="card">
     <div class="card-top">
-      <div class="badge">HTTP 451</div>
+      <div class="badge">HTTP 403</div>
       <h1 id="card-title">Access Restricted by Location</h1>
       <p id="card-subtitle">This service is unavailable from your region. A geo-restriction or VPN policy is blocking access.</p>
       <div class="country-pill">
@@ -265,7 +265,7 @@
       <div class="meta-cell"><div class="lbl" id="l-ip">Client IP</div><div class="val" id="m-ip">—</div></div>
       <div class="meta-cell"><div class="lbl" id="l-time">Time</div><div class="val" id="m-time">—</div></div>
       <div class="meta-cell"><div class="lbl" id="l-rid">Request ID</div><div class="val" id="m-rid">—</div></div>
-      <div class="meta-cell"><div class="lbl" id="l-policy">Policy</div><div class="val">geo-restriction / 451</div></div>
+      <div class="meta-cell"><div class="lbl" id="l-policy">Policy</div><div class="val">geo-restriction / 403</div></div>
     </div>
   </div>
 
@@ -286,7 +286,7 @@
     function s(id,v){var e=document.getElementById(id);if(e)e.textContent=v;}
     var l=lang(),t=C[l],p=new URLSearchParams(location.search);
     document.documentElement.lang=l;
-    document.title="451 — "+t.title;
+    document.title="403 — "+t.title;
     s("card-title",t.title);s("card-subtitle",t.sub);
     s("country-label",t.cc);s("country-val",cc(p.get("cc"),l));
     s("flow-label",t.fl);s("node-user",t.nu);s("node-host",t.nh);s("blocked-label",t.bl);

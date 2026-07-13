@@ -148,7 +148,7 @@ func TestRequestArchiveFallsBackWhenClickHouseConfigIsMissing(t *testing.T) {
 	)
 
 	stamp := time.Now().UTC().Add(-2 * time.Hour).Format(time.RFC3339)
-	line := fmt.Sprintf(`{"timestamp":"%s","request_id":"req-1","client_ip":"1.1.1.1","method":"GET","uri":"/catalog","status":200,"site":"localhost","host":"localhost","upstream_addr":"172.18.0.6:80"}`, stamp)
+	line := fmt.Sprintf(`{"timestamp":"%s","request_id":"req-1","client_ip":"1.1.1.1","method":"GET","uri":"/catalog","status":200,"site":"shop_example","host":"shop.example","upstream_addr":"172.18.0.6:80"}`, stamp)
 	if err := os.WriteFile(logPath, []byte(line+"\n"), 0o644); err != nil {
 		t.Fatalf("write log fixture: %v", err)
 	}

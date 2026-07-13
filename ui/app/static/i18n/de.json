@@ -346,7 +346,7 @@
   "app.sites": "Dienstleistungen",
   "app.tls": "TLS / Zertifikate",
   "app.user.noRoles": "Keine Rollen",
-  "app.version": "v1.5.0",
+  "app.version": "v1.5.1",
   "auth.2fa.challengeMissing": "2FA-Herausforderung fehlt. Bitte melden Sie sich erneut an.",
   "auth.2fa.code": "2FA-Code",
   "auth.2fa.codeRequired": "2FA-Code ist erforderlich",
@@ -2324,4 +2324,12 @@
   ,"settings.managementHosts.drift": "Warnung: Das aktive Runtime-Artefakt enthält den erwarteten Management-Safeguard nicht. Nutzen Sie die interne CLI und wenden Sie eine korrigierte Revision an."
   ,"sites.tls.confirmRebind": "TLS-Zertifikatsbindung für {{site}} durch {{certificate}} ersetzen?"
   ,"sites.tls.rebindCancelled": "TLS-Zertifikatsbindung wurde abgebrochen."
+  ,"sites.easy.errorpages.category.client": "Client-Fehler"
+  ,"sites.easy.errorpages.category.server": "Serverfehler"
+  ,"sites.easy.errorpages.category.proxy": "Proxy- / Nginx-Fehler"
+  ,"sites.easy.errorpages.category.upstream": "Upstream- / CDN-Fehler"
+  ,"sites.easy.errorpages.category.waf": "WAF-Sperrseiten"
+  ,"sites.easy.errorpages.vendor": "herstellerspezifisch"
+  ,"sites.easy.errorpages.diagnostic": "nur Diagnose"
+  ,"sites.easy.errorpages.extended.451":"451 Aus rechtlichen Gründen nicht verfügbar","sites.easy.errorpages.extended.494":"494 Anfragekopfzeile zu groß","sites.easy.errorpages.extended.495":"495 SSL-Zertifikatsfehler","sites.easy.errorpages.extended.496":"496 SSL-Zertifikat erforderlich","sites.easy.errorpages.extended.497":"497 HTTP-Anfrage an HTTPS-Port gesendet","sites.easy.errorpages.extended.499":"499 Client hat Anfrage geschlossen","sites.easy.errorpages.extended.506":"506 Variante verhandelt ebenfalls","sites.easy.errorpages.extended.520":"520 Unbekannter Fehler","sites.easy.errorpages.extended.521":"521 Webserver ist ausgefallen","sites.easy.errorpages.extended.522":"522 Verbindung hat Zeitüberschreitung","sites.easy.errorpages.extended.523":"523 Origin ist nicht erreichbar","sites.easy.errorpages.extended.524":"524 Zeitüberschreitung aufgetreten","sites.easy.errorpages.extended.525":"525 SSL-Handshake fehlgeschlagen","sites.easy.errorpages.extended.526":"526 Ungültiges SSL-Zertifikat"
 }

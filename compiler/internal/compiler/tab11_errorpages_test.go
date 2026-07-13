@@ -30,8 +30,31 @@ func TestErrorPages_Enabled_HasProxyInterceptAndErrorPages(t *testing.T) {
 	if !strings.Contains(conf, "/__waf_errors/ep-site/404.html") {
 		t.Fatalf("expected site-scoped error page path for 404, got:\n%s", conf)
 	}
-	if !strings.Contains(conf, "/__waf_errors/_global/geo_block.html") {
-		t.Fatalf("expected global geo_block path for 451, got:\n%s", conf)
+	if !strings.Contains(conf, "/__waf_errors/ep-site/451.html") {
+		t.Fatalf("expected site-scoped legal page path for 451, got:\n%s", conf)
+	}
+}
+
+func TestErrorPages_GeoBlockUsesInternalMarkerAndPublic403(t *testing.T) {
+	conf := mustRenderSiteConf(t, "geo-site", EasyProfileInput{
+		SiteID: "geo-site", SecurityMode: "block", AllowedMethods: []string{"GET"},
+		MaxClientSize: "10m", UseCustomErrorPages: true, ShowGeoBlockPage: true,
+		BlacklistCountry: []string{"RU"},
+	})
+	if !strings.Contains(conf, "return 599") || !strings.Contains(conf, "error_page 599 =403 /__waf_errors/_global/geo_block.html") {
+		t.Fatalf("expected geo marker to use geo_block body with public 403, got:\n%s", conf)
+	}
+	if strings.Contains(conf, "return 451") {
+		t.Fatalf("geo policy must not return legal-restriction status 451, got:\n%s", conf)
+	}
+}
+
+func TestErrorPages_DoesNotAttemptToDeliver499(t *testing.T) {
+	conf := mustRenderSiteConf(t, "closed-client", EasyProfileInput{
+		SiteID: "closed-client", SecurityMode: "block", AllowedMethods: []string{"GET"}, MaxClientSize: "10m", UseCustomErrorPages: true,
+	})
+	if strings.Contains(conf, "error_page 499") {
+		t.Fatalf("499 is diagnostic and must not produce an undeliverable response: %s", conf)
 	}
 }
 

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"sort"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -19,6 +20,7 @@ import (
 type nginxMainData struct {
 	SitesIncludeGlob string
 	DefaultTLSRef    string
+	ErrorStatusCodes []int
 }
 
 type nginxSiteData struct {
@@ -41,6 +43,7 @@ type nginxSiteData struct {
 	HealthCheckEnabled  bool
 	UseEasyConfig       bool
 	UseCustomErrorPages bool
+	ErrorStatusCodes    []int
 	MTLSSnippet         string
 }
 
@@ -72,7 +75,9 @@ const globalErrorSiteID = "_global"
 
 var supportedErrorStatusCodes = []int{
 	400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415,
-	416, 417, 418, 421, 422, 423, 424, 425, 426, 428, 429, 431, 444, 451, 500, 501,
+	416, 417, 418, 421, 422, 423, 424, 425, 426, 428, 429, 431, 444, 451, 494, 495,
+	496, 497, 499, 500, 501,
+	506,
 	502, 503, 504, 505, 507, 508, 510, 511, 520, 521, 522, 523, 524, 525, 526,
 }
 
@@ -89,6 +94,7 @@ func RenderSiteUpstreamArtifacts(sites []SiteInput, upstreams []UpstreamInput) (
 	mainContent, err := renderTemplate("templates/nginx/nginx.conf.tmpl", nginxMainData{
 		SitesIncludeGlob: "sites/*.conf",
 		DefaultTLSRef:    defaultTLSRefPath(sortedSites),
+		ErrorStatusCodes: responseErrorStatusCodes(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("render nginx main template: %w", err)
@@ -96,7 +102,7 @@ func RenderSiteUpstreamArtifacts(sites []SiteInput, upstreams []UpstreamInput) (
 	artifacts = append(artifacts, newArtifact("nginx/nginx.conf", ArtifactKindNginxConfig, mainContent))
 
 	baseContent, err := renderTemplate("templates/nginx/conf.d/base.conf.tmpl", nginxBaseData{
-		ErrorStatusCodes:         append([]int(nil), supportedErrorStatusCodes...),
+		ErrorStatusCodes:         responseErrorStatusCodes(),
 		HostMapEntries:           buildHostMapEntries(sortedSites),
 		ManagementAPIProxyTarget: managementAPIProxyTarget(),
 		UIProxyTarget:            uiProxyTarget(),
@@ -112,7 +118,8 @@ func RenderSiteUpstreamArtifacts(sites []SiteInput, upstreams []UpstreamInput) (
 	}
 	artifacts = append(artifacts, globalErrorArtifacts...)
 
-	// geo_block.html — shared page for HTTP 451 geo-restriction responses
+	// geo_block.html is a shared body for geo policy blocks. The public status
+	// is set to 403 by the site-level internal error marker.
 	geoBlockPage, err := renderTemplate("templates/errors/geo_block.html.tmpl", nil)
 	if err != nil {
 		return nil, fmt.Errorf("render geo block page: %w", err)
@@ -148,6 +155,7 @@ func RenderSiteUpstreamArtifacts(sites []SiteInput, upstreams []UpstreamInput) (
 			RateLimitEscalationCookie: rateLimitEscalationCookieName(site.ID),
 			UseEasyConfig:             site.UseEasyConfig,
 			UseCustomErrorPages:       site.UseCustomErrorPages,
+			ErrorStatusCodes:          responseErrorStatusCodes(),
 			MTLSSnippet:               mtlsSnippet,
 		})
 		if err != nil {
@@ -366,33 +374,55 @@ func templatesRoot() string {
 }
 
 func renderSiteErrorArtifacts(siteID string) ([]ArtifactOutput, error) {
-	pages := buildErrorPageCatalog()
-
-	artifacts := make([]ArtifactOutput, 0, len(pages))
-	for _, page := range pages {
-		var content []byte
-		var err error
-
-		// Use the new static preview page if available — these are the
-		// canonical production error pages. Fall back to status.html.tmpl
-		// only for codes that don't have a dedicated preview file yet.
-		previewPath := fmt.Sprintf("templates/errors/%d.preview.html", page.StatusCode)
-		if previewContent, fsErr := compiler.TemplatesFS.ReadFile(previewPath); fsErr == nil {
-			content = previewContent
-		} else {
-			content, err = renderTemplate("templates/errors/status.html.tmpl", page)
+	artifacts := make([]ArtifactOutput, 0, len(supportedErrorStatusCodes))
+	for _, code := range supportedErrorStatusCodes {
+		content, generated := compiler.GeneratedErrorPage(strconv.Itoa(code))
+		if !generated {
+			var err error
+			content, err = compiler.TemplatesFS.ReadFile(errorPagePreviewPath(code))
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("read canonical error page %d: %w", code, err)
 			}
 		}
 
+		// Use the new static preview page if available — these are the
+
+		content = compiler.NormalizeErrorPageRouteLabels(content)
 		artifacts = append(artifacts, newArtifact(
-			fmt.Sprintf("errors/%s/%d.html", siteID, page.StatusCode),
+			fmt.Sprintf("errors/%s/%d.html", siteID, code),
 			ArtifactKindNginxConfig,
 			content,
 		))
 	}
 	return artifacts, nil
+}
+
+func responseErrorStatusCodes() []int {
+	codes := make([]int, 0, len(supportedErrorStatusCodes))
+	for _, code := range supportedErrorStatusCodes {
+		if code != 499 {
+			codes = append(codes, code)
+		}
+	}
+	return codes
+}
+
+// errorPagePreviewPath is the sole source for production WAF fallback pages.
+// Codes without a dedicated visual intentionally use the nearest canonical
+// WAF page; they never fall back to nginx or a legacy template.
+func errorPagePreviewPath(code int) string {
+	switch code {
+	case 451:
+		return "templates/errors/451.preview.html"
+	case 494, 495, 496, 497, 499:
+		return "templates/errors/400.preview.html"
+	case 506:
+		return "templates/errors/500.preview.html"
+	case 520, 521, 522, 523, 524, 525, 526:
+		return "templates/errors/500.preview.html"
+	default:
+		return fmt.Sprintf("templates/errors/%d.preview.html", code)
+	}
 }
 
 type nginxBaseData struct {

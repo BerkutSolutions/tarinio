@@ -43,6 +43,7 @@ func normalizeProfile(profile EasySiteProfile) EasySiteProfile {
 	profile.HTTPBehavior.AllowedMethods = ensureControlPlaneAccessMethods(profile.SiteID, profile.HTTPBehavior.AllowedMethods)
 	profile.HTTPBehavior.MaxClientSize = strings.ToLower(strings.TrimSpace(profile.HTTPBehavior.MaxClientSize))
 	profile.HTTPBehavior.SSLProtocols = normalizeTrimmedList(profile.HTTPBehavior.SSLProtocols)
+	profile.DisabledErrorPages = migrateLegacyDisabledErrorPages(profile.DisabledErrorPages)
 
 	profile.HTTPHeaders.CookieFlags = strings.TrimSpace(profile.HTTPHeaders.CookieFlags)
 	profile.HTTPHeaders.ContentSecurityPolicy = strings.TrimSpace(profile.HTTPHeaders.ContentSecurityPolicy)
@@ -724,6 +725,17 @@ func normalizeTrimmedList(values []string) []string {
 	}
 	sort.Strings(items)
 	return slices.Compact(items)
+}
+
+// migrateLegacyDisabledErrorPages preserves the intent of the former
+// "451 Geo Block" toggle. Before 1.5.1, disabling 451 disabled the geo page;
+// after the split, 451 is legal-only and geo_block owns that old setting.
+func migrateLegacyDisabledErrorPages(values []string) []string {
+	items := normalizeTrimmedList(values)
+	if !slices.Contains(items, "451") || slices.Contains(items, "geo_block") {
+		return items
+	}
+	return normalizeTrimmedList(append(items, "geo_block"))
 }
 
 func normalizeUpperList(values []string) []string {

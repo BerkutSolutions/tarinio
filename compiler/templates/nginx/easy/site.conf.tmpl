@@ -191,8 +191,8 @@ if ($waf_blacklist_uri_guard ~* "^0:.*{{ . }}") { return 403; }
 set $waf_country_guard "$waf_easy_exception_guard:$waf_country_code";
 add_header X-WAF-Country-Code "$waf_country_code" always;
 add_header X-WAF-Country-Guard "$waf_country_guard" always;
-{{- if .ShowGeoBlockPage }}
-if ($waf_country_guard !~ "{{ .WhitelistCountryGuardPattern }}") { return 451; }
+{{- if and .ShowGeoBlockPage (not (sliceContains .DisabledErrorPages "geo_block")) }}
+if ($waf_country_guard !~ "{{ .WhitelistCountryGuardPattern }}") { return 599; }
 {{- else }}
 if ($waf_country_guard !~ "{{ .WhitelistCountryGuardPattern }}") { return 403; }
 {{- end }}
@@ -202,8 +202,8 @@ if ($waf_country_guard !~ "{{ .WhitelistCountryGuardPattern }}") { return 403; }
 set $waf_country_guard "$waf_easy_exception_guard:$waf_country_code";
 add_header X-WAF-Country-Code "$waf_country_code" always;
 add_header X-WAF-Country-Guard "$waf_country_guard" always;
-{{- if .ShowGeoBlockPage }}
-if ($waf_country_guard ~ "{{ .BlacklistCountryGuardPattern }}") { return 451; }
+{{- if and .ShowGeoBlockPage (not (sliceContains .DisabledErrorPages "geo_block")) }}
+if ($waf_country_guard ~ "{{ .BlacklistCountryGuardPattern }}") { return 599; }
 {{- else }}
 if ($waf_country_guard ~ "{{ .BlacklistCountryGuardPattern }}") { return 403; }
 {{- end }}
@@ -406,13 +406,34 @@ error_page 431 /__waf_errors/{{ .SiteID }}/431.html?rid=$request_id&ip=$remote_a
 error_page 444 /__waf_errors/{{ .SiteID }}/444.html?rid=$request_id&ip=$remote_addr&ts=$msec;
 {{- end }}
 {{- if not (sliceContains .DisabledErrorPages "451") }}
-error_page 451 /__waf_errors/_global/geo_block.html?rid=$request_id&ip=$remote_addr&ts=$msec&cc=$waf_country_code;
+error_page 451 /__waf_errors/{{ .SiteID }}/451.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if and .ShowGeoBlockPage (not (sliceContains .DisabledErrorPages "geo_block")) }}
+# 599 is an internal marker only. error_page changes it to the public 403 response.
+error_page 599 =403 /__waf_errors/_global/geo_block.html?rid=$request_id&ip=$remote_addr&ts=$msec&cc=$waf_country_code;
 {{- end }}
 {{- if not (sliceContains .DisabledErrorPages "500") }}
 error_page 500 /__waf_errors/{{ .SiteID }}/500.html?rid=$request_id&ip=$remote_addr&ts=$msec;
 {{- end }}
 {{- if not (sliceContains .DisabledErrorPages "501") }}
 error_page 501 /__waf_errors/{{ .SiteID }}/501.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "494") }}
+error_page 494 /__waf_errors/{{ .SiteID }}/494.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "495") }}
+error_page 495 /__waf_errors/{{ .SiteID }}/495.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "496") }}
+error_page 496 /__waf_errors/{{ .SiteID }}/496.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "497") }}
+error_page 497 /__waf_errors/{{ .SiteID }}/497.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+# 499 is logged by nginx after the client closes the connection. There is no
+# error_page directive because a response cannot be delivered to that client.
+{{- if not (sliceContains .DisabledErrorPages "506") }}
+error_page 506 /__waf_errors/{{ .SiteID }}/506.html?rid=$request_id&ip=$remote_addr&ts=$msec;
 {{- end }}
 {{- if not (sliceContains .DisabledErrorPages "502") }}
 error_page 502 /__waf_errors/{{ .SiteID }}/502.html?rid=$request_id&ip=$remote_addr&ts=$msec;
@@ -437,6 +458,27 @@ error_page 510 /__waf_errors/{{ .SiteID }}/510.html?rid=$request_id&ip=$remote_a
 {{- end }}
 {{- if not (sliceContains .DisabledErrorPages "511") }}
 error_page 511 /__waf_errors/{{ .SiteID }}/511.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "520") }}
+error_page 520 /__waf_errors/{{ .SiteID }}/520.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "521") }}
+error_page 521 /__waf_errors/{{ .SiteID }}/521.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "522") }}
+error_page 522 /__waf_errors/{{ .SiteID }}/522.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "523") }}
+error_page 523 /__waf_errors/{{ .SiteID }}/523.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "524") }}
+error_page 524 /__waf_errors/{{ .SiteID }}/524.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "525") }}
+error_page 525 /__waf_errors/{{ .SiteID }}/525.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- end }}
+{{- if not (sliceContains .DisabledErrorPages "526") }}
+error_page 526 /__waf_errors/{{ .SiteID }}/526.html?rid=$request_id&ip=$remote_addr&ts=$msec;
 {{- end }}
 {{- end }}
 

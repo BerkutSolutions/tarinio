@@ -143,7 +143,9 @@ export async function upsertSiteResources(draft, ctx, existingSite, existingUpst
   };
 
   try {
-    if (existingSite && !siteIDChanged) {
+    if (existingSite && siteIDChanged) {
+      await ctx.api.put(`/api/sites/${encodeURIComponent(existingSite.id)}`, sitePayload, requestOptions);
+    } else if (existingSite) {
       try {
         await ctx.api.put(`/api/sites/${encodeURIComponent(sitePayload.id)}`, sitePayload, requestOptions);
       } catch (error) {
@@ -237,6 +239,10 @@ export async function upsertSiteResources(draft, ctx, existingSite, existingUpst
       if (createdUpstream) {
         rollbackable(async () => deleteIgnoreNotFound(`/api/upstreams/${encodeURIComponent(upstreamPayload.id)}`));
       }
+    }
+
+    if (siteIDChanged && upstreamIDChanged && existingUpstream?.id) {
+      await deleteIgnoreNotFound(`/api/upstreams/${encodeURIComponent(existingUpstream.id)}`);
     }
 
     if (draft.tls_enabled) {

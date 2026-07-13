@@ -1,8 +1,11 @@
 package compiler
 
 import (
+	"fmt"
 	"strings"
 	"testing"
+
+	rootcompiler "waf/compiler"
 )
 
 func TestRenderSiteUpstreamArtifacts_Deterministic(t *testing.T) {
@@ -71,6 +74,53 @@ func TestRenderSiteUpstreamArtifacts_Deterministic(t *testing.T) {
 		}
 		if first[i].Checksum != second[i].Checksum {
 			t.Fatalf("artifact checksum differs for %s", first[i].Path)
+		}
+	}
+}
+
+func TestRenderSiteErrorArtifactsUsesOnlyLocalizedCanonicalPreviewPages(t *testing.T) {
+	artifacts, err := renderSiteErrorArtifacts("site-a")
+	if err != nil {
+		t.Fatalf("render error artifacts: %v", err)
+	}
+	if len(artifacts) != len(supportedErrorStatusCodes) {
+		t.Fatalf("unexpected error artifact count: %d", len(artifacts))
+	}
+	for _, code := range responseErrorStatusCodes() {
+		path := errorPagePreviewPath(code)
+		content, err := rootcompiler.TemplatesFS.ReadFile(path)
+		if err != nil {
+			t.Fatalf("canonical preview for %d: %v", code, err)
+		}
+		for _, locale := range []string{"en:", "ru:", "de:", "sr:", "zh:"} {
+			if !strings.Contains(string(content), locale) {
+				t.Fatalf("preview %s lacks locale %s", path, locale)
+			}
+		}
+	}
+}
+
+func TestRenderSiteErrorArtifactsUsesDedicatedGeneratedExtendedPages(t *testing.T) {
+	artifacts, err := renderSiteErrorArtifacts("site-a")
+	if err != nil {
+		t.Fatalf("render error artifacts: %v", err)
+	}
+	for _, expected := range []struct{ path, title string }{
+		{"errors/site-a/495.html", "SSL Certificate Error"},
+		{"errors/site-a/522.html", "Connection Timed Out"},
+		{"errors/site-a/526.html", "Invalid SSL Certificate"},
+	} {
+		found := false
+		for _, artifact := range artifacts {
+			if artifact.Path == expected.path {
+				found = true
+				if !strings.Contains(string(artifact.Content), expected.title) || strings.Contains(string(artifact.Content), "HTTP 400") {
+					t.Fatalf("artifact %s does not contain its dedicated page", expected.path)
+				}
+			}
+		}
+		if !found {
+			t.Fatalf("expected artifact %s", expected.path)
 		}
 	}
 }
@@ -217,15 +267,50 @@ func TestRenderSiteUpstreamArtifacts_DefaultHTTPSServerUsesFirstActiveTLSRefAndR
 			t.Fatalf("expected nginx main config to contain %q, got: %s", fragment, content)
 		}
 	}
+	for _, code := range responseErrorStatusCodes() {
+		if !strings.Contains(content, fmt.Sprintf("error_page %d /__waf_errors/_global/%d.html", code, code)) {
+			t.Fatalf("expected branded default TLS error page for %d, got: %s", code, content)
+		}
+	}
+}
+
+func TestRenderSiteUpstreamArtifacts_DisabledServiceLeavesNoRuntimeArtifacts(t *testing.T) {
+	artifacts, err := RenderSiteUpstreamArtifacts(
+		[]SiteInput{
+			{ID: "198.51.100.54", Enabled: false, PrimaryHost: "198.51.100.54", ListenHTTPS: true, DefaultUpstreamID: "old"},
+			{ID: "waf.site.com", Enabled: true, PrimaryHost: "waf.site.com", ListenHTTPS: true, DefaultUpstreamID: "new"},
+		},
+		[]UpstreamInput{
+			{ID: "old", SiteID: "198.51.100.54", Scheme: "http", Host: "old-app", Port: 80},
+			{ID: "new", SiteID: "waf.site.com", Scheme: "http", Host: "ui", Port: 80},
+		},
+	)
+	if err != nil {
+		t.Fatalf("render failed: %v", err)
+	}
+	for _, artifact := range artifacts {
+		if strings.Contains(artifact.Path, "198.51.100.54") || strings.Contains(string(artifact.Content), "198.51.100.54") {
+			t.Fatalf("disabled service leaked into runtime artifact %s: %s", artifact.Path, artifact.Content)
+		}
+	}
+	var main string
+	for _, artifact := range artifacts {
+		if artifact.Path == "nginx/nginx.conf" {
+			main = string(artifact.Content)
+		}
+	}
+	if !strings.Contains(main, "alias /etc/waf/errors/_global/421.html;") || !strings.Contains(main, "return 421;") {
+		t.Fatalf("default TLS server must return branded 421, got: %s", main)
+	}
 }
 
 func TestRenderSiteUpstreamArtifacts_PrefersNamedHTTPSSitesBeforeIPHTTPSSites(t *testing.T) {
 	artifacts, err := RenderSiteUpstreamArtifacts(
 		[]SiteInput{
 			{
-				ID:                "135.136.191.54",
+				ID:                "198.51.100.54",
 				Enabled:           true,
-				PrimaryHost:       "135.136.191.54",
+				PrimaryHost:       "198.51.100.54",
 				ListenHTTP:        true,
 				ListenHTTPS:       true,
 				DefaultUpstreamID: "up-ip",
@@ -242,7 +327,7 @@ func TestRenderSiteUpstreamArtifacts_PrefersNamedHTTPSSitesBeforeIPHTTPSSites(t 
 		[]UpstreamInput{
 			{
 				ID:             "up-ip",
-				SiteID:         "135.136.191.54",
+				SiteID:         "198.51.100.54",
 				Scheme:         "http",
 				Host:           "app-ip",
 				Port:           8080,
@@ -275,7 +360,7 @@ func TestRenderSiteUpstreamArtifacts_PrefersNamedHTTPSSitesBeforeIPHTTPSSites(t 
 	if !strings.Contains(nginxContent, "include /etc/waf/tls/panel.example.test.conf;") {
 		t.Fatalf("expected default HTTPS server to use domain TLS ref, got: %s", nginxContent)
 	}
-	if strings.Contains(nginxContent, "include /etc/waf/tls/135.136.191.54.conf;") {
+	if strings.Contains(nginxContent, "include /etc/waf/tls/198.51.100.54.conf;") {
 		t.Fatalf("did not expect default HTTPS server to use IP TLS ref when domain HTTPS site exists, got: %s", nginxContent)
 	}
 
@@ -288,7 +373,7 @@ func TestRenderSiteUpstreamArtifacts_PrefersNamedHTTPSSitesBeforeIPHTTPSSites(t 
 	if len(sitesInOrder) < 2 {
 		t.Fatalf("expected at least two site artifacts, got: %v", sitesInOrder)
 	}
-	if sitesInOrder[0] != "nginx/sites/panel.example.test.conf" || sitesInOrder[1] != "nginx/sites/135.136.191.54.conf" {
+	if sitesInOrder[0] != "nginx/sites/panel.example.test.conf" || sitesInOrder[1] != "nginx/sites/198.51.100.54.conf" {
 		t.Fatalf("expected domain HTTPS site before IP HTTPS site, got: %v", sitesInOrder)
 	}
 }

@@ -210,12 +210,12 @@ func TestE2EBehavioral(t *testing.T) {
 		securityAntibot["challenge_uri"] = "/challenge"
 		p["security_antibot"] = securityAntibot
 		setSBL(p, map[string]any{
-			"use_limit_req":     true,
-			"limit_req_url":     "/",
-			"limit_req_rate":    "1r/m",
-			"use_limit_conn":    false,
-			"use_blacklist":     false,
-			"use_bad_behavior":  false,
+			"use_limit_req":    true,
+			"limit_req_url":    "/",
+			"limit_req_rate":   "1r/m",
+			"use_limit_conn":   false,
+			"use_blacklist":    false,
+			"use_bad_behavior": false,
 		})
 		saveProfile(t, p)
 		compileApply(t)
@@ -310,8 +310,8 @@ func TestE2EBehavioral(t *testing.T) {
 			}
 		}
 
-		checkGeoCase("blacklist-country", map[string]any{"enabled": true, "blacklist_country": []string{"ZZ"}}, http.StatusUnavailableForLegalReasons, map[string]string{"X-Country-Code": "ZZ"})
-		checkGeoCase("whitelist-miss", map[string]any{"enabled": true, "whitelist_country": []string{"US"}}, http.StatusUnavailableForLegalReasons, map[string]string{"X-Country-Code": "ZZ"})
+		checkGeoCase("blacklist-country", map[string]any{"enabled": true, "blacklist_country": []string{"ZZ"}}, http.StatusForbidden, map[string]string{"X-Country-Code": "ZZ"})
+		checkGeoCase("whitelist-miss", map[string]any{"enabled": true, "whitelist_country": []string{"US"}}, http.StatusForbidden, map[string]string{"X-Country-Code": "ZZ"})
 	})
 
 	t.Run("UnknownHost_ReturnsBranded421", func(t *testing.T) {

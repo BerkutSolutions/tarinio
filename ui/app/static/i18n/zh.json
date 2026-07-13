@@ -346,7 +346,7 @@
   "app.sites": "服务",
   "app.tls": "TLS / 证书",
   "app.user.noRoles": "没有角色",
-  "app.version": "v1.5.0",
+  "app.version": "v1.5.1",
   "auth.2fa.challengeMissing": "2FA 挑战缺失。请重新登录。",
   "auth.2fa.code": "2FA 代码",
   "auth.2fa.codeRequired": "需要 2FA 代码",
@@ -2324,4 +2324,12 @@
   ,"settings.managementHosts.drift": "警告：活动运行时工件不包含预期的管理保护规则。请使用内部 CLI 并应用修正后的修订。"
   ,"sites.tls.confirmRebind": "要将 {{site}} 的 TLS 证书绑定替换为 {{certificate}} 吗？"
   ,"sites.tls.rebindCancelled": "已取消 TLS 证书重新绑定。"
+  ,"sites.easy.errorpages.category.client": "客户端错误"
+  ,"sites.easy.errorpages.category.server": "服务器错误"
+  ,"sites.easy.errorpages.category.proxy": "代理 / Nginx 错误"
+  ,"sites.easy.errorpages.category.upstream": "上游 / CDN 错误"
+  ,"sites.easy.errorpages.category.waf": "WAF 阻断页面"
+  ,"sites.easy.errorpages.vendor": "供应商特定"
+  ,"sites.easy.errorpages.diagnostic": "仅诊断"
+  ,"sites.easy.errorpages.extended.451":"451 因法律原因不可用","sites.easy.errorpages.extended.494":"494 请求头过大","sites.easy.errorpages.extended.495":"495 SSL 证书错误","sites.easy.errorpages.extended.496":"496 需要 SSL 证书","sites.easy.errorpages.extended.497":"497 HTTP 请求发送到了 HTTPS 端口","sites.easy.errorpages.extended.499":"499 客户端关闭了请求","sites.easy.errorpages.extended.506":"506 变体也在协商","sites.easy.errorpages.extended.520":"520 未知错误","sites.easy.errorpages.extended.521":"521 Web 服务器不可用","sites.easy.errorpages.extended.522":"522 连接超时","sites.easy.errorpages.extended.523":"523 源站不可达","sites.easy.errorpages.extended.524":"524 发生超时","sites.easy.errorpages.extended.525":"525 SSL 握手失败","sites.easy.errorpages.extended.526":"526 无效的 SSL 证书"
 }
