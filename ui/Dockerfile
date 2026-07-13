@@ -9,6 +9,7 @@ COPY CHANGELOG.md README.md README.en.md ./
 COPY package.json package-lock.json ./
 COPY scripts/check-docs-lockfile.js ./scripts/check-docs-lockfile.js
 COPY control-plane/internal/appmeta ./control-plane/internal/appmeta
+COPY control-plane/apiroutes ./control-plane/apiroutes
 COPY docs ./docs
 COPY ui/app ./ui/app
 COPY ui/nginx.conf ./ui/nginx.conf
