@@ -103,21 +103,8 @@ func TestEasyAdminBypassPathPatternForSite_MatchesManagementMutationEndpoints(t 
 func TestEasyAdminAntibotExclusionRulesForSite_ManagementSite(t *testing.T) {
 	t.Setenv("CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID", "control-plane-access")
 	rules := easyAdminAntibotExclusionRulesForSite(SiteInput{ID: "control-plane-access", PrimaryHost: "ui"})
-	if len(rules) == 0 {
-		t.Fatal("expected management site antibot exclusions")
-	}
-	byPath := map[string][]string{}
-	for _, rule := range rules {
-		byPath[rule.Path] = append([]string(nil), rule.Methods...)
-	}
-	for _, path := range []string{"/", "/api/administration", "/api/administration/", "/api/management-hosts", "/api/management-hosts/", "/static/", "/services", "/dashboard", "/auth", "/auth/verify"} {
-		methods, ok := byPath[path]
-		if !ok {
-			t.Fatalf("expected antibot exclusion for %s, got %#v", path, byPath)
-		}
-		if len(methods) != 2 || methods[0] != "GET" || methods[1] != "HEAD" {
-			t.Fatalf("expected GET/HEAD methods for %s, got %#v", path, methods)
-		}
+	if len(rules) != 0 {
+		t.Fatalf("management routes must remain protected by antibot, got %#v", rules)
 	}
 	if extra := easyAdminAntibotExclusionRulesForSite(SiteInput{ID: "site-a", PrimaryHost: "example.com"}); len(extra) != 0 {
 		t.Fatalf("expected no management exclusions for regular site, got %#v", extra)

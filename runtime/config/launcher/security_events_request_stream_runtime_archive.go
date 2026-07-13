@@ -226,7 +226,19 @@ func (s *requestStreamSource) loadArchiveRowsLocked(options requestQueryOptions)
 }
 
 func (s *requestStreamSource) countArchiveRowsLocked(options requestQueryOptions) int {
-	days, err := s.listArchiveDaysLocked("")
+	dayKeys := requestDayArchiveKeys(options)
+	var (
+		days []string
+		err  error
+	)
+	switch len(dayKeys) {
+	case 0:
+		days, err = s.listArchiveDaysLocked("")
+	case 1:
+		days, err = s.listArchiveDaysLocked(dayKeys[0])
+	default:
+		days = append([]string(nil), dayKeys...)
+	}
 	if err != nil {
 		return 0
 	}

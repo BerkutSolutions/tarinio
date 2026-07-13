@@ -63,3 +63,22 @@ func TestRenderSiteUpstreamArtifacts_ManagementSiteRoutesAPIToControlPlane(t *te
 		t.Fatal("expected management site root location to keep proxying to the UI upstream")
 	}
 }
+
+func TestRenderSiteUpstreamArtifacts_ManagementAPIUsesCustom504Page(t *testing.T) {
+	site := SiteInput{ID: "control-plane-access", Enabled: true, PrimaryHost: "waf.example.com", ListenHTTP: true, DefaultUpstreamID: "mgmt-upstream", UseEasyConfig: true, UseCustomErrorPages: true}
+	artifacts, err := RenderSiteUpstreamArtifacts([]SiteInput{site}, []UpstreamInput{{ID: "mgmt-upstream", SiteID: site.ID, Scheme: "http", Host: "ui", Port: 80}})
+	if err != nil {
+		t.Fatalf("render failed: %v", err)
+	}
+	for _, artifact := range artifacts {
+		if artifact.Path != "nginx/sites/control-plane-access.conf" {
+			continue
+		}
+		content := string(artifact.Content)
+		apiStart := strings.Index(content, "location ^~ /api/ {")
+		rootStart := strings.Index(content, "location / {")
+		if apiStart < 0 || rootStart <= apiStart || !strings.Contains(content[apiStart:rootStart], "proxy_intercept_errors on;") {
+			t.Fatalf("management API must intercept a 504 with the configured custom page, got: %s", content)
+		}
+	}
+}

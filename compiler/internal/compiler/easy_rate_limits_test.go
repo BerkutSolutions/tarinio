@@ -147,6 +147,22 @@ func TestRenderEasyRateLimitArtifacts_UsesConfiguredManagementAPIUpstream(t *tes
 	}
 }
 
+func TestRenderEasyRateLimitArtifacts_CustomPagesKeepAPIInterception(t *testing.T) {
+	artifacts, err := RenderEasyRateLimitArtifacts(
+		[]SiteInput{{ID: "site-a", Enabled: true, PrimaryHost: "a.example.com", ListenHTTP: true, DefaultUpstreamID: "upstream-a"}},
+		[]UpstreamInput{{ID: "upstream-a", SiteID: "site-a", Scheme: "http", Host: "upstream", Port: 8080}},
+		[]EasyProfileInput{{SiteID: "site-a", UseCustomErrorPages: true, CustomLimitRules: []CustomRateLimitRuleInput{{Path: "/api/work", Rate: "10r/s"}}}},
+	)
+	if err != nil {
+		t.Fatalf("render easy rate limit artifacts: %v", err)
+	}
+	for _, item := range artifacts {
+		if item.Path == "nginx/easy-locations/site-a.conf" && strings.Contains(string(item.Content), "proxy_intercept_errors off;") {
+			t.Fatalf("custom error pages must intercept API upstream errors, got: %s", item.Content)
+		}
+	}
+}
+
 func TestRenderEasyRateLimitArtifacts_ManagementHostRoutesAdminAPIToControlPlane(t *testing.T) {
 	artifacts, err := RenderEasyRateLimitArtifacts(
 		[]SiteInput{{
@@ -385,4 +401,3 @@ func TestRenderEasyRateLimitArtifacts_CustomStatusIgnoresNon429Codes(t *testing.
 		t.Fatalf("expected custom route rate limit to return 429 independently of non-429 status codes, got: %s", locationsConf)
 	}
 }
-

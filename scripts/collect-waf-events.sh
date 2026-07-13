@@ -27,6 +27,10 @@ VAULT_CONTAINER="${VAULT_CONTAINER:-tarinio-vault}"
 WAF_CLI_BIN="${WAF_CLI_BIN:-waf-cli}"
 SINCE="${SINCE:-24h}"
 NON_INTERACTIVE="${NON_INTERACTIVE:-0}"
+FILTER_IP="${FILTER_IP:-}"
+FILTER_SITE="${FILTER_SITE:-}"
+FILTER_URI="${FILTER_URI:-}"
+FILTER_STATUS="${FILTER_STATUS:-}"
 
 prompt_value() {
   local var_name="$1"
@@ -178,8 +182,8 @@ run_cli "runtime_settings.json" --json api GET /api/settings/runtime
 run_sh "runtime_request_indexes.json" "docker exec '$RUNTIME_CONTAINER' sh -lc \"wget --header='X-WAF-Runtime-Token: ${WAF_RUNTIME_API_TOKEN:-default-runtime-shared-token}' -qO- 'http://127.0.0.1:8081/requests/indexes?limit=20&offset=0'\""
 run_sh "clickhouse_ping.txt" "docker exec '$CLICKHOUSE_CONTAINER' sh -lc \"wget -qO- http://127.0.0.1:8123/ping\""
 run_sh "clickhouse_request_log_count.txt" "docker exec '$CLICKHOUSE_CONTAINER' sh -lc \"clickhouse-client --user \\\"\\${CLICKHOUSE_USER:-default}\\\" --password \\\"\\${CLICKHOUSE_PASSWORD:-}\\\" --query \\\"SELECT count() FROM waf_logs.request_logs\\\" 2>/dev/null || true\""
-run_sh "opensearch_health.txt" "docker exec '$OPENSEARCH_CONTAINER' bash -lc \"exec 3<>/dev/tcp/127.0.0.1/9200; printf 'GET /_cluster/health HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n' >&3; cat <&3\""
-run_sh "opensearch_requests_count.txt" "docker exec '$OPENSEARCH_CONTAINER' bash -lc \"exec 3<>/dev/tcp/127.0.0.1/9200; printf 'GET /waf-requests/_count HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n' >&3; cat <&3\""
+run_sh "opensearch_health.txt" "timeout 15 docker exec '$OPENSEARCH_CONTAINER' bash -lc \"timeout 8 bash -c 'exec 3<>/dev/tcp/127.0.0.1/9200; printf \\\"GET /_cluster/health HTTP/1.0\\r\\nHost: 127.0.0.1\\r\\nConnection: close\\r\\n\\r\\n\\\" >&3; timeout 8 cat <&3'\""
+run_sh "opensearch_requests_count.txt" "timeout 15 docker exec '$OPENSEARCH_CONTAINER' bash -lc \"timeout 8 bash -c 'exec 3<>/dev/tcp/127.0.0.1/9200; printf \\\"GET /waf-requests/_count HTTP/1.0\\r\\nHost: 127.0.0.1\\r\\nConnection: close\\r\\n\\r\\n\\\" >&3; timeout 8 cat <&3'\""
 run_sh "vault_health.txt" "docker exec '$VAULT_CONTAINER' sh -lc \"vault status -format=json -address=http://127.0.0.1:8200 2>/dev/null || true\""
 
 if [[ -n "$N_FILTER_SITE" ]]; then

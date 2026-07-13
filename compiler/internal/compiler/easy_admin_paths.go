@@ -83,7 +83,10 @@ func easyManagementProtectedPaths() []string {
 }
 
 func easyAdminAntibotExclusionRulesForSite(site SiteInput) []AntibotExclusionRuleInput {
-	return easyAdminMethodExclusionRulesForSite(site, []string{"GET", "HEAD"})
+	// Management routes still pass through the anti-bot challenge. The challenge
+	// itself is served by dedicated internal locations, while a verified
+	// management session bypasses repeated checks in the site template.
+	return nil
 }
 
 func easyAdminAuthExclusionRulesForSite(site SiteInput) []AuthExclusionRuleInput {

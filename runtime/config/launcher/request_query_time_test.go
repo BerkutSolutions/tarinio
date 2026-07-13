@@ -37,6 +37,13 @@ func TestRequestDayRangeUTCUsesLocalTimezoneOffset(t *testing.T) {
 	}
 }
 
+func TestRequestDayArchiveKeysLimitsSinceToRelevantDays(t *testing.T) {
+	keys := requestDayArchiveKeys(requestQueryOptions{Since: time.Now().UTC().Add(-24 * time.Hour)})
+	if len(keys) == 0 || len(keys) > 2 {
+		t.Fatalf("expected one or two archive days for a 24-hour range, got %#v", keys)
+	}
+}
+
 func TestRequestArchiveLatestRespectsLocalDayTimezoneOffset(t *testing.T) {
 	root := t.TempDir()
 	logPath := filepath.Join(root, "access.log")

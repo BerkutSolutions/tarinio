@@ -173,7 +173,7 @@ func RenderEasyRateLimitArtifacts(sites []SiteInput, upstreams []UpstreamInput, 
 				IsAdminAPIPath:              isAdminAPIPath,
 				LocationModifier:            customLimitLocationModifier(rule.Path),
 				LocationPath:                customLimitLocationPath(rule.Path),
-				DisableProxyInterceptErrors: strings.HasPrefix(canonicalPath, "/api/"),
+				DisableProxyInterceptErrors: strings.HasPrefix(canonicalPath, "/api/") && !profile.UseCustomErrorPages,
 				ZoneName:                    easyCustomReqZoneName(site.ID, index),
 				Burst:                       customLimitBurst(rule.Rate),
 				StatusCode:                  statusCode,
@@ -351,4 +351,3 @@ func expandCustomLimitRuleAliases(path, rate string) []CustomRateLimitRuleInput 
 func easyCustomLimitStatusCode(values []int) int {
 	return 429
 }
-

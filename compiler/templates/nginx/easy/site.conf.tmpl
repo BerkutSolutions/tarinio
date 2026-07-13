@@ -26,9 +26,6 @@ if ($cookie_waf_session_boot != "") {
 if (${{ .ExceptionVar }} = 1) {
     set $waf_easy_exception_guard 1;
 }
-if ($waf_easy_admin_guard = 1) {
-    set $waf_easy_exception_guard 1;
-}
 {{- range .ExceptionsURI }}
 if ($uri ~* "{{ . }}") {
     set $waf_easy_exception_guard 1;
@@ -45,6 +42,10 @@ if ($cookie_{{ .RateLimitEscalationCookieVar }} = "1") {
     set $waf_rate_limited_escalated 1;
 }
 if ($waf_easy_exception_guard = 1) {
+    set $waf_rate_limited_active 0;
+    set $waf_rate_limited_escalated 0;
+}
+if ($waf_easy_admin_guard = 1) {
     set $waf_rate_limited_active 0;
     set $waf_rate_limited_escalated 0;
 }

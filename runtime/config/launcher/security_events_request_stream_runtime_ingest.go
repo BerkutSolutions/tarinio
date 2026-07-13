@@ -54,19 +54,9 @@ func (s *requestStreamSource) count(query url.Values) (int, error) {
 		return 0, err
 	}
 
-	// Try OpenSearch first — accurate server-side count, zero document transfer.
-	if s.opensearch != nil {
-		n, err := s.opensearch.count(options)
-		if err == nil {
-			return n, nil
-		}
-		if !errors.Is(err, errOpenSearchDisabled) {
-			s.lastIngestError = err.Error()
-		}
-	}
-
-	// ClickHouse: fall back to local archive count (ClickHouse path uses file archive too).
-	// Archive is always the local copy; count it directly.
+	// The archive is the authoritative live source. Querying a remote storage
+	// backend while holding the stream lock could stall the dashboard when a
+	// historical migration is slow or unavailable.
 	return s.countArchiveRowsLocked(options), nil
 }
 
@@ -105,7 +95,7 @@ func (s *requestStreamSource) startBackgroundIngest(interval time.Duration) {
 			s.lastIngestError = err.Error()
 			return
 		}
-		if err := s.ingestLatestLocked(s.defaultRetention); err != nil {
+		if err := s.ingestArchiveLocked(s.defaultRetention); err != nil {
 			s.lastIngestError = err.Error()
 			return
 		}

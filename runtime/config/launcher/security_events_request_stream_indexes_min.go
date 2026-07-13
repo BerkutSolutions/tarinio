@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"errors"
 	"net/url"
 	"os"
@@ -43,11 +42,6 @@ func (s *requestStreamSource) indexes(query url.Values) (map[string]any, error) 
 		limit = 50
 	}
 
-	options := requestQueryOptions{Limit: limit, Offset: offset, RetentionDays: s.defaultRetention}
-	if payload, ok := s.indexesFromBackendsLocked(options); ok {
-		payload["last_ingest_error"] = s.lastIngestError
-		return payload, nil
-	}
 	days, err := s.listArchiveDaysLocked("")
 	if err != nil {
 		return nil, err
@@ -68,22 +62,11 @@ func (s *requestStreamSource) indexes(query url.Values) (map[string]any, error) 
 		if statErr != nil {
 			continue
 		}
-		lines := 0
-		file, openErr := os.Open(path)
-		if openErr == nil {
-			scanner := bufio.NewScanner(file)
-			for scanner.Scan() {
-				if strings.TrimSpace(scanner.Text()) != "" {
-					lines++
-				}
-			}
-			_ = file.Close()
-		}
 		items = append(items, requestArchiveIndex{
 			Date:      day,
 			FileName:  filepath.Base(path),
 			SizeBytes: info.Size(),
-			Lines:     lines,
+			Lines:     0,
 			UpdatedAt: info.ModTime().UTC().Format(time.RFC3339),
 		})
 	}
@@ -94,6 +77,7 @@ func (s *requestStreamSource) indexes(query url.Values) (map[string]any, error) 
 		"limit":             limit,
 		"offset":            offset,
 		"archive_root":      s.archiveRoot,
+		"storage_type":      "archive",
 		"last_ingest_error": s.lastIngestError,
 	}, nil
 }

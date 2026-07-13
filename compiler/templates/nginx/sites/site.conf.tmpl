@@ -218,7 +218,11 @@ server {
 
 {{- if .IsManagementSite }}
     location ^~ /api/ {
+{{- if .UseCustomErrorPages }}
+        proxy_intercept_errors on;
+{{- else }}
         proxy_intercept_errors off;
+{{- end }}
         modsecurity off;
         proxy_pass {{ .ManagementAPIProxyTarget }};
         proxy_set_header Host $http_host;

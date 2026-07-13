@@ -33,15 +33,18 @@ func requestDayRangeUTC(options requestQueryOptions) (time.Time, time.Time, bool
 func requestDayArchiveKeys(options requestQueryOptions) []string {
 	start, end, ok := requestDayRangeUTC(options)
 	if !ok {
-		if options.Day == "" {
+		if options.Day != "" {
+			return []string{options.Day}
+		}
+		if options.Since.IsZero() {
 			return nil
 		}
-		return []string{options.Day}
+		start = time.Date(options.Since.UTC().Year(), options.Since.UTC().Month(), options.Since.UTC().Day(), 0, 0, 0, 0, time.UTC)
+		end = time.Now().UTC()
 	}
-	keys := []string{start.Format("2006-01-02")}
-	lastKey := end.Add(-time.Nanosecond).Format("2006-01-02")
-	if lastKey != keys[0] {
-		keys = append(keys, lastKey)
+	keys := make([]string, 0, 2)
+	for day := start; !day.After(end); day = day.AddDate(0, 0, 1) {
+		keys = append(keys, day.Format("2006-01-02"))
 	}
 	return keys
 }
