@@ -484,6 +484,7 @@ function Run-StartupChecks {
     @{ Name = "ui i18n quality"; Action = { Invoke-Checked -Command "go" -Arguments @("test", "./ui/tests", "-run", "TestI18NValuesNonEmpty", "-count=1") } },
     @{ Name = "ui e2e security modes reality (full runtime stack)"; Action = { Invoke-E2ERuntimeSuite -Filter "TestE2ESecurityModesReality" } },
     @{ Name = "e2e behavioral suite (full runtime stack)"; Action = { Invoke-E2ERuntimeSuite -Filter "TestE2EBehavioral" } },
+    @{ Name = "e2e admin-panel ModSecurity safeguard (full runtime stack)"; Action = { Invoke-E2ERuntimeSuite -Filter "TestE2EAdminPanelModSecurityBypassesEveryAdministrativeRoute" } },
     @{ Name = "docs ru wiki quality"; Action = { Invoke-Checked -Command "go" -Arguments @("test", "./ui/tests", "-run", "TestDocsRuWikiNoMixedEnglish", "-count=1") } },
     @{ Name = "lab k8s no-trace preflight"; Action = { Invoke-LabK8sNoTraceCheck } },
     @{ Name = "lab terraform no-trace preflight"; Action = { Invoke-LabTerraformNoTraceCheck } }
@@ -554,7 +555,7 @@ Write-KeyValue "Release tag" $tag
 Write-KeyValue "Docker image" $ghcrVersion
 
 Write-Title "Startup Test Checks"
-$expectedStartupCheckCount = 13
+$expectedStartupCheckCount = 14
 $startupResults = @(Run-StartupChecks)
 $executedStartupCheckCount = @($startupResults).Count
 $passedStartupCheckCount = @($startupResults | Where-Object { $_.Ok }).Count

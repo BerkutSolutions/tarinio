@@ -89,19 +89,19 @@ jobs:
         run: |
           go run ./cmd/release-artifacts \
             -repo-root . \
-            -version 2.0.10-ci \
+            -version 1.5.0-ci \
             -commit "${GITHUB_SHA}" \
             -tag "ci-${GITHUB_RUN_ID}" \
             -docker-tags "ghcr.io/berkutsolutions/tarinio:ci-${GITHUB_RUN_ID}"
 
       - name: Verify release artifact files
         run: |
-          test -f build/release/2.0.10-ci/release-manifest.json
-          test -f build/release/2.0.10-ci/signature.json
-          test -f build/release/2.0.10-ci/checksums.txt
-          test -f build/release/2.0.10-ci/sbom.cdx.json
-          test -f build/release/2.0.10-ci/provenance.json
+          test -f build/release/1.5.0-ci/release-manifest.json
+          test -f build/release/1.5.0-ci/signature.json
+          test -f build/release/1.5.0-ci/checksums.txt
+          test -f build/release/1.5.0-ci/sbom.cdx.json
+          test -f build/release/1.5.0-ci/provenance.json
 
       - name: Verify release artifact checksums and signature
         run: |
-          go run ./cmd/release-artifacts-verify -output build/release/2.0.10-ci
+          go run ./cmd/release-artifacts-verify -output build/release/1.5.0-ci

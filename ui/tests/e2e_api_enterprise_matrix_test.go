@@ -37,7 +37,6 @@ func TestE2EAPIEnterpriseMatrix(t *testing.T) {
 	t.Run("EnterpriseAdminEndpoints", func(t *testing.T) {
 		paths := []string{
 			"/api/administration/enterprise",
-			"/api/administration/enterprise/scim-tokens",
 			"/api/administration/support-bundle",
 		}
 		for _, path := range paths {
@@ -63,10 +62,13 @@ func TestE2EAPIEnterpriseMatrix(t *testing.T) {
 		if scriptsResp.StatusCode != http.StatusOK {
 			t.Fatalf("scripts catalog failed: status=%d body=%s", scriptsResp.StatusCode, mustReadBody(t, scriptsResp.Body))
 		}
-		var scripts []map[string]any
-		if err := json.NewDecoder(scriptsResp.Body).Decode(&scripts); err != nil {
+		var catalog struct {
+			Scripts []map[string]any `json:"scripts"`
+		}
+		if err := json.NewDecoder(scriptsResp.Body).Decode(&catalog); err != nil {
 			t.Fatalf("decode scripts catalog: %v", err)
 		}
+		scripts := catalog.Scripts
 		if len(scripts) == 0 {
 			t.Skip("no administration scripts in catalog")
 		}
@@ -78,7 +80,9 @@ func TestE2EAPIEnterpriseMatrix(t *testing.T) {
 		runResp := postJSON(t, client, requestBaseURL+"/api/administration/scripts/"+scriptID+"/run", requestHostOverride, map[string]any{
 			"input": map[string]any{},
 		})
-		assertAnyStatus(t, runResp, "run script", http.StatusOK, http.StatusCreated, http.StatusAccepted, http.StatusBadRequest)
+		if runResp.StatusCode != http.StatusOK && runResp.StatusCode != http.StatusCreated && runResp.StatusCode != http.StatusAccepted && runResp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("run script unexpected status=%d body=%s", runResp.StatusCode, mustReadBody(t, runResp.Body))
+		}
 
 		if runResp.StatusCode == http.StatusOK || runResp.StatusCode == http.StatusCreated || runResp.StatusCode == http.StatusAccepted {
 			var payload map[string]any

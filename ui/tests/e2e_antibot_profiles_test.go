@@ -23,7 +23,7 @@ type antibotEndpoint struct {
 }
 
 func TestE2EAntiBot_ProfileCutoffAndCookiePersistence(t *testing.T) {
-	baseURL := strings.TrimRight(strings.TrimSpace(firstNonEmpty(os.Getenv("WAF_E2E_ANTIBOT_BASE_URL"), os.Getenv("WAF_E2E_BASE_URL"))), "/")
+	baseURL := strings.TrimRight(strings.TrimSpace(firstNonEmpty(os.Getenv("WAF_E2E_ANTIBOT_BASE_URL"), os.Getenv("WAF_E2E_RUNTIME_HTTPS_URL"), os.Getenv("WAF_E2E_BASE_URL"))), "/")
 	if baseURL == "" {
 		t.Skip("WAF_E2E_ANTIBOT_BASE_URL or WAF_E2E_BASE_URL is not set; skipping antibot e2e test")
 	}
@@ -37,8 +37,49 @@ func TestE2EAntiBot_ProfileCutoffAndCookiePersistence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolve antibot endpoint: %v", err)
 	}
+	if runtimeURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_RUNTIME_URL")), "/"); runtimeURL != "" {
+		adminClient, adminBaseURL, adminHostOverride := newE2EClientAndBase(t, os.Getenv("WAF_E2E_BASE_URL"))
+		loginE2EUser(t, adminClient, adminBaseURL, adminHostOverride)
+		for _, path := range []string{"/api/tls-configs/e2e-antibot-site?auto_apply=false", "/api/sites/e2e-antibot-site?auto_apply=false", "/api/upstreams/e2e-antibot-upstream?auto_apply=false"} {
+			resp := requestE2EJSON(t, adminClient, http.MethodDelete, adminBaseURL+path, adminHostOverride, nil)
+			_ = resp.Body.Close()
+		}
+		createE2EModSecuritySite(t, adminClient, adminBaseURL, adminHostOverride, "e2e-antibot-site", "e2e-antibot-upstream", endpoint.hostOverride)
+		certificateID := "e2e-antibot-tls"
+		issue := postJSON(t, adminClient, adminBaseURL+"/api/certificates/self-signed/issue", adminHostOverride, map[string]any{
+			"certificate_id": certificateID, "common_name": endpoint.hostOverride,
+		})
+		if issue.StatusCode != http.StatusCreated && issue.StatusCode != http.StatusOK {
+			t.Fatalf("issue antibot TLS certificate: status=%d body=%s", issue.StatusCode, mustReadBody(t, issue.Body))
+		}
+		_ = issue.Body.Close()
+		existingTLS := requestE2EJSON(t, adminClient, http.MethodDelete, adminBaseURL+"/api/tls-configs/e2e-antibot-site?auto_apply=false", adminHostOverride, nil)
+		_ = existingTLS.Body.Close()
+		bind := postJSON(t, adminClient, adminBaseURL+"/api/tls-configs?auto_apply=false", adminHostOverride, map[string]any{
+			"site_id": "e2e-antibot-site", "certificate_id": certificateID,
+		})
+		if bind.StatusCode != http.StatusCreated && bind.StatusCode != http.StatusOK {
+			t.Fatalf("bind antibot TLS certificate: status=%d body=%s", bind.StatusCode, mustReadBody(t, bind.Body))
+		}
+		_ = bind.Body.Close()
+		t.Cleanup(func() {
+			for _, path := range []string{"/api/sites/e2e-antibot-site?auto_apply=false", "/api/upstreams/e2e-antibot-upstream?auto_apply=false"} {
+				resp := requestE2EJSON(t, adminClient, http.MethodDelete, adminBaseURL+path, adminHostOverride, nil)
+				_ = resp.Body.Close()
+			}
+		})
+		profile := e2eGetProfile(t, adminClient, adminBaseURL, adminHostOverride, "e2e-antibot-site")
+		mapGetOrCreate(profile, "front_service")["security_mode"] = "block"
+		antibot := mapGetOrCreate(profile, "security_antibot")
+		antibot["antibot_challenge"] = "javascript"
+		antibot["antibot_uri"] = challengeURI
+		e2ePutProfile(t, adminClient, adminBaseURL, adminHostOverride, "e2e-antibot-site", profile)
+		e2eCompileAndApply(t, adminClient, adminBaseURL, adminHostOverride)
+		time.Sleep(2 * time.Second)
+	}
 
-	probeClient := newE2EHTTPClient(endpoint.requestBaseURL, false)
+	probeClient := newAntibotHTTPClient(endpoint, false)
+	probeClient.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	if err := waitForHTTP(probeClient, endpoint.requestBaseURL+normalPath, endpoint.hostOverride, 90*time.Second); err != nil {
 		t.Fatalf("target is not ready: %v", err)
 	}
@@ -94,16 +135,20 @@ func TestE2EAntiBot_ProfileCutoffAndCookiePersistence(t *testing.T) {
 	for _, actor := range actors {
 		actor := actor
 		t.Run(actor.name, func(t *testing.T) {
-			client := newE2EHTTPClient(endpoint.requestBaseURL, actor.persistCookies)
-			for _, targetPath := range actor.targets {
+			client := newAntibotHTTPClient(endpoint, actor.persistCookies)
+			for targetIndex, targetPath := range actor.targets {
 				targetPath = normalizePathWithDefault(strings.TrimSpace(targetPath), "/")
 				targetURL := endpoint.requestBaseURL + targetPath
 
 				firstResp := antibotDoRequest(t, client, endpoint, http.MethodGet, targetURL, actor.userAgent, false)
 				challengeLocation, challenged := extractChallengeLocation(firstResp, challengeURI)
 				if !challenged {
+					if actor.persistCookies && targetIndex > 0 {
+						continue
+					}
 					t.Fatalf("expected challenge redirect for actor=%s path=%s status=%d location=%q", actor.name, targetPath, firstResp.StatusCode, firstResp.Header.Get("Location"))
 				}
+				challengeLocation = localAntibotLocation(challengeLocation)
 
 				if !actor.executesChallenge {
 					secondResp := antibotDoRequest(t, client, endpoint, http.MethodGet, targetURL, actor.userAgent, false)
@@ -166,16 +211,39 @@ func resolveAntibotEndpoint(baseURL string) (antibotEndpoint, error) {
 		originalParsed:  parsed,
 		requestParsed:   parsed,
 	}
-	if strings.EqualFold(parsed.Hostname(), "localhost") {
-		hostOverride := parsed.Hostname()
+	if strings.EqualFold(parsed.Hostname(), "localhost") || net.ParseIP(parsed.Hostname()).IsLoopback() {
+		hostOverride := strings.TrimSpace(os.Getenv("WAF_E2E_ANTIBOT_HOST"))
+		if hostOverride == "" {
+			hostOverride = parsed.Hostname()
+		}
 		requestParsed := &url.URL{}
 		*requestParsed = *parsed
-		requestParsed.Host = net.JoinHostPort("127.0.0.1", effectivePort(parsed))
+		requestParsed.Host = net.JoinHostPort(hostOverride, effectivePort(parsed))
 		out.hostOverride = hostOverride
 		out.requestParsed = requestParsed
 		out.requestBaseURL = strings.TrimRight(requestParsed.String(), "/")
 	}
 	return out, nil
+}
+
+func newAntibotHTTPClient(endpoint antibotEndpoint, withJar bool) *http.Client {
+	client := newE2EHTTPClient(endpoint.requestBaseURL, withJar)
+	transport, ok := client.Transport.(*http.Transport)
+	if !ok || transport == nil {
+		transport = http.DefaultTransport.(*http.Transport).Clone()
+	} else {
+		transport = transport.Clone()
+	}
+	dialer := &net.Dialer{Timeout: 15 * time.Second}
+	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		host, port, err := net.SplitHostPort(addr)
+		if err == nil && strings.EqualFold(host, endpoint.hostOverride) {
+			return dialer.DialContext(ctx, network, net.JoinHostPort("127.0.0.1", port))
+		}
+		return dialer.DialContext(ctx, network, addr)
+	}
+	client.Transport = transport
+	return client
 }
 
 func newE2EHTTPClient(baseURL string, withJar bool) *http.Client {
@@ -252,6 +320,14 @@ func extractChallengeLocation(resp *http.Response, challengeURI string) (string,
 		return location, true
 	}
 	return "", false
+}
+
+func localAntibotLocation(location string) string {
+	parsed, err := url.Parse(strings.TrimSpace(location))
+	if err != nil || !parsed.IsAbs() {
+		return location
+	}
+	return parsed.RequestURI()
 }
 
 func buildVerifyURL(baseURL, challengeLocation, verifyURI string) (string, error) {

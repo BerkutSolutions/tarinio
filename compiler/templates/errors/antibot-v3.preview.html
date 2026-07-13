@@ -63,6 +63,7 @@ h1{font-size:clamp(20px,4vw,28px);font-weight:800;letter-spacing:-.02em;color:#f
   <div class="footer" id="footer-txt"></div>
 </div>
 <script>
+  var verifyURI = "/__waf_antibot_verify";
 (function(){
   var I={
     en:{badge:"Security Scan",title:"Identity Verification",sub:"Tarinio WAF is verifying your browser. This is a one-time automated check.",steps:["TLS handshake","Browser fingerprint","Threat analysis","Access token","Redirect"],stOk:"Verified",stRun:"Scanning",stWait:"Pending",stDone:"Complete",footer:'Protected by <a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener">Tarinio WAF</a> &nbsp;·&nbsp; Do not refresh this page'},
@@ -103,7 +104,7 @@ h1{font-size:clamp(20px,4vw,28px);font-weight:800;letter-spacing:-.02em;color:#f
     if(current<steps.length){renderRows(current);setTimeout(advance,timings[current]-timings[current-1]);}
     else{
       renderRows(steps.length);
-      if(!isPreview){setTimeout(function(){location.reload();},600);}
+      if(!isPreview){setTimeout(function(){window.location.replace(verifyURI);},600);}
     }
   }
   setTimeout(advance,timings[0]);

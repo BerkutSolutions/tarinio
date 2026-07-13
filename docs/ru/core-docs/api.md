@@ -166,6 +166,31 @@
 - `PUT /core-docs/api/tls-configs/{siteID}`
 - `DELETE /core-docs/api/tls-configs/{siteID}`
 
+## Контракт обновления связей сервиса
+
+`PUT` — полная замена переданного ресурса, а не неявный merge со старой
+записью. Идентификатор в URL является каноническим: `PUT /api/sites/{id}` не
+переименовывает `site.id`, а `PUT /api/tls-configs/{siteID}` всегда привязывает
+конфигурацию к `siteID` из URL.
+
+- Для смены upstream используется явный `PUT /api/upstreams/{id}`; ресурс
+  остаётся привязанным к своему `site_id` и не переносится на другой site из-за
+  совпадения host:port.
+- Для смены certificate используется явный `PUT /api/tls-configs/{siteID}` с
+  новым `certificate_id`. Отсутствующий certificate возвращает validation error;
+  старый certificate не подставляется автоматически.
+- Certificate должен покрывать `primary_host` site через Common Name или SAN
+  (допустим wildcard первого уровня). Несовпадение возвращает
+  `certificate-host mismatch`.
+- Omitted reference не наследуется неявно из другой записи: API использует
+  собственный контракт ресурса и возвращает ошибку для отсутствующей обязательной
+  ссылки.
+- `PATCH` для site/upstream/TLS/certificate не поддерживается. Для смены
+  identity используйте явный create/migrate/delete workflow.
+
+После любой успешной мутации control-plane создаёт новую revision; apply
+использует только сохранённый snapshot revision, а не позднее mutable state.
+
 ### Автопродление TLS
 
 - `GET /core-docs/api/tls/auto-renew`

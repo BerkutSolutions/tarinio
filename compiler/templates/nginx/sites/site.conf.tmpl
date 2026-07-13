@@ -168,9 +168,6 @@ server {
     location ^~ /static/ {
         allow all;
         proxy_intercept_errors off;
-{{- if .IsManagementSite }}
-        modsecurity off;
-{{- end }}
 {{- if .PassHostHeader }}
         proxy_set_header Host $http_host;
 {{- end }}
@@ -221,7 +218,17 @@ server {
     location = /preview/511 { allow all; modsecurity off; default_type text/html; alias /etc/waf/errors/_global/511.html; }
 {{- end }}
 
-{{- if not .IsManagementSite }}
+{{- if .IsManagementSite }}
+    location ^~ /api/ {
+        proxy_intercept_errors off;
+        modsecurity off;
+        proxy_pass {{ .ManagementAPIProxyTarget }};
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+{{- else }}
     location ^~ /api/ {
         proxy_intercept_errors off;
 {{- if and (not .UseEasyConfig) (not .IsManagementSite) }}
@@ -254,4 +261,3 @@ server {
         proxy_pass {{ .ProxyPassTarget }};
     }
 }
-

@@ -21,17 +21,17 @@ type easySiteData struct {
 	UseCORS               bool
 	CORSAllowedOrigins    string
 
-	ReverseProxyCustomHost string
-	ReverseProxySSLSNI     bool
-	ReverseProxySSLSNIName string
-	ReverseProxyWebsocket  bool
-	ReverseProxyKeepalive  bool
-	PassHostHeader         bool
-	SendXForwardedFor      bool
-	SendXForwardedProto    bool
-	SendXRealIP            bool
-	RateLimitBanSeconds    int
-	AdminBypassPathPattern string
+	ReverseProxyCustomHost       string
+	ReverseProxySSLSNI           bool
+	ReverseProxySSLSNIName       string
+	ReverseProxyWebsocket        bool
+	ReverseProxyKeepalive        bool
+	PassHostHeader               bool
+	SendXForwardedFor            bool
+	SendXForwardedProto          bool
+	SendXRealIP                  bool
+	RateLimitBanSeconds          int
+	AdminBypassPathPattern       string
 	ModSecurityBypassPathPattern string
 
 	AuthEnabled            bool
@@ -125,9 +125,9 @@ type antibotChallengePageData struct {
 }
 
 type authGatePageData struct {
-	BasicVerifyURI string
-	TokenVerifyURI string
-	UseBasic       bool
+	BasicVerifyURI  string
+	TokenVerifyURI  string
+	UseBasic        bool
 	UseServiceToken bool
 }
 

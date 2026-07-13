@@ -346,7 +346,7 @@
   "app.sites": "Услуге",
   "app.tls": "ТЛС / сертификати",
   "app.user.noRoles": "Нема улога",
-  "app.version": "в1.4.9",
+  "app.version": "в1.5.0",
   "auth.2fa.challengeMissing": "2ФА изазов недостаје. Пријавите се поново.",
   "auth.2fa.code": "2ФА код",
   "auth.2fa.codeRequired": "Потребан је 2ФА код",
@@ -2312,4 +2312,16 @@
   "sites.easy.upstream.healthCheckPassive": "Пасивна провера исправности",
   "sites.easy.tab.httpheaders.title": "HTTP и заглавља",
   "sites.easy.tab.httpheaders.subtitle": "Методе, протоколи и заглавља"
+  ,"settings.tabs.managementHosts": "Hostovi upravljanja"
+  ,"settings.managementHosts.title": "Hostovi upravljanja"
+  ,"settings.managementHosts.subtitle": "Izričiti javni hostovi za WAF rute samoupravljanja."
+  ,"settings.managementHosts.warning": "Sačuvajte izmene, zatim izvršite compile/apply revizije. Autentikacija i RBAC ostaju aktivni."
+  ,"settings.managementHosts.label": "Jedan DNS naziv ili IP adresa po redu"
+  ,"settings.managementHosts.ready": "Trajna konfiguracija je aktivna."
+  ,"settings.managementHosts.setupRequired": "Potrebno je podešavanje. Ako panel nije dostupan, koristite interni CLI."
+  ,"settings.managementHosts.saved": "Hostovi upravljanja su sačuvani."
+  ,"settings.managementHosts.applyRequired": "Hostovi su sačuvani. Izvršite compile/apply za aktiviranje."
+  ,"settings.managementHosts.drift": "Upozorenje: aktivni runtime artefakt nema očekivani safeguard upravljanja. Koristite interni CLI i primenite ispravljenu reviziju."
+  ,"sites.tls.confirmRebind": "Zameniti TLS vezu sertifikata za {{site}} sertifikatom {{certificate}}?"
+  ,"sites.tls.rebindCancelled": "TLS ponovno povezivanje je otkazano."
 }

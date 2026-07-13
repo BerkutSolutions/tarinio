@@ -42,12 +42,9 @@ func TestRenderSiteUpstreamArtifacts_ManagementSiteRoutesAPIToControlPlane(t *te
 	}
 
 	content := string(siteArtifact.Content)
-	if strings.Contains(content, "location ^~ /api/ {") {
-		t.Fatal("did not expect management site config to declare catch-all /api location in site template")
-	}
-	apiStart := strings.Index(content, "include /etc/waf/nginx/easy-locations/control-plane-access.conf;")
+	apiStart := strings.Index(content, "location ^~ /api/ {")
 	if apiStart < 0 {
-		t.Fatal("expected management site config to include easy-locations before root location")
+		t.Fatal("expected management site config to declare a dedicated API location")
 	}
 	rootStart := strings.Index(content, "location / {")
 	if rootStart < 0 || rootStart <= apiStart {
@@ -56,11 +53,11 @@ func TestRenderSiteUpstreamArtifacts_ManagementSiteRoutesAPIToControlPlane(t *te
 
 	apiBlock := content[apiStart:rootStart]
 	rootBlock := content[rootStart:]
-	if !strings.Contains(apiBlock, "include /etc/waf/nginx/easy-locations/control-plane-access.conf;") {
-		t.Fatal("expected management site config to include dedicated easy-locations for management APIs")
+	if !strings.Contains(apiBlock, "modsecurity off;") {
+		t.Fatal("expected management API location to disable ModSecurity")
 	}
-	if strings.Contains(apiBlock, "location ^~ /api/") {
-		t.Fatal("did not expect management site management-api section to define catch-all /api routing in site template")
+	if !strings.Contains(apiBlock, "proxy_pass http://control-plane:8080;") {
+		t.Fatal("expected management API location to proxy to control-plane")
 	}
 	if !strings.Contains(rootBlock, "proxy_pass http://site_control-plane-access_upstream_mgmt-upstream;") {
 		t.Fatal("expected management site root location to keep proxying to the UI upstream")

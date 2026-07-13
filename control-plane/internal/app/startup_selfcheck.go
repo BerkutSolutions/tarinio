@@ -122,7 +122,7 @@ func (a *App) runStartupSelfTestUnlocked(ctx context.Context) error {
 	if _, err := a.CertificateStore.Create(certificates.Certificate{
 		ID:         certUpdatedID,
 		CommonName: "updated-" + createdSite.PrimaryHost,
-		SANList:    []string{"updated-" + createdSite.PrimaryHost},
+		SANList:    []string{createdSite.PrimaryHost, "updated-" + createdSite.PrimaryHost},
 		Status:     "active",
 		NotBefore:  now.Add(-time.Hour).Format(time.RFC3339),
 		NotAfter:   now.Add(48 * time.Hour).Format(time.RFC3339),

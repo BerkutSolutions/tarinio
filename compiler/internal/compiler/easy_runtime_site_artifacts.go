@@ -150,7 +150,7 @@ func renderEasySiteArtifacts(site SiteInput, profile EasyProfileInput) ([]Artifa
 		MTLSSnippet:                  buildMTLSServerSnippet(profile.MTLS),
 		UpstreamMTLSSnippet:          buildUpstreamMTLSSnippet(profile.UpstreamMTLS),
 		UseModSecurity:               profile.UseModSecurity,
-		UseModSecurityEasyFile:       profile.UseModSecurity,
+		UseModSecurityEasyFile:       profile.UseModSecurity && !isManagementSite(site),
 		ModSecurityEasyRulesOn:       profile.UseModSecurity,
 		ModSecurityEasyRules: buildEasyModSecurityRules(
 			site.ID,

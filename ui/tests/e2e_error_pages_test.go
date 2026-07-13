@@ -207,6 +207,7 @@ func e2eCompileAndApply(t *testing.T, client *http.Client, requestBaseURL, reque
 	}
 	var compilePayload map[string]any
 	if err := json.Unmarshal(body, &compilePayload); err != nil {
+		t.Logf("decode compile response: %v; body=%s", err, string(body))
 		return ""
 	}
 	// API возвращает {"revision_id": "..."} или {"revision": {"id": "..."}}
@@ -217,6 +218,10 @@ func e2eCompileAndApply(t *testing.T, client *http.Client, requestBaseURL, reque
 		}
 	}
 	if revID == "" {
+		revID, _ = compilePayload["id"].(string)
+	}
+	if revID == "" {
+		t.Logf("compile response did not contain a revision id: %s", string(body))
 		return ""
 	}
 

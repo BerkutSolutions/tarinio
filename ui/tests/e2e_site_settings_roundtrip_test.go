@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -43,6 +44,21 @@ func TestE2ESiteSettingsRoundtrip(t *testing.T) {
 
 	// ── step 1: create site + upstream ───────────────────────────────────────
 	t.Run("Setup", func(t *testing.T) {
+		siteResp := postJSON(t, client, requestBaseURL+"/api/sites?auto_apply=false", requestHostOverride, map[string]any{
+			"id":                  testSiteID,
+			"primary_host":        "e2e-roundtrip.test",
+			"enabled":             true,
+			"default_upstream_id": testUpstreamID,
+			"listen_http":         true,
+			"listen_https":        false,
+			"use_easy_config":     true,
+		})
+		body, _ := io.ReadAll(siteResp.Body)
+		_ = siteResp.Body.Close()
+		if siteResp.StatusCode != http.StatusCreated && siteResp.StatusCode != http.StatusOK {
+			t.Fatalf("create site: status=%d body=%s", siteResp.StatusCode, string(body))
+		}
+
 		upstreamResp := postJSON(t, client, requestBaseURL+"/api/upstreams?auto_apply=false", requestHostOverride, map[string]any{
 			"id":               testUpstreamID,
 			"site_id":          testSiteID,
@@ -53,33 +69,29 @@ func TestE2ESiteSettingsRoundtrip(t *testing.T) {
 			"base_path":        "/",
 			"pass_host_header": true,
 		})
-		body, _ := io.ReadAll(upstreamResp.Body)
+		body, _ = io.ReadAll(upstreamResp.Body)
 		_ = upstreamResp.Body.Close()
 		if upstreamResp.StatusCode != http.StatusCreated && upstreamResp.StatusCode != http.StatusOK {
 			t.Fatalf("create upstream: status=%d body=%s", upstreamResp.StatusCode, string(body))
-		}
-
-		siteResp := postJSON(t, client, requestBaseURL+"/api/sites?auto_apply=false", requestHostOverride, map[string]any{
-			"id":                  testSiteID,
-			"primary_host":        "e2e-roundtrip.test",
-			"enabled":             true,
-			"default_upstream_id": testUpstreamID,
-			"listen_http":         true,
-			"listen_https":        false,
-			"use_easy_config":     true,
-		})
-		body, _ = io.ReadAll(siteResp.Body)
-		_ = siteResp.Body.Close()
-		if siteResp.StatusCode != http.StatusCreated && siteResp.StatusCode != http.StatusOK {
-			t.Fatalf("create site: status=%d body=%s", siteResp.StatusCode, string(body))
 		}
 	})
 
 	// ── helpers ───────────────────────────────────────────────────────────────
 
+	defaultResp := getWithAuth(t, client, requestBaseURL+"/api/easy-site-profiles/"+testSiteID, requestHostOverride)
+	defer defaultResp.Body.Close()
+	if defaultResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(defaultResp.Body)
+		t.Fatalf("get default easy profile: status=%d body=%s", defaultResp.StatusCode, string(body))
+	}
+	var defaultProfile map[string]any
+	if err := json.NewDecoder(defaultResp.Body).Decode(&defaultProfile); err != nil {
+		t.Fatalf("decode default easy profile: %v", err)
+	}
+
 	saveProfile := func(t *testing.T, profile map[string]any) {
 		t.Helper()
-		resp := postJSON(t, client, requestBaseURL+"/api/easy-site-profiles/"+testSiteID, requestHostOverride, profile)
+		resp := postJSON(t, client, requestBaseURL+"/api/easy-site-profiles/"+testSiteID, requestHostOverride, mergeE2EProfile(defaultProfile, profile))
 		body, _ := io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
 		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
@@ -129,37 +141,46 @@ func TestE2ESiteSettingsRoundtrip(t *testing.T) {
 
 	// ── all-on profile ────────────────────────────────────────────────────────
 	allOnProfile := map[string]any{
-		"site_id":       testSiteID,
-		"security_mode": "block",
-		"allowed_methods": []string{"GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"},
-		"max_client_size": "50m",
-		"http2":           true,
-		"hsts_enabled":    true,
-		"hsts_max_age_seconds": 31536000,
-		"hsts_include_subdomains": true,
-		"hsts_preload": true,
-		"send_x_forwarded_for":   true,
-		"send_x_forwarded_proto": true,
-		"send_x_real_ip":         true,
-		"pass_host_header":        true,
-		"use_limit_conn": true,
-		"limit_conn_max_http1": 100,
-		"limit_conn_max_http2": 200,
-		"use_limit_req":  true,
-		"limit_req_rate": "60r/s",
-		"use_bad_behavior": true,
-		"bad_behavior_status_codes": []int{400, 403, 404, 429},
+		"site_id":          testSiteID,
+		"front_service":    map[string]any{"server_name": "e2e-roundtrip.test", "certificate_authority_server": "letsencrypt"},
+		"upstream_routing": map[string]any{"reverse_proxy_url": "/"},
+		"http_behavior":    map[string]any{"allowed_methods": []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}, "max_client_size": "50m"},
+		"security_behavior_and_limits": map[string]any{
+			"use_limit_conn": true, "limit_conn_max_http1": 100, "limit_conn_max_http2": 200, "limit_conn_max_http3": 200,
+			"use_limit_req": true, "limit_req_rate": "60r/s", "limit_req_url": "/",
+			"use_bad_behavior": true, "bad_behavior_status_codes": []int{400, 403, 404, 429}, "bad_behavior_ban_time_seconds": 300, "bad_behavior_threshold": 10, "bad_behavior_count_time_seconds": 60,
+			"ban_escalation_scope": "current_site",
+		},
+		"security_mode":                 "block",
+		"allowed_methods":               []string{"GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"},
+		"max_client_size":               "50m",
+		"http2":                         true,
+		"hsts_enabled":                  true,
+		"hsts_max_age_seconds":          31536000,
+		"hsts_include_subdomains":       true,
+		"hsts_preload":                  true,
+		"send_x_forwarded_for":          true,
+		"send_x_forwarded_proto":        true,
+		"send_x_real_ip":                true,
+		"pass_host_header":              true,
+		"use_limit_conn":                true,
+		"limit_conn_max_http1":          100,
+		"limit_conn_max_http2":          200,
+		"use_limit_req":                 true,
+		"limit_req_rate":                "60r/s",
+		"use_bad_behavior":              true,
+		"bad_behavior_status_codes":     []int{400, 403, 404, 429},
 		"bad_behavior_ban_time_seconds": 300,
 		"bad_behavior_threshold":        10,
-		"use_blacklist": true,
-		"blacklist_ip":  []string{"203.0.113.1"},
-		"blacklist_user_agent": []string{"badbot/1.0"},
-		"blacklist_uri": []string{"/wp-admin"},
-		"blacklist_country": []string{"XX"},
-		"use_custom_error_pages": true,
-		"disabled_error_pages":   []string{},
+		"use_blacklist":                 true,
+		"blacklist_ip":                  []string{"203.0.113.1"},
+		"blacklist_user_agent":          []string{"badbot/1.0"},
+		"blacklist_uri":                 []string{"/wp-admin"},
+		"blacklist_country":             []string{"XX"},
+		"use_custom_error_pages":        true,
+		"disabled_error_pages":          []string{},
 		"security_modsecurity": map[string]any{
-			"use_modsecurity":          true,
+			"use_modsecurity":             true,
 			"use_modsecurity_crs_plugins": false,
 		},
 		"security_antibot": map[string]any{
@@ -168,30 +189,38 @@ func TestE2ESiteSettingsRoundtrip(t *testing.T) {
 			"scanner_auto_ban_enabled":   true,
 			"antibot_challenge_template": "v1",
 		},
-		"use_hsts":                  true,
-		"referrer_policy":           "no-referrer-when-downgrade",
-		"proxy_cookie_flags":        "* SameSite=Lax",
-		"keep_upstream_headers":     []string{"*"},
+		"use_hsts":              true,
+		"referrer_policy":       "no-referrer-when-downgrade",
+		"proxy_cookie_flags":    "* SameSite=Lax",
+		"keep_upstream_headers": []string{"*"},
 	}
 
 	// ── all-off profile ───────────────────────────────────────────────────────
 	allOffProfile := map[string]any{
-		"site_id":         testSiteID,
-		"security_mode":   "transparent",
-		"allowed_methods": []string{"GET"},
-		"max_client_size": "10m",
-		"hsts_enabled":    false,
+		"site_id":          testSiteID,
+		"front_service":    map[string]any{"server_name": "e2e-roundtrip.test", "certificate_authority_server": "letsencrypt"},
+		"upstream_routing": map[string]any{"reverse_proxy_url": "/"},
+		"http_behavior":    map[string]any{"allowed_methods": []string{"GET"}, "max_client_size": "10m"},
+		"security_behavior_and_limits": map[string]any{
+			"limit_conn_max_http1": 100, "limit_conn_max_http2": 100, "limit_conn_max_http3": 100,
+			"limit_req_rate": "10r/s", "limit_req_url": "/", "bad_behavior_status_codes": []int{400},
+			"bad_behavior_threshold": 1, "bad_behavior_count_time_seconds": 60, "ban_escalation_scope": "current_site",
+		},
+		"security_mode":          "transparent",
+		"allowed_methods":        []string{"GET"},
+		"max_client_size":        "10m",
+		"hsts_enabled":           false,
 		"send_x_forwarded_for":   false,
 		"send_x_forwarded_proto": false,
 		"send_x_real_ip":         false,
-		"use_limit_conn": false,
-		"use_limit_req":  false,
-		"use_bad_behavior": false,
-		"use_blacklist":    false,
-		"blacklist_ip":     []string{},
-		"blacklist_user_agent": []string{},
-		"blacklist_uri":    []string{},
-		"blacklist_country": []string{},
+		"use_limit_conn":         false,
+		"use_limit_req":          false,
+		"use_bad_behavior":       false,
+		"use_blacklist":          false,
+		"blacklist_ip":           []string{},
+		"blacklist_user_agent":   []string{},
+		"blacklist_uri":          []string{},
+		"blacklist_country":      []string{},
 		"use_custom_error_pages": false,
 		"security_modsecurity": map[string]any{
 			"use_modsecurity": false,
@@ -284,22 +313,31 @@ func TestE2ESiteSettingsRoundtrip(t *testing.T) {
 	t.Run("Round4_SecurityModes", func(t *testing.T) {
 		// Базовый профиль со всеми модулями включёнными — только mode меняем
 		baseProfile := map[string]any{
-			"site_id":         testSiteID,
-			"allowed_methods": []string{"GET", "POST"},
-			"max_client_size": "10m",
-			"use_limit_conn":  true,
-			"limit_conn_max_http1": 80,
-			"use_limit_req":   true,
-			"limit_req_rate":  "30r/s",
-			"use_bad_behavior": true,
-			"bad_behavior_status_codes":    []int{400, 403, 429},
+			"site_id":          testSiteID,
+			"front_service":    map[string]any{"server_name": "e2e-roundtrip.test", "certificate_authority_server": "letsencrypt"},
+			"upstream_routing": map[string]any{"reverse_proxy_url": "/"},
+			"http_behavior":    map[string]any{"allowed_methods": []string{"GET", "POST"}, "max_client_size": "10m"},
+			"security_behavior_and_limits": map[string]any{
+				"use_limit_conn": true, "limit_conn_max_http1": 80, "limit_conn_max_http2": 80, "limit_conn_max_http3": 80,
+				"use_limit_req": true, "limit_req_rate": "30r/s", "limit_req_url": "/",
+				"use_bad_behavior": true, "bad_behavior_status_codes": []int{400, 403, 429}, "bad_behavior_ban_time_seconds": 300, "bad_behavior_threshold": 10, "bad_behavior_count_time_seconds": 60,
+				"ban_escalation_scope": "current_site",
+			},
+			"allowed_methods":               []string{"GET", "POST"},
+			"max_client_size":               "10m",
+			"use_limit_conn":                true,
+			"limit_conn_max_http1":          80,
+			"use_limit_req":                 true,
+			"limit_req_rate":                "30r/s",
+			"use_bad_behavior":              true,
+			"bad_behavior_status_codes":     []int{400, 403, 429},
 			"bad_behavior_ban_time_seconds": 300,
 			"bad_behavior_threshold":        10,
-			"use_blacklist":        true,
-			"blacklist_ip":         []string{"203.0.113.99"},
-			"blacklist_user_agent": []string{"evilbot/2.0"},
-			"blacklist_uri":        []string{"/evil"},
-			"blacklist_country":    []string{"XX"},
+			"use_blacklist":                 true,
+			"blacklist_ip":                  []string{"203.0.113.99"},
+			"blacklist_user_agent":          []string{"evilbot/2.0"},
+			"blacklist_uri":                 []string{"/evil"},
+			"blacklist_country":             []string{"XX"},
 			"security_modsecurity": map[string]any{
 				"use_modsecurity": true,
 			},
@@ -397,4 +435,25 @@ func TestE2ESiteSettingsRoundtrip(t *testing.T) {
 			assertInConf(t, siteConf, "proxy_intercept_errors off", "transparent_no_error_intercept")
 		})
 	})
+}
+
+func mergeE2EProfile(defaults, overrides map[string]any) map[string]any {
+	merged := make(map[string]any, len(defaults)+len(overrides))
+	for key, value := range defaults {
+		if nested, ok := value.(map[string]any); ok {
+			merged[key] = mergeE2EProfile(nested, nil)
+			continue
+		}
+		merged[key] = value
+	}
+	for key, value := range overrides {
+		overrideNested, isNested := value.(map[string]any)
+		defaultNested, hasDefaultNested := merged[key].(map[string]any)
+		if isNested && hasDefaultNested {
+			merged[key] = mergeE2EProfile(defaultNested, overrideNested)
+			continue
+		}
+		merged[key] = value
+	}
+	return merged
 }

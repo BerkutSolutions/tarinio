@@ -9,19 +9,19 @@ func TestRenderEasyArtifacts_AuthTokenOrderAndExclusions(t *testing.T) {
 	artifacts, err := RenderEasyArtifacts(
 		[]SiteInput{{ID: "site-a", Enabled: true, PrimaryHost: "a.example.com", ListenHTTP: true, DefaultUpstreamID: "site-a-upstream"}},
 		[]EasyProfileInput{{
-			SiteID:            "site-a",
-			SecurityMode:      "block",
-			AllowedMethods:    []string{"GET", "POST"},
-			MaxClientSize:     "50m",
-			UseAuthBasic:      true,
-			AuthMode:          "basic_or_token",
-			AuthOrder:         "antibot_first",
-			AuthBasicText:     "Restricted area",
-			AuthUsers:         []ServiceAuthUserInput{{Username: "admin", Password: "secret", Enabled: true}},
-			AuthServiceTokens: []ServiceAuthTokenInput{{ServiceName: "sentry-ingest", Token: "token-1", Enabled: true}},
+			SiteID:             "site-a",
+			SecurityMode:       "block",
+			AllowedMethods:     []string{"GET", "POST"},
+			MaxClientSize:      "50m",
+			UseAuthBasic:       true,
+			AuthMode:           "basic_or_token",
+			AuthOrder:          "antibot_first",
+			AuthBasicText:      "Restricted area",
+			AuthUsers:          []ServiceAuthUserInput{{Username: "admin", Password: "secret", Enabled: true}},
+			AuthServiceTokens:  []ServiceAuthTokenInput{{ServiceName: "sentry-ingest", Token: "token-1", Enabled: true}},
 			AuthExclusionRules: []AuthExclusionRuleInput{{Path: "/api/public/", Methods: []string{"GET", "OPTIONS"}}},
-			AntibotChallenge:  "javascript",
-			AntibotURI:        "/challenge",
+			AntibotChallenge:   "javascript",
+			AntibotURI:         "/challenge",
 		}},
 	)
 	if err != nil {
@@ -96,7 +96,7 @@ func TestRenderEasyArtifacts_ManagementSiteAuthBypassesWriteAPI(t *testing.T) {
 	}
 	byPath := mapArtifactsByPath(artifacts)
 	siteConf := byPath["nginx/easy/management-site.conf"]
-	if !strings.Contains(siteConf, `if ($waf_auth_exclusion_match ~* "^(?:DELETE|GET|HEAD|PATCH|POST|PUT):^/api/$")`) {
+	if !strings.Contains(siteConf, `if ($waf_auth_exclusion_match ~* "^(?:DELETE|GET|HEAD|PATCH|POST|PUT):^/api/administration$")`) || !strings.Contains(siteConf, `if ($waf_auth_exclusion_match ~* "^(?:DELETE|GET|HEAD|PATCH|POST|PUT):^/api/administration/$")`) {
 		t.Fatalf("expected management auth exclusion for write api paths, got: %s", siteConf)
 	}
 	if !strings.Contains(siteConf, `if ($waf_auth_exclusion_match ~* "^(?:DELETE|GET|HEAD|PATCH|POST|PUT):^/services$")`) {

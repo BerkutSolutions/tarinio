@@ -662,12 +662,19 @@ func startPeriodicL4GuardRefresh() {
 			intervalSeconds = parsed
 		}
 	}
+	lastFingerprint := l4GuardConfigFingerprint()
 	ticker := time.NewTicker(time.Duration(intervalSeconds) * time.Second)
 	go func() {
 		for range ticker.C {
+			fingerprint := l4GuardConfigFingerprint()
+			if fingerprint == lastFingerprint {
+				continue
+			}
 			if err := applyL4Guard(); err != nil {
 				fmt.Fprintf(os.Stderr, "waf-runtime-launcher periodic l4 guard reapply failed: %v\n", err)
+				continue
 			}
+			lastFingerprint = fingerprint
 		}
 	}()
 }

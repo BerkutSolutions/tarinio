@@ -1,4 +1,4 @@
-import { buildLoginChallengeUrl } from "./guard.js";
+import { buildLoginURL } from "./guard.js";
 
 const apiBase = window.WAF_API_BASE || "";
 let reloginInFlight = false;
@@ -37,7 +37,7 @@ async function hardRelogin(reason = "session_invalid") {
   }
   const currentPath = window.location.pathname || "/";
   if (!currentPath.startsWith("/login") && !currentPath.startsWith("/onboarding")) {
-    window.location.replace(buildLoginChallengeUrl(reason));
+    window.location.replace(buildLoginURL(reason));
   }
 }
 

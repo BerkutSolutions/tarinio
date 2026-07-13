@@ -82,6 +82,7 @@ h1{font-size:28px;font-weight:800;line-height:1.15;color:#f1f5f9;margin-bottom:1
   </div>
 </div>
 <script>
+  var verifyURI = "/__waf_antibot_verify";
 (function(){
   var dest=location.pathname||'/';
   var I={
@@ -155,7 +156,7 @@ h1{font-size:28px;font-weight:800;line-height:1.15;color:#f1f5f9;margin-bottom:1
       var delay=timings[current+1]-timings[current];
       setTimeout(advance,delay);
     } else {
-      if(!isPreview){setTimeout(function(){location.reload();},700);}
+      if(!isPreview){setTimeout(function(){window.location.replace(verifyURI);},700);}
     }
   }
   setTimeout(advance,timings[1]);

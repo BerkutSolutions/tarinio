@@ -14,6 +14,7 @@ type fakeExecutor struct {
 	runCommands  [][]string
 	outputErrors map[string]error
 	rules        map[string]bool
+	chainRules   map[string][]string
 	failDelete   map[string]int
 }
 
@@ -23,8 +24,19 @@ func (f *fakeExecutor) Run(name string, args ...string) error {
 	if f.rules == nil {
 		f.rules = map[string]bool{}
 	}
+	if f.chainRules == nil {
+		f.chainRules = map[string][]string{}
+	}
 	if len(args) >= 3 && args[1] == "-N" {
 		f.chains[args[2]] = true
+		return nil
+	}
+	if len(args) >= 3 && args[1] == "-F" {
+		f.chainRules[name+":"+args[2]] = nil
+		return nil
+	}
+	if len(args) >= 3 && args[1] == "-A" {
+		f.chainRules[name+":"+args[2]] = append(f.chainRules[name+":"+args[2]], strings.Join(args[3:], " "))
 		return nil
 	}
 	if len(args) >= 3 && args[1] == "-I" {
@@ -32,7 +44,7 @@ func (f *fakeExecutor) Run(name string, args ...string) error {
 		return nil
 	}
 	if len(args) >= 2 && args[1] == "-C" {
-		inserted := append([]string{name, args[0], "-I", args[2]}, args[3:]...)
+		inserted := append([]string{name, args[0], "-I", args[2], "1"}, args[3:]...)
 		if !f.rules[strings.Join(inserted, " ")] {
 			return errors.New("rule not found")
 		}
@@ -40,13 +52,14 @@ func (f *fakeExecutor) Run(name string, args ...string) error {
 	}
 	if len(args) >= 2 && args[1] == "-D" {
 		key := strings.Join(command, " ")
+		inserted := append([]string{name, args[0], "-I", args[2], "1"}, args[3:]...)
 		if f.failDelete != nil {
 			if remain, ok := f.failDelete[key]; ok && remain > 0 {
 				f.failDelete[key] = remain - 1
+				delete(f.rules, strings.Join(inserted, " "))
 				return errors.New("simulated delete race")
 			}
 		}
-		inserted := append([]string{name, args[0], "-I", args[2]}, args[3:]...)
 		delete(f.rules, strings.Join(inserted, " "))
 		return nil
 	}
@@ -59,7 +72,11 @@ func (f *fakeExecutor) Output(name string, args ...string) ([]byte, error) {
 		return nil, err
 	}
 	if len(args) == 3 && args[1] == "-S" && f.chains[args[2]] {
-		return []byte("-N " + args[2]), nil
+		lines := []string{"-N " + args[2]}
+		for _, rule := range f.chainRules[name+":"+args[2]] {
+			lines = append(lines, "-A "+args[2]+" "+rule)
+		}
+		return []byte(strings.Join(lines, "\n")), nil
 	}
 	return nil, errors.New("not found")
 }
@@ -75,7 +92,7 @@ func TestParsePorts_SortsAndDeduplicates(t *testing.T) {
 }
 
 func TestBootstrap_AutoFallsBackToInputWhenDockerUserMissing(t *testing.T) {
-	exec := &fakeExecutor{chains: map[string]bool{"INPUT": true, customChainName: true}, outputErrors: map[string]error{}}
+	exec := &fakeExecutor{chains: map[string]bool{"INPUT": true, customChainName: true}, outputErrors: map[string]error{}, chainRules: map[string][]string{}}
 	cfg := config{Enabled: true, ChainMode: "auto", ConnLimit: 50, RatePerSec: 30, RateBurst: 60, Ports: []int{80, 443}, Target: "DROP"}
 
 	if err := bootstrap(exec, cfg); err != nil {
@@ -124,9 +141,9 @@ func TestBootstrap_DockerUserUsesDestinationIP(t *testing.T) {
 func TestDeleteJumpRule_ToleratesConcurrentRemovalRace(t *testing.T) {
 	exec := &fakeExecutor{
 		chains:       map[string]bool{"INPUT": true, customChainName: true},
-		outputErrors: map[string]error{},
-		rules:        map[string]bool{},
-		failDelete:   map[string]int{},
+		outputErrors: map[string]error{}, chainRules: map[string][]string{},
+		rules:      map[string]bool{},
+		failDelete: map[string]int{},
 	}
 	rule := []string{"-p", "tcp", "-m", "multiport", "--dports", "80,443", "-j", customChainName}
 	inserted := append([]string{iptablesIPv4, "-w", "-I", "INPUT", "1"}, rule...)
@@ -136,6 +153,23 @@ func TestDeleteJumpRule_ToleratesConcurrentRemovalRace(t *testing.T) {
 
 	if err := deleteJumpRule(exec, iptablesIPv4, "INPUT", rule); err != nil {
 		t.Fatalf("deleteJumpRule should tolerate race: %v", err)
+	}
+}
+
+func TestBootstrap_RepeatedCallDoesNotRewriteMatchingRules(t *testing.T) {
+	exec := &fakeExecutor{chains: map[string]bool{"INPUT": true, customChainName: true}, outputErrors: map[string]error{}, chainRules: map[string][]string{}}
+	cfg := config{Enabled: true, ChainMode: "input", ConnLimit: 50, RatePerSec: 30, RateBurst: 60, Ports: []int{80, 443}, Target: "DROP"}
+	if err := bootstrap(exec, cfg); err != nil {
+		t.Fatalf("initial bootstrap: %v", err)
+	}
+	before := len(exec.runCommands)
+	if err := bootstrap(exec, cfg); err != nil {
+		t.Fatalf("repeated bootstrap: %v", err)
+	}
+	for _, command := range exec.runCommands[before:] {
+		if strings.Contains(strings.Join(command, " "), " -F ") || strings.Contains(strings.Join(command, " "), " -A ") || strings.Contains(strings.Join(command, " "), " -I ") {
+			t.Fatalf("matching bootstrap must not rewrite iptables, got %q", strings.Join(command, " "))
+		}
 	}
 }
 

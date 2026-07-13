@@ -132,7 +132,7 @@ export function mergeByID(primary, secondary) {
   for (const item of normalizeArray(primary)) {
     const id = String(item?.id || "").trim();
     const loweredID = id.toLowerCase();
-    const normalizedID = loweredID === "localhost" || loweredID === "control-plane" || loweredID === "ui" ? "control-plane-access" : loweredID;
+    const normalizedID = loweredID;
     if (!normalizedID) {
       continue;
     }
@@ -141,7 +141,7 @@ export function mergeByID(primary, secondary) {
   for (const item of normalizeArray(secondary)) {
     const id = String(item?.id || "").trim();
     const loweredID = id.toLowerCase();
-    const normalizedID = loweredID === "localhost" || loweredID === "control-plane" || loweredID === "ui" ? "control-plane-access" : loweredID;
+    const normalizedID = loweredID;
     if (!normalizedID || map.has(normalizedID)) {
       continue;
     }

@@ -175,7 +175,7 @@ func TestRenderEasyArtifacts_AdminBypassOnlyForManagementSites(t *testing.T) {
 	if siteConf == "" {
 		t.Fatal("expected easy site conf for management site")
 	}
-	if !strings.Contains(siteConf, `if ($uri ~* "^/(?:`) || !strings.Contains(siteConf, `dashboard(?:/.*)?`) || !strings.Contains(siteConf, `api/.*`) || !strings.Contains(siteConf, `static/.*`) {
+	if !strings.Contains(siteConf, `if ($uri ~* "^/(?:`) || !strings.Contains(siteConf, `dashboard(?:/.*)?`) || !strings.Contains(siteConf, `api/administration(?:/.*)?`) || !strings.Contains(siteConf, `static/.*`) {
 		t.Fatalf("expected admin bypass guard for management site, got: %s", siteConf)
 	}
 	if !strings.Contains(siteConf, `if ($waf_antibot_exclusion_match ~* "^(?:GET|HEAD):/static/") { set $waf_antibot_exception_guard 1; }`) {

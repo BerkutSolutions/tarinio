@@ -229,3 +229,48 @@ func TestUIContract_OnboardingAndSidebarMarkers(t *testing.T) {
 		}
 	}
 }
+
+func TestUIContract_SessionExpiryReturnsDirectlyToLogin(t *testing.T) {
+	files := []string{
+		filepath.Join("..", "app", "static", "js", "guard.js"),
+		filepath.Join("..", "app", "static", "js", "api.js"),
+		filepath.Join("..", "app", "static", "js", "login.js"),
+		filepath.Join("..", "app", "static", "js", "login-2fa.js"),
+		filepath.Join("..", "app", "login.html"),
+		filepath.Join("..", "app", "login-2fa.html"),
+	}
+	for _, file := range files {
+		raw, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatalf("read %s: %v", file, err)
+		}
+		if strings.Contains(string(raw), "/challenge?") || strings.Contains(string(raw), "buildLoginChallengeUrl") {
+			t.Fatalf("session recovery must not redirect management login through challenge: %s", file)
+		}
+	}
+	guard, err := os.ReadFile(files[0])
+	if err != nil {
+		t.Fatalf("read guard: %v", err)
+	}
+	if !strings.Contains(string(guard), "export function buildLoginURL") || !strings.Contains(string(guard), "secureAppUrl(`/login?${params.toString()}`)") {
+		t.Fatal("session recovery must construct a direct login URL")
+	}
+}
+
+func TestUIContract_LocalhostServiceIDIsNotRewrittenToLegacyManagementID(t *testing.T) {
+	files := []string{
+		filepath.Join("..", "app", "static", "js", "pages", "sites.routing-merge.js"),
+		filepath.Join("..", "app", "static", "js", "pages", "sites.service-policy-helpers.js"),
+		filepath.Join("..", "app", "static", "js", "pages", "sites.page-utilities.js"),
+	}
+	for _, file := range files {
+		raw, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatalf("read %s: %v", file, err)
+		}
+		content := string(raw)
+		if strings.Contains(content, `"localhost" ||`) && strings.Contains(content, `"control-plane-access"`) {
+			t.Fatalf("localhost must retain its persisted site ID instead of becoming control-plane-access: %s", file)
+		}
+	}
+}

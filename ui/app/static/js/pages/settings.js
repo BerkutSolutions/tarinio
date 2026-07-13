@@ -19,11 +19,13 @@ import {
 import { clearRuntimeAutoCheckTimer, setRuntimeAutoCheckTimer } from "./settings.runtime-timer.js";
 import { renderRuntimeData } from "./settings.runtime-render.js";
 import { bindSettingsActions } from "./settings.actions.js";
+import { bindManagementHostsPanel, renderManagementHostsPanel } from "./settings.management-hosts.js";
 
 const SETTINGS_TABS = [
   { id: "general", path: "/settings/general", labelKey: "settings.tabs.general", permissions: ["settings.general.read", "settings.general.write"] },
   { id: "storage", path: "/settings/storage", labelKey: "settings.tabs.storage", permissions: ["settings.storage.read", "settings.storage.write"] },
   { id: "security", path: "/settings/security", labelKey: "settings.tabs.security", permissions: ["settings.general.read", "settings.general.write"] },
+  { id: "management-hosts", path: "/settings/management-hosts", labelKey: "settings.tabs.managementHosts", permissions: ["settings.general.read", "settings.general.write"] },
   { id: "logging", path: "/settings/logging", labelKey: "settings.tabs.logging", permissions: ["settings.general.read", "settings.general.write", "settings.storage.read", "settings.storage.write"] },
   { id: "secrets", path: "/settings/secrets", labelKey: "settings.tabs.secrets", permissions: ["settings.general.read", "settings.general.write", "settings.storage.read", "settings.storage.write"] },
   { id: "about", path: "/settings/about", labelKey: "settings.tabs.about", permissions: ["settings.about.read"] },
@@ -386,6 +388,8 @@ export async function renderSettings(container, ctx) {
         </section>
       </div>
 
+      ${renderManagementHostsPanel(ctx)}
+
       <div class="settings-panel" data-settings-panel="about" hidden>
         <section class="waf-card">
           <div class="waf-card-head">
@@ -684,6 +688,7 @@ export async function renderSettings(container, ctx) {
 
   const selectedTab = currentTab.id;
   showTab(container, selectedTab);
+  await bindManagementHostsPanel(container, ctx, setAlert);
 
   try {
     const meta = await ctx.api.get("/api/app/meta");

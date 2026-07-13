@@ -677,7 +677,12 @@ func isValidModSecurityTarget(value string) bool {
 	}
 	parts := strings.SplitN(trimmed, ":", 2)
 	if len(parts) != 2 {
-		return false
+		switch strings.ToUpper(trimmed) {
+		case "REQUEST_URI", "REQUEST_BODY":
+			return true
+		default:
+			return false
+		}
 	}
 	collection := strings.ToUpper(strings.TrimSpace(parts[0]))
 	member := strings.TrimSpace(parts[1])

@@ -3,11 +3,7 @@ export function normalizeHost(value) {
 }
 
 export function normalizeSiteID(value) {
-  const normalized = String(value || "").trim().toLowerCase();
-  if (normalized === "localhost" || normalized === "control-plane" || normalized === "ui") {
-    return "control-plane-access";
-  }
-  return normalized;
+  return String(value || "").trim().toLowerCase();
 }
 const SERVICE_PROFILE_VALUES = ["strict", "balanced", "compat", "api", "public-edge"];
 

@@ -40,11 +40,8 @@ func TestRenderSiteUpstreamArtifacts_ManagementSiteRoutesAPIToControlPlaneFromEn
 	if content == "" {
 		t.Fatal("expected site artifact for env-configured management site")
 	}
-	if strings.Contains(content, "location ^~ /api/ {") {
-		t.Fatalf("did not expect env-configured management site to keep catch-all /api location in site template, got: %s", content)
-	}
-	if !strings.Contains(content, "include /etc/waf/nginx/easy-locations/ui.example.test.conf;") {
-		t.Fatalf("expected env-configured management site to include easy-locations for management APIs, got: %s", content)
+	if !containsAll(content, "location ^~ /api/ {", "modsecurity off;", "proxy_pass http://control-plane:8080;") {
+		t.Fatalf("expected env-configured management site to route API without ModSecurity, got: %s", content)
 	}
 }
 
@@ -83,11 +80,8 @@ func TestRenderSiteUpstreamArtifacts_ManagementSiteRoutesAPIToConfiguredManageme
 	if content == "" {
 		t.Fatal("expected site artifact for configured management site")
 	}
-	if strings.Contains(content, "location ^~ /api/ {") {
-		t.Fatalf("did not expect configured management site to keep catch-all /api location in site template, got: %s", content)
-	}
-	if !strings.Contains(content, "include /etc/waf/nginx/easy-locations/control-plane-access.conf;") {
-		t.Fatalf("expected configured management site to include easy-locations for management APIs, got: %s", content)
+	if !containsAll(content, "location ^~ /api/ {", "modsecurity off;", "proxy_pass http://control-plane-test:8080;") {
+		t.Fatalf("expected configured management site to route API without ModSecurity, got: %s", content)
 	}
 }
 
@@ -100,7 +94,7 @@ func containsAll(content string, parts ...string) bool {
 	return true
 }
 
-func TestRenderSiteUpstreamArtifacts_LocalhostStaysRegularSiteWithoutExplicitManagementID(t *testing.T) {
+func TestRenderSiteUpstreamArtifacts_LocalhostUsesBuiltInManagementRouting(t *testing.T) {
 	t.Setenv("CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID", "control-plane-access")
 
 	artifacts, err := RenderSiteUpstreamArtifacts(
@@ -129,19 +123,12 @@ func TestRenderSiteUpstreamArtifacts_LocalhostStaysRegularSiteWithoutExplicitMan
 	for _, artifact := range artifacts {
 		if artifact.Path == "nginx/sites/localhost.conf" {
 			content = string(artifact.Content)
-			break
 		}
 	}
 	if content == "" {
 		t.Fatal("expected site artifact for localhost site")
 	}
-	if !containsAll(content,
-		"location ^~ /api/ {",
-		"proxy_pass http://site_localhost_upstream_site-upstream;",
-	) {
-		t.Fatalf("expected localhost site to keep /api on its own upstream, got: %s", content)
-	}
-	if strings.Contains(content, "proxy_pass http://control-plane:8080;") {
-		t.Fatalf("expected localhost site to avoid management API upstream, got: %s", content)
+	if !containsAll(content, "location ^~ /api/ {", "modsecurity off;", "proxy_pass http://control-plane:8080;") {
+		t.Fatalf("expected localhost management API routing without ModSecurity, got: %s", content)
 	}
 }

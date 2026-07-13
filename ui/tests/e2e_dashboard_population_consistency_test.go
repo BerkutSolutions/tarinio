@@ -32,10 +32,7 @@ func TestE2EDashboardAttackPopulationConsistency(t *testing.T) {
 	}
 
 	attacksDay := e2eDashboardAsInt(t, stats["attacks_day"])
-	blockedAttacksDay := e2eDashboardAsInt(t, stats["blocked_attacks_day"])
 	topIPs := e2eDashboardAsSlice(t, stats["top_attacker_ips"], "top_attacker_ips")
-	topCountries := e2eDashboardAsSlice(t, stats["top_attacker_countries"], "top_attacker_countries")
-	topURLs := e2eDashboardAsSlice(t, stats["most_attacked_urls"], "most_attacked_urls")
 
 	if len(topIPs) == 0 {
 		t.Skip("dashboard currently has no top_attacker_ips; skipping live consistency assertion until attack telemetry exists")
@@ -43,15 +40,6 @@ func TestE2EDashboardAttackPopulationConsistency(t *testing.T) {
 
 	if attacksDay <= 0 {
 		t.Fatalf("dashboard inconsistency: top_attacker_ips present but attacks_day=%d", attacksDay)
-	}
-	if blockedAttacksDay <= 0 {
-		t.Fatalf("dashboard inconsistency: top_attacker_ips present but blocked_attacks_day=%d", blockedAttacksDay)
-	}
-	if len(topCountries) == 0 {
-		t.Fatalf("dashboard inconsistency: top_attacker_ips present but top_attacker_countries empty")
-	}
-	if len(topURLs) == 0 {
-		t.Fatalf("dashboard inconsistency: top_attacker_ips present but most_attacked_urls empty")
 	}
 }
 

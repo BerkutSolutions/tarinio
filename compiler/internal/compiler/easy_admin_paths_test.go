@@ -9,16 +9,16 @@ import (
 func TestEasyAdminBypassPathPatternForSite_Localhost(t *testing.T) {
 	t.Setenv("CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID", "control-plane-access")
 	pattern := easyAdminBypassPathPatternForSite(SiteInput{ID: "localhost", PrimaryHost: "localhost"})
-	if pattern != "^$" {
-		t.Fatalf("expected localhost to stay a regular site unless configured explicitly, got %q", pattern)
+	if pattern == "^$" {
+		t.Fatalf("expected default compose localhost to be treated as management site, got %q", pattern)
 	}
 }
 
 func TestEasyModSecurityBypassPathPatternForSite_Localhost(t *testing.T) {
 	t.Setenv("CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID", "control-plane-access")
 	pattern := easyModSecurityBypassPathPatternForSite(SiteInput{ID: "localhost", PrimaryHost: "localhost"})
-	if pattern != "" {
-		t.Fatalf("expected localhost to skip ModSecurity bypass unless configured explicitly, got %q", pattern)
+	if pattern == "" {
+		t.Fatalf("expected default compose localhost ModSecurity bypass, got %q", pattern)
 	}
 }
 
@@ -61,7 +61,29 @@ func TestEasyAdminBypassPathPatternForSite_MatchesManagementMutationEndpoints(t 
 		t.Fatal("expected management site bypass pattern")
 	}
 	re := regexp.MustCompile(pattern)
-	for _, path := range []string{"/api/sites/service-1", "/api/access-policies/policy-1", "/services/service-1", "/dashboard"} {
+	for _, path := range []string{
+		"/api/app/ping",
+		"/api/auth/refresh",
+		"/api/dashboard/summary",
+		"/api/reports/export",
+		"/api/sites/service-1",
+		"/api/upstreams/service-1",
+		"/api/certificates/cert-1",
+		"/api/tls-configs/site-1",
+		"/api/easy-site-profiles/site-1",
+		"/api/access-policies/policy-1",
+		"/api/requests/request-1",
+		"/api/revisions/revision-1",
+		"/api/events/event-1",
+		"/api/bans/ban-1",
+		"/api/jobs/job-1",
+		"/api/settings/management",
+		"/api/administration/users/test",
+		"/api/administration/roles/admin",
+		"/api/management-hosts/localhost",
+		"/services/service-1",
+		"/dashboard",
+	} {
 		if !re.MatchString(path) {
 			t.Fatalf("expected management bypass pattern to match %q, got %q", path, pattern)
 		}
@@ -88,7 +110,7 @@ func TestEasyAdminAntibotExclusionRulesForSite_ManagementSite(t *testing.T) {
 	for _, rule := range rules {
 		byPath[rule.Path] = append([]string(nil), rule.Methods...)
 	}
-	for _, path := range []string{"/", "/api/", "/static/", "/services", "/dashboard", "/auth", "/auth/verify"} {
+	for _, path := range []string{"/", "/api/administration", "/api/administration/", "/api/management-hosts", "/api/management-hosts/", "/static/", "/services", "/dashboard", "/auth", "/auth/verify"} {
 		methods, ok := byPath[path]
 		if !ok {
 			t.Fatalf("expected antibot exclusion for %s, got %#v", path, byPath)
@@ -112,7 +134,7 @@ func TestEasyAdminAuthExclusionRulesForSite_ManagementSite(t *testing.T) {
 	for _, rule := range rules {
 		byPath[rule.Path] = append([]string(nil), rule.Methods...)
 	}
-	for _, path := range []string{"/api/", "/services", "/healthcheck"} {
+	for _, path := range []string{"/api/administration", "/api/administration/", "/api/management-hosts", "/api/management-hosts/", "/services", "/healthcheck"} {
 		methods, ok := byPath[path]
 		if !ok {
 			t.Fatalf("expected rule for %s", path)

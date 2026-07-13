@@ -346,7 +346,7 @@
   "app.sites": "服务",
   "app.tls": "TLS / 证书",
   "app.user.noRoles": "没有角色",
-  "app.version": "v1.4.9",
+  "app.version": "v1.5.0",
   "auth.2fa.challengeMissing": "2FA 挑战缺失。请重新登录。",
   "auth.2fa.code": "2FA 代码",
   "auth.2fa.codeRequired": "需要 2FA 代码",
@@ -2312,4 +2312,16 @@
   "sites.easy.upstream.healthCheckPassive": "被动健康检查",
   "sites.easy.tab.httpheaders.title": "HTTP 与标头",
   "sites.easy.tab.httpheaders.subtitle": "方法、协议和标头"
+  ,"settings.tabs.managementHosts": "管理主机"
+  ,"settings.managementHosts.title": "管理主机"
+  ,"settings.managementHosts.subtitle": "允许使用 WAF 自管理路由的显式公共主机。"
+  ,"settings.managementHosts.warning": "保存更改后请执行编译并应用修订。身份验证和 RBAC 仍会强制执行。"
+  ,"settings.managementHosts.label": "每行一个 DNS 名称或 IP 地址"
+  ,"settings.managementHosts.ready": "持久化配置已生效。"
+  ,"settings.managementHosts.setupRequired": "需要设置。如果公共面板不可用，请使用内部 CLI。"
+  ,"settings.managementHosts.saved": "管理主机已保存。"
+  ,"settings.managementHosts.applyRequired": "管理主机已保存。请编译并应用修订以激活。"
+  ,"settings.managementHosts.drift": "警告：活动运行时工件不包含预期的管理保护规则。请使用内部 CLI 并应用修正后的修订。"
+  ,"sites.tls.confirmRebind": "要将 {{site}} 的 TLS 证书绑定替换为 {{certificate}} 吗？"
+  ,"sites.tls.rebindCancelled": "已取消 TLS 证书重新绑定。"
 }

@@ -459,6 +459,8 @@ func TestMapSiteUpstreamInputs_RespectsHostHeaderToggle(t *testing.T) {
 				DisableHostHeader: true,
 			},
 		}},
+		nil,
+		false,
 	)
 	if len(siteInputs) != 1 || len(upstreamInputs) != 1 {
 		t.Fatalf("unexpected mapped inputs: sites=%d upstreams=%d", len(siteInputs), len(upstreamInputs))

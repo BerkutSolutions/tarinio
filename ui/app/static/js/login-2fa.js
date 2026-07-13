@@ -1,12 +1,10 @@
 import { api } from "./api.js";
 import { getBrowserLanguage, getLanguage, setLanguage, t } from "./i18n.js";
-import { buildChallengeUrl, checkEntryAccess, onboardingUrl, secureAppUrl } from "./guard.js";
+import { checkEntryAccess, onboardingUrl, secureAppUrl } from "./guard.js";
 import { BerkutWebAuthn } from "./webauthn.js";
 
 const challengeStorageKey = "waf_login_2fa_challenge_id";
 const nextStorageKey = "waf_login_next";
-const challengeRefreshMarkerKey = "waf_login_2fa_page_challenge_refresh_at";
-const challengeRefreshCooldownMs = 8000;
 
 async function nextLocation() {
   const setup = await api.get("/api/setup/status");
@@ -45,53 +43,6 @@ function clearError() {
 
 function webAuthnSupported() {
   return BerkutWebAuthn && BerkutWebAuthn.supported && BerkutWebAuthn.supported();
-}
-
-function shouldRefreshChallenge(status) {
-  const code = Number(status || 0);
-  return code === 403 || code === 429;
-}
-
-function redirectToChallenge() {
-  try {
-    const lastAttempt = Number(sessionStorage.getItem(challengeRefreshMarkerKey) || 0);
-    if (Number.isFinite(lastAttempt) && Date.now() - lastAttempt < challengeRefreshCooldownMs) {
-      return false;
-    }
-    sessionStorage.setItem(challengeRefreshMarkerKey, String(Date.now()));
-  } catch {
-    // best-effort only
-  }
-  window.location.replace(buildChallengeUrl(window.location.pathname || "/login/2fa", window.location.search || ""));
-  return true;
-}
-
-async function ensureChallengeAccess() {
-  let response;
-  try {
-    response = await fetch("/api/auth/me", {
-      credentials: "include",
-      headers: { Accept: "application/json" },
-    });
-  } catch {
-    return true;
-  }
-  if (shouldRefreshChallenge(response.status)) {
-    redirectToChallenge();
-    return false;
-  }
-  return true;
-}
-
-function installChallengeRecheckHandlers() {
-  const handleReturnToPage = () => {
-    if (document.visibilityState === "hidden") {
-      return;
-    }
-    void ensureChallengeAccess();
-  };
-  document.addEventListener("visibilitychange", handleReturnToPage);
-  window.addEventListener("focus", handleReturnToPage);
 }
 
 async function confirmWithCode() {
@@ -151,11 +102,6 @@ async function bootstrap() {
   } catch {
     // keep page usable
   }
-  installChallengeRecheckHandlers();
-  if (!await ensureChallengeAccess()) {
-    return;
-  }
-
   const switcher = document.getElementById("language-switcher");
   if (switcher) {
     switcher.value = getLanguage();
@@ -186,16 +132,10 @@ async function bootstrap() {
       submit.disabled = true;
     }
     try {
-      if (!await ensureChallengeAccess()) {
-        return;
-      }
       await confirmWithCode();
       clearChallenge();
       window.location.href = await nextLocation();
     } catch (error) {
-      if (shouldRefreshChallenge(error?.status) && redirectToChallenge()) {
-        return;
-      }
       if (error?.status === 401) {
         showError(t("login2fa.errorInvalidCode"));
       } else {
@@ -218,17 +158,11 @@ async function bootstrap() {
     clearError();
     passkeyBtn.disabled = true;
     try {
-      if (!await ensureChallengeAccess()) {
-        return;
-      }
       await confirmWithPasskey();
       clearChallenge();
       window.location.href = await nextLocation();
     } catch (error) {
       const key = BerkutWebAuthn.errorKey ? BerkutWebAuthn.errorKey(error) : "";
-      if (shouldRefreshChallenge(error?.status) && redirectToChallenge()) {
-        return;
-      }
       if (Number(error?.status || 0) === 404) {
         showError(t("auth.passkeys.notAvailable"));
       } else {

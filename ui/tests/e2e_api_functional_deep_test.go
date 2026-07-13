@@ -35,12 +35,21 @@ func TestE2EAPIFunctionalDeep(t *testing.T) {
 	t.Run("AdminRolesAndUsersCRUD", func(t *testing.T) {
 		roleID := "e2e-role-functional"
 		userID := "e2e-user-functional"
-		roleCreate := postJSON(t, client, requestBaseURL+"/api/administration/roles", requestHostOverride, map[string]any{
+		rolePayload := map[string]any{
 			"id":          roleID,
 			"name":        "E2E Functional Role",
 			"permissions": []string{"sites.read", "sites.write", "auth.self"},
-		})
-		assertStatusOneOfDeep(t, roleCreate, "create role", http.StatusCreated, http.StatusOK)
+		}
+		roleExisting := getWithAuth(t, client, requestBaseURL+"/api/administration/roles/"+roleID, requestHostOverride)
+		if roleExisting.StatusCode == http.StatusNotFound {
+			_ = roleExisting.Body.Close()
+			roleCreate := postJSON(t, client, requestBaseURL+"/api/administration/roles", requestHostOverride, rolePayload)
+			assertStatusOneOfDeep(t, roleCreate, "create role", http.StatusCreated, http.StatusOK)
+		} else {
+			assertStatusOneOfDeep(t, roleExisting, "get existing role", http.StatusOK)
+			roleReset := requestDeepJSON(t, client, http.MethodPut, requestBaseURL+"/api/administration/roles/"+roleID, requestHostOverride, rolePayload)
+			assertStatusOneOfDeep(t, roleReset, "reset existing role", http.StatusOK)
+		}
 
 		roleGet := getWithAuth(t, client, requestBaseURL+"/api/administration/roles/"+roleID, requestHostOverride)
 		assertStatusOneOfDeep(t, roleGet, "get role", http.StatusOK)
@@ -51,7 +60,7 @@ func TestE2EAPIFunctionalDeep(t *testing.T) {
 		})
 		assertStatusOneOfDeep(t, roleUpdate, "update role", http.StatusOK)
 
-		userCreate := postJSON(t, client, requestBaseURL+"/api/administration/users", requestHostOverride, map[string]any{
+		userPayload := map[string]any{
 			"id":         userID,
 			"username":   userID,
 			"email":      "e2e-functional@example.test",
@@ -59,8 +68,17 @@ func TestE2EAPIFunctionalDeep(t *testing.T) {
 			"department": "QA",
 			"position":   "Automation",
 			"role_ids":   []string{roleID},
-		})
-		assertStatusOneOfDeep(t, userCreate, "create user", http.StatusCreated, http.StatusOK)
+		}
+		userExisting := getWithAuth(t, client, requestBaseURL+"/api/administration/users/"+userID, requestHostOverride)
+		if userExisting.StatusCode == http.StatusNotFound {
+			_ = userExisting.Body.Close()
+			userCreate := postJSON(t, client, requestBaseURL+"/api/administration/users", requestHostOverride, userPayload)
+			assertStatusOneOfDeep(t, userCreate, "create user", http.StatusCreated, http.StatusOK)
+		} else {
+			assertStatusOneOfDeep(t, userExisting, "get existing user", http.StatusOK)
+			userReset := requestDeepJSON(t, client, http.MethodPut, requestBaseURL+"/api/administration/users/"+userID, requestHostOverride, userPayload)
+			assertStatusOneOfDeep(t, userReset, "reset existing user", http.StatusOK)
+		}
 
 		userGet := getWithAuth(t, client, requestBaseURL+"/api/administration/users/"+userID, requestHostOverride)
 		assertStatusOneOfDeep(t, userGet, "get user", http.StatusOK)
@@ -90,12 +108,12 @@ func TestE2EAPIFunctionalDeep(t *testing.T) {
 		if roleList.StatusCode != http.StatusOK {
 			t.Fatalf("list roles failed: status=%d body=%s", roleList.StatusCode, mustReadBody(t, roleList.Body))
 		}
-		var rolePayload map[string]any
-		if err := json.NewDecoder(roleList.Body).Decode(&rolePayload); err != nil {
+		var roleListPayload map[string]any
+		if err := json.NewDecoder(roleList.Body).Decode(&roleListPayload); err != nil {
 			t.Fatalf("decode roles list: %v", err)
 		}
-		if _, ok := rolePayload["roles"]; !ok {
-			t.Fatalf("roles list missing roles field: %#v", rolePayload)
+		if _, ok := roleListPayload["roles"]; !ok {
+			t.Fatalf("roles list missing roles field: %#v", roleListPayload)
 		}
 	})
 
@@ -172,7 +190,7 @@ func requestDeepJSON(t *testing.T, client *http.Client, method, endpoint, hostOv
 		}
 		return resp
 	}
-	return postJSON(t, client, endpoint, hostOverride, payload)
+	return requestE2EJSON(t, client, method, endpoint, hostOverride, payload)
 }
 
 func assertStatusOneOfDeep(t *testing.T, resp *http.Response, action string, allowed ...int) {

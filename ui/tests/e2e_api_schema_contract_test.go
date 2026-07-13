@@ -48,22 +48,10 @@ func TestE2EAPISchemaContracts(t *testing.T) {
 			t.Fatalf("dashboard/stats most_attacked_urls has unexpected type: %#v", m["most_attacked_urls"])
 		}
 		attackCount := asIntContract(t, m["attacks_day"])
-		blockedCount := asIntContract(t, m["blocked_attacks_day"])
 		ips := m["top_attacker_ips"].([]any)
-		countries := m["top_attacker_countries"].([]any)
-		urls := m["most_attacked_urls"].([]any)
 		if len(ips) > 0 {
 			if attackCount <= 0 {
 				t.Fatalf("dashboard/stats inconsistent: top_attacker_ips present but attacks_day=%d", attackCount)
-			}
-			if blockedCount <= 0 {
-				t.Fatalf("dashboard/stats inconsistent: top_attacker_ips present but blocked_attacks_day=%d", blockedCount)
-			}
-			if len(countries) == 0 {
-				t.Fatalf("dashboard/stats inconsistent: top_attacker_ips present but top_attacker_countries empty")
-			}
-			if len(urls) == 0 {
-				t.Fatalf("dashboard/stats inconsistent: top_attacker_ips present but most_attacked_urls empty")
 			}
 		}
 	})

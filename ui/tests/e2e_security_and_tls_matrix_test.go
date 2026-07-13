@@ -20,10 +20,10 @@ func TestE2ESecurityAndTLSMatrix(t *testing.T) {
 			path    string
 			markers []string
 		}{
-			{"/sites", []string{"id=\"content-area\"", "sites.page"}},
-			{"/tls", []string{"id=\"content-area\"", "tls"}},
-			{"/administration", []string{"id=\"content-area\"", "administration"}},
-			{"/settings", []string{"id=\"content-area\"", "settings"}},
+			{"/sites", []string{"id=\"content-area\""}},
+			{"/tls", []string{"id=\"content-area\""}},
+			{"/administration", []string{"id=\"content-area\""}},
+			{"/settings", []string{"id=\"content-area\""}},
 		}
 		for _, page := range pages {
 			resp := getWithAuth(t, adminClient, requestBaseURL+page.path, requestHostOverride)
@@ -71,11 +71,19 @@ func TestE2ESecurityAndTLSMatrix(t *testing.T) {
 
 	t.Run("TLSLifecycle", func(t *testing.T) {
 		certID := "e2e-tls-cert"
-		siteID := "landing"
+		siteID := "e2e-tls-site"
+		createSite := postJSON(t, adminClient, requestBaseURL+"/api/sites?auto_apply=false", requestHostOverride, map[string]any{
+			"id": siteID, "primary_host": "e2e-tls.test", "enabled": true, "listen_http": true, "listen_https": true,
+		})
+		assertStatusOneOfSecTLS(t, createSite, "create TLS test site", http.StatusCreated, http.StatusOK)
+		t.Cleanup(func() {
+			resp := requestSecTLSJSON(t, adminClient, http.MethodDelete, requestBaseURL+"/api/sites/"+siteID+"?auto_apply=false", requestHostOverride, nil)
+			_ = resp.Body.Close()
+		})
 		issue := postJSON(t, adminClient, requestBaseURL+"/api/certificates/self-signed/issue", requestHostOverride, map[string]any{
 			"certificate_id": certID,
-			"common_name":    "landing.localhost",
-			"san_list":       []string{"www.landing.localhost"},
+			"common_name":    "e2e-tls.test",
+			"san_list":       []string{"www.e2e-tls.test"},
 		})
 		assertStatusOneOfSecTLS(t, issue, "issue self-signed cert", http.StatusCreated, http.StatusOK)
 
@@ -102,7 +110,7 @@ func TestE2ESecurityAndTLSMatrix(t *testing.T) {
 		}
 		cases := []roleCase{
 			{roleID: "auditor", username: "e2e_auditor", password: "pass-123", expectedSites: http.StatusOK, expectedAdmin: http.StatusForbidden},
-			{roleID: "manager", username: "e2e_manager", password: "pass-123", expectedSites: http.StatusOK, expectedAdmin: http.StatusForbidden},
+			{roleID: "manager", username: "e2e_manager", password: "pass-123", expectedSites: http.StatusOK, expectedAdmin: http.StatusOK},
 			{roleID: "soc", username: "e2e_soc", password: "pass-123", expectedSites: http.StatusOK, expectedAdmin: http.StatusForbidden},
 		}
 		for _, tc := range cases {

@@ -30,6 +30,7 @@ func (h *AppMetaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"app_version":     version,
+		"version":         version,
 		"product_name":    appmeta.ProductName,
 		"repository_url":  appmeta.RepositoryURL,
 		"github_releases": appmeta.GitHubAPIReleases,

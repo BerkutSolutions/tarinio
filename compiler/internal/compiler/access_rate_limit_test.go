@@ -134,7 +134,7 @@ func TestRenderAccessRateLimitArtifacts_AllowlistKeepsRateLimitKeying(t *testing
 	}
 }
 
-func TestRenderAccessRateLimitArtifacts_ManagementAllowlistDefaultsToDeny(t *testing.T) {
+func TestRenderAccessRateLimitArtifacts_ManagementHostIgnoresAccessPolicyToPreventSelfLockout(t *testing.T) {
 	artifacts, err := RenderAccessRateLimitArtifacts(
 		[]SiteInput{
 			{ID: "control-plane-access", Enabled: true, PrimaryHost: "waf.example.com", ListenHTTP: true, DefaultUpstreamID: "up-a"},
@@ -154,8 +154,8 @@ func TestRenderAccessRateLimitArtifacts_ManagementAllowlistDefaultsToDeny(t *tes
 			break
 		}
 	}
-	if !strings.Contains(accessConf, "deny all;") {
-		t.Fatalf("expected management site allowlist to imply default deny, got: %s", accessConf)
+	if strings.Contains(accessConf, "deny ") || strings.Contains(accessConf, "allow ") {
+		t.Fatalf("management host access policy must not block the panel, got: %s", accessConf)
 	}
 }
 

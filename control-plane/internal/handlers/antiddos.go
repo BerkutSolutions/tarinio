@@ -53,6 +53,10 @@ func (h *AntiDDoSHandler) upsert(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
 		return
 	}
+	if item.ConnLimit < 0 || item.RatePerSecond < 0 || item.RateBurst < 0 || item.L7RequestsPS < 0 || item.L7Burst < 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "anti-ddos limits must not be negative"})
+		return
+	}
 	updated, err := h.service.Upsert(withActorIP(r), item)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})

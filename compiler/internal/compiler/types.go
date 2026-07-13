@@ -13,6 +13,9 @@ type SiteInput struct {
 	UseEasyConfig       bool
 	UseCustomErrorPages bool
 	MTLS                MTLSInput
+	// Management is resolved from the immutable revision snapshot.
+	Management           bool
+	ManagementConfigured bool
 }
 
 // UpstreamInput is the MVP compiler input slice for upstream mapping.

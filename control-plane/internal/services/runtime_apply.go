@@ -240,6 +240,9 @@ func (s *ApplyService) runApply(ctx context.Context, revision revisions.Revision
 	if err := s.syntaxRunner.Validate(bundle); err != nil {
 		return err
 	}
+	if err := validateManagementSafeguard(bundle, snapshot); err != nil {
+		return err
+	}
 
 	knownGood, _ := pipeline.LoadActivePointer(s.activationRoot)
 
@@ -333,7 +336,7 @@ func (s *ApplyService) emitEvent(event events.Event) {
 }
 
 func (s *ApplyService) compileBundle(revision revisions.Revision, snapshot revisionsnapshots.Snapshot) (*pipeline.RevisionBundle, error) {
-	siteInputs, upstreamInputs := mapSiteUpstreamInputs(snapshot.Sites, snapshot.Upstreams, snapshot.TLSConfigs, snapshot.EasySiteProfiles)
+	siteInputs, upstreamInputs := mapSiteUpstreamInputs(snapshot.Sites, snapshot.Upstreams, snapshot.TLSConfigs, snapshot.EasySiteProfiles, snapshot.ManagementHosts, snapshot.ManagementHostsConfigured)
 	antiDDoSSettings := antiddos.NormalizeSettings(snapshot.AntiDDoSSettings)
 	tlsInputs, certInputs, tlsMaterialArtifacts, err := s.mapTLSInputs(snapshot.TLSConfigs, snapshot.CertificateMaterials, snapshot.EasySiteProfiles)
 	if err != nil {
@@ -760,7 +763,7 @@ func certificateMaterialIDFromRef(ref string) string {
 	return ""
 }
 
-func mapSiteUpstreamInputs(siteItems []sites.Site, upstreamItems []upstreams.Upstream, tlsItems []tlsconfigs.TLSConfig, easyItems []easysiteprofiles.EasySiteProfile) ([]pipeline.SiteInput, []pipeline.UpstreamInput) {
+func mapSiteUpstreamInputs(siteItems []sites.Site, upstreamItems []upstreams.Upstream, tlsItems []tlsconfigs.TLSConfig, easyItems []easysiteprofiles.EasySiteProfile, managementHosts []string, managementConfigured bool) ([]pipeline.SiteInput, []pipeline.UpstreamInput) {
 	sortedSites := append([]sites.Site(nil), siteItems...)
 	sort.Slice(sortedSites, func(i, j int) bool { return sortedSites[i].ID < sortedSites[j].ID })
 
@@ -793,6 +796,10 @@ func mapSiteUpstreamInputs(siteItems []sites.Site, upstreamItems []upstreams.Ups
 
 	easySites := make(map[string]struct{}, len(easyItems))
 	customErrorPagesBySite := make(map[string]bool, len(easyItems))
+	managementHostSet := make(map[string]struct{}, len(managementHosts))
+	for _, host := range managementHosts {
+		managementHostSet[strings.ToLower(strings.TrimSpace(host))] = struct{}{}
+	}
 	for _, item := range easyItems {
 		easySites[item.SiteID] = struct{}{}
 		customErrorPagesBySite[item.SiteID] = item.UseCustomErrorPages
@@ -803,17 +810,20 @@ func mapSiteUpstreamInputs(siteItems []sites.Site, upstreamItems []upstreams.Ups
 		_, hasTLS := tlsSites[item.ID]
 		_, hasEasy := easySites[item.ID]
 		mtls := mtlsBySite[item.ID]
+		_, management := managementHostSet[strings.ToLower(strings.TrimSpace(item.PrimaryHost))]
 		siteInputs = append(siteInputs, pipeline.SiteInput{
-			ID:                  item.ID,
-			Name:                item.ID,
-			Enabled:             item.Enabled,
-			PrimaryHost:         item.PrimaryHost,
-			ListenHTTP:          !hasTLS,
-			ListenHTTPS:         hasTLS,
-			DefaultUpstreamID:   defaultUpstreamBySite[item.ID],
-			UseEasyConfig:       hasEasy,
-			UseCustomErrorPages: customErrorPagesBySite[item.ID],
-			MTLS:                mtls,
+			ID:                   item.ID,
+			Name:                 item.ID,
+			Enabled:              item.Enabled,
+			PrimaryHost:          item.PrimaryHost,
+			ListenHTTP:           !hasTLS,
+			ListenHTTPS:          hasTLS,
+			DefaultUpstreamID:    defaultUpstreamBySite[item.ID],
+			UseEasyConfig:        hasEasy,
+			UseCustomErrorPages:  customErrorPagesBySite[item.ID],
+			MTLS:                 mtls,
+			Management:           management,
+			ManagementConfigured: managementConfigured,
 		})
 	}
 
@@ -1110,6 +1120,7 @@ func mapEasyInputs(items []easysiteprofiles.EasySiteProfile, virtualPatches []vi
 			UseModSecurityCustomConfiguration: item.SecurityModSecurity.UseCustomConfiguration,
 			ModSecurityCRSVersion:             item.SecurityModSecurity.ModSecurityCRSVersion,
 			ModSecurityCRSPlugins:             item.SecurityModSecurity.ModSecurityCRSPlugins,
+			ModSecurityExclusionRules:         mapModSecurityExclusionRules(item.SecurityModSecurity.ExclusionRules),
 			ModSecurityCustomPath:             item.SecurityModSecurity.CustomConfiguration.Path,
 			ModSecurityCustomContent:          item.SecurityModSecurity.CustomConfiguration.Content,
 
@@ -1125,6 +1136,17 @@ func mapEasyInputs(items []easysiteprofiles.EasySiteProfile, virtualPatches []vi
 
 			UseCustomErrorPages: item.UseCustomErrorPages,
 			DisabledErrorPages:  item.DisabledErrorPages,
+		})
+	}
+	return out
+}
+
+func mapModSecurityExclusionRules(items []easysiteprofiles.ModSecurityExclusionRule) []pipeline.ModSecurityExclusionRuleInput {
+	out := make([]pipeline.ModSecurityExclusionRuleInput, 0, len(items))
+	for _, item := range items {
+		out = append(out, pipeline.ModSecurityExclusionRuleInput{
+			Path: item.Path, PathPattern: item.PathPattern, Methods: append([]string(nil), item.Methods...),
+			Mode: item.MatchMode, RuleIDs: append([]int(nil), item.RuleIDs...), Targets: append([]string(nil), item.Targets...), Comment: item.Comment,
 		})
 	}
 	return out

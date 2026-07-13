@@ -3,9 +3,11 @@ package services
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"waf/control-plane/internal/audits"
 	"waf/control-plane/internal/certificates"
+	"waf/control-plane/internal/references"
 	"waf/control-plane/internal/tlsconfigs"
 )
 
@@ -50,7 +52,7 @@ func (s *TLSConfigService) Create(ctx context.Context, item tlsconfigs.TLSConfig
 	if err := s.ensureSiteExists(item.SiteID); err != nil {
 		return tlsconfigs.TLSConfig{}, err
 	}
-	if err := s.ensureCertificateExists(item.CertificateID); err != nil {
+	if err := s.ensureCertificateMatchesSite(item.SiteID, item.CertificateID); err != nil {
 		return tlsconfigs.TLSConfig{}, err
 	}
 	created, err = s.store.Create(item)
@@ -68,21 +70,35 @@ func (s *TLSConfigService) List() ([]tlsconfigs.TLSConfig, error) {
 }
 
 func (s *TLSConfigService) Update(ctx context.Context, item tlsconfigs.TLSConfig) (updated tlsconfigs.TLSConfig, err error) {
+	action := "tlsconfig.update"
+	details := map[string]any(nil)
 	defer func() {
 		recordAudit(ctx, s.audits, audits.AuditEvent{
-			Action:       "tlsconfig.update",
+			Action:       action,
 			ResourceType: "tlsconfig",
 			ResourceID:   item.SiteID,
 			SiteID:       item.SiteID,
 			Status:       auditStatus(err),
-			Summary:      "tls config update",
+			Summary:      action,
+			Details:      details,
 		})
 	}()
 	if err := s.ensureSiteExists(item.SiteID); err != nil {
 		return tlsconfigs.TLSConfig{}, err
 	}
-	if err := s.ensureCertificateExists(item.CertificateID); err != nil {
+	if err := s.ensureCertificateMatchesSite(item.SiteID, item.CertificateID); err != nil {
 		return tlsconfigs.TLSConfig{}, err
+	}
+	current, listErr := s.store.List()
+	if listErr != nil {
+		return tlsconfigs.TLSConfig{}, listErr
+	}
+	for _, previous := range current {
+		if previous.SiteID == item.SiteID && previous.CertificateID != item.CertificateID {
+			action = "tlsconfig.rebind"
+			details = map[string]any{"previous_certificate_id": previous.CertificateID, "certificate_id": item.CertificateID}
+			break
+		}
 	}
 	updated, err = s.store.Update(item)
 	if err != nil {
@@ -135,4 +151,58 @@ func (s *TLSConfigService) ensureCertificateExists(certificateID string) error {
 		}
 	}
 	return fmt.Errorf("certificate %s not found", certificateID)
+}
+
+func (s *TLSConfigService) ensureCertificateMatchesSite(siteID, certificateID string) error {
+	sitesList, err := s.sites.List()
+	if err != nil {
+		return err
+	}
+	certificatesList, err := s.certificates.List()
+	if err != nil {
+		return err
+	}
+	var host string
+	foundSite := false
+	for _, site := range sitesList {
+		if site.ID == siteID {
+			foundSite = true
+			host = strings.ToLower(strings.TrimSpace(site.PrimaryHost))
+			break
+		}
+	}
+	if !foundSite {
+		return references.NewError(references.CodeMissing, "site_id", siteID)
+	}
+	for _, certificate := range certificatesList {
+		if certificate.ID != certificateID {
+			continue
+		}
+		if host == "" {
+			return nil
+		}
+		names := append([]string{certificate.CommonName}, certificate.SANList...)
+		for _, name := range names {
+			if certificateHostMatches(host, name) {
+				return nil
+			}
+		}
+		if strings.TrimSpace(certificate.CommonName) == "" && len(certificate.SANList) == 0 {
+			return nil
+		}
+		return references.NewError(references.CodeCertificateHostMismatch, "certificate_id", certificateID)
+	}
+	return references.NewError(references.CodeMissing, "certificate_id", certificateID)
+}
+
+func certificateHostMatches(host, pattern string) bool {
+	host, pattern = strings.ToLower(strings.TrimSpace(host)), strings.ToLower(strings.TrimSpace(pattern))
+	if host == pattern {
+		return true
+	}
+	if !strings.HasPrefix(pattern, "*.") {
+		return false
+	}
+	suffix := strings.TrimPrefix(pattern, "*")
+	return strings.HasSuffix(host, suffix) && strings.Count(host, ".") == strings.Count(strings.TrimPrefix(suffix, "."), ".")+1
 }

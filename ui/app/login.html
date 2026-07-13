@@ -14,37 +14,12 @@
     .waf-fallback-badge { display: inline-block; margin-top: 14px; padding: 4px 10px; border-radius: 999px; border: 1px solid #365f95; background: #0d1c34; color: #b4cbef; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
     .waf-fallback-hint { margin-top: 14px; font-size: 13px; color: #93add8; }
   </style>
-  <script>
-    (() => {
-      const markerKey = "waf_login_static_challenge_refresh_at";
-      const cooldownMs = 8000;
-      window.__wafRedirectLoginToChallenge = () => {
-        try {
-          const lastAttempt = Number(sessionStorage.getItem(markerKey) || 0);
-          if (Number.isFinite(lastAttempt) && Date.now() - lastAttempt < cooldownMs) {
-            return false;
-          }
-          sessionStorage.setItem(markerKey, String(Date.now()));
-        } catch {
-          // best-effort only
-        }
-        const params = new URLSearchParams();
-        params.set("return_uri", window.location.pathname || "/login");
-        const returnArgs = String(window.location.search || "").replace(/^\?/, "");
-        if (returnArgs) {
-          params.set("return_args", returnArgs);
-        }
-        window.location.replace(`/challenge?${params.toString()}`);
-        return true;
-      };
-    })();
-  </script>
   <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon16.png">
   <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon32.png">
   <link rel="icon" type="image/png" sizes="48x48" href="/static/favicon48.png">
   <link rel="icon" type="image/png" sizes="64x64" href="/static/favicon64.png">
-  <link rel="stylesheet" href="/static/styles.css?v=20260712-login-challenge-1" onerror="window.__wafRedirectLoginToChallenge && window.__wafRedirectLoginToChallenge()">
-  <link rel="stylesheet" href="/static/waf.css?v=20260712-login-challenge-1" onerror="window.__wafRedirectLoginToChallenge && window.__wafRedirectLoginToChallenge()">
+  <link rel="stylesheet" href="/static/styles.css?v=20260713-login-session-1">
+  <link rel="stylesheet" href="/static/waf.css?v=20260713-login-session-1">
 </head>
 <body class="login-body">
   <div class="login-wrapper">
@@ -64,6 +39,6 @@
       </form>
     </div>
   </div>
-  <script type="module" src="/static/js/login.js?v=20260712-login-challenge-1" onerror="window.__wafRedirectLoginToChallenge && window.__wafRedirectLoginToChallenge()"></script>
+  <script type="module" src="/static/js/login.js?v=20260713-login-session-1"></script>
 </body>
 </html>

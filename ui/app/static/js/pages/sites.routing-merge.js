@@ -164,11 +164,7 @@ export function mergeByID(primary, secondary) {
 }
 
 export function normalizeSiteID(value) {
-  const normalized = String(value || "").trim().toLowerCase();
-  if (normalized === "localhost" || normalized === "control-plane" || normalized === "ui") {
-    return "control-plane-access";
-  }
-  return normalized;
+  return String(value || "").trim().toLowerCase();
 }
 
 export function mergeProfilesBySite(primary, secondaryPayload) {

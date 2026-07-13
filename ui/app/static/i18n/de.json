@@ -346,7 +346,7 @@
   "app.sites": "Dienstleistungen",
   "app.tls": "TLS / Zertifikate",
   "app.user.noRoles": "Keine Rollen",
-  "app.version": "v1.4.9",
+  "app.version": "v1.5.0",
   "auth.2fa.challengeMissing": "2FA-Herausforderung fehlt. Bitte melden Sie sich erneut an.",
   "auth.2fa.code": "2FA-Code",
   "auth.2fa.codeRequired": "2FA-Code ist erforderlich",
@@ -2312,4 +2312,16 @@
   "sites.easy.upstream.healthCheckPassive": "Passive Integritätsprüfung",
   "sites.easy.tab.httpheaders.title": "HTTP & Header",
   "sites.easy.tab.httpheaders.subtitle": "Methoden, Protokolle und Header"
+  ,"settings.tabs.managementHosts": "Verwaltungshosts"
+  ,"settings.managementHosts.title": "Verwaltungshosts"
+  ,"settings.managementHosts.subtitle": "Explizite öffentliche Hosts für WAF-Selbstverwaltungsrouten."
+  ,"settings.managementHosts.warning": "Speichern Sie die Änderungen und führen Sie danach Compile/Apply aus. Authentifizierung und RBAC bleiben aktiv."
+  ,"settings.managementHosts.label": "Ein DNS-Name oder eine IP-Adresse pro Zeile"
+  ,"settings.managementHosts.ready": "Persistente Konfiguration ist aktiv."
+  ,"settings.managementHosts.setupRequired": "Einrichtung erforderlich. Verwenden Sie bei nicht erreichbarer Oberfläche die interne CLI."
+  ,"settings.managementHosts.saved": "Verwaltungshosts gespeichert."
+  ,"settings.managementHosts.applyRequired": "Hosts gespeichert. Führen Sie Compile/Apply zur Aktivierung aus."
+  ,"settings.managementHosts.drift": "Warnung: Das aktive Runtime-Artefakt enthält den erwarteten Management-Safeguard nicht. Nutzen Sie die interne CLI und wenden Sie eine korrigierte Revision an."
+  ,"sites.tls.confirmRebind": "TLS-Zertifikatsbindung für {{site}} durch {{certificate}} ersetzen?"
+  ,"sites.tls.rebindCancelled": "TLS-Zertifikatsbindung wurde abgebrochen."
 }

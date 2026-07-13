@@ -344,27 +344,52 @@ func bootstrapFamily(exec executor, cfg config, table string, ipv6 bool) error {
 	if err := ensureChain(exec, table, customChainName); err != nil {
 		return err
 	}
-	if err := flushChain(exec, table, customChainName); err != nil {
-		return err
-	}
-	for _, rule := range adaptiveRules(cfg, ipv6) {
-		if err := exec.Run(table, append([]string{"-w", "-A", customChainName}, rule...)...); err != nil {
-			return fmt.Errorf("append adaptive guard rule (%s): %w", table, err)
+	desiredRules := append(adaptiveRules(cfg, ipv6), guardRules(cfg.Target, cfg.ConnLimit, cfg.RatePerSec, cfg.RateBurst, ipv6)...)
+	if !chainRulesMatch(exec, table, customChainName, desiredRules) {
+		if err := flushChain(exec, table, customChainName); err != nil {
+			return err
 		}
-	}
-	for _, rule := range guardRules(cfg.Target, cfg.ConnLimit, cfg.RatePerSec, cfg.RateBurst, ipv6) {
-		if err := exec.Run(table, append([]string{"-w", "-A", customChainName}, rule...)...); err != nil {
-			return fmt.Errorf("append guard rule (%s): %w", table, err)
+		for _, rule := range desiredRules {
+			if err := exec.Run(table, append([]string{"-w", "-A", customChainName}, rule...)...); err != nil {
+				return fmt.Errorf("append guard rule (%s): %w", table, err)
+			}
 		}
 	}
 	jumpRule := parentJumpRule(parentChain, destinationIP, cfg.Ports)
-	if err := deleteJumpRule(exec, table, parentChain, jumpRule); err != nil {
-		return err
-	}
-	if err := exec.Run(table, append([]string{"-w", "-I", parentChain, "1"}, jumpRule...)...); err != nil {
+	if err := ensureJumpRule(exec, table, parentChain, jumpRule); err != nil {
 		return fmt.Errorf("insert jump rule into %s via %s: %w", parentChain, table, err)
 	}
 	return nil
+}
+
+func chainRulesMatch(exec executor, table, chain string, desired [][]string) bool {
+	output, err := exec.Output(table, "-w", "-S", chain)
+	if err != nil {
+		return false
+	}
+	actual := make([]string, 0, len(desired))
+	for _, line := range strings.Split(string(output), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "-A "+chain+" ") {
+			actual = append(actual, strings.TrimPrefix(line, "-A "+chain+" "))
+		}
+	}
+	if len(actual) != len(desired) {
+		return false
+	}
+	for index, rule := range desired {
+		if actual[index] != strings.Join(rule, " ") {
+			return false
+		}
+	}
+	return true
+}
+
+func ensureJumpRule(exec executor, table, parentChain string, rule []string) error {
+	if err := exec.Run(table, append([]string{"-w", "-C", parentChain}, rule...)...); err == nil {
+		return nil
+	}
+	return exec.Run(table, append([]string{"-w", "-I", parentChain, "1"}, rule...)...)
 }
 
 func adaptiveRules(cfg config, ipv6 bool) [][]string {

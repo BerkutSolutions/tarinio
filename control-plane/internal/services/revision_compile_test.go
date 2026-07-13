@@ -135,6 +135,7 @@ func TestRevisionCompileService_CreateBuildsPendingRevisionAndCompileJob(t *test
 		&fakeRateLimitPolicyStateReader{items: []ratelimitpolicies.RateLimitPolicy{{ID: "rate-a", SiteID: "site-a", Enabled: true, Limits: ratelimitpolicies.Limits{RequestsPerSecond: 10, Burst: 5}}}},
 		&fakeEasySiteProfileStateReader{items: []easysiteprofiles.EasySiteProfile{easysiteprofiles.DefaultProfile("site-a")}},
 		&fakeAntiDDoSSettingsReader{item: antiddos.Settings{UseL4Guard: true, ConnLimit: 350, RatePerSecond: 175, RateBurst: 350, Ports: []int{80, 443}, ChainMode: antiddos.ChainModeAuto, Target: antiddos.TargetDrop, L7StatusCode: 429}},
+		nil,
 		&fakeCertificateMaterialReader{},
 		nil,
 	)

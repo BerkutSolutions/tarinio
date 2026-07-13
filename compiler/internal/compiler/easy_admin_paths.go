@@ -30,11 +30,47 @@ var easyAdminExactPaths = []string{
 	"/",
 	"/auth",
 	"/auth/verify",
+	"/api/app",
+	"/api/auth",
+	"/api/dashboard",
+	"/api/reports",
+	"/api/sites",
+	"/api/upstreams",
+	"/api/certificates",
+	"/api/tls-configs",
+	"/api/easy-site-profiles",
+	"/api/access-policies",
+	"/api/requests",
+	"/api/revisions",
+	"/api/events",
+	"/api/bans",
+	"/api/jobs",
+	"/api/settings",
+	"/api/administration",
+	"/api/management-hosts",
 }
 
 var easyAdminPrefixPaths = []string{
 	"/api/",
 	"/static/",
+	"/api/app/",
+	"/api/auth/",
+	"/api/dashboard/",
+	"/api/reports/",
+	"/api/sites/",
+	"/api/upstreams/",
+	"/api/certificates/",
+	"/api/tls-configs/",
+	"/api/easy-site-profiles/",
+	"/api/access-policies/",
+	"/api/requests/",
+	"/api/revisions/",
+	"/api/events/",
+	"/api/bans/",
+	"/api/jobs/",
+	"/api/settings/",
+	"/api/administration/",
+	"/api/management-hosts/",
 }
 
 func easyManagementProtectedPaths() []string {
@@ -144,12 +180,25 @@ func isManagementSiteID(siteID string) bool {
 }
 
 func isManagementSite(site SiteInput) bool {
+	if site.ManagementConfigured {
+		return site.Management
+	}
+	if site.Management {
+		return true
+	}
 	if isManagementSiteID(site.ID) {
 		return true
 	}
 	primaryHost := strings.ToLower(strings.TrimSpace(site.PrimaryHost))
 	if primaryHost == "" {
 		return false
+	}
+	// localhost is the built-in management host of the default compose stack.
+	// It must remain self-managing without asking an operator to configure a
+	// development-only fast-start environment variable. Explicit persisted
+	// management-host settings above always take precedence.
+	if primaryHost == "localhost" {
+		return true
 	}
 	if primaryHost == managementUIHost() {
 		return true

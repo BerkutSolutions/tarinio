@@ -84,6 +84,8 @@ func New(
 	runtimeSecurityProbe interface{ Probe() error },
 	runtimeRequestProbe interface{ Probe(url.Values) error },
 	adminScriptService *services.AdminScriptService,
+	managementHostsService *services.ManagementHostsService,
+	managementSafeguardStatusService *services.ManagementSafeguardStatusService,
 ) *Server {
 	mux := http.NewServeMux()
 	metrics := telemetry.Default()
@@ -107,6 +109,12 @@ func New(
 		http.MethodGet: {rbac.PermissionSettingsGeneralRead},
 		http.MethodPut: {rbac.PermissionSettingsGeneralWrite},
 	}, settingsRuntimeHandler))
+	mux.Handle("/api/settings/management-hosts", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodGet: {rbac.PermissionSettingsGeneralRead}, http.MethodPut: {rbac.PermissionSettingsGeneralWrite},
+	}, handlers.NewManagementHostsHandler(managementHostsService)))
+	mux.Handle("/api/settings/management-hosts/status", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodGet: {rbac.PermissionSettingsGeneralRead},
+	}, handlers.NewManagementSafeguardStatusHandler(managementSafeguardStatusService)))
 	mux.Handle("/api/settings/runtime/check-updates", withMethodAllPermissions(authService, map[string][]rbac.Permission{
 		http.MethodPost: {rbac.PermissionSettingsGeneralWrite},
 	}, settingsRuntimeHandler))

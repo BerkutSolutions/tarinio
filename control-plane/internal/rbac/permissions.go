@@ -39,8 +39,8 @@ const (
 	PermissionEventsRead   Permission = "events.read"
 	PermissionBansRead     Permission = "bans.read"
 
-	PermissionRevisionsRead  Permission = "revisions.read"
-	PermissionRevisionsWrite Permission = "revisions.write"
+	PermissionRevisionsRead    Permission = "revisions.read"
+	PermissionRevisionsWrite   Permission = "revisions.write"
 	PermissionRevisionsApprove Permission = "revisions.approve"
 
 	PermissionAdministrationRead       Permission = "administration.read"

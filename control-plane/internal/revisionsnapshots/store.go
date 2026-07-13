@@ -28,17 +28,22 @@ import (
 
 // Snapshot is the immutable control-plane state captured for one revision.
 type Snapshot struct {
-	Sites                []sites.Site                        `json:"sites"`
-	Upstreams            []upstreams.Upstream                `json:"upstreams"`
-	Certificates         []certificates.Certificate          `json:"certificates"`
-	TLSConfigs           []tlsconfigs.TLSConfig              `json:"tls_configs"`
-	WAFPolicies          []wafpolicies.WAFPolicy             `json:"waf_policies"`
-	AccessPolicies       []accesspolicies.AccessPolicy       `json:"access_policies"`
-	RateLimitPolicies    []ratelimitpolicies.RateLimitPolicy `json:"rate_limit_policies"`
-	EasySiteProfiles     []easysiteprofiles.EasySiteProfile  `json:"easy_site_profiles"`
-	AntiDDoSSettings     antiddos.Settings                   `json:"anti_ddos_settings"`
-	CertificateMaterials []CertificateMaterialSnapshot       `json:"certificate_materials"`
-	VirtualPatches       []virtualpatches.VirtualPatch       `json:"virtual_patches,omitempty"`
+	Sites                     []sites.Site                        `json:"sites"`
+	Upstreams                 []upstreams.Upstream                `json:"upstreams"`
+	Certificates              []certificates.Certificate          `json:"certificates"`
+	TLSConfigs                []tlsconfigs.TLSConfig              `json:"tls_configs"`
+	WAFPolicies               []wafpolicies.WAFPolicy             `json:"waf_policies"`
+	AccessPolicies            []accesspolicies.AccessPolicy       `json:"access_policies"`
+	RateLimitPolicies         []ratelimitpolicies.RateLimitPolicy `json:"rate_limit_policies"`
+	EasySiteProfiles          []easysiteprofiles.EasySiteProfile  `json:"easy_site_profiles"`
+	AntiDDoSSettings          antiddos.Settings                   `json:"anti_ddos_settings"`
+	CertificateMaterials      []CertificateMaterialSnapshot       `json:"certificate_materials"`
+	VirtualPatches            []virtualpatches.VirtualPatch       `json:"virtual_patches,omitempty"`
+	ManagementHosts           []string                            `json:"management_hosts,omitempty"`
+	ManagementHostsConfigured bool                                `json:"management_hosts_configured,omitempty"`
+	// LegacyManagementSiteID is accepted only to read snapshots produced by
+	// pre-persisted-management builds. It is never used for host ownership.
+	LegacyManagementSiteID string `json:"management_site_id,omitempty"`
 }
 
 type CertificateMaterialSnapshot struct {
@@ -131,7 +136,20 @@ func (s *Store) Load(snapshotPath string) (Snapshot, error) {
 	if err := json.Unmarshal(content, &snapshot); err != nil {
 		return Snapshot{}, fmt.Errorf("decode revision snapshot: %w", err)
 	}
+	normalizeLegacyManagementSnapshot(&snapshot)
 	return snapshot, nil
+}
+
+func normalizeLegacyManagementSnapshot(snapshot *Snapshot) {
+	if snapshot == nil {
+		return
+	}
+	if !snapshot.ManagementHostsConfigured {
+		// An old ID/upstream alias must remain legacy compatibility metadata,
+		// never become an implicit persisted management host.
+		snapshot.ManagementHosts = nil
+	}
+	snapshot.LegacyManagementSiteID = ""
 }
 
 func (s *Store) ReadMaterial(ref string) ([]byte, error) {

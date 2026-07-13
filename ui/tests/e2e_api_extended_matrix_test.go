@@ -28,7 +28,6 @@ func TestE2EAPIExtendedMatrix(t *testing.T) {
 			"/api/anti-ddos/rule-suggestions",
 			"/api/tls/auto-renew",
 			"/api/administration/zero-trust/health",
-			"/api/certificate-materials/export",
 		}
 		for _, path := range paths {
 			resp := getWithAuthRetry429(t, client, requestBaseURL+path, requestHostOverride, 3)
@@ -83,10 +82,19 @@ func TestE2EAPIExtendedMatrix(t *testing.T) {
 	})
 
 	t.Run("PoliciesCRUD", func(t *testing.T) {
+		const siteID = "e2e-policy-site"
+		createSite := postJSON(t, client, requestBaseURL+"/api/sites?auto_apply=false", requestHostOverride, map[string]any{
+			"id": siteID, "primary_host": "e2e-policy.test", "enabled": true, "listen_http": true, "listen_https": false,
+		})
+		assertE2EStatus(t, createSite, "create policy site", http.StatusCreated, http.StatusOK)
+		t.Cleanup(func() {
+			resp := requestE2EJSON(t, client, http.MethodDelete, requestBaseURL+"/api/sites/"+siteID+"?auto_apply=false", requestHostOverride, nil)
+			_ = resp.Body.Close()
+		})
 		wafID := "e2e-waf-policy"
 		wafCreate := postJSON(t, client, requestBaseURL+"/api/waf-policies?auto_apply=false", requestHostOverride, map[string]any{
 			"id":          wafID,
-			"site_id":     "landing",
+			"site_id":     siteID,
 			"enabled":     true,
 			"mode":        "detection",
 			"crs_enabled": true,
@@ -98,7 +106,7 @@ func TestE2EAPIExtendedMatrix(t *testing.T) {
 		accessID := "e2e-access-policy"
 		accessCreate := postJSON(t, client, requestBaseURL+"/api/access-policies?auto_apply=false", requestHostOverride, map[string]any{
 			"id":        accessID,
-			"site_id":   "landing",
+			"site_id":   siteID,
 			"enabled":   true,
 			"allowlist": []string{"127.0.0.1"},
 		})
@@ -109,7 +117,7 @@ func TestE2EAPIExtendedMatrix(t *testing.T) {
 		rateID := "e2e-rate-policy"
 		rateCreate := postJSON(t, client, requestBaseURL+"/api/rate-limit-policies?auto_apply=false", requestHostOverride, map[string]any{
 			"id":      rateID,
-			"site_id": "landing",
+			"site_id": siteID,
 			"enabled": true,
 			"limits": map[string]any{
 				"requests_per_second": 5,
@@ -156,7 +164,20 @@ func requestE2EJSON(t *testing.T, client *http.Client, method, endpoint, hostOve
 		}
 		return resp
 	}
-	return postJSON(t, client, endpoint, hostOverride, payload)
+	body, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal payload for %s: %v", endpoint, err)
+	}
+	req, err := newE2ERequest(method, endpoint, hostOverride, "application/json", strings.NewReader(string(body)))
+	if err != nil {
+		t.Fatalf("create %s %s request: %v", method, endpoint, err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := doPreparedE2ERequest(client, req, true)
+	if err != nil {
+		t.Fatalf("%s %s failed: %v", method, endpoint, err)
+	}
+	return resp
 }
 
 func assertE2EStatus(t *testing.T, resp *http.Response, action string, allowed ...int) {

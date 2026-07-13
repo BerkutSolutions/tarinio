@@ -11,6 +11,7 @@ $composeFile = Join-Path $repoRoot "deploy/compose/e2e/docker-compose.yml"
 $logDir = Join-Path $repoRoot ".work/logs"
 $logFile = Join-Path $logDir ("e2e-{0}.log" -f (Get-Date -Format "yyyyMMdd_HHmmss"))
 $baseUrl = "http://127.0.0.1:18080"
+$controlPlaneUrl = "http://127.0.0.1:18082"
 $runtimeUrl = "http://127.0.0.1:10080"
 $runtimeHealthUrl = "http://127.0.0.1:18081"
 $user = "e2e-admin"
@@ -64,7 +65,8 @@ try {
     Invoke-Compose -Arguments @("up", "-d", "--build")
     $stackStarted = $true
 
-    Wait-ForUrl "$baseUrl/healthz" "control-plane"
+    Wait-ForUrl "$controlPlaneUrl/healthz" "control-plane"
+    Wait-ForUrl "$baseUrl/login" "ui"
 
     $loginBody = @{ username = $user; password = $password } | ConvertTo-Json -Compress
     $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
@@ -98,6 +100,8 @@ try {
     $env:WAF_E2E_RUNTIME_HTTPS_URL = "https://127.0.0.1:10443"
     $env:WAF_E2E_RUNTIME_HEALTH_URL = $runtimeHealthUrl
     $env:WAF_E2E_RUNTIME_API_TOKEN = "e2e-test-runtime-token"
+    $env:WAF_E2E_MANAGEMENT_HOST = "e2e-management.test"
+    $env:WAF_E2E_ANTIBOT_HOST = "e2e-antibot.test"
 
     Push-Location $repoRoot
     try {

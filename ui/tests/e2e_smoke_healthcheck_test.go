@@ -16,18 +16,21 @@ import (
 const defaultE2EBrowserUserAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
 
 func TestE2ESmoke_LoginHealthcheckDashboard(t *testing.T) {
-	baseURL := strings.TrimRight(strings.TrimSpace(firstNonEmpty(os.Getenv("WAF_E2E_ANTIBOT_BASE_URL"), os.Getenv("WAF_E2E_BASE_URL"))), "/")
+	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL")), "/")
 	if baseURL == "" {
 		t.Skip("WAF_E2E_BASE_URL is not set; skipping e2e smoke test")
 	}
 	challengeURI := normalizeChallengeURI(strings.TrimSpace(os.Getenv("WAF_E2E_ANTIBOT_CHALLENGE_URI")))
 
-	endpoint, err := resolveAntibotEndpoint(baseURL)
+	client, requestBaseURL, requestHostOverride := newE2EClientAndBase(t, baseURL)
+	requestParsed, err := url.Parse(requestBaseURL)
 	if err != nil {
-		t.Fatalf("resolve e2e endpoint: %v", err)
+		t.Fatalf("parse request base URL: %v", err)
 	}
-	requestBaseURL := endpoint.requestBaseURL
-	requestHostOverride := endpoint.hostOverride
+	originalParsed, err := url.Parse(baseURL)
+	if err != nil {
+		t.Fatalf("parse original base URL: %v", err)
+	}
 	username := strings.TrimSpace(os.Getenv("WAF_E2E_USERNAME"))
 	if username == "" {
 		username = "admin"
@@ -36,8 +39,6 @@ func TestE2ESmoke_LoginHealthcheckDashboard(t *testing.T) {
 	if password == "" {
 		password = "admin"
 	}
-
-	client := newE2EHTTPClient(requestBaseURL, true)
 
 	if err := waitForHTTP(client, requestBaseURL+"/login", requestHostOverride, 90*time.Second); err != nil {
 		t.Fatalf("ui is not ready: %v", err)
@@ -78,11 +79,11 @@ func TestE2ESmoke_LoginHealthcheckDashboard(t *testing.T) {
 	}
 
 	if requestHostOverride != "" {
-		client.Jar.SetCookies(endpoint.requestParsed, loginResp.Cookies())
+		client.Jar.SetCookies(requestParsed, loginResp.Cookies())
 	}
-	cookies := client.Jar.Cookies(endpoint.originalParsed)
+	cookies := client.Jar.Cookies(originalParsed)
 	if len(cookies) == 0 {
-		cookies = client.Jar.Cookies(endpoint.requestParsed)
+		cookies = client.Jar.Cookies(requestParsed)
 	}
 	hasSession := false
 	for _, c := range cookies {

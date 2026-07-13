@@ -14,6 +14,7 @@ import (
 	"waf/control-plane/internal/certificates"
 	"waf/control-plane/internal/easysiteprofiles"
 	"waf/control-plane/internal/jobs"
+	"waf/control-plane/internal/managementhosts"
 	"waf/control-plane/internal/ratelimitpolicies"
 	"waf/control-plane/internal/revisions"
 	"waf/control-plane/internal/revisionsnapshots"
@@ -65,6 +66,10 @@ type AntiDDoSSettingsReader interface {
 	Get() (antiddos.Settings, error)
 }
 
+type ManagementHostsReader interface {
+	Get() (managementhosts.Settings, error)
+}
+
 type RevisionMetadataStore interface {
 	SavePending(revision revisions.Revision) error
 	List() ([]revisions.Revision, error)
@@ -93,6 +98,7 @@ type RevisionCompileService struct {
 	easySiteProfiles  EasySiteProfileStateReader
 	virtualPatches    VirtualPatchStateReader
 	antiDDoSSettings  AntiDDoSSettingsReader
+	managementHosts   ManagementHostsReader
 	materials         CertificateMaterialReader
 	audits            *AuditService
 	coord             DistributedCoordinator
@@ -118,6 +124,7 @@ func NewRevisionCompileService(
 	rateLimitPolicies RateLimitPolicyStateReader,
 	easySiteProfiles EasySiteProfileStateReader,
 	antiDDoSSettings AntiDDoSSettingsReader,
+	managementHosts ManagementHostsReader,
 	materials CertificateMaterialReader,
 	audits *AuditService,
 ) *RevisionCompileService {
@@ -134,6 +141,7 @@ func NewRevisionCompileService(
 		rateLimitPolicies: rateLimitPolicies,
 		easySiteProfiles:  easySiteProfiles,
 		antiDDoSSettings:  antiDDoSSettings,
+		managementHosts:   managementHosts,
 		materials:         materials,
 		audits:            audits,
 		coord:             NewNoopDistributedCoordinator(),
@@ -281,6 +289,15 @@ func (s *RevisionCompileService) buildSnapshot() (revisionsnapshots.Snapshot, []
 		}
 		antiDDoSSettings = item
 	}
+	managementHosts := []string(nil)
+	managementHostsConfigured := false
+	if s.managementHosts != nil {
+		item, err := s.managementHosts.Get()
+		if err != nil {
+			return revisionsnapshots.Snapshot{}, nil, err
+		}
+		managementHosts, managementHostsConfigured = item.Hosts, item.Migrated
+	}
 	materialItems := make([]revisionsnapshots.MaterialContent, 0, len(certificateItems))
 	for _, certificate := range certificateItems {
 		record, certificatePEM, privateKeyPEM, err := s.materials.Read(certificate.ID)
@@ -295,16 +312,18 @@ func (s *RevisionCompileService) buildSnapshot() (revisionsnapshots.Snapshot, []
 	}
 
 	return revisionsnapshots.Snapshot{
-		Sites:             siteItems,
-		Upstreams:         upstreamItems,
-		Certificates:      certificateItems,
-		TLSConfigs:        tlsConfigItems,
-		WAFPolicies:       wafPolicyItems,
-		AccessPolicies:    accessPolicyItems,
-		RateLimitPolicies: rateLimitPolicyItems,
-		EasySiteProfiles:  easySiteProfileItems,
-		AntiDDoSSettings:  antiDDoSSettings,
-		VirtualPatches:    collectActiveVirtualPatches(siteItems, s.virtualPatches),
+		Sites:                     siteItems,
+		Upstreams:                 upstreamItems,
+		Certificates:              certificateItems,
+		TLSConfigs:                tlsConfigItems,
+		WAFPolicies:               wafPolicyItems,
+		AccessPolicies:            accessPolicyItems,
+		RateLimitPolicies:         rateLimitPolicyItems,
+		EasySiteProfiles:          easySiteProfileItems,
+		AntiDDoSSettings:          antiDDoSSettings,
+		VirtualPatches:            collectActiveVirtualPatches(siteItems, s.virtualPatches),
+		ManagementHosts:           managementHosts,
+		ManagementHostsConfigured: managementHostsConfigured,
 	}, materialItems, nil
 }
 

@@ -346,7 +346,7 @@
   "app.sites": "Сервисы",
   "app.tls": "TLS / Сертификаты",
   "app.user.noRoles": "Нет ролей",
-  "app.version": "Версия 1.4.9",
+  "app.version": "Версия 1.5.0",
   "auth.2fa.challengeMissing": "Запрос 2FA отсутствует. Пожалуйста, войдите снова.",
   "auth.2fa.code": "Код 2FA",
   "auth.2fa.codeRequired": "Нужен код 2FA",
@@ -2311,4 +2311,16 @@
   "sites.easy.upstream.healthCheckPassive": "Пассивная проверка работоспособности",
   "sites.easy.tab.httpheaders.title": "HTTP и заголовки",
   "sites.easy.tab.httpheaders.subtitle": "Методы, протоколы и заголовки"
+  ,"settings.tabs.managementHosts": "Управляющие хосты"
+  ,"settings.managementHosts.title": "Управляющие хосты"
+  ,"settings.managementHosts.subtitle": "Явные публичные хосты для маршрутов самоуправления WAF."
+  ,"settings.managementHosts.warning": "Сохраните изменения, затем скомпилируйте и примените ревизию. Аутентификация и ролевая модель доступа сохраняются."
+  ,"settings.managementHosts.label": "Одно DNS-имя или IP-адрес в строке"
+  ,"settings.managementHosts.ready": "Сохранённая конфигурация активна."
+  ,"settings.managementHosts.setupRequired": "Требуется настройка. При недоступности панели используйте внутренний CLI."
+  ,"settings.managementHosts.saved": "Управляющие хосты сохранены."
+  ,"settings.managementHosts.applyRequired": "Хосты сохранены. Выполните compile/apply ревизии для активации."
+  ,"settings.managementHosts.drift": "Внимание: активный артефакт среды выполнения не содержит ожидаемую защиту. Используйте внутренний CLI и примените исправленную ревизию."
+  ,"sites.tls.confirmRebind": "Заменить привязку сертификата для {{site}} на {{certificate}}?"
+  ,"sites.tls.rebindCancelled": "Перепривязка TLS-сертификата отменена."
 }

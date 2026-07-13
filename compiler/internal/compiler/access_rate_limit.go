@@ -104,7 +104,7 @@ func RenderAccessRateLimitArtifacts(
 			continue
 		}
 		accessPolicy, ok := accessBySite[site.ID]
-		if !ok {
+		if isManagementSite(site) || !ok {
 			accessPolicy = AccessPolicyInput{
 				SiteID:        site.ID,
 				DefaultAction: "allow",
@@ -178,7 +178,7 @@ func RenderAccessRateLimitArtifacts(
 		}
 
 		accessPolicy, ok := accessBySite[site.ID]
-		if !ok {
+		if isManagementSite(site) || !ok {
 			accessPolicy = AccessPolicyInput{
 				SiteID:        site.ID,
 				DefaultAction: "allow",

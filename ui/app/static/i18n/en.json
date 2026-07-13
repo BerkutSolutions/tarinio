@@ -346,7 +346,7 @@
   "app.sites": "Services",
   "app.tls": "TLS / Certificates",
   "app.user.noRoles": "No roles",
-  "app.version": "v1.4.9",
+  "app.version": "v1.5.0",
   "auth.2fa.challengeMissing": "2FA challenge is missing. Please sign in again.",
   "auth.2fa.code": "2FA code",
   "auth.2fa.codeRequired": "2FA code is required",
@@ -2322,4 +2322,16 @@
   "sites.easy.upstream.healthCheckPassive": "Passive health check",
   "sites.easy.tab.httpheaders.title": "HTTP & Headers",
   "sites.easy.tab.httpheaders.subtitle": "Methods, protocols and headers"
+  ,"settings.tabs.managementHosts": "Management hosts"
+  ,"settings.managementHosts.title": "Management hosts"
+  ,"settings.managementHosts.subtitle": "Explicit public hosts permitted to use WAF self-management routes."
+  ,"settings.managementHosts.warning": "Save changes, then compile and apply a revision. Authentication and RBAC remain enforced."
+  ,"settings.managementHosts.label": "One DNS name or IP address per line"
+  ,"settings.managementHosts.ready": "Persisted configuration is active."
+  ,"settings.managementHosts.setupRequired": "Setup required. Use the internal CLI if this public panel is unavailable."
+  ,"settings.managementHosts.saved": "Management hosts saved."
+  ,"settings.managementHosts.applyRequired": "Management hosts saved. Compile and apply a revision to activate them."
+  ,"settings.managementHosts.drift": "Warning: active runtime artifact does not contain the expected management safeguard. Use the internal CLI and apply a corrected revision."
+  ,"sites.tls.confirmRebind": "Replace the TLS certificate binding for {{site}} with {{certificate}}?"
+  ,"sites.tls.rebindCancelled": "TLS certificate rebind was cancelled."
 }

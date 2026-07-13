@@ -111,6 +111,40 @@ CLI учитывает:
 .\waf-cli.ps1 api DELETE /api/sites/site-a
 ```
 
+## Восстановление management host
+
+Если публичная панель заблокирована CRS, не изменяйте `.env` и не редактируйте
+сгенерированные nginx/ModSecurity-файлы. Используйте внутренний control-plane CLI
+с учётной записью, которая имеет `settings.general.write` и `revisions.write`.
+
+1. Проверьте состояние и сохраните текущую версию настройки:
+
+```powershell
+.\waf-cli.ps1 --json api GET /api/settings/management-hosts
+.\waf-cli.ps1 --json api GET /api/settings/management-hosts/status
+```
+
+2. Создайте JSON с новым публичным DNS/IP и версией из первого ответа:
+
+```json
+{"management_hosts":["panel.example.com"],"version":3}
+```
+
+3. Сохраните настройку, затем скомпилируйте и примените новую ревизию:
+
+```powershell
+.\waf-cli.ps1 api PUT /api/settings/management-hosts --file .\management-hosts.json
+.\waf-cli.ps1 revisions compile
+.\waf-cli.ps1 revisions apply rev-000123
+```
+
+4. Повторите `GET /api/settings/management-hosts/status`. Значение `drift` должно
+быть `false`; при `true` не выполняйте ручной reload, а исправьте входные данные и
+выпустите следующую ревизию.
+
+Аутентификация и RBAC control-plane действуют и на этот аварийный путь; каждое
+изменение сохраняется в audit log.
+
 ## Быстрые примеры
 
 ```powershell

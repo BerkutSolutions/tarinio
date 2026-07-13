@@ -245,6 +245,10 @@ export async function upsertSiteResources(draft, ctx, existingSite, existingUpst
       const importMode = String(draft.certificate_authority_server || "").trim().toLowerCase() === "import";
       const isCurrentTLSCertificate = deps.normalizeSiteID(existingTLSConfig?.site_id) === deps.normalizeSiteID(sitePayload.id) &&
         String(existingTLSConfig?.certificate_id || "").trim().toLowerCase() === certificateID;
+	  if (existingTLSConfig && !existingTLSBoundToOldSite && !isCurrentTLSCertificate &&
+	    !window.confirm(ctx.t("sites.tls.confirmRebind", { site: sitePayload.id, certificate: certificateID }))) {
+	    throw new Error(ctx.t("sites.tls.rebindCancelled"));
+	  }
       if (importMode && !hadCertificateBefore) {
         throw new Error(ctx.t("sites.tls.importRequired"));
       }

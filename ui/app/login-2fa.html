@@ -12,36 +12,12 @@
     .waf-fallback-title { margin: 0; font-size: 24px; font-weight: 700; }
     .waf-fallback-sub { margin: 10px 0 0; font-size: 14px; color: #afc3e7; }
   </style>
-  <script>
-    (function initStaticChallengeRecovery() {
-      const markerKey = "waf_login_2fa_static_challenge_refresh_at";
-      const cooldownMs = 8000;
-      window.__wafRedirectLogin2faToChallenge = function redirectLogin2faToChallenge() {
-        try {
-          const now = Date.now();
-          const lastRefresh = Number(window.sessionStorage.getItem(markerKey) || "0");
-          if (Number.isFinite(lastRefresh) && now - lastRefresh < cooldownMs) {
-            return;
-          }
-          window.sessionStorage.setItem(markerKey, String(now));
-        } catch (_) {
-          // Ignore sessionStorage failures and still attempt challenge recovery.
-        }
-        const params = new URLSearchParams();
-        params.set("return_uri", window.location.pathname || "/login/2fa");
-        if (window.location.search && window.location.search.length > 1) {
-          params.set("return_args", window.location.search.slice(1));
-        }
-        window.location.replace(`/challenge?${params.toString()}`);
-      };
-    }());
-  </script>
   <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon16.png">
   <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon32.png">
   <link rel="icon" type="image/png" sizes="48x48" href="/static/favicon48.png">
   <link rel="icon" type="image/png" sizes="64x64" href="/static/favicon64.png">
-  <link rel="stylesheet" href="/static/styles.css?v=20260712-login-challenge-1" onerror="window.__wafRedirectLogin2faToChallenge && window.__wafRedirectLogin2faToChallenge()">
-  <link rel="stylesheet" href="/static/waf.css?v=20260712-login-challenge-1" onerror="window.__wafRedirectLogin2faToChallenge && window.__wafRedirectLogin2faToChallenge()">
+  <link rel="stylesheet" href="/static/styles.css?v=20260713-login-session-1">
+  <link rel="stylesheet" href="/static/waf.css?v=20260713-login-session-1">
 </head>
 <body class="login-body">
   <div class="login-wrapper">
@@ -66,6 +42,6 @@
       </form>
     </div>
   </div>
-  <script type="module" src="/static/js/login-2fa.js?v=20260712-login-challenge-1" onerror="window.__wafRedirectLogin2faToChallenge && window.__wafRedirectLogin2faToChallenge()"></script>
+  <script type="module" src="/static/js/login-2fa.js?v=20260713-login-session-1"></script>
 </body>
 </html>

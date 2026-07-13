@@ -224,11 +224,10 @@ func TestModsec_ManagementSite_SafeguardPrecedesArtifactStructuredExclusionsAndR
 	}
 	byPath := artifactsByPath(artifacts)
 	conf := string(byPath["nginx/easy/control-plane-access.conf"].Content)
-	safeguardIndex := strings.Index(conf, `ctl:ruleEngine=Off`)
-	if safeguardIndex == -1 {
-		t.Fatalf("expected management modsecurity safeguard in rendered site.conf, got:\n%s", conf)
+	if strings.Contains(conf, "modsecurity on;") || strings.Contains(conf, "modsecurity_rules_file") {
+		t.Fatalf("management easy snippet must not enable ModSecurity, got:\n%s", conf)
 	}
-	for _, expected := range []string{"api/.*", "static/.*", "dashboard(?:/.*)?", "services(?:/.*)?", "login(?:/.*)?", "login/2fa(?:/.*)?", "auth(?:/.*)?", "auth/verify(?:/.*)?"} {
+	for _, expected := range []string{"api/administration(?:/.*)?", "api/management-hosts(?:/.*)?", "static/.*", "dashboard(?:/.*)?", "services(?:/.*)?", "login(?:/.*)?", "login/2fa(?:/.*)?", "auth(?:/.*)?", "auth/verify(?:/.*)?"} {
 		if !strings.Contains(conf, expected) {
 			t.Fatalf("expected management safeguard to include route fragment %q, got:\n%s", expected, conf)
 		}
@@ -244,6 +243,25 @@ func TestModsec_ManagementSite_SafeguardPrecedesArtifactStructuredExclusionsAndR
 	}
 	if structuredIndex > rawIndex {
 		t.Fatalf("expected structured exclusions before raw custom rule in modsecurity artifact, got:\n%s", artifact)
+	}
+}
+
+func TestTab08ExplicitManagementSnapshotGeneratesOnlyManagementSafeguard(t *testing.T) {
+	sites := []SiteInput{
+		{ID: "panel", Enabled: true, PrimaryHost: "panel.example", ListenHTTP: true, Management: true, ManagementConfigured: true},
+		{ID: "ordinary", Enabled: true, PrimaryHost: "ordinary.example", ListenHTTP: true, ManagementConfigured: true},
+	}
+	profiles := []EasyProfileInput{defaultEasyProfileForSite("panel"), defaultEasyProfileForSite("ordinary")}
+	artifacts, err := RenderEasyArtifacts(sites, profiles)
+	if err != nil {
+		t.Fatalf("render tab08 artifacts: %v", err)
+	}
+	byPath := artifactsByPath(artifacts)
+	if strings.Contains(string(byPath["nginx/easy/panel.conf"].Content), "modsecurity on;") {
+		t.Fatal("management tab08 artifact enables ModSecurity")
+	}
+	if strings.Contains(string(byPath["nginx/easy/ordinary.conf"].Content), "ctl:ruleEngine=Off") {
+		t.Fatal("ordinary tab08 artifact inherited safeguard")
 	}
 }
 
@@ -274,7 +292,7 @@ func TestModsec_ManagementSite_ModSecurityToggleControlsEasyArtifact(t *testing.
 		t.Fatalf("expected management-site modsecurity artifact to enable modsecurity, got:\n%s", contentOn)
 	}
 	confOn := string(byPathOn["nginx/easy/management-site.conf"].Content)
-	for _, marker := range []string{"login(?:/.*)?", "login/2fa(?:/.*)?", "api/.*", "static/.*"} {
+	for _, marker := range []string{"login(?:/.*)?", "login/2fa(?:/.*)?", "api/administration(?:/.*)?", "static/.*"} {
 		if !strings.Contains(confOn, marker) {
 			t.Fatalf("expected management-site nginx config to include safeguard marker %q, got:\n%s", marker, confOn)
 		}
@@ -379,7 +397,10 @@ func TestModsec_ManagementSite_CRSVariantsKeepSafeguardWhenModSecurityEnabled(t 
 			}
 			byPath := artifactsByPath(artifacts)
 			conf := string(byPath["nginx/easy/management-site.conf"].Content)
-			for _, marker := range []string{"ctl:ruleEngine=Off", "login(?:/.*)?", "login/2fa(?:/.*)?", "api/.*", "static/.*"} {
+			if strings.Contains(conf, "modsecurity on;") || strings.Contains(conf, "modsecurity_rules_file") {
+				t.Fatalf("management-site must not enable ModSecurity for %s, got:\n%s", tc.name, conf)
+			}
+			for _, marker := range []string{"login(?:/.*)?", "login/2fa(?:/.*)?", "api/administration(?:/.*)?", "static/.*"} {
 				if !strings.Contains(conf, marker) {
 					t.Fatalf("expected management-site safeguard marker %q for %s, got:\n%s", marker, tc.name, conf)
 				}

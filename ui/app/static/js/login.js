@@ -1,12 +1,10 @@
 import { api } from "./api.js";
 import { getBrowserLanguage, getLanguage, setLanguage, t } from "./i18n.js";
-import { buildChallengeUrl, checkEntryAccess, onboardingUrl, secureAppUrl } from "./guard.js";
+import { checkEntryAccess, onboardingUrl, secureAppUrl } from "./guard.js";
 import { BerkutWebAuthn } from "./webauthn.js";
 
 const challengeStorageKey = "waf_login_2fa_challenge_id";
 const nextStorageKey = "waf_login_next";
-const challengeRefreshMarkerKey = "waf_login_page_challenge_refresh_at";
-const challengeRefreshCooldownMs = 8000;
 
 async function nextLocation() {
   const setup = await api.get("/api/setup/status");
@@ -62,53 +60,6 @@ function webAuthnSupported() {
   return BerkutWebAuthn && BerkutWebAuthn.supported && BerkutWebAuthn.supported();
 }
 
-function shouldRefreshChallenge(status) {
-  const code = Number(status || 0);
-  return code === 403 || code === 429;
-}
-
-function redirectToChallenge() {
-  try {
-    const lastAttempt = Number(sessionStorage.getItem(challengeRefreshMarkerKey) || 0);
-    if (Number.isFinite(lastAttempt) && Date.now() - lastAttempt < challengeRefreshCooldownMs) {
-      return false;
-    }
-    sessionStorage.setItem(challengeRefreshMarkerKey, String(Date.now()));
-  } catch {
-    // best-effort only
-  }
-  window.location.replace(buildChallengeUrl(window.location.pathname || "/login", window.location.search || ""));
-  return true;
-}
-
-async function ensureChallengeAccess() {
-  let response;
-  try {
-    response = await fetch("/api/auth/me", {
-      credentials: "include",
-      headers: { Accept: "application/json" },
-    });
-  } catch {
-    return true;
-  }
-  if (shouldRefreshChallenge(response.status)) {
-    redirectToChallenge();
-    return false;
-  }
-  return true;
-}
-
-function installChallengeRecheckHandlers() {
-  const handleReturnToPage = () => {
-    if (document.visibilityState === "hidden") {
-      return;
-    }
-    void ensureChallengeAccess();
-  };
-  document.addEventListener("visibilitychange", handleReturnToPage);
-  window.addEventListener("focus", handleReturnToPage);
-}
-
 async function tryPasskeyLogin(usernameRaw) {
   const username = String(usernameRaw || "").trim();
   const begin = await api.post("/api/auth/passkeys/login/begin", { username });
@@ -139,10 +90,6 @@ async function bootstrap() {
   } catch {
     // keep login screen visible
   }
-  installChallengeRecheckHandlers();
-  if (!await ensureChallengeAccess()) {
-    return;
-  }
   showReasonFromQuery();
 
   const switcher = document.getElementById("language-switcher");
@@ -168,9 +115,6 @@ async function bootstrap() {
       clearError();
       passkeyBtn.disabled = true;
       try {
-        if (!await ensureChallengeAccess()) {
-          return;
-        }
         const result = await tryPasskeyLogin(usernameInput?.value || "");
         if (result && result.requires_2fa) {
           sessionStorage.setItem(challengeStorageKey, result.challenge_id || "");
@@ -181,9 +125,6 @@ async function bootstrap() {
         window.location.href = await nextLocation();
       } catch (error) {
         const errorKey = BerkutWebAuthn.errorKey ? BerkutWebAuthn.errorKey(error) : "";
-        if (shouldRefreshChallenge(error?.status) && redirectToChallenge()) {
-          return;
-        }
         if (Number(error?.status || 0) === 404) {
           showError(t("auth.passkeys.notAvailable"));
         } else {
@@ -208,9 +149,6 @@ async function bootstrap() {
       oidcBtn.hidden = true;
     }
     oidcBtn.addEventListener("click", async () => {
-      if (!await ensureChallengeAccess()) {
-        return;
-      }
       window.location.href = `/api/auth/oidc/start?next=${encodeURIComponent(currentNext())}`;
     });
   }
@@ -223,9 +161,6 @@ async function bootstrap() {
       submit.disabled = true;
     }
     try {
-      if (!await ensureChallengeAccess()) {
-        return;
-      }
       const result = await api.post("/api/auth/login", {
         username: usernameInput?.value,
         password: document.getElementById("password")?.value,
@@ -238,9 +173,6 @@ async function bootstrap() {
       }
       window.location.href = await nextLocation();
     } catch (error) {
-      if (shouldRefreshChallenge(error?.status) && redirectToChallenge()) {
-        return;
-      }
       if (error?.status === 401) {
         showError(t("login.errorInvalidCredentials"));
       } else {

@@ -83,6 +83,13 @@ func buildModSecurityExclusionRules(rules []ModSecurityExclusionRuleInput) []str
 		if len(rule.Targets) > 0 {
 			for _, target := range rule.Targets {
 				for _, excludedRuleID := range rule.RuleIDs {
+					// REQUEST_URI is the complete target of common path rules. Removing
+					// just that target does not suppress the rule in libmodsecurity, so
+					// remove the explicitly scoped rule for this request instead.
+					if strings.EqualFold(strings.TrimSpace(target), "REQUEST_URI") {
+						actions = append(actions, fmt.Sprintf("ctl:ruleRemoveById=%d", excludedRuleID))
+						continue
+					}
 					actions = append(actions, fmt.Sprintf("ctl:ruleRemoveTargetById=%d;%s", excludedRuleID, target))
 				}
 			}
