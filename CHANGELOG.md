@@ -7,6 +7,7 @@
 ### Security
 
 - При падении Trivy filesystem scan в GitHub Actions в журнал теперь выводится краткая сводка правила и затронутого пути, поэтому причина не теряется в SARIF-артефакте.
+- Обновлены `golang.org/x/crypto`, `golang.org/x/net` и `golang.org/x/text`; SARIF от Trivy теперь применяет установленный policy-порог `MEDIUM,HIGH,CRITICAL`, не превращая записи уровня `UNKNOWN` без доступного исправления в ложный отказ CI.
 
 ### Monitoring, requests and telemetry
 
