@@ -55,6 +55,19 @@ func TestE2EAdminPanelModSecurityBypassesEveryAdministrativeRoute(t *testing.T) 
 	if revisionID := e2eCompileAndApply(t, client, baseURL, host); revisionID == "" {
 		t.Fatal("enable ModSecurity probe and apply management revision failed")
 	}
+	// The login HTML is protected, but its module, stylesheet and icons must not
+	// receive a challenge document. Otherwise browsers reject the HTML response
+	// as a JavaScript module because its MIME type is text/html.
+	anonymousClient, anonymousBaseURL, _ := newE2EClientAndBase(t, activeRuntimeURL)
+	assetResp, err := doE2ERequest(anonymousClient, http.MethodGet, anonymousBaseURL+"/static/js/login.js", host, "text/javascript,*/*", nil, false)
+	if err != nil {
+		t.Fatalf("request unauthenticated management login module: %v", err)
+	}
+	assetBody := mustReadBody(t, assetResp.Body)
+	assetContentType := strings.ToLower(assetResp.Header.Get("Content-Type"))
+	if assetResp.StatusCode != http.StatusOK || !strings.Contains(assetContentType, "javascript") || strings.Contains(strings.ToLower(assetBody), "<html") {
+		t.Fatalf("management login module must bypass challenge: status=%d content-type=%q body=%s", assetResp.StatusCode, assetContentType, assetBody)
+	}
 	if activeRuntimeURL != runtimeURL {
 		client, baseURL, _ = newE2EClientAndBase(t, activeRuntimeURL)
 		loginE2EUser(t, client, baseURL, host)

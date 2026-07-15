@@ -85,6 +85,24 @@ func TestRenderSiteUpstreamArtifacts_ManagementSiteRoutesAPIToControlPlane(t *te
 		if !strings.Contains(block, "include /etc/waf/nginx/ratelimits/control-plane-access.conf;") {
 			t.Fatalf("management %s must include site-wide rate and connection limits, got: %s", path, block)
 		}
+		if !strings.Contains(block, `add_header Cache-Control "no-store" always;`) {
+			t.Fatalf("management %s must not be served from a stale browser cache, got: %s", path, block)
+		}
+	}
+
+	staticStart := strings.Index(content, "location ^~ /static/ {")
+	if staticStart < 0 {
+		t.Fatal("expected management site static location")
+	}
+	staticBlock := content[staticStart:]
+	if next := strings.Index(staticBlock, "\n    location "); next >= 0 {
+		staticBlock = staticBlock[:next]
+	}
+	if strings.Contains(staticBlock, "include /etc/waf/nginx/easy/control-plane-access.conf;") {
+		t.Fatalf("management static assets must bypass the easy anti-bot guard, got: %s", staticBlock)
+	}
+	if !strings.Contains(staticBlock, "modsecurity off;") || !strings.Contains(staticBlock, "proxy_pass http://ui:80;") {
+		t.Fatalf("management static assets must be served directly by UI, got: %s", staticBlock)
 	}
 }
 

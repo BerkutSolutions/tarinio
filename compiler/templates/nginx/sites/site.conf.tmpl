@@ -145,6 +145,7 @@ server {
     location = /login {
         limit_req zone=waf_management_login_req burst=20 nodelay;
 	include /etc/waf/nginx/ratelimits/{{ .SiteID }}.conf;
+        add_header Cache-Control "no-store" always;
         # Management login must pass through the same challenge guard as the
         # rest of the site. The challenge and verification locations are
         # separate and therefore cannot form a redirect loop here.
@@ -159,6 +160,7 @@ server {
     location = /login/2fa {
         limit_req zone=waf_management_login_req burst=20 nodelay;
 	include /etc/waf/nginx/ratelimits/{{ .SiteID }}.conf;
+        add_header Cache-Control "no-store" always;
         include /etc/waf/nginx/easy/{{ .SiteID }}.conf;
         proxy_pass {{ .UIProxyTarget }};
         proxy_set_header Host $http_host;
@@ -174,8 +176,15 @@ server {
 {{- if .PassHostHeader }}
         proxy_set_header Host $http_host;
 {{- end }}
+{{- if .IsManagementSite }}
+        # The login and challenge documents load their own modules, styles and
+        # icons. Never return a challenge HTML document for a static asset.
+        modsecurity off;
+        proxy_pass {{ .UIProxyTarget }};
+{{- else }}
         include /etc/waf/nginx/easy/{{ .SiteID }}.conf;
         proxy_pass {{ .ProxyPassTarget }};
+{{- end }}
     }
 
 {{- if .IsManagementSite }}

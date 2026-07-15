@@ -59,6 +59,12 @@ func shouldSkipRequestTelemetry(item parsedAccess) bool {
 	if shouldSkipInternalSite(item.siteID) {
 		return true
 	}
+	// Static assets do not describe user traffic or an attack. Filtering them
+	// at ingest keeps the Requests view and its storage free of the WAF UI's
+	// modules, icons, styles and favicon reloads.
+	if shouldIgnoreBurstPath(item.path) {
+		return true
+	}
 	host := strings.ToLower(strings.TrimSpace(item.host))
 	return host == "" || isInternalManagementHost(host) || sanitizeSiteID(item.siteID) == ""
 }
