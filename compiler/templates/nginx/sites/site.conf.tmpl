@@ -176,15 +176,8 @@ server {
 {{- if .PassHostHeader }}
         proxy_set_header Host $http_host;
 {{- end }}
-{{- if .IsManagementSite }}
-        # The login and challenge documents load their own modules, styles and
-        # icons. Never return a challenge HTML document for a static asset.
-        modsecurity off;
-        proxy_pass {{ .UIProxyTarget }};
-{{- else }}
         include /etc/waf/nginx/easy/{{ .SiteID }}.conf;
         proxy_pass {{ .ProxyPassTarget }};
-{{- end }}
     }
 
 {{- if .IsManagementSite }}

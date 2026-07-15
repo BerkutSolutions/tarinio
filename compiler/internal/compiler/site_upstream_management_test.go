@@ -98,11 +98,8 @@ func TestRenderSiteUpstreamArtifacts_ManagementSiteRoutesAPIToControlPlane(t *te
 	if next := strings.Index(staticBlock, "\n    location "); next >= 0 {
 		staticBlock = staticBlock[:next]
 	}
-	if strings.Contains(staticBlock, "include /etc/waf/nginx/easy/control-plane-access.conf;") {
-		t.Fatalf("management static assets must bypass the easy anti-bot guard, got: %s", staticBlock)
-	}
-	if !strings.Contains(staticBlock, "modsecurity off;") || !strings.Contains(staticBlock, "proxy_pass http://ui:80;") {
-		t.Fatalf("management static assets must be served directly by UI, got: %s", staticBlock)
+	if !strings.Contains(staticBlock, "include /etc/waf/nginx/easy/control-plane-access.conf;") {
+		t.Fatalf("management static assets must keep the site anti-bot guard, got: %s", staticBlock)
 	}
 }
 

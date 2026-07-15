@@ -47,6 +47,10 @@ func TestE2EAdminPanelModSecurityBypassesEveryAdministrativeRoute(t *testing.T) 
 		"path":    "modsec/e2e-management-all-routes.conf",
 		"content": `SecRule ARGS:e2e_modsec_probe "@streq enabled" "id:100199,phase:2,deny,status:418,log"`,
 	}
+	antibot := mapGetOrCreate(protected, "security_antibot")
+	antibot["enabled"] = true
+	antibot["antibot_challenge"] = "javascript"
+	antibot["antibot_uri"] = "/challenge"
 	t.Cleanup(func() {
 		e2ePutProfile(t, client, baseURL, host, siteID, original)
 		_ = e2eCompileAndApply(t, client, baseURL, host)
@@ -55,18 +59,66 @@ func TestE2EAdminPanelModSecurityBypassesEveryAdministrativeRoute(t *testing.T) 
 	if revisionID := e2eCompileAndApply(t, client, baseURL, host); revisionID == "" {
 		t.Fatal("enable ModSecurity probe and apply management revision failed")
 	}
-	// The login HTML is protected, but its module, stylesheet and icons must not
-	// receive a challenge document. Otherwise browsers reject the HTML response
-	// as a JavaScript module because its MIME type is text/html.
+	// A new browser must see a challenge before the login HTML. Once verification
+	// sets the anti-bot cookie, the original page and its module must load without
+	// another challenge or a substituted HTML response.
 	anonymousClient, anonymousBaseURL, _ := newE2EClientAndBase(t, activeRuntimeURL)
+	loginResp, err := doE2ERequest(anonymousClient, http.MethodGet, anonymousBaseURL+"/login", host, "text/html", nil, false)
+	if err != nil {
+		t.Fatalf("open unauthenticated management login: %v", err)
+	}
+	if loginResp.StatusCode != http.StatusFound && loginResp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("unauthenticated management login must redirect to challenge: status=%d body=%s", loginResp.StatusCode, mustReadBody(t, loginResp.Body))
+	}
+	challengeLocation := strings.TrimSpace(loginResp.Header.Get("Location"))
+	if !strings.Contains(challengeLocation, "/challenge") {
+		t.Fatalf("unauthenticated management login must redirect to challenge, got %q", challengeLocation)
+	}
+	if !strings.Contains(strings.ToLower(loginResp.Header.Get("Cache-Control")), "no-store") {
+		t.Fatalf("management login redirect must prevent stale HTML caching, got Cache-Control=%q", loginResp.Header.Get("Cache-Control"))
+	}
+	_ = loginResp.Body.Close()
+	challengeLocation = localAntibotLocation(challengeLocation)
+
+	challengePageURL := absolutizeLocation(anonymousBaseURL, challengeLocation)
+	challengeResp, err := doE2ERequest(anonymousClient, http.MethodGet, challengePageURL, host, "text/html", nil, false)
+	if err != nil {
+		t.Fatalf("open management challenge page: %v", err)
+	}
+	challengeBody := strings.ToLower(mustReadBody(t, challengeResp.Body))
+	if challengeResp.StatusCode != http.StatusOK || (!strings.Contains(challengeBody, "verification") && !strings.Contains(challengeBody, "challenge")) {
+		t.Fatalf("management challenge page contract mismatch: status=%d body=%s", challengeResp.StatusCode, challengeBody)
+	}
+	verifyURL, err := buildVerifyURL(anonymousBaseURL, challengeLocation, antibotVerifyURI("/challenge"))
+	if err != nil {
+		t.Fatalf("build management challenge verify URL: %v", err)
+	}
+	verifyResp, err := doE2ERequest(anonymousClient, http.MethodGet, verifyURL, host, "text/html", nil, false)
+	if err != nil {
+		t.Fatalf("verify management challenge: %v", err)
+	}
+	if verifyResp.StatusCode != http.StatusFound && verifyResp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("management challenge verification must redirect: status=%d body=%s", verifyResp.StatusCode, mustReadBody(t, verifyResp.Body))
+	}
+	_ = verifyResp.Body.Close()
+
+	verifiedLoginResp, err := doE2ERequest(anonymousClient, http.MethodGet, anonymousBaseURL+"/login", host, "text/html", nil, false)
+	if err != nil {
+		t.Fatalf("open verified management login: %v", err)
+	}
+	verifiedLoginBody := strings.ToLower(mustReadBody(t, verifiedLoginResp.Body))
+	if verifiedLoginResp.StatusCode < http.StatusOK || verifiedLoginResp.StatusCode >= http.StatusMultipleChoices || strings.Contains(verifiedLoginBody, "challenge") {
+		t.Fatalf("verified management login must return UI HTML: status=%d body=%s", verifiedLoginResp.StatusCode, verifiedLoginBody)
+	}
+
 	assetResp, err := doE2ERequest(anonymousClient, http.MethodGet, anonymousBaseURL+"/static/js/login.js", host, "text/javascript,*/*", nil, false)
 	if err != nil {
-		t.Fatalf("request unauthenticated management login module: %v", err)
+		t.Fatalf("request verified management login module: %v", err)
 	}
 	assetBody := mustReadBody(t, assetResp.Body)
 	assetContentType := strings.ToLower(assetResp.Header.Get("Content-Type"))
 	if assetResp.StatusCode != http.StatusOK || !strings.Contains(assetContentType, "javascript") || strings.Contains(strings.ToLower(assetBody), "<html") {
-		t.Fatalf("management login module must bypass challenge: status=%d content-type=%q body=%s", assetResp.StatusCode, assetContentType, assetBody)
+		t.Fatalf("verified management login module must be JavaScript, got status=%d content-type=%q body=%s", assetResp.StatusCode, assetContentType, assetBody)
 	}
 	if activeRuntimeURL != runtimeURL {
 		client, baseURL, _ = newE2EClientAndBase(t, activeRuntimeURL)
