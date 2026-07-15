@@ -115,6 +115,7 @@ func renderEasySiteArtifacts(site SiteInput, profile EasyProfileInput) ([]Artifa
 		AuthExclusionRules:           buildEasyAuthExclusionRuleData(authExclusionRules),
 		AuthTokenRules:               buildEasyAuthTokenRuleData(authTokens),
 		AntibotEnabled:               antibotEnabled,
+		ManagementSite:               isManagementSite(site),
 		AntibotTwoLayerEnabled:       antibotTwoLayer,
 		AntibotUsesInterstitial:      antibotUsesInterstitial(defaultChallenge),
 		AntibotChallenge:             defaultChallenge,

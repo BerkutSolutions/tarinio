@@ -84,14 +84,10 @@ func easyManagementProtectedPaths() []string {
 }
 
 func easyAdminAntibotExclusionRulesForSite(site SiteInput) []AntibotExclusionRuleInput {
-	if !isManagementSite(site) {
-		return nil
-	}
-	// Management login routes are deliberately not excluded: an unauthenticated
-	// visitor must complete the anti-bot check before seeing the login form.
-	// Static UI assets need to remain available, otherwise the challenge page and
-	// the login form cannot load their own logo, CSS and JavaScript.
-	return []AntibotExclusionRuleInput{{Path: "/static/", Methods: []string{"GET", "HEAD"}}}
+	// The anti-bot guard applies to every request, including static resources.
+	// Its own challenge and verify routes are handled separately by the template,
+	// so no site-wide path exemption is required.
+	return nil
 }
 
 func easyAdminAuthExclusionRulesForSite(site SiteInput) []AuthExclusionRuleInput {

@@ -380,7 +380,7 @@
         window.setTimeout(function () {
           cookieState.textContent = m("cookieRedirecting");
           cookieState.className = "hint-ok";
-          window.location.replace(buildVerifyURL(target));
+          fetch(buildVerifyURL(target),{credentials:"same-origin"}).then(function(){window.location.replace(target.uri+(target.args?"?"+target.args:""));});
         }, 1200);
       }
 

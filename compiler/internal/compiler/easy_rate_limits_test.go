@@ -72,8 +72,8 @@ func TestRenderEasyRateLimitArtifacts_GeneratesRouteSpecificArtifacts(t *testing
 	if !strings.Contains(locationsConf, "alias /etc/waf/errors/control-plane-access/antibot.html;") {
 		t.Fatalf("expected antibot interstitial alias in easy locations conf, got: %s", locationsConf)
 	}
-	if !strings.Contains(locationsConf, "return 302 $scheme://$host$waf_antibot_return_path$waf_antibot_return_query;") {
-		t.Fatalf("expected antibot verify redirect in easy locations conf, got: %s", locationsConf)
+	if !strings.Contains(locationsConf, "return 204;") {
+		t.Fatalf("expected interstitial antibot verify to return its cookie without redirecting, got: %s", locationsConf)
 	}
 	if !strings.Contains(locationsConf, "location ^~ /api/auth/ {") {
 		t.Fatalf("expected prefix location for /api/auth/, got: %s", locationsConf)

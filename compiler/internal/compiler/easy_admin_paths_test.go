@@ -103,17 +103,14 @@ func TestEasyAdminBypassPathPatternForSite_MatchesManagementMutationEndpoints(t 
 	}
 }
 
-func TestEasyAdminAntibotExclusionRulesForSite_ManagementSite(t *testing.T) {
-	t.Setenv("CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID", "control-plane-access")
-	rules := easyAdminAntibotExclusionRulesForSite(SiteInput{ID: "control-plane-access", PrimaryHost: "ui"})
-	if len(rules) != 1 || rules[0].Path != "/static/" {
-		t.Fatalf("expected only the static asset exclusion, got %#v", rules)
-	}
-	if got := strings.Join(rules[0].Methods, ","); got != "GET,HEAD" {
-		t.Fatalf("expected safe methods only for static assets, got %q", got)
-	}
-	if extra := easyAdminAntibotExclusionRulesForSite(SiteInput{ID: "site-a", PrimaryHost: "example.com"}); len(extra) != 0 {
-		t.Fatalf("expected no management exclusions for regular site, got %#v", extra)
+func TestEasyAdminAntibotExclusionRulesForSite_HasNoAutomaticBypass(t *testing.T) {
+	for _, site := range []SiteInput{
+		{ID: "control-plane-access", PrimaryHost: "ui", ManagementConfigured: true, Management: true},
+		{ID: "site-a", PrimaryHost: "example.com"},
+	} {
+		if rules := easyAdminAntibotExclusionRulesForSite(site); len(rules) != 0 {
+			t.Fatalf("expected no automatic anti-bot exclusions for %s, got %#v", site.ID, rules)
+		}
 	}
 }
 
@@ -135,6 +132,25 @@ func TestEasyManagementLoginChallengeIsNotBypassedBySession(t *testing.T) {
 	if !strings.Contains(siteConf, `if ($uri ~* "^/login(?:/2fa)?$") { set $waf_antibot_session_guard 0; }`) {
 		t.Fatalf("expected login routes to clear the session antibot bypass, got: %s", siteConf)
 	}
+}
+
+func TestEasyProtectedSiteLoginKeepsVerifiedAntibotSession(t *testing.T) {
+	artifacts, err := RenderEasyArtifacts(
+		[]SiteInput{{ID: "protected-site", Enabled: true, PrimaryHost: "app.example.com", ListenHTTP: true}},
+		[]EasyProfileInput{{SiteID: "protected-site", AntibotChallenge: "javascript", AntibotURI: "/challenge"}},
+	)
+	if err != nil {
+		t.Fatalf("render protected-site easy artifacts: %v", err)
+	}
+	for _, artifact := range artifacts {
+		if artifact.Path == "nginx/easy/protected-site.conf" {
+			if strings.Contains(string(artifact.Content), `if ($uri ~* "^/login(?:/2fa)?$") { set $waf_antibot_session_guard 0; }`) {
+				t.Fatalf("ordinary site must not apply the WAF login anti-bot override: %s", artifact.Content)
+			}
+			return
+		}
+	}
+	t.Fatal("missing protected-site easy artifact")
 }
 
 func TestEasyAdminAuthExclusionRulesForSite_ManagementSite(t *testing.T) {

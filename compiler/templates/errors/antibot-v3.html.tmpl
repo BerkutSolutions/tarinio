@@ -120,7 +120,7 @@ h1{font-size:clamp(20px,4vw,28px);font-weight:800;letter-spacing:-.02em;color:#f
       renderRows(steps.length);
       if(!isPreview){
         var t=readReturnTarget();
-        setTimeout(function(){window.location.replace(buildVerifyURL(t));},500);
+        setTimeout(function(){fetch(buildVerifyURL(t),{credentials:"same-origin"}).then(function(){window.location.replace(t.uri+(t.args?"?"+t.args:""));});},500);
       }
     }
   }

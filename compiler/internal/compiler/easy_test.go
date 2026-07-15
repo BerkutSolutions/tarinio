@@ -178,8 +178,8 @@ func TestRenderEasyArtifacts_AdminBypassOnlyForManagementSites(t *testing.T) {
 	if !strings.Contains(siteConf, `if ($uri ~* "^/(?:`) || !strings.Contains(siteConf, `dashboard(?:/.*)?`) || !strings.Contains(siteConf, `api/administration(?:/.*)?`) || !strings.Contains(siteConf, `static/.*`) {
 		t.Fatalf("expected admin bypass guard for management site, got: %s", siteConf)
 	}
-	if !strings.Contains(siteConf, `waf_antibot_exclusion_match ~* "^(?:GET|HEAD):/static/"`) {
-		t.Fatalf("expected static assets to bypass antibot, got: %s", siteConf)
+	if strings.Contains(siteConf, `waf_antibot_exclusion_match ~* "^(?:GET|HEAD):/static/"`) {
+		t.Fatalf("static assets must not bypass antibot automatically, got: %s", siteConf)
 	}
 	if strings.Contains(siteConf, `waf_antibot_exclusion_match ~* "^(?:GET|HEAD):/login`) {
 		t.Fatalf("login must remain protected by antibot, got: %s", siteConf)

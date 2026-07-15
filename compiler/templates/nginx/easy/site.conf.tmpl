@@ -229,9 +229,12 @@ set $waf_antibot_exception_guard 0;
 set $waf_antibot_session_guard 0;
 if ($cookie_waf_session != "") { set $waf_antibot_session_guard 1; }
 if ($cookie_waf_session_boot != "") { set $waf_antibot_session_guard 1; }
-# A management session does not replace the browser challenge on either login screen.
-# This keeps a direct visit to /login protected before the form is rendered.
+# A management session does not replace the browser challenge on either WAF
+# login screen. Protected sites may use /login themselves, so their session
+# must not receive this WAF-specific override.
+{{- if .ManagementSite }}
 if ($uri ~* "^/login(?:/2fa)?$") { set $waf_antibot_session_guard 0; }
+{{- end }}
 if ($waf_antibot_session_guard = 1) { set $waf_antibot_exception_guard 1; }
 if (${{ .ExceptionVar }} = 1) { set $waf_antibot_exception_guard 1; }
 set $waf_antibot_exclusion_match "$request_method:$uri";

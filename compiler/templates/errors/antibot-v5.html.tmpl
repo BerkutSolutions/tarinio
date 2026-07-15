@@ -381,7 +381,7 @@
         window.setTimeout(function () {
           cookieState.textContent = m("cookieRedirecting");
           cookieState.className = "hint-ok";
-          if (!isPreview) { window.location.replace(buildVerifyURL(target)); }
+          if (!isPreview) { fetch(buildVerifyURL(target),{credentials:"same-origin"}).then(function(){window.location.replace(target.uri+(target.args?"?"+target.args:""));}); }
         }, 1200);
       }
 

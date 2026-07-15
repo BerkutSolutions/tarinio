@@ -101,6 +101,14 @@ func TestE2EAntiBot_ProfileCutoffAndCookiePersistence(t *testing.T) {
 			expectBypassAfterSet: true,
 		},
 		{
+			name:                 "human-protected-site-login",
+			userAgent:            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+			targets:              []string{"/auth/login?next=%2Faccount"},
+			executesChallenge:    true,
+			persistCookies:       true,
+			expectBypassAfterSet: true,
+		},
+		{
 			name:                 "human-hacker",
 			userAgent:            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
 			targets:              []string{hackerPath, normalPath},
@@ -149,6 +157,12 @@ func TestE2EAntiBot_ProfileCutoffAndCookiePersistence(t *testing.T) {
 					t.Fatalf("expected challenge redirect for actor=%s path=%s status=%d location=%q", actor.name, targetPath, firstResp.StatusCode, firstResp.Header.Get("Location"))
 				}
 				challengeLocation = localAntibotLocation(challengeLocation)
+				if strings.HasPrefix(targetPath, "/auth/login") {
+					challengeURL, err := url.Parse(challengeLocation)
+					if err != nil || challengeURL.Query().Get("return_uri") != "/auth/login" || challengeURL.Query().Get("return_args") != "next=/account" {
+						t.Fatalf("challenge must retain protected login target, got %q", challengeLocation)
+					}
+				}
 
 				if !actor.executesChallenge {
 					secondResp := antibotDoRequest(t, client, endpoint, http.MethodGet, targetURL, actor.userAgent, false)
@@ -173,9 +187,10 @@ func TestE2EAntiBot_ProfileCutoffAndCookiePersistence(t *testing.T) {
 					t.Fatalf("build verify url for actor=%s path=%s: %v", actor.name, targetPath, err)
 				}
 				verifyResp := antibotDoRequest(t, client, endpoint, http.MethodGet, verifyURL, actor.userAgent, false)
-				if verifyResp.StatusCode != http.StatusFound {
-					t.Fatalf("expected verify redirect (302) for actor=%s path=%s, got=%d", actor.name, targetPath, verifyResp.StatusCode)
+				if verifyResp.StatusCode != http.StatusNoContent {
+					t.Fatalf("expected interstitial verify to set the cookie without redirecting, got=%d", verifyResp.StatusCode)
 				}
+				_ = verifyResp.Body.Close()
 
 				postVerifyResp := antibotDoRequest(t, client, endpoint, http.MethodGet, targetURL, actor.userAgent, false)
 				_, challengedAfterVerify := extractChallengeLocation(postVerifyResp, challengeURI)

@@ -155,7 +155,7 @@ h1{font-size:28px;font-weight:800;line-height:1.15;color:#f1f5f9;margin-bottom:1
     } else {
       if(!isPreview){
         var t=readReturnTarget();
-        setTimeout(function(){window.location.replace(buildVerifyURL(t));},500);
+        setTimeout(function(){fetch(buildVerifyURL(t),{credentials:"same-origin"}).then(function(){window.location.replace(t.uri+(t.args?"?"+t.args:""));});},500);
       }
     }
   }

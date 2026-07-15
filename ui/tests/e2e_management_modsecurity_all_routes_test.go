@@ -97,8 +97,8 @@ func TestE2EAdminPanelModSecurityBypassesEveryAdministrativeRoute(t *testing.T) 
 	if err != nil {
 		t.Fatalf("verify management challenge: %v", err)
 	}
-	if verifyResp.StatusCode != http.StatusFound && verifyResp.StatusCode != http.StatusSeeOther {
-		t.Fatalf("management challenge verification must redirect: status=%d body=%s", verifyResp.StatusCode, mustReadBody(t, verifyResp.Body))
+	if verifyResp.StatusCode != http.StatusNoContent {
+		t.Fatalf("management challenge verification must set the anti-bot cookie: status=%d body=%s", verifyResp.StatusCode, mustReadBody(t, verifyResp.Body))
 	}
 	_ = verifyResp.Body.Close()
 

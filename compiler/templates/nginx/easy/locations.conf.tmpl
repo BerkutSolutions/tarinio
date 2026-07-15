@@ -40,6 +40,11 @@ location = {{ .AntibotURI }} {
 location = {{ .AntibotVerifyURI }} {
     proxy_intercept_errors off;
     modsecurity off;
+    add_header Cache-Control "no-store" always;
+    add_header Set-Cookie "{{ .AntibotCookieName }}={{ .AntibotCookieValue }}; Max-Age=600; Path=/; SameSite=Lax; Secure; HttpOnly" always;
+{{- if .AntibotUsesInterstitial }}
+    return 204;
+{{- else }}
     set $waf_antibot_return_path /;
     set $waf_antibot_return_query "";
     if ($arg_return_uri != "") {
@@ -56,9 +61,8 @@ location = {{ .AntibotVerifyURI }} {
         set $waf_antibot_return_path /;
         set $waf_antibot_return_query "";
     }
-    add_header Cache-Control "no-store" always;
-    add_header Set-Cookie "{{ .AntibotCookieName }}={{ .AntibotCookieValue }}; Max-Age=600; Path=/; SameSite=Lax; Secure; HttpOnly" always;
     return 302 $scheme://$host$waf_antibot_return_path$waf_antibot_return_query;
+{{- end }}
 }
 {{- end }}
 {{- if .AuthEnabled }}

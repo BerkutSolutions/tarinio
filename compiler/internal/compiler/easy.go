@@ -52,6 +52,7 @@ type easySiteData struct {
 	AuthTokenRules         []easyAuthTokenRuleData
 
 	AntibotEnabled           bool
+	ManagementSite           bool
 	AntibotTwoLayerEnabled   bool
 	AntibotUsesInterstitial  bool
 	AntibotChallenge         string
