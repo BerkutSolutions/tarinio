@@ -49,6 +49,9 @@ func (s *securityEventSource) next() ([]securityEvent, error) {
 		if !ok {
 			continue
 		}
+		if item.management {
+			continue
+		}
 		if shouldSkipInternalManagementRequest(item) {
 			continue
 		}
@@ -110,7 +113,7 @@ func (s *securityEventSource) next() ([]securityEvent, error) {
 		}
 
 		switch item.status {
-		case 302, 429:
+		case 429:
 			out = append(out, securityEvent{
 				Type:            "security_rate_limit",
 				Severity:        "warning",

@@ -193,7 +193,7 @@ export function renderDetail({ detailContentNode, detailModalNode, row, siteLabe
     ["events.detail.field.time", row.occurredAt ? row.occurredAt.toISOString() : "-"],
     ["events.detail.field.site", siteLabel || row.siteID || "-"],
     ["bans.col.ip", row.ip || "-"],
-    ["bans.col.country", countryFlagEmoji(row.country)],
+    ["bans.col.country", countryFlagEmoji(row.country), true],
     ["bans.col.module", renderModules(row.modules || new Set(), t) || "-"],
     ["events.detail.field.summary", renderReasonList(row.reasons || new Set())],
     ["bans.col.left", row.expiresAt ? formatRemaining(row.expiresAt, new Date(), t) : t("bans.time.permanent")]
@@ -219,10 +219,10 @@ export function renderDetail({ detailContentNode, detailModalNode, row, siteLabe
       <div class="waf-table-wrap">
         <table class="waf-table waf-detail-table">
           <tbody>
-            ${detailRows.map(([labelKey, value]) => `
+            ${detailRows.map(([labelKey, value, trustedHTML]) => `
               <tr>
                 <th>${escapeHtml(t(labelKey) === labelKey ? labelKey : t(labelKey))}</th>
-                <td><pre class="waf-code">${escapeHtml(String(value || "-"))}</pre></td>
+                <td><pre class="waf-code">${trustedHTML ? String(value || "-") : escapeHtml(String(value || "-"))}</pre></td>
               </tr>
             `).join("")}
             <tr>

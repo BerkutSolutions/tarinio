@@ -131,6 +131,43 @@ func TestSecurityEventSourceSkipsAdminAppTrafficOnPublicHost(t *testing.T) {
 	}
 }
 
+func TestSecurityEventSourceDoesNotTreatAntibotRedirectAsRateLimit(t *testing.T) {
+	lines := []string{mustMarshalAccessLogLine(t, map[string]any{
+		"timestamp":  "2026-07-15T11:33:48Z",
+		"client_ip":  "87.239.0.140",
+		"method":     "GET",
+		"uri":        "/challenge/stage1/verify?return_uri=/login&return_args=",
+		"status":     302,
+		"site":       "protected_site",
+		"host":       "protected.example.com",
+		"country":    "RU",
+		"user_agent": "Mozilla/5.0",
+	})}
+
+	if events := readSecurityEventsFromLines(t, lines); len(events) != 0 {
+		t.Fatalf("anti-bot redirect must not create a rate-limit event, got %+v", events)
+	}
+}
+
+func TestSecurityEventSourceSkipsManagementHostSecurityEvents(t *testing.T) {
+	lines := []string{mustMarshalAccessLogLine(t, map[string]any{
+		"timestamp":  "2026-07-15T11:33:48Z",
+		"client_ip":  "87.239.0.140",
+		"method":     "GET",
+		"uri":        "/api/events",
+		"status":     429,
+		"site":       "management_site",
+		"management": 1,
+		"host":       "waf.example.com",
+		"country":    "RU",
+		"user_agent": "Mozilla/5.0",
+	})}
+
+	if events := readSecurityEventsFromLines(t, lines); len(events) != 0 {
+		t.Fatalf("management host traffic must not create security events, got %+v", events)
+	}
+}
+
 func TestSecurityEventSourceThreatIntelEmitsReputationEvent(t *testing.T) {
 	root := t.TempDir()
 	feedPath := filepath.Join(root, "threat-intel-feed.txt")
@@ -257,7 +294,6 @@ func TestSecurityEventSourceAddsNormalizedEventTypeForBlockedAccess(t *testing.T
 		})
 	}
 }
-
 
 func readSecurityEventsFromLines(t *testing.T, lines []string) []securityEvent {
 	t.Helper()
