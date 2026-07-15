@@ -1,7 +1,5 @@
-# Berkut Solutions - TARINIO
-
 <p align="center">
-  <img src="ui/app/static/logo700x250.png" alt="Berkut TARINIO logo" width="240">
+  <img src="ui/app/static/logo700x250.png" alt="Berkut TARINIO logo" width="300">
 </p>
 
 [English version](README.en.md)
@@ -87,4 +85,8 @@ TARINIO принимает входящий трафик перед бизнес
 
 ![Экран 3](ui/app/static/screen3.png)
 
-![Экран 4](ui/app/static/screen4.png)
+![Экран 4](ui/app/static/screen5.png)
+
+![Экран 5](ui/app/static/screen6.png)
+
+![Экран 6](ui/app/static/screen7.png)

@@ -1,7 +1,5 @@
-# Berkut Solutions - TARINIO
-
 <p align="center">
-  <img src="ui/app/static/logo700x250.png" alt="Berkut TARINIO logo" width="240">
+  <img src="ui/app/static/logo700x250.png" alt="Berkut TARINIO logo" width="300">
 </p>
 
 [Russian version](README.md)
@@ -87,5 +85,9 @@ This provides reproducible changes, auditable operations, and one control loop f
 
 ![Screenshot 3](ui/app/static/screen3.png)
 
-![Screenshot 4](ui/app/static/screen4.png)
+![Screenshot 4](ui/app/static/screen5.png)
+
+![Screenshot 5](ui/app/static/screen6.png)
+
+![Screenshot 6](ui/app/static/screen7.png)
 
