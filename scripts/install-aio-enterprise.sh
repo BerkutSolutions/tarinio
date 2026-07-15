@@ -568,9 +568,12 @@ if [ -d "$INSTALL_DIR/.git" ]; then
   safe_data_backup
 
   step "Updating existing repository in $INSTALL_DIR"
-  run_logged git -C "$INSTALL_DIR" fetch --all --tags
-  run_logged git -C "$INSTALL_DIR" checkout "$BRANCH"
-  run_logged git -C "$INSTALL_DIR" pull --ff-only origin "$BRANCH"
+  run_logged git -C "$INSTALL_DIR" fetch --all --tags --prune
+  if [ -n "$(git -C "$INSTALL_DIR" status --porcelain --untracked-files=no 2>>"$LOG_FILE")" ]; then
+    warn "discarding local tracked repository changes; runtime data and .env are preserved"
+  fi
+  run_logged git -C "$INSTALL_DIR" checkout -f -B "$BRANCH" "origin/$BRANCH"
+  run_logged git -C "$INSTALL_DIR" reset --hard "origin/$BRANCH"
   ok "repository updated to branch $BRANCH"
 else
   step "Cloning repository to $INSTALL_DIR"
