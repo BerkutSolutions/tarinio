@@ -19,6 +19,9 @@ func burstThresholdFromEnv(name string, fallback int) int {
 }
 
 func shouldTrackRequestBurst(item parsedAccess) bool {
+	if item.management {
+		return false
+	}
 	if shouldSkipInternalManagementRequest(item) {
 		return false
 	}
@@ -52,10 +55,13 @@ func shouldSkipInternalManagementRequest(item parsedAccess) bool {
 	return host == "" || isInternalManagementHost(host) || sanitizeSiteID(item.siteID) == ""
 }
 
-// shouldSkipRequestTelemetry excludes only traffic that originates from the
-// private control-plane endpoints. A public management host is still a WAF
-// site: its requests must be visible in traffic metrics after a host rename.
+// shouldSkipRequestTelemetry excludes the WAF's management host from product
+// telemetry. Its requests remain in the technical nginx access log, while the
+// Requests view, dashboard counters and storage represent protected services.
 func shouldSkipRequestTelemetry(item parsedAccess) bool {
+	if item.management {
+		return true
+	}
 	if shouldSkipInternalSite(item.siteID) {
 		return true
 	}

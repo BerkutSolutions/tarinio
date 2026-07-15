@@ -175,7 +175,7 @@ func TestRequestArchiveSkipsInternalManagementTraffic(t *testing.T) {
 	uiStamp := time.Now().UTC().Add(-2 * time.Hour).Format(time.RFC3339)
 	realStamp := time.Now().UTC().Add(-1 * time.Hour).Format(time.RFC3339)
 	lines := []string{
-		fmt.Sprintf(`{"timestamp":"%s","request_id":"req-ui","client_ip":"127.0.0.1","method":"GET","uri":"/api/requests","status":200,"site":"","host":"localhost"}`, uiStamp),
+		fmt.Sprintf(`{"timestamp":"%s","request_id":"req-ui","client_ip":"127.0.0.1","method":"GET","uri":"/api/requests","status":200,"site":"waf_site","host":"waf.example.com","management":1}`, uiStamp),
 		fmt.Sprintf(`{"timestamp":"%s","request_id":"req-real","client_ip":"1.1.1.1","method":"GET","uri":"/checkout","status":200,"site":"site-a","host":"shop.example.com","upstream_addr":"172.18.0.7:80"}`, realStamp),
 	}
 	if err := os.WriteFile(logPath, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {

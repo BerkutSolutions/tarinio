@@ -42,6 +42,16 @@ func TestRenderSiteUpstreamArtifacts_ManagementSiteRoutesAPIToControlPlane(t *te
 	}
 
 	content := string(siteArtifact.Content)
+	var baseContent string
+	for _, artifact := range artifacts {
+		if artifact.Path == "nginx/conf.d/base.conf" {
+			baseContent = string(artifact.Content)
+			break
+		}
+	}
+	if !strings.Contains(baseContent, `map $waf_site_id_log $waf_management_telemetry {`) || !strings.Contains(baseContent, `"control-plane-access" 1;`) || !strings.Contains(baseContent, `"management":$waf_management_telemetry`) {
+		t.Fatalf("management access log must identify self-traffic for telemetry filtering, got: %s", baseContent)
+	}
 	apiStart := strings.Index(content, "location ^~ /api/ {")
 	if apiStart < 0 {
 		t.Fatal("expected management site config to declare a dedicated API location")

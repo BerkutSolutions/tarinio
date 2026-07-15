@@ -12,6 +12,7 @@ type parsedAccess struct {
 	requestID    string
 	ip           string
 	siteID       string
+	management   bool
 	host         string
 	country      string
 	city         string
@@ -38,6 +39,7 @@ func parseAccessLine(line string) (parsedAccess, bool) {
 			Referer      string `json:"referer"`
 			UserAgent    string `json:"user_agent"`
 			Site         string `json:"site"`
+			Management   int    `json:"management"`
 			Host         string `json:"host"`
 			UpstreamAddr string `json:"upstream_addr"`
 		}
@@ -57,6 +59,7 @@ func parseAccessLine(line string) (parsedAccess, bool) {
 				requestID:    strings.TrimSpace(item.RequestID),
 				ip:           ip,
 				siteID:       sanitizeSiteID(item.Site),
+				management:   item.Management == 1,
 				host:         strings.ToLower(strings.TrimSpace(item.Host)),
 				country:      strings.ToUpper(strings.TrimSpace(item.Country)),
 				city:         strings.TrimSpace(item.City),
