@@ -103,6 +103,16 @@ jobs:
           severity: MEDIUM,HIGH,CRITICAL
           exit-code: "1"
 
+      - name: Summarize Trivy findings
+        if: always()
+        run: |
+          jq -r '
+            .runs[]
+            | .results[]?
+            | [.ruleId, .level, .message.text, .locations[0].physicalLocation.artifactLocation.uri]
+            | @tsv
+          ' trivy-results.sarif
+
       - name: Upload Trivy SARIF
         if: always()
         uses: github/codeql-action/upload-sarif@v4
