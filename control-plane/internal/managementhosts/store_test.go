@@ -36,6 +36,26 @@ func TestStoreReportsSetupRequiredBeforeMigration(t *testing.T) {
 	}
 }
 
+func TestStorePersistsDirectIPAccessPolicy(t *testing.T) {
+	root := t.TempDir()
+	store, err := NewStore(root, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated, err := store.UpdateDirectIPAccess(true)
+	if err != nil || !updated.BlockDirectIPAccess {
+		t.Fatalf("update direct ip policy: item=%+v err=%v", updated, err)
+	}
+	restarted, err := NewStore(root, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored, err := restarted.Get()
+	if err != nil || !stored.BlockDirectIPAccess {
+		t.Fatalf("direct ip policy was not persisted: item=%+v err=%v", stored, err)
+	}
+}
+
 func TestBootstrapIsIdempotentAndSurvivesStoreRestart(t *testing.T) {
 	root := t.TempDir()
 	store, err := NewStore(root, nil)

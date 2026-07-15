@@ -45,8 +45,11 @@ func TestUIContract_OnboardingAndSidebarMarkers(t *testing.T) {
 			name:  "index",
 			files: []string{filepath.Join("..", "app", "index.html")},
 			markers: []string{
-				`class="sidebar-logo-collapsed`,
+				`class="sidebar-brand no-select"`,
+				`class="sidebar-logo"`,
 				`id="menu" class="sidebar-nav"`,
+				`id="notifications-btn" class="icon-btn"`,
+				`id="sidebar-toggle" class="sidebar-collapse-btn"`,
 				`id="logout-btn" class="icon-btn"`,
 			},
 		},
@@ -57,6 +60,27 @@ func TestUIContract_OnboardingAndSidebarMarkers(t *testing.T) {
 				`pathBase: "/anti-ddos"`,
 				`labelKey: "app.antiddos"`,
 				`render: renderAntiDDoS`,
+			},
+		},
+		{
+			name: "grouped sidebar menu",
+			files: []string{
+				filepath.Join("..", "app", "static", "js", "app.sidebar-menu.js"),
+				filepath.Join("..", "app", "static", "js", "app.sidebar-status.js"),
+			},
+			markers: []string{
+				`app.incidents`,
+				`app.sidebarCertificates`,
+				`app.sidebarGroup.system`,
+				`sections: ["administration", "events", "activity", "settings"]`,
+				`events: "app.sidebarJournal"`,
+				`activity: "app.sidebarAudit"`,
+				`/healthz`,
+				`/api/reports/revisions`,
+				`revision_apply?.active_revision_id`,
+				`/api/anti-ddos/settings`,
+				`/api/owasp-crs/status`,
+				`sidebar-mode-model`,
 			},
 		},
 		{
@@ -155,7 +179,7 @@ func TestUIContract_OnboardingAndSidebarMarkers(t *testing.T) {
 			},
 		},
 		{
-			name:  "requests",
+			name: "requests",
 			files: []string{
 				filepath.Join("..", "app", "static", "js", "pages", "requests.js"),
 				filepath.Join("..", "app", "static", "js", "pages", "requests.security.js"),
@@ -254,6 +278,40 @@ func TestUIContract_SessionExpiryReturnsDirectlyToLogin(t *testing.T) {
 	}
 	if !strings.Contains(string(guard), "export function buildLoginURL") || !strings.Contains(string(guard), "secureAppUrl(`/login?${params.toString()}`)") {
 		t.Fatal("session recovery must construct a direct login URL")
+	}
+}
+
+func TestUIContract_LoginAppearanceUsesSharedThemeStyles(t *testing.T) {
+	files := map[string]string{
+		"login":        filepath.Join("..", "app", "login.html"),
+		"login2fa":     filepath.Join("..", "app", "login-2fa.html"),
+		"theme styles": filepath.Join("..", "app", "static", "login-appearance.css"),
+		"theme script": filepath.Join("..", "app", "static", "js", "login-appearance.js"),
+		"settings":     filepath.Join("..", "app", "static", "js", "pages", "settings.js"),
+	}
+	contents := make(map[string]string, len(files))
+	for name, file := range files {
+		raw, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatalf("read %s: %v", name, err)
+		}
+		contents[name] = string(raw)
+	}
+	for _, theme := range []string{"command-center", "incident-console", "command-center-classic", "security-card", "incident-console-classic"} {
+		if !strings.Contains(contents["theme styles"], `data-login-appearance="`+theme+`"`) {
+			t.Fatalf("theme CSS is missing %q", theme)
+		}
+		if !strings.Contains(contents["theme script"], `"`+theme+`"`) || !strings.Contains(contents["settings"], `value="`+theme+`"`) {
+			t.Fatalf("theme is missing from login runtime or settings: %q", theme)
+		}
+	}
+	for _, page := range []string{"login", "login2fa"} {
+		if !strings.Contains(contents[page], `/static/login-appearance.css?v=20260714-4`) || !strings.Contains(contents[page], `class="login-theme-shell"`) {
+			t.Fatalf("%s must use the shared login appearance shell", page)
+		}
+	}
+	if strings.Contains(contents["theme styles"], "sidebar-rail") || strings.Contains(contents["theme script"], "sidebar-rail") || strings.Contains(contents["settings"], "sidebar-rail") {
+		t.Fatal("removed Sidebar Rail appearance is still exposed")
 	}
 }
 

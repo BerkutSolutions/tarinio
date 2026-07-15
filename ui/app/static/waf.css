@@ -104,7 +104,7 @@ body {
   background: rgba(20, 26, 38, 0.92);
   border: 1px solid rgba(125, 155, 255, 0.2);
   border-radius: 14px;
-  overflow: hidden;
+  overflow: visible;
   box-shadow: 0 18px 38px rgba(0, 0, 0, 0.22);
   min-width: 0;
 }
@@ -2161,3 +2161,126 @@ canvas {
   gap: 4px;
 }
 
+/* TARINIO incident-console sidebar. Kept here as a final override for the legacy shell. */
+#sidebar {
+  width: 245px;
+  overflow: hidden;
+  background: #0d1119;
+  border-right: 1px solid rgba(101, 137, 184, .24);
+  box-shadow: none;
+}
+
+#content { margin-left: 245px; width: auto; }
+
+.sidebar-header {
+  min-height: 78px;
+  padding: 14px 12px 12px;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid rgba(101, 137, 184, .18);
+}
+
+.sidebar-brand { display: flex; min-width: 0; align-items: center; gap: 9px; }
+.sidebar-logo {
+  width: 48px; height: 48px; flex: 0 0 48px; object-fit: contain;
+  border-radius: 14px; padding: 4px;
+  background: linear-gradient(145deg, #2a4058, #172536);
+  border: 1px solid #4e6989; box-shadow: 0 8px 22px rgba(0, 0, 0, .3);
+}
+.brand-text { gap: 1px; padding-top: 1px; }
+.brand-title { color: #f7f2e7; font-size: 15px; font-weight: 800; letter-spacing: .12em; line-height: 1.05; }
+.brand-subtitle { color: #9eacbc; font-size: 10px; line-height: 1.24; letter-spacing: .02em; white-space: normal; }
+.sidebar-header-actions { margin-left: 0; position: relative; display: flex; flex-direction: row; align-items: center; gap: 6px; }
+.sidebar-header .icon-btn, .sidebar-collapse-btn, .sidebar-footer .icon-btn {
+  width: 29px; height: 29px; min-width: 29px; border-radius: 50%;
+  display: grid; place-items: center; border: 1px solid #384f6c;
+  background: #101924; color: #c9d7e8; box-shadow: none;
+}
+.sidebar-header .icon-btn:hover, .sidebar-collapse-btn:hover, .sidebar-footer .icon-btn:hover { background: #1b293a; border-color: #668bc0; transform: none; }
+.sidebar-collapse-btn { margin: 0; }
+.sidebar-collapse-btn svg { width: 15px; height: 15px; display: block; }
+.sidebar-collapse-btn > span { display: none; }
+
+.sidebar-protection-mode { display: flex; flex-wrap: wrap; gap: 5px; padding: 10px 12px 5px; }
+.sidebar-protection-mode span { padding: 5px 7px; border-radius: 5px; background: #1a202c; color: #8fa0b8; font-size: 10px; letter-spacing: .04em; }
+.sidebar-protection-mode .sidebar-mode-break { display: none; }
+.sidebar-protection-mode .is-on::before,
+.sidebar-protection-mode .is-off::before { content: "●"; margin-right: 4px; font-size: 8px; }
+.sidebar-protection-mode .is-on { color: #93f1cb; }
+.sidebar-protection-mode .is-on::before { color: #74dfae; }
+.sidebar-protection-mode .is-off::before { color: #ff6978; }
+
+.sidebar-content { min-height: 0; }
+.sidebar-nav { display: block; padding: 12px 12px 18px; overflow-y: auto; }
+.sidebar-nav-group { margin: 0; padding: 0 0 15px; }
+.sidebar-nav-group + .sidebar-nav-group { padding-top: 14px; border-top: 1px solid rgba(111, 139, 175, .26); }
+.sidebar-group-title {
+  margin: 0 0 6px; padding: 0; color: #8292a7; font-size: 10px;
+  font-weight: 700; line-height: 1.4; letter-spacing: .13em; text-transform: uppercase;
+}
+.sidebar-link {
+  min-height: 36px; margin: 2px 0; padding: 8px 9px; border: 1px solid transparent;
+  border-radius: 7px; color: #d8e4f2; font-size: 13px; font-weight: 500; letter-spacing: 0;
+}
+.sidebar-link:hover { background: rgba(105, 132, 166, .13); border-color: transparent; color: #edf4ff; }
+.sidebar-link.active { background: #222938; border-color: transparent; color: #f8fbff; box-shadow: none; }
+.sidebar-link-pending { cursor: default; opacity: .92; }
+.sidebar-link-icon { width: 17px; height: 17px; flex-basis: 17px; margin-right: 11px; color: #6dc4ff; }
+.sidebar-link-icon svg, .sidebar-link-icon img { width: 17px; height: 17px; }
+.sidebar-icon-image, .sidebar-control-icon {
+  display: block;
+  object-fit: contain;
+  filter: invert(76%) sepia(39%) saturate(1090%) hue-rotate(171deg) brightness(102%) contrast(101%);
+}
+.sidebar-control-icon { width: 16px; height: 16px; }
+.sidebar-link.active .sidebar-link-icon { color: #6dc4ff; }
+
+.sidebar-footer { min-height: auto; padding: 12px 12px 15px; border-top: 1px solid rgba(101, 137, 184, .16); gap: 8px; align-items: stretch; }
+.sidebar-footer > * { width: 100%; max-width: none; }
+.sidebar-footer-main { display: grid; grid-template-columns: minmax(0, 1fr) 64px; align-items: center; gap: 8px; width: 100%; }
+.sidebar-runtime { display: flex; flex: 0 1 auto; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; padding: 0; font-size: 11px; white-space: nowrap; }
+.sidebar-runtime-status { color: #bac8d7; font-weight: 700; }
+.sidebar-runtime-status::before { content: "●"; margin-right: 5px; font-size: 12px; }
+.sidebar-runtime-status.is-healthy::before { color: #74dfae; }
+.sidebar-runtime-status.is-unhealthy::before { color: #ff6978; }
+.sidebar-revision { color: #78889c; white-space: nowrap; }
+.sidebar-tools { display: grid; grid-template-columns: repeat(2, 29px); flex: 0 0 64px; width: 64px; max-width: none; place-items: center; justify-content: center; gap: 6px; }
+.sidebar-footer .icon-btn { padding: 0; }
+.sidebar-footer .icon-btn svg, .sidebar-footer .icon-btn img { display: block; margin: auto; }
+.sidebar-footer .app-version { margin-top: 0; color: #728297; font-size: 11px; }
+
+body.sidebar-collapsed #sidebar { width: 74px; align-items: stretch; }
+body.sidebar-collapsed #content { margin-left: 74px; }
+body.sidebar-collapsed .sidebar-header { min-height: auto; padding: 14px 10px; flex-direction: column; align-items: center; }
+body.sidebar-collapsed .sidebar-brand { width: 100%; justify-content: center; }
+body.sidebar-collapsed .sidebar-logo { width: 46px; height: 46px; flex-basis: 46px; }
+body.sidebar-collapsed .brand-text, body.sidebar-collapsed .sidebar-header-actions > #notifications-btn, body.sidebar-collapsed .sidebar-header-actions > #notifications-dropdown, body.sidebar-collapsed .sidebar-group-title, body.sidebar-collapsed .sidebar-link-label, body.sidebar-collapsed #app-update-badge { display: none !important; }
+body.sidebar-collapsed .sidebar-header-actions { width: 100%; margin: 0; justify-content: center; }
+body.sidebar-collapsed .sidebar-collapse-btn { position: static; margin: 2px 0 0; width: 27px; height: 27px; min-width: 27px; background: #172536; }
+body.sidebar-collapsed .sidebar-collapse-btn svg, body.sidebar-collapsed .sidebar-collapse-btn img { transform: rotate(180deg); }
+body.sidebar-collapsed .sidebar-protection-mode { display: none; }
+body.sidebar-collapsed .sidebar-nav { padding: 10px; }
+body.sidebar-collapsed .sidebar-nav-group { margin: 0 0 8px; padding: 0; border: 0; }
+body.sidebar-collapsed .sidebar-link { width: 52px; min-height: 44px; justify-content: center; padding: 10px; }
+body.sidebar-collapsed .sidebar-link-icon { margin-right: 0; }
+body.sidebar-collapsed .sidebar-footer { padding: 10px; }
+body.sidebar-collapsed .sidebar-footer-main { grid-template-columns: 1fr; justify-items: center; gap: 8px; }
+body.sidebar-collapsed .sidebar-runtime { width: 100%; align-items: center; text-align: center; }
+body.sidebar-collapsed .sidebar-tools { grid-template-columns: 29px; width: 100%; flex-basis: auto; justify-content: center; }
+body.sidebar-collapsed .sidebar-runtime-status { display: block; max-width: 52px; white-space: normal; line-height: 1.2; text-align: center; }
+
+@media (max-width: 860px) {
+  #sidebar { width: 74px; }
+  #content { margin-left: 74px; }
+  .sidebar-brand { justify-content: center; }
+  .sidebar-logo { width: 46px; height: 46px; flex-basis: 46px; }
+  .brand-text, .sidebar-header-actions > #notifications-btn, .sidebar-header-actions > #notifications-dropdown, .sidebar-group-title, .sidebar-link-label { display: none !important; }
+  .sidebar-header { padding: 14px 10px; min-height: auto; flex-direction: column; }
+  .sidebar-header-actions { width: 100%; margin: 0; justify-content: center; }
+  .sidebar-collapse-btn { position: static; margin: 2px 0 0; width: 27px; height: 27px; min-width: 27px; background: #172536; }
+  .sidebar-collapse-btn svg, .sidebar-collapse-btn img { transform: rotate(180deg); }
+  .sidebar-protection-mode { display: none; }
+  .sidebar-nav { padding: 10px; }
+  .sidebar-nav-group { margin-bottom: 8px; }
+  .sidebar-footer { padding: 10px; }
+}

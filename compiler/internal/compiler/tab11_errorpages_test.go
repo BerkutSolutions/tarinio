@@ -74,3 +74,55 @@ func TestErrorPages_Disabled_NoProxyIntercept(t *testing.T) {
 		t.Fatalf("expected no error_page directives when UseCustomErrorPages=false, got:\n%s", conf)
 	}
 }
+
+func TestErrorPages_DisabledCodesAreRemovedWithoutDisablingOtherPages(t *testing.T) {
+	conf := mustRenderSiteConf(t, "ep-selective", EasyProfileInput{
+		SiteID: "ep-selective", SecurityMode: "block", AllowedMethods: []string{"GET"},
+		MaxClientSize: "10m", UseCustomErrorPages: true,
+		DisabledErrorPages: []string{"403", "429", "502", "geo_block"},
+	})
+
+	for _, code := range []string{"403", "429", "502"} {
+		if strings.Contains(conf, "error_page "+code+" ") {
+			t.Fatalf("disabled custom page %s is still emitted:\n%s", code, conf)
+		}
+	}
+	if strings.Contains(conf, "error_page 599 =403") {
+		t.Fatalf("disabled geo block page must not emit its internal 599 mapping:\n%s", conf)
+	}
+	for _, code := range []string{"404", "405", "500", "504"} {
+		if !strings.Contains(conf, "error_page "+code+" ") {
+			t.Fatalf("unrelated custom page %s disappeared:\n%s", code, conf)
+		}
+	}
+}
+
+func TestErrorPages_AcmeAndErrorArtifactsBypassInterceptionSafely(t *testing.T) {
+	conf := mustRenderSiteConf(t, "ep-boundaries", EasyProfileInput{
+		SiteID: "ep-boundaries", SecurityMode: "block", AllowedMethods: []string{"GET"},
+		MaxClientSize: "10m", UseCustomErrorPages: true,
+	})
+
+	acmeStart := strings.Index(conf, "location ^~ /.well-known/acme-challenge/ {")
+	if acmeStart < 0 {
+		t.Fatalf("ACME location is missing:\n%s", conf)
+	}
+	acme := conf[acmeStart:]
+	if next := strings.Index(acme, "\n    location "); next >= 0 {
+		acme = acme[:next]
+	}
+	for _, want := range []string{"proxy_intercept_errors off;", "modsecurity off;", "default_type text/plain;"} {
+		if !strings.Contains(acme, want) {
+			t.Fatalf("ACME HTTP-01 must contain %q, got:\n%s", want, acme)
+		}
+	}
+
+	for _, path := range []string{
+		"location = /__waf_errors/ep-boundaries/404.html {\n        internal;",
+		"location ~ ^/__waf_errors/([a-zA-Z0-9_-]+)/([0-9]+\\.html)$ {\n        internal;",
+	} {
+		if !strings.Contains(conf, path) {
+			t.Fatalf("error artifacts must not be public, missing %q:\n%s", path, conf)
+		}
+	}
+}

@@ -96,6 +96,45 @@ export async function renderSettings(container, ctx) {
               </div>
 
               <div class="waf-list-item">
+                <div class="waf-list-head"><div class="waf-list-title">${escapeHtml(ctx.t("settings.loginAppearance.title"))}</div></div>
+                <div class="waf-note">${escapeHtml(ctx.t("settings.loginAppearance.hint"))}</div>
+                <div class="waf-field">
+                  <label for="settings-login-appearance">${escapeHtml(ctx.t("settings.loginAppearance.label"))}</label>
+                  <select id="settings-login-appearance">
+                    <option value="command-center">${escapeHtml(ctx.t("settings.loginAppearance.commandCenter"))}</option>
+                    <option value="command-center-classic">${escapeHtml(ctx.t("settings.loginAppearance.commandCenterClassic"))}</option>
+                    <option value="security-card">${escapeHtml(ctx.t("settings.loginAppearance.securityCard"))}</option>
+                    <option value="incident-console">${escapeHtml(ctx.t("settings.loginAppearance.incidentConsole"))}</option>
+                    <option value="incident-console-classic">${escapeHtml(ctx.t("settings.loginAppearance.incidentConsoleClassic"))}</option>
+                  </select>
+                </div>
+                <div class="waf-actions" style="margin-top:10px;">
+                  <button id="settings-login-appearance-preview" class="btn ghost btn-sm" type="button">${escapeHtml(ctx.t("settings.loginAppearance.preview"))}</button>
+                  <button id="settings-login-appearance-preview-2fa" class="btn ghost btn-sm" type="button">${escapeHtml(ctx.t("settings.loginAppearance.preview2fa"))}</button>
+                  <button id="settings-login-appearance-save" class="btn primary btn-sm" type="button">${escapeHtml(ctx.t("common.save"))}</button>
+                </div>
+              </div>
+
+              <div class="waf-list-item">
+                <div class="waf-list-head"><div class="waf-list-title">${escapeHtml(ctx.t("settings.healthcheckAppearance.title"))}</div></div>
+                <div class="waf-note">${escapeHtml(ctx.t("settings.healthcheckAppearance.hint"))}</div>
+                <div class="waf-field">
+                  <label for="settings-healthcheck-appearance">${escapeHtml(ctx.t("settings.healthcheckAppearance.label"))}</label>
+                  <select id="settings-healthcheck-appearance">
+                    <option value="variant-1">${escapeHtml(ctx.t("settings.healthcheckAppearance.variant1"))}</option>
+                    <option value="variant-2">${escapeHtml(ctx.t("settings.healthcheckAppearance.variant2"))}</option>
+                    <option value="variant-3">${escapeHtml(ctx.t("settings.healthcheckAppearance.variant3"))}</option>
+                    <option value="variant-4">${escapeHtml(ctx.t("settings.healthcheckAppearance.variant4"))}</option>
+                    <option value="variant-5">${escapeHtml(ctx.t("settings.healthcheckAppearance.variant5"))}</option>
+                  </select>
+                </div>
+                <div class="waf-actions" style="margin-top:10px;">
+                  <button id="settings-healthcheck-appearance-preview" class="btn ghost btn-sm" type="button">${escapeHtml(ctx.t("settings.healthcheckAppearance.preview"))}</button>
+                  <button id="settings-healthcheck-appearance-save" class="btn primary btn-sm" type="button">${escapeHtml(ctx.t("common.save"))}</button>
+                </div>
+              </div>
+
+              <div class="waf-list-item">
                 <div class="waf-list-head">
                   <div class="waf-list-title">${escapeHtml(ctx.t("settings.updates.title"))}</div>
                   <button id="settings-update-check" class="btn ghost btn-sm" type="button">${escapeHtml(ctx.t("settings.updates.checkNow"))}</button>
@@ -187,6 +226,13 @@ export async function renderSettings(container, ctx) {
                   <input id="settings-security-login-rate-block" type="number" min="60" max="86400" step="1" value="600">
                 </div>
               </div>
+            </section>
+
+            <section class="waf-list-item">
+              <div class="waf-list-head"><div class="waf-list-title">${escapeHtml(ctx.t("settings.security.directIp.title"))}</div></div>
+              <div class="waf-note">${escapeHtml(ctx.t("settings.security.directIp.hint"))}</div>
+              <label class="waf-checkbox" for="settings-security-block-direct-ip-access"><input type="checkbox" id="settings-security-block-direct-ip-access"><span>${escapeHtml(ctx.t("settings.security.directIp.enabled"))}</span></label>
+              <div class="waf-actions"><button id="settings-security-block-direct-ip-save" class="btn primary btn-sm" type="button">${escapeHtml(ctx.t("common.save"))}</button></div>
             </section>
 
             <section class="waf-list-item">
@@ -401,7 +447,7 @@ export async function renderSettings(container, ctx) {
           <div class="waf-card-body waf-stack">
             <div class="about-grid">
               <div class="about-logo-wrap">
-                <img class="about-logo" src="/static/logo500x300.png" alt="Berkut Solutions - TARINIO">
+                <img class="about-logo" src="/static/logo700x250.png" alt="Berkut Solutions - TARINIO">
               </div>
               <div class="about-content">
                 <h4 class="about-name">${escapeHtml(ctx.t("about.projectName"))}</h4>
@@ -439,6 +485,8 @@ export async function renderSettings(container, ctx) {
   const securityLoginRateBlock = container.querySelector("#settings-security-login-rate-block");
   const securityAllowInsecureVaultTLS = container.querySelector("#settings-security-allow-insecure-vault-tls");
   const securitySave = container.querySelector("#settings-security-save");
+  const blockDirectIPAccess = container.querySelector("#settings-security-block-direct-ip-access");
+  const blockDirectIPAccessSave = container.querySelector("#settings-security-block-direct-ip-save");
   const secretsSave = container.querySelector("#settings-secrets-save");
   const loggingHotBackend = container.querySelector("#settings-logging-hot-backend");
   const loggingColdBackend = container.querySelector("#settings-logging-cold-backend");
@@ -475,6 +523,13 @@ export async function renderSettings(container, ctx) {
   const languageSelect = container.querySelector("#settings-language-select");
   const languageSave = container.querySelector("#settings-language-save");
   const runtimeSave = container.querySelector("#settings-runtime-save");
+  const loginAppearanceSelect = container.querySelector("#settings-login-appearance");
+  const loginAppearanceSave = container.querySelector("#settings-login-appearance-save");
+  const loginAppearancePreview = container.querySelector("#settings-login-appearance-preview");
+  const loginAppearancePreview2FA = container.querySelector("#settings-login-appearance-preview-2fa");
+  const healthcheckAppearanceSelect = container.querySelector("#settings-healthcheck-appearance");
+  const healthcheckAppearanceSave = container.querySelector("#settings-healthcheck-appearance-save");
+  const healthcheckAppearancePreview = container.querySelector("#settings-healthcheck-appearance-preview");
   if (languageSelect) {
     languageSelect.value = String(ctx.getLanguage?.() || "en");
   }
@@ -560,6 +615,8 @@ export async function renderSettings(container, ctx) {
       ctx,
       permissionSet,
       runtimeStatus,
+      loginAppearanceSelect,
+      healthcheckAppearanceSelect,
       languageSelect,
       updatesEnabled,
       updateStatus,
@@ -616,6 +673,8 @@ export async function renderSettings(container, ctx) {
       setStorageIndexesOffset: (value) => { storageIndexesOffset = value; },
       settingsStorageRenderIndexes: renderStorageIndexes
     });
+    const directIPAccess = await ctx.api.get("/api/settings/direct-ip-access").catch(() => null);
+    if (blockDirectIPAccess && directIPAccess) blockDirectIPAccess.checked = !!directIPAccess.block_direct_ip_access;
     if (loggingContainersOverview === null) {
       loggingContainersOverview = await ctx.api.get("/api/dashboard/containers/overview").catch(() => ({}));
     }
@@ -684,6 +743,48 @@ export async function renderSettings(container, ctx) {
     renderRuntime,
     buildLoggingPayload,
     renderUpdateStatus
+  });
+
+  loginAppearanceSave?.addEventListener("click", async () => {
+    setAlert("");
+    try {
+      await ctx.api.put("/api/settings/runtime", { login_appearance: String(loginAppearanceSelect?.value || "command-center") });
+      setAlert(ctx.t("settings.saved"), true);
+      await renderRuntime();
+    } catch (error) {
+      setAlert(error?.message || ctx.t("common.error"));
+    }
+  });
+  const openLoginAppearancePreview = (screen) => {
+    const theme = encodeURIComponent(String(loginAppearanceSelect?.value || "command-center"));
+    window.open(`/api/login-appearance/preview/${theme}?screen=${screen}`, "_blank", "noopener");
+  };
+  loginAppearancePreview?.addEventListener("click", () => openLoginAppearancePreview("login"));
+  loginAppearancePreview2FA?.addEventListener("click", () => openLoginAppearancePreview("2fa"));
+
+  healthcheckAppearanceSave?.addEventListener("click", async () => {
+    setAlert("");
+    try {
+      await ctx.api.put("/api/settings/runtime", { healthcheck_appearance: String(healthcheckAppearanceSelect?.value || "variant-1") });
+      setAlert(ctx.t("settings.saved"), true);
+      await renderRuntime();
+    } catch (error) {
+      setAlert(error?.message || ctx.t("common.error"));
+    }
+  });
+  healthcheckAppearancePreview?.addEventListener("click", () => {
+    const theme = encodeURIComponent(String(healthcheckAppearanceSelect?.value || "variant-1"));
+    window.open(`/healthcheck?appearance=${theme}`, "_blank", "noopener");
+  });
+
+  blockDirectIPAccessSave?.addEventListener("click", async () => {
+    setAlert("");
+    try {
+      await ctx.api.put("/api/settings/direct-ip-access", { block_direct_ip_access: !!blockDirectIPAccess?.checked });
+      setAlert(ctx.t("settings.saved"), true);
+    } catch (error) {
+      setAlert(error?.message || ctx.t("common.error"));
+    }
   });
 
   const selectedTab = currentTab.id;

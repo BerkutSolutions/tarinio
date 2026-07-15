@@ -93,7 +93,7 @@ func TestE2EQualityMatrix_MainPagesAndAPIs(t *testing.T) {
 		markers []string
 	}{
 		{name: "dashboard", path: "/dashboard", markers: []string{`id="content-area"`}},
-		{name: "healthcheck", path: "/healthcheck", markers: []string{`id="healthcheck-steps"`}},
+		{name: "healthcheck", path: "/healthcheck", markers: []string{`id="healthcheck-app"`, `/static/js/healthcheck.js`}},
 		{name: "sites", path: "/sites", markers: []string{`id="content-area"`}},
 		{name: "requests", path: "/requests", markers: []string{`id="content-area"`}},
 		{name: "settings", path: "/settings", markers: []string{`id="content-area"`}},

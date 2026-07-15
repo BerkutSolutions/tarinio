@@ -7,12 +7,15 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"waf/control-plane/internal/services"
 )
 
-type fakeAuthService struct{}
+type fakeAuthService struct {
+	beginPasskeyErr error
+}
 
 func (f *fakeAuthService) Bootstrap(ctx context.Context, username, email, password string) (services.SessionResult, error) {
 	return services.SessionResult{
@@ -42,6 +45,9 @@ func (f *fakeAuthService) Login2FA(ctx context.Context, challengeID, code, recov
 }
 
 func (f *fakeAuthService) BeginPasskeyLogin(ctx context.Context, username string, req *http.Request) (services.PasskeyBeginResult, error) {
+	if f.beginPasskeyErr != nil {
+		return services.PasskeyBeginResult{}, f.beginPasskeyErr
+	}
 	return services.PasskeyBeginResult{ChallengeID: "pk-login", Options: map[string]any{"challenge": "abc"}}, nil
 }
 func (f *fakeAuthService) FinishPasskeyLogin(ctx context.Context, challengeID string, credentialJSON json.RawMessage, req *http.Request) (services.LoginResult, error) {
@@ -130,6 +136,19 @@ func TestAuthHandler_BootstrapSetsCookie(t *testing.T) {
 	}
 	if len(resp.Result().Cookies()) == 0 {
 		t.Fatal("expected bootstrap to return session cookie")
+	}
+}
+
+func TestAuthHandler_PasskeyLoginMissingKeyReturnsLocalizedCode(t *testing.T) {
+	handler := NewAuthHandler(&fakeAuthService{beginPasskeyErr: errors.New("auth.passkeys.notFound")})
+	request := httptest.NewRequest(http.MethodPost, "/api/auth/passkeys/login/begin", bytes.NewBufferString(`{"username":"admin"}`))
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("missing passkey status=%d, want %d", response.Code, http.StatusOK)
+	}
+	if !strings.Contains(response.Body.String(), "auth.passkeys.notFound") {
+		t.Fatalf("missing passkey response=%s", response.Body.String())
 	}
 }
 

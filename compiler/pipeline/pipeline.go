@@ -8,6 +8,7 @@ import (
 )
 
 type RevisionInput = internal.RevisionInput
+type DefaultServerOptions = internal.DefaultServerOptions
 type SiteInput = internal.SiteInput
 type UpstreamInput = internal.UpstreamInput
 type TLSConfigInput = internal.TLSConfigInput
@@ -57,6 +58,10 @@ const (
 
 func RenderSiteUpstreamArtifacts(sites []SiteInput, upstreams []UpstreamInput) ([]ArtifactOutput, error) {
 	return internal.RenderSiteUpstreamArtifacts(sites, upstreams)
+}
+
+func RenderSiteUpstreamArtifactsWithOptions(sites []SiteInput, upstreams []UpstreamInput, options DefaultServerOptions) ([]ArtifactOutput, error) {
+	return internal.RenderSiteUpstreamArtifactsWithOptions(sites, upstreams, options)
 }
 
 func RenderTLSArtifacts(sites []SiteInput, tlsConfigs []TLSConfigInput, certificates []CertificateInput) ([]ArtifactOutput, error) {

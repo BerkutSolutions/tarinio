@@ -93,7 +93,29 @@ map $host $waf_site_id_log {
     default "_global";
 }
 
-log_format waf_security_json escape=json '{"timestamp":"$time_iso8601","request_id":"$request_id","client_ip":"$remote_addr","country":"$waf_country_code","city":"$waf_city_name","host":"$host","method":"$request_method","uri":"$request_uri","status":$status,"bytes_sent":$body_bytes_sent,"referer":"$http_referer","user_agent":"$http_user_agent","site":"$waf_site_id_log","upstream_addr":"$upstream_addr","request_time":$request_time}';
+map "$waf_site_id:$uri" $waf_unknown_host {
+    ~^_global:(?!/\.well-known/acme-challenge/) 1;
+    default 0;
+}
+
+map $host $waf_direct_ip_request {
+    ~^[0-9][0-9]?[0-9]?\.[0-9][0-9]?[0-9]?\.[0-9][0-9]?[0-9]?\.[0-9][0-9]?[0-9]?$ 1;
+    ~^\[[0-9A-Fa-f:]+\]$ 1;
+    ~^[0-9A-Fa-f:]+$ 1;
+    default 0;
+}
+
+map "$waf_site_id_log:$waf_direct_ip_request" $waf_security_reason {
+{{- if .BlockDirectIPAccess }}
+    "_global:1" "direct_ip_blocked";
+{{- else }}
+    "_global:1" "direct_ip_access";
+{{- end }}
+    "_global:0" "unknown_host";
+    default "";
+}
+
+log_format waf_security_json escape=json '{"timestamp":"$time_iso8601","request_id":"$request_id","client_ip":"$remote_addr","country":"$waf_country_code","city":"$waf_city_name","host":"$host","method":"$request_method","uri":"$request_uri","status":$status,"bytes_sent":$body_bytes_sent,"referer":"$http_referer","user_agent":"$http_user_agent","site":"$waf_site_id_log","security_reason":"$waf_security_reason","upstream_addr":"$upstream_addr","request_time":$request_time}';
 access_log /var/log/nginx/access.log waf_security_json;
 
 limit_req_zone $binary_remote_addr zone=waf_management_login_req:10m rate=5r/s;
@@ -111,20 +133,22 @@ server {
     location = /__waf_errors/_global/{{ . }}.html {
         internal;
         allow all;
+        default_type text/html;
         alias /etc/waf/errors/_global/{{ . }}.html;
     }
 {{- end }}
 
-    set $waf_unknown_host 0;
-    if ($waf_site_id = "_global") {
-        set $waf_unknown_host 1;
+{{- if .BlockDirectIPAccess }}
+    if ($waf_direct_ip_request = 1) {
+        return 444;
     }
-
+{{- end }}
     if ($waf_unknown_host = 1) {
-        rewrite ^ /__waf_errors/_global/421.html?rid=$request_id&ip=$remote_addr&ts=$msec last;
+        rewrite ^ /__waf_errors/_global/421.html last;
     }
 
     location ^~ /.well-known/acme-challenge/ {
+        modsecurity off;
         default_type text/plain;
         log_not_found off;
         alias /var/lib/waf/control-plane/acme-challenges/;
@@ -145,7 +169,12 @@ server {
 
     location = /login {
         limit_req zone=waf_management_login_req burst=20 nodelay;
+{{- if .ManagementSiteID }}
+        include /etc/waf/nginx/ratelimits/{{ .ManagementSiteID }}.conf;
+        include /etc/waf/nginx/easy/{{ .ManagementSiteID }}.conf;
+{{- else }}
         limit_req_status 429;
+{{- end }}
         proxy_pass {{ .UIProxyTarget }};
         proxy_set_header Host $http_host;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -155,7 +184,12 @@ server {
 
     location = /login/2fa {
         limit_req zone=waf_management_login_req burst=20 nodelay;
+{{- if .ManagementSiteID }}
+        include /etc/waf/nginx/ratelimits/{{ .ManagementSiteID }}.conf;
+        include /etc/waf/nginx/easy/{{ .ManagementSiteID }}.conf;
+{{- else }}
         limit_req_status 429;
+{{- end }}
         proxy_pass {{ .UIProxyTarget }};
         proxy_set_header Host $http_host;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

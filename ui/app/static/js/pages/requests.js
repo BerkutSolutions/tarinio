@@ -205,6 +205,10 @@ export async function renderRequests(container, ctx) {
   const resolveServiceDisplay = (rawSite, rawHost, siteHostMap) => {
     const source = String(rawSite || "").trim();
     const host = String(rawHost || "").trim();
+    if (source === "_global") {
+      const directIP = /^(?:\d{1,3}\.){3}\d{1,3}$/.test(host) || /^[0-9a-f:]+$/i.test(host);
+      return `${ctx.t(directIP ? "requests.global.directIp" : "requests.global.unknownHost")}: ${host || "-"}`;
+    }
     if (!source) {
       return host || "-";
     }

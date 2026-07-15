@@ -19,14 +19,16 @@ func validateManagementSafeguard(bundle *pipeline.RevisionBundle, snapshot revis
 		}
 		easyPath := "nginx/easy/" + siteID + ".conf"
 		sitePath := "nginx/sites/" + siteID + ".conf"
-		modSecurityPath := "modsecurity/easy/" + siteID + ".conf"
 		modSecurityEnabled := false
 		for _, artifact := range bundle.Files {
-			if artifact.Path == modSecurityPath {
-				modSecurityEnabled = true
-			}
-			if (artifact.Path == easyPath || artifact.Path == sitePath) && hasManagementModSecurityBypass(string(artifact.Content)) {
-				goto nextHost
+			if artifact.Path == easyPath || artifact.Path == sitePath {
+				content := string(artifact.Content)
+				if strings.Contains(content, "modsecurity on;") && strings.Contains(content, "modsecurity_rules_file ") {
+					modSecurityEnabled = true
+				}
+				if hasManagementModSecurityBypass(content) {
+					goto nextHost
+				}
 			}
 		}
 		// There is no CRS request to bypass when the selected management

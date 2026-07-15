@@ -351,7 +351,7 @@ func (s *ApplyService) compileBundle(revision revisions.Revision, snapshot revis
 	rateInputs = applyAntiDDoSRateOverrides(siteInputs, rateInputs, antiDDoSSettings)
 	rateInputs = applyEasyLimitReqURLOverrides(rateInputs, easyInputs)
 
-	siteArtifacts, err := pipeline.RenderSiteUpstreamArtifacts(siteInputs, upstreamInputs)
+	siteArtifacts, err := pipeline.RenderSiteUpstreamArtifactsWithOptions(siteInputs, upstreamInputs, pipeline.DefaultServerOptions{BlockDirectIPAccess: snapshot.BlockDirectIPAccess})
 	if err != nil {
 		return nil, err
 	}

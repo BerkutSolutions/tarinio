@@ -68,7 +68,7 @@ func summarizeRequests(items []map[string]any, cutoff, now time.Time) (int, int,
 	return total, len(uniqueIPs), topCounts(siteCounts, 20), topCounts(urlCounts, 20), seriesOut, blockedOut, blockedTotal, topCounts(errorCounts, 7)
 }
 
-func summarizeAttackEvents(items []events.Event, cutoff, now time.Time) (int, int, int, []DashboardKeyCount, []DashboardKeyCount, []DashboardKeyCount, []DashboardTimeCount, []DashboardKeyCount) {
+func summarizeAttackEvents(items []events.Event, cutoff, now time.Time) (int, int, int, []DashboardKeyCount, []DashboardKeyCount, []DashboardKeyCount, []DashboardTimeCount, []DashboardTimeCount, []DashboardKeyCount) {
 	var attacks int
 	var blocked int
 	ipCounts := map[string]int{}
@@ -76,6 +76,7 @@ func summarizeAttackEvents(items []events.Event, cutoff, now time.Time) (int, in
 	urlCounts := map[string]int{}
 	errorCounts := map[string]int{}
 	uniqueIPs := map[string]struct{}{}
+	attacksByHour := map[time.Time]int{}
 	blockedByHour := map[time.Time]int{}
 
 	for _, item := range items {
@@ -104,6 +105,7 @@ func summarizeAttackEvents(items []events.Event, cutoff, now time.Time) (int, in
 		}
 
 		attacks++
+		attacksByHour[when.UTC().Truncate(time.Hour)]++
 		ip := strings.TrimSpace(asString(item.Details["client_ip"]))
 		if ip == "" {
 			ip = strings.TrimSpace(asString(item.Details["ip"]))
@@ -139,7 +141,35 @@ func summarizeAttackEvents(items []events.Event, cutoff, now time.Time) (int, in
 		}
 	}
 
-	return attacks, blocked, len(uniqueIPs), topCounts(ipCounts, 10), topCounts(countryCounts, 10), topCounts(urlCounts, 10), buildHourlySeries(blockedByHour, now), topCounts(errorCounts, 7)
+	return attacks, blocked, len(uniqueIPs), topCounts(ipCounts, 10), topCounts(countryCounts, 10), topCounts(urlCounts, 10), buildHourlySeries(attacksByHour, now), buildHourlySeries(blockedByHour, now), topCounts(errorCounts, 7)
+}
+
+func summarizeRequestAttackSeries(items []map[string]any, cutoff, now time.Time) []DashboardTimeCount {
+	attacksByHour := map[time.Time]int{}
+	for _, row := range items {
+		entry, ok := row["entry"].(map[string]any)
+		if !ok {
+			continue
+		}
+		when := parseAnyTime(entry["timestamp"])
+		if when.IsZero() {
+			when = parseAnyTime(row["ingested_at"])
+		}
+		if when.IsZero() || when.Before(cutoff) {
+			continue
+		}
+		uri := strings.TrimSpace(asString(entry["uri"]))
+		siteID := strings.TrimSpace(asString(entry["site"]))
+		host := strings.TrimSpace(asString(entry["host"]))
+		if shouldSkipInternalRequest(uri, siteID, host) {
+			continue
+		}
+		statusCode := parseAnyInt(entry["status"])
+		if statusCode == 403 || statusCode == 429 || statusCode == 444 {
+			attacksByHour[when.UTC().Truncate(time.Hour)]++
+		}
+	}
+	return buildHourlySeries(attacksByHour, now)
 }
 
 func summarizeRequestAttacks(items []map[string]any, cutoff time.Time) requestAttackSummary {

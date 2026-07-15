@@ -182,6 +182,8 @@ func loadPersistedRuntimeSettingsLocked() {
 	runtimeSettingsState.hasUpdate = stored.HasUpdate
 	runtimeSettingsState.storage = normalizeStorageRetention(stored.Storage)
 	runtimeSettingsState.security = normalizeRuntimeSecuritySettings(stored.Security)
+	runtimeSettingsState.loginAppearance = normalizeLoginAppearance(stored.LoginAppearance)
+	runtimeSettingsState.healthcheckAppearance = normalizeHealthcheckAppearance(stored.HealthcheckAppearance)
 	runtimeSettingsState.logging = loggingconfig.Normalize(stored.Logging)
 	if !runtimeSettingsState.security.AllowInsecureVaultTLS {
 		runtimeSettingsState.logging.Vault.TLSSkipVerify = false
@@ -204,15 +206,17 @@ func savePersistedRuntimeSettingsLocked() {
 		return
 	}
 	payload := persistedRuntimeSettings{
-		UpdateChecksEnabled: runtimeSettingsState.updateChecksEnabled,
-		Language:            normalizeRuntimeLanguage(runtimeSettingsState.language),
-		LastCheckedAt:       runtimeSettingsState.lastCheckedAt,
-		LatestVersion:       runtimeSettingsState.latestVersion,
-		ReleaseURL:          runtimeSettingsState.releaseURL,
-		HasUpdate:           runtimeSettingsState.hasUpdate,
-		Storage:             normalizeStorageRetention(runtimeSettingsState.storage),
-		Security:            normalizeRuntimeSecuritySettings(runtimeSettingsState.security),
-		Logging:             loggingconfig.Normalize(runtimeSettingsState.logging),
+		UpdateChecksEnabled:   runtimeSettingsState.updateChecksEnabled,
+		Language:              normalizeRuntimeLanguage(runtimeSettingsState.language),
+		LastCheckedAt:         runtimeSettingsState.lastCheckedAt,
+		LatestVersion:         runtimeSettingsState.latestVersion,
+		ReleaseURL:            runtimeSettingsState.releaseURL,
+		HasUpdate:             runtimeSettingsState.hasUpdate,
+		Storage:               normalizeStorageRetention(runtimeSettingsState.storage),
+		Security:              normalizeRuntimeSecuritySettings(runtimeSettingsState.security),
+		LoginAppearance:       normalizeLoginAppearance(runtimeSettingsState.loginAppearance),
+		HealthcheckAppearance: normalizeHealthcheckAppearance(runtimeSettingsState.healthcheckAppearance),
+		Logging:               loggingconfig.Normalize(runtimeSettingsState.logging),
 	}
 	content, err := json.MarshalIndent(payload, "", "  ")
 	if err != nil {

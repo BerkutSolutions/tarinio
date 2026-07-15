@@ -291,12 +291,13 @@ func (s *RevisionCompileService) buildSnapshot() (revisionsnapshots.Snapshot, []
 	}
 	managementHosts := []string(nil)
 	managementHostsConfigured := false
+	blockDirectIPAccess := false
 	if s.managementHosts != nil {
 		item, err := s.managementHosts.Get()
 		if err != nil {
 			return revisionsnapshots.Snapshot{}, nil, err
 		}
-		managementHosts, managementHostsConfigured = item.Hosts, item.Migrated
+		managementHosts, managementHostsConfigured, blockDirectIPAccess = item.Hosts, item.Migrated, item.BlockDirectIPAccess
 	}
 	materialItems := make([]revisionsnapshots.MaterialContent, 0, len(certificateItems))
 	for _, certificate := range certificateItems {
@@ -324,6 +325,7 @@ func (s *RevisionCompileService) buildSnapshot() (revisionsnapshots.Snapshot, []
 		VirtualPatches:            collectActiveVirtualPatches(siteItems, s.virtualPatches),
 		ManagementHosts:           managementHosts,
 		ManagementHostsConfigured: managementHostsConfigured,
+		BlockDirectIPAccess:       blockDirectIPAccess,
 	}, materialItems, nil
 }
 

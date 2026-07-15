@@ -32,11 +32,11 @@ type dashboardContainerIssueReader interface {
 }
 
 type DashboardService struct {
-	events          dashboardEventReader
-	requests        RuntimeRequestCollector
-	runtimeReady    dashboardEventProber
-	containers      dashboardContainerIssueReader
-	sampler         dashboardSnapshotSampler
+	events        dashboardEventReader
+	requests      RuntimeRequestCollector
+	runtimeReady  dashboardEventProber
+	containers    dashboardContainerIssueReader
+	sampler       dashboardSnapshotSampler
 	requestsCache struct {
 		mu   sync.Mutex
 		rows []map[string]any
@@ -48,17 +48,17 @@ type DashboardService struct {
 	// dismissedServiceErrors хранит ID ошибок сервисов, которые пользователь скрыл.
 	// Хранится in-memory (сбрасывается при перезапуске — это нормально для этого кейса).
 	dismissedServiceErrors struct {
-		mu   sync.RWMutex
-		ids  map[string]struct{}
+		mu  sync.RWMutex
+		ids map[string]struct{}
 	}
 }
 
 type DashboardServiceStatus struct {
-	Name           string                      `json:"name"`
-	Up             bool                        `json:"up"`
-	CheckedAt      string                      `json:"checked_at"`
-	UpstreamErrors []DashboardServiceError     `json:"upstream_errors,omitempty"`
-	HasErrors      bool                        `json:"has_errors"`
+	Name           string                  `json:"name"`
+	Up             bool                    `json:"up"`
+	CheckedAt      string                  `json:"checked_at"`
+	UpstreamErrors []DashboardServiceError `json:"upstream_errors,omitempty"`
+	HasErrors      bool                    `json:"has_errors"`
 }
 
 // DashboardServiceError — одна ошибка upstream для сервиса (из nginx логов runtime).
@@ -107,25 +107,26 @@ type DashboardSystemStats struct {
 }
 
 type DashboardStats struct {
-	GeneratedAt            string                   `json:"generated_at"`
-	Services               []DashboardServiceStatus `json:"services"`
-	ServicesUp             int                      `json:"services_up"`
-	ServicesDown           int                      `json:"services_down"`
-	RequestsDay            int                      `json:"requests_day"`
-	RequestUniqueIPsDay    int                      `json:"request_unique_ips_day"`
-	RequestTopSites        []DashboardKeyCount      `json:"request_top_sites"`
-	RequestTopURLs         []DashboardKeyCount      `json:"request_top_urls"`
-	RequestsSeries         []DashboardTimeCount     `json:"requests_series"`
-	BlockedSeries          []DashboardTimeCount     `json:"blocked_series"`
-	AttacksDay             int                      `json:"attacks_day"`
-	BlockedAttacksDay      int                      `json:"blocked_attacks_day"`
-	UniqueAttackerIPsDay   int                      `json:"unique_attacker_ips_day"`
-	PopularErrors          []DashboardKeyCount      `json:"popular_errors"`
-	TopAttackerIPs         []DashboardKeyCount      `json:"top_attacker_ips"`
-	TopAttackerCountries   []DashboardKeyCount      `json:"top_attacker_countries"`
-	MostAttackedURLs       []DashboardKeyCount      `json:"most_attacked_urls"`
-	System                 DashboardSystemStats     `json:"system"`
-	ObservationWindowHours int                      `json:"observation_window_hours"`
+	GeneratedAt            string                    `json:"generated_at"`
+	Services               []DashboardServiceStatus  `json:"services"`
+	ServicesUp             int                       `json:"services_up"`
+	ServicesDown           int                       `json:"services_down"`
+	RequestsDay            int                       `json:"requests_day"`
+	RequestUniqueIPsDay    int                       `json:"request_unique_ips_day"`
+	RequestTopSites        []DashboardKeyCount       `json:"request_top_sites"`
+	RequestTopURLs         []DashboardKeyCount       `json:"request_top_urls"`
+	RequestsSeries         []DashboardTimeCount      `json:"requests_series"`
+	AttacksSeries          []DashboardTimeCount      `json:"attacks_series"`
+	BlockedSeries          []DashboardTimeCount      `json:"blocked_series"`
+	AttacksDay             int                       `json:"attacks_day"`
+	BlockedAttacksDay      int                       `json:"blocked_attacks_day"`
+	UniqueAttackerIPsDay   int                       `json:"unique_attacker_ips_day"`
+	PopularErrors          []DashboardKeyCount       `json:"popular_errors"`
+	TopAttackerIPs         []DashboardKeyCount       `json:"top_attacker_ips"`
+	TopAttackerCountries   []DashboardKeyCount       `json:"top_attacker_countries"`
+	MostAttackedURLs       []DashboardKeyCount       `json:"most_attacked_urls"`
+	System                 DashboardSystemStats      `json:"system"`
+	ObservationWindowHours int                       `json:"observation_window_hours"`
 	UpstreamHealth         []DashboardUpstreamHealth `json:"upstream_health,omitempty"`
 }
 

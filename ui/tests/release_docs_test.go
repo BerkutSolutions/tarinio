@@ -86,7 +86,7 @@ func TestReleaseDocsAndLockfileConsistency(t *testing.T) {
 	}
 	for _, content := range loggingDocs {
 		if strings.Contains(content, "default profile now includes `OpenSearch`, `ClickHouse`, and `Vault`") {
-			t.Fatalf("logging and migration docs must not describe ClickHouse as part of the default 1.5.0 profile")
+			t.Fatalf("logging and migration docs must not describe ClickHouse as part of the default 1.5.3 profile")
 		}
 	}
 
@@ -101,6 +101,15 @@ func TestReleaseDocsAndLockfileConsistency(t *testing.T) {
 		content := mustReadFile(t, path)
 		if strings.Contains(content, "2.0.5") {
 			t.Fatalf("i18n file still contains stale 2.0.5 version marker: %s", path)
+		}
+	}
+
+	for _, path := range []string{
+		filepath.Join(repoRoot, "ui", "app", "index.html"),
+		filepath.Join(repoRoot, "ui", "app", "static", "js", "app.js"),
+	} {
+		if !strings.Contains(mustReadFile(t, path), "v"+appVersion) {
+			t.Fatalf("runtime fallback version must match AppVersion %q: %s", appVersion, path)
 		}
 	}
 }

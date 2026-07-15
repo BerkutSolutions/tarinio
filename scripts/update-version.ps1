@@ -159,6 +159,30 @@ function Sync-DocsAndFrontendVersion([string]$RepoRoot, [string]$TargetVersion) 
     }
 }
 
+function Sync-LegacyRuntimeVersion([string]$RepoRoot, [string]$TargetVersion) {
+    # The runtime shell is served independently from the documentation site.
+    # Keep its pre-i18n fallback version in sync for users whose locale has not
+    # loaded yet, and for pages rendered before app.js finishes bootstrapping.
+    $utf8 = [System.Text.UTF8Encoding]::new($false)
+    $targets = @(
+        @{ Path = "ui/app/static/js/app.js"; Pattern = 'v\d+\.\d+\.\d+' },
+        @{ Path = "ui/app/index.html"; Pattern = '>v\d+\.\d+\.\d+<' }
+    )
+    foreach ($target in $targets) {
+        $path = Join-Path $RepoRoot $target.Path
+        if (-not (Test-Path $path)) {
+            throw "runtime version file not found: $path"
+        }
+        $raw = [System.IO.File]::ReadAllText($path, $utf8)
+        $replacement = if ($target.Path.EndsWith("index.html")) { ">v$TargetVersion<" } else { "v$TargetVersion" }
+        $updated = [regex]::Replace($raw, $target.Pattern, $replacement)
+        if ($updated -eq $raw) {
+            throw "legacy runtime version marker not found in $path"
+        }
+        [System.IO.File]::WriteAllText($path, $updated, $utf8)
+    }
+}
+
 Assert-Version -Value $Version
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 
@@ -166,5 +190,6 @@ Update-AppMeta -RepoRoot $repoRoot -TargetVersion $Version
 Sync-PackageMetadataVersion -RepoRoot $repoRoot -TargetVersion $Version
 Sync-I18NAppVersion -RepoRoot $repoRoot -TargetVersion $Version
 Sync-DocsAndFrontendVersion -RepoRoot $repoRoot -TargetVersion $Version
+Sync-LegacyRuntimeVersion -RepoRoot $repoRoot -TargetVersion $Version
 
 Write-Host ("Version synchronized to " + $Version)

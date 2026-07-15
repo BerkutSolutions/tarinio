@@ -228,6 +228,13 @@ func (h *AuthHandler) passkeyLoginBegin(w http.ResponseWriter, r *http.Request) 
 	_ = json.NewDecoder(r.Body).Decode(&req)
 	result, err := h.auth.BeginPasskeyLogin(withActorIP(r), req.Username, r)
 	if err != nil {
+		if strings.TrimSpace(err.Error()) == "auth.passkeys.notFound" {
+			// A missing key is an expected login-state outcome. Keep it as JSON with
+			// a successful transport status so a WAF custom 404 page cannot replace
+			// the notification the login screen must show.
+			writeJSON(w, http.StatusOK, map[string]any{"error": "auth.passkeys.notFound"})
+			return
+		}
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 		return
 	}

@@ -13,7 +13,7 @@ export async function renderAbout(container, ctx) {
         <div class="waf-card-body waf-stack">
           <div class="about-grid">
             <div class="about-logo-wrap">
-              <img class="about-logo" src="/static/logo500x300.png" alt="Berkut Solutions - TARINIO">
+              <img class="about-logo" src="/static/logo700x250.png" alt="Berkut Solutions - TARINIO">
             </div>
             <div class="about-content">
               <h4 class="about-name">${escapeHtml(ctx.t("about.projectName"))}</h4>

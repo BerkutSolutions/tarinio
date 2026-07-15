@@ -30,11 +30,12 @@ function renderSystemCPU(stats, ctx) {
 }
 
 function prepareSeriesRows(stats) {
+  const attacks = Array.isArray(stats?.attacks_series) ? stats.attacks_series : [];
   const requests = Array.isArray(stats?.requests_series) ? stats.requests_series : [];
-  const blockedRaw = Array.isArray(stats?.blocked_series) ? stats.blocked_series : [];
-  const blockedMap = new Map(blockedRaw.map((item) => [String(item?.timestamp || ""), Number(item?.count || 0)]));
   const hourFormatter = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", hour12: false });
-  return requests.map((item) => ({
+  const attacksByTimestamp = new Map(attacks.map((item) => [String(item?.timestamp || ""), Number(item?.count || 0)]));
+  const source = requests.length ? requests : attacks;
+  return source.map((item) => ({
     label: (() => {
       const ts = String(item?.timestamp || "");
       if (!ts) {
@@ -43,8 +44,9 @@ function prepareSeriesRows(stats) {
       const dt = new Date(ts);
       return Number.isNaN(dt.getTime()) ? String(item?.label || "") : hourFormatter.format(dt);
     })(),
+    timestamp: String(item?.timestamp || ""),
     requests: Number(item?.count || 0),
-    blocked: blockedMap.get(String(item?.timestamp || "")) || 0
+    attacks: attacksByTimestamp.get(String(item?.timestamp || "")) || 0
   }));
 }
 
@@ -52,53 +54,57 @@ function renderRequestsSeries(rows, ctx, chartWidthPx) {
   if (!rows.length) {
     return `<div class="dashboard-widget-content waf-empty">${escapeHtml(ctx.t("dashboard.series.empty"))}</div>`;
   }
-  const maxY = Math.max(1, ...rows.map((row) => Math.max(row.requests, row.blocked)));
+  const maxRequests = Math.max(1, ...rows.map((row) => row.requests));
+  const averageRequests = rows.reduce((sum, row) => sum + row.requests, 0) / rows.length;
+  const maxY = Math.max(maxRequests, ...rows.map((row) => row.attacks));
   const width = Math.max(320, Math.floor(chartWidthPx || 1100));
-  const height = 260;
-  const pad = { left: 56, right: 20, top: 16, bottom: 36 };
+  const height = 230;
+  const pad = { left: 40, right: 20, top: 18, bottom: 34 };
   const chartWidth = width - pad.left - pad.right;
   const chartHeight = height - pad.top - pad.bottom;
 
-  const pointsReq = rows.map((row, index) => {
+  const toPoints = (field) => rows.map((row, index) => {
     const x = pad.left + (index / Math.max(rows.length - 1, 1)) * chartWidth;
-    const y = pad.top + (1 - (row.requests / maxY)) * chartHeight;
+    const y = pad.top + (1 - (row[field] / maxY)) * chartHeight;
     return { x, y, ...row };
   });
-  const pointsBlocked = rows.map((row, index) => {
-    const x = pad.left + (index / Math.max(rows.length - 1, 1)) * chartWidth;
-    const y = pad.top + (1 - (row.blocked / maxY)) * chartHeight;
-    return { x, y, ...row };
-  });
-  const reqPolyline = pointsReq.map((point) => `${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(" ");
-  const blockedPolyline = pointsBlocked.map((point) => `${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(" ");
-  const yTicks = 5;
-  const yStep = Math.max(1, Math.ceil(maxY / yTicks));
-  const yValues = Array.from({ length: yTicks + 1 }, (_, i) => i * yStep);
-  const xLabelStep = Math.max(1, Math.ceil(rows.length / 8));
+  const toPath = (points) => points.reduce((path, point, index) => {
+    if (index === 0) return `M ${point.x.toFixed(2)} ${point.y.toFixed(2)}`;
+    const previous = points[index - 1];
+    const controlX = ((previous.x + point.x) / 2).toFixed(2);
+    return `${path} C ${controlX} ${previous.y.toFixed(2)}, ${controlX} ${point.y.toFixed(2)}, ${point.x.toFixed(2)} ${point.y.toFixed(2)}`;
+  }, "");
+  const requestPath = toPath(toPoints("requests"));
+  const attackPath = toPath(toPoints("attacks"));
+  const gridLines = 4;
+  const xLabelStep = Math.max(1, Math.ceil((rows.length - 1) / 4));
 
   return `
     <div class="dashboard-widget-content dashboard-series" data-requests-chart="true">
+      <div class="dashboard-series-legend">
+        <span><i class="dot dot-requests"></i>${escapeHtml(ctx.t("dashboard.series.requests"))}</span>
+        <span><i class="dot dot-attacks"></i>${escapeHtml(ctx.t("dashboard.series.attacks"))}</span>
+      </div>
       <div class="dashboard-series-canvas">
         <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" class="dashboard-series-svg">
-          ${yValues.map((value) => {
-            const y = pad.top + (1 - (value / Math.max(yValues[yValues.length - 1], 1))) * chartHeight;
-            return `
-              <line x1="${pad.left}" y1="${y}" x2="${width - pad.right}" y2="${y}" stroke="rgba(255,255,255,0.08)" stroke-width="1"></line>
-              <text x="${pad.left - 8}" y="${y + 4}" text-anchor="end" font-size="12" fill="rgba(255,255,255,0.7)">${value}</text>
-            `;
+          ${Array.from({ length: gridLines }, (_, index) => {
+            const y = pad.top + ((index + 1) / gridLines) * chartHeight;
+            return `<line x1="${pad.left}" y1="${y}" x2="${width - pad.right}" y2="${y}" stroke="rgba(148, 163, 184, 0.16)" stroke-width="1" stroke-dasharray="3 7"></line>`;
           }).join("")}
-          <polyline points="${blockedPolyline}" fill="none" stroke="#ff5d6e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></polyline>
-          <polyline points="${reqPolyline}" fill="none" stroke="#58a6ff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></polyline>
+          <text x="${pad.left - 8}" y="${pad.top + 4}" text-anchor="end" font-size="11" fill="rgba(203, 213, 225, 0.68)">${escapeHtml(formatNumber(maxRequests))}</text>
+          <text x="${pad.left - 8}" y="${pad.top + chartHeight / 2 + 4}" text-anchor="end" font-size="11" fill="rgba(203, 213, 225, 0.68)">${escapeHtml(formatNumber(averageRequests))}</text>
+          <path d="${requestPath}" fill="none" stroke="#2895ff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+          <path d="${attackPath}" fill="none" stroke="#f17322" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+          ${rows.map((row, index) => {
+            if (index % xLabelStep !== 0 && index !== rows.length - 1) return "";
+            const x = pad.left + (index / Math.max(rows.length - 1, 1)) * chartWidth;
+            return `<text x="${x}" y="${height - 8}" text-anchor="middle" font-size="11" fill="rgba(203, 213, 225, 0.68)">${escapeHtml(row.label)}</text>`;
+          }).join("")}
+          <line data-chart-cursor="true" x1="0" x2="0" y1="${pad.top}" y2="${pad.top + chartHeight}" stroke="rgba(148, 163, 184, 0.8)" stroke-width="1" stroke-dasharray="3 5" hidden></line>
+          <circle data-chart-point="true" cx="0" cy="0" r="4" fill="#12181f" stroke="#f17322" stroke-width="2" hidden></circle>
           <rect x="${pad.left}" y="${pad.top}" width="${chartWidth}" height="${chartHeight}" fill="transparent" data-chart-overlay="true"></rect>
         </svg>
         <div class="dashboard-chart-tooltip" data-chart-tooltip="true" hidden></div>
-      </div>
-      <div class="dashboard-series-axis">
-        ${rows.map((row, index) => (index % xLabelStep === 0 ? `<span>${escapeHtml(row.label)}</span>` : "<span></span>")).join("")}
-      </div>
-      <div class="dashboard-series-legend">
-        <span><i class="dot dot-requests"></i>${escapeHtml(ctx.t("dashboard.series.requests"))}</span>
-        <span><i class="dot dot-blocked"></i>${escapeHtml(ctx.t("dashboard.series.blocked"))}</span>
       </div>
     </div>
   `;
@@ -108,12 +114,14 @@ function bindRequestsChartHover(bodyNode, rows, ctx) {
   const overlay = bodyNode.querySelector("[data-chart-overlay='true']");
   const tooltip = bodyNode.querySelector("[data-chart-tooltip='true']");
   const svg = bodyNode.querySelector(".dashboard-series-svg");
+  const cursor = bodyNode.querySelector("[data-chart-cursor='true']");
+  const point = bodyNode.querySelector("[data-chart-point='true']");
   if (!overlay || !tooltip || !svg || !rows.length) {
     return;
   }
   const viewBox = String(svg.getAttribute("viewBox") || "").split(/\s+/).map((part) => Number(part));
   const width = Number.isFinite(viewBox[2]) ? viewBox[2] : 1100;
-  const padLeft = 56;
+  const padLeft = 40;
   const padRight = 20;
   const chartWidth = width - padLeft - padRight;
   const nearest = (x) => clamp(Math.round(((x - padLeft) / chartWidth) * (rows.length - 1)), 0, rows.length - 1);
@@ -121,8 +129,24 @@ function bindRequestsChartHover(bodyNode, rows, ctx) {
     const rect = svg.getBoundingClientRect();
     const localX = ((event.clientX - rect.left) / Math.max(rect.width, 1)) * width;
     const row = rows[nearest(localX)];
-    tooltip.textContent = `${row.label}: ${ctx.t("dashboard.series.requests")} ${formatNumber(row.requests)}, ${ctx.t("dashboard.series.blocked")} ${formatNumber(row.blocked)}`;
+    const timestamp = new Date(row.timestamp);
+    const formatted = Number.isNaN(timestamp.getTime())
+      ? row.label
+      : new Intl.DateTimeFormat(undefined, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).format(timestamp);
+    tooltip.textContent = `${formatted}\n${ctx.t("dashboard.series.requests")}: ${formatNumber(row.requests)}\n${ctx.t("dashboard.series.attacks")}: ${formatNumber(row.attacks)}`;
     tooltip.hidden = false;
+    const pointX = padLeft + (nearest(localX) / Math.max(rows.length - 1, 1)) * chartWidth;
+    const pointY = 18 + (1 - (row.attacks / Math.max(1, ...rows.flatMap((item) => [item.requests, item.attacks])))) * (Number(viewBox[3]) - 52);
+    if (cursor) {
+      cursor.setAttribute("x1", String(pointX));
+      cursor.setAttribute("x2", String(pointX));
+      cursor.hidden = false;
+    }
+    if (point) {
+      point.setAttribute("cx", String(pointX));
+      point.setAttribute("cy", String(pointY));
+      point.hidden = false;
+    }
     const left = clamp(event.clientX - rect.left + 12, 8, Math.max(8, rect.width - (tooltip.offsetWidth || 180) - 8));
     const top = clamp(event.clientY - rect.top - 36, 8, Math.max(8, rect.height - 28));
     tooltip.style.left = `${Math.round(left)}px`;
@@ -132,6 +156,8 @@ function bindRequestsChartHover(bodyNode, rows, ctx) {
   overlay.addEventListener("mouseenter", show);
   overlay.addEventListener("mouseleave", () => {
     tooltip.hidden = true;
+    if (cursor) cursor.hidden = true;
+    if (point) point.hidden = true;
   });
 }
 

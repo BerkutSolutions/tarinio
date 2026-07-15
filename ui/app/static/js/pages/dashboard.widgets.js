@@ -1,12 +1,12 @@
 import { escapeHtml } from "../ui.js";
+import { renderCountryFlag } from "./country-flag.js";
 
 function countryFlag(code, deps) {
   const token = deps.normalizeCountryCode(code);
   if (!/^[A-Z]{2}$/.test(token)) {
     return "";
   }
-  const cc = token.toLowerCase();
-  return `<img class="country-flag-img" src="https://flagcdn.com/16x12/${cc}.png" srcset="https://flagcdn.com/32x24/${cc}.png 2x" width="16" height="12" alt="${token}" loading="lazy" onerror="this.style.display='none';this.nextSibling&&(this.nextSibling.style.display='')"><span class="country-flag-fallback" style="display:none">${token}</span>`;
+  return renderCountryFlag(token);
 }
 
 function countryName(code, deps) {

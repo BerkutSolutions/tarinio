@@ -184,15 +184,17 @@ func (s *DashboardService) buildSnapshot() (DashboardStats, error) {
 	out.BlockedSeries = blockedFromRequestsSeries
 	out.PopularErrors = popularErrors
 
-	attacksDay, blockedAttacksDay, uniqueIPsDay, topIPs, topCountries, topURLs, blockedFromEventsSeries, eventErrors := summarizeAttackEvents(eventItems, cutoff, now)
+	attacksDay, blockedAttacksDay, uniqueIPsDay, topIPs, topCountries, topURLs, attacksFromEventsSeries, blockedFromEventsSeries, eventErrors := summarizeAttackEvents(eventItems, cutoff, now)
 	out.AttacksDay = attacksDay
 	out.BlockedAttacksDay = blockedAttacksDay
 	out.UniqueAttackerIPsDay = uniqueIPsDay
 	out.TopAttackerIPs = topIPs
 	out.TopAttackerCountries = topCountries
 	out.MostAttackedURLs = topURLs
+	out.AttacksSeries = attacksFromEventsSeries
 
 	requestAttackFallback := summarizeRequestAttacks(requestRows, cutoff)
+	requestAttackSeries := summarizeRequestAttackSeries(requestRows, cutoff, now)
 	eventAttackBreakdownPartial := (out.AttacksDay > 0 || out.BlockedAttacksDay > 0 || out.UniqueAttackerIPsDay > 0) &&
 		(len(out.TopAttackerCountries) == 0 || len(out.MostAttackedURLs) == 0)
 	if requestAttackFallback.AttacksDay > out.AttacksDay {
@@ -231,6 +233,9 @@ func (s *DashboardService) buildSnapshot() (DashboardStats, error) {
 	}
 	if out.BlockedAttacksDay <= 0 && blockedFromRequestsDay > 0 {
 		out.BlockedAttacksDay = blockedFromRequestsDay
+	}
+	if out.AttacksDay <= 0 {
+		out.AttacksSeries = requestAttackSeries
 	}
 	out.PopularErrors = mergeKeyCountsSum(out.PopularErrors, eventErrors, 7)
 	out.System = collectSystemStats()

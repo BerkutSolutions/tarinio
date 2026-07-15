@@ -1,6 +1,7 @@
 import { api } from "./api.js";
 import { checkEntryAccess, secureAppUrl } from "./guard.js";
 import { getBrowserLanguage, setLanguage, t } from "./i18n.js";
+import { applyHealthcheckAppearance, updateHealthcheckThemeSummary } from "./healthcheck-appearance.js";
 
 const MIN_STEP_MS = 150;
 const CHECKS_CONCURRENCY = 4;
@@ -209,6 +210,13 @@ function updateChecksHeader() {
   } else {
     setToggleStatus("hc-checks", "done");
   }
+  updateHealthcheckThemeSummary({
+    checksDone: done,
+    checksTotal: total,
+    errors: state.errorItems.length,
+    compatFailed: hasFailed || hasAttention,
+    message: `[LIVE] Проверки: ${done}/${total}`,
+  });
 }
 
 function detailsLine(item) {
@@ -330,6 +338,13 @@ function renderCompat(items) {
   } else {
     setToggleStatus("hc-compat", "pending");
   }
+  updateHealthcheckThemeSummary({
+    checksDone: Array.from(state.checks.values()).filter((item) => ["done", "failed", "skipped", "needs_attention"].includes(String(item.status))).length,
+    checksTotal: state.checks.size,
+    errors: state.errorItems.length,
+    compatFailed: hasFailed || hasAttention,
+    message: `[LIVE] Совместимость: ${hasFailed ? "ошибка" : hasAttention ? "внимание" : "OK"}`,
+  });
 }
 
 function renderErrorIssues(items) {
@@ -348,6 +363,13 @@ function renderErrorIssues(items) {
 
   if (!state.errorItems.length) {
     setToggleStatus("hc-errors", "done");
+    updateHealthcheckThemeSummary({
+      checksDone: Array.from(state.checks.values()).filter((item) => ["done", "failed", "skipped", "needs_attention"].includes(String(item.status))).length,
+      checksTotal: state.checks.size,
+      errors: 0,
+      compatFailed: false,
+      message: "[LIVE] Журнал ошибок: критичных событий нет",
+    });
     return;
   }
 
@@ -395,6 +417,13 @@ function renderErrorIssues(items) {
   });
 
   setToggleStatus("hc-errors", hasError ? "failed" : "warning");
+  updateHealthcheckThemeSummary({
+    checksDone: Array.from(state.checks.values()).filter((item) => ["done", "failed", "skipped", "needs_attention"].includes(String(item.status))).length,
+    checksTotal: state.checks.size,
+    errors: state.errorItems.length,
+    compatFailed: hasError,
+    message: `[LIVE] Журнал ошибок: ${state.errorItems.length}`,
+  });
 }
 
 function bindAccordion() {
@@ -535,6 +564,7 @@ async function loadErrorIssues() {
 
 async function bootstrap() {
   await setLanguage(getBrowserLanguage());
+  const appearance = await applyHealthcheckAppearance();
   document.title = t("healthcheck.pageTitle");
 
   const access = await checkEntryAccess("app");
@@ -543,11 +573,17 @@ async function bootstrap() {
   document.getElementById("healthcheck-continue")?.addEventListener("click", () => {
     window.location.href = secureAppUrl("/dashboard");
   });
+  document.getElementById("healthcheck-refresh")?.addEventListener("click", async () => {
+    setError("");
+    await runChecks();
+    await loadErrorIssues();
+    await loadCompat();
+  });
 
   bindAccordion();
 
   const checksPanel = document.getElementById("hc-checks");
-  if (checksPanel) checksPanel.hidden = false;
+  if (checksPanel && appearance !== "variant-5") checksPanel.hidden = false;
   document.querySelectorAll("[data-hc-toggle]").forEach((btn) => {
     const panelID = btn.getAttribute("data-hc-toggle");
     const panel = panelID ? document.getElementById(panelID) : null;

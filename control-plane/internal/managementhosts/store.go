@@ -18,11 +18,12 @@ import (
 // Settings is the persisted, explicit ownership of WAF self-management paths.
 // Version provides optimistic concurrency for settings clients.
 type Settings struct {
-	Hosts         []string `json:"management_hosts"`
-	Version       int64    `json:"version"`
-	Migrated      bool     `json:"migrated"`
-	SetupRequired bool     `json:"management_hosts_setup_required"`
-	UpdatedAt     string   `json:"updated_at"`
+	Hosts               []string `json:"management_hosts"`
+	BlockDirectIPAccess bool     `json:"block_direct_ip_access"`
+	Version             int64    `json:"version"`
+	Migrated            bool     `json:"migrated"`
+	SetupRequired       bool     `json:"management_hosts_setup_required"`
+	UpdatedAt           string   `json:"updated_at"`
 }
 
 type Store struct {
@@ -68,6 +69,24 @@ func (s *Store) Update(hosts []string, version int64) (Settings, error) {
 		return Settings{}, errors.New("at least one management host is required")
 	}
 	current.Hosts, current.Version, current.Migrated, current.SetupRequired, current.UpdatedAt = canonical, current.Version+1, true, false, time.Now().UTC().Format(time.RFC3339Nano)
+	return current, s.saveLocked(current)
+}
+
+// UpdateDirectIPAccess changes the WAF-wide default-server policy without
+// touching the independently managed control-plane host ownership.
+func (s *Store) UpdateDirectIPAccess(block bool) (Settings, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	current, err := s.loadLocked()
+	if err != nil {
+		return Settings{}, err
+	}
+	if current.BlockDirectIPAccess == block {
+		return current, nil
+	}
+	current.BlockDirectIPAccess = block
+	current.Version++
+	current.UpdatedAt = time.Now().UTC().Format(time.RFC3339Nano)
 	return current, s.saveLocked(current)
 }
 

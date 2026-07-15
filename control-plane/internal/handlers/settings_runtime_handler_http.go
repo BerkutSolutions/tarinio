@@ -52,6 +52,38 @@ func (h *SettingsRuntimeHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 			runtimeSettingsState.language = normalizeRuntimeLanguage(value)
 			updated = true
 		}
+		if raw, exists := body["login_appearance"]; exists {
+			value, typeOK := raw.(string)
+			if !typeOK {
+				runtimeSettingsState.mu.Unlock()
+				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "login_appearance must be string"})
+				return
+			}
+			normalized := normalizeLoginAppearance(value)
+			if normalized != strings.TrimSpace(value) {
+				runtimeSettingsState.mu.Unlock()
+				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "unknown login_appearance"})
+				return
+			}
+			runtimeSettingsState.loginAppearance = normalized
+			updated = true
+		}
+		if raw, exists := body["healthcheck_appearance"]; exists {
+			value, typeOK := raw.(string)
+			if !typeOK {
+				runtimeSettingsState.mu.Unlock()
+				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "healthcheck_appearance must be string"})
+				return
+			}
+			normalized := normalizeHealthcheckAppearance(value)
+			if normalized != strings.TrimSpace(value) {
+				runtimeSettingsState.mu.Unlock()
+				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "unknown healthcheck_appearance"})
+				return
+			}
+			runtimeSettingsState.healthcheckAppearance = normalized
+			updated = true
+		}
 		if raw, exists := body["logging"]; exists {
 			typed, typeOK := raw.(map[string]any)
 			if !typeOK {

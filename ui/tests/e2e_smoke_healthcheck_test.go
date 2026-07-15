@@ -101,7 +101,7 @@ func TestE2ESmoke_LoginHealthcheckDashboard(t *testing.T) {
 		t.Fatalf("healthcheck page failed: status=%d", healthcheckPage.StatusCode)
 	}
 	healthcheckBody := mustReadBody(t, healthcheckPage.Body)
-	if !strings.Contains(healthcheckBody, `id="healthcheck-steps"`) || !strings.Contains(healthcheckBody, `id="healthcheck-error"`) {
+	if !strings.Contains(healthcheckBody, `id="healthcheck-app"`) || !strings.Contains(healthcheckBody, `/static/js/healthcheck.js`) {
 		t.Fatalf("healthcheck page contract mismatch: missing current page markers")
 	}
 

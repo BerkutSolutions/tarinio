@@ -1,5 +1,6 @@
 import { asDate, normalizeIP, normalizeList } from "./bans.helpers.base.js";
 import { isStartupSelfTestSite } from "./bans.helpers.timers.js";
+import { renderCountryFlag } from "./country-flag.js";
 
 export function parsePositiveNumber(value, fallback = 0) {
   const parsed = Number(value);
@@ -37,8 +38,7 @@ export function countryFlagEmoji(value) {
   if (!code || !/^[A-Z]{2}$/.test(code)) {
     return "-";
   }
-  const cc = code.toLowerCase();
-  return `<img class="country-flag-img" src="https://flagcdn.com/16x12/${cc}.png" srcset="https://flagcdn.com/32x24/${cc}.png 2x" width="16" height="12" alt="${code}" loading="lazy" onerror="this.style.display='none';this.nextSibling&&(this.nextSibling.style.display='')"><span class="country-flag-fallback" style="display:none">${code}</span>`;
+  return renderCountryFlag(code);
 }
 
 export function deriveModuleFromEvent(item) {

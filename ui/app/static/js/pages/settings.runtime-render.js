@@ -6,6 +6,8 @@ export async function renderRuntimeData(params) {
     ctx,
     permissionSet,
     runtimeStatus,
+    loginAppearanceSelect,
+    healthcheckAppearanceSelect,
     languageSelect,
     updatesEnabled,
     updateStatus,
@@ -80,6 +82,12 @@ export async function renderRuntimeData(params) {
       runtimeStatus.textContent = ctx.t("settings.runtime.loaded", { mode });
       if (languageSelect) {
         languageSelect.value = String(runtime?.language || ctx.getLanguage?.() || "en");
+      }
+      if (loginAppearanceSelect) {
+        loginAppearanceSelect.value = String(runtime?.login_appearance || "command-center");
+      }
+      if (healthcheckAppearanceSelect) {
+        healthcheckAppearanceSelect.value = String(runtime?.healthcheck_appearance || "variant-1");
       }
       if (updatesEnabled) {
         updatesEnabled.checked = !!runtime?.update_checks_enabled;

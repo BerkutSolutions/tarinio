@@ -18,9 +18,14 @@ import (
 )
 
 type nginxMainData struct {
-	SitesIncludeGlob string
-	DefaultTLSRef    string
-	ErrorStatusCodes []int
+	SitesIncludeGlob    string
+	DefaultTLSRef       string
+	ErrorStatusCodes    []int
+	BlockDirectIPAccess bool
+}
+
+type DefaultServerOptions struct {
+	BlockDirectIPAccess bool
 }
 
 type nginxSiteData struct {
@@ -84,6 +89,12 @@ var supportedErrorStatusCodes = []int{
 // RenderSiteUpstreamArtifacts produces deterministic nginx artifacts for the MVP
 // Site and Upstream compiler mapping.
 func RenderSiteUpstreamArtifacts(sites []SiteInput, upstreams []UpstreamInput) ([]ArtifactOutput, error) {
+	return RenderSiteUpstreamArtifactsWithOptions(sites, upstreams, DefaultServerOptions{})
+}
+
+// RenderSiteUpstreamArtifactsWithOptions renders WAF-wide default-server
+// behavior alongside per-service configuration.
+func RenderSiteUpstreamArtifactsWithOptions(sites []SiteInput, upstreams []UpstreamInput, options DefaultServerOptions) ([]ArtifactOutput, error) {
 	sortedSites, upstreamByID, err := normalizeInputs(sites, upstreams)
 	if err != nil {
 		return nil, err
@@ -92,9 +103,10 @@ func RenderSiteUpstreamArtifacts(sites []SiteInput, upstreams []UpstreamInput) (
 	var artifacts []ArtifactOutput
 
 	mainContent, err := renderTemplate("templates/nginx/nginx.conf.tmpl", nginxMainData{
-		SitesIncludeGlob: "sites/*.conf",
-		DefaultTLSRef:    defaultTLSRefPath(sortedSites),
-		ErrorStatusCodes: responseErrorStatusCodes(),
+		SitesIncludeGlob:    "sites/*.conf",
+		DefaultTLSRef:       defaultTLSRefPath(sortedSites),
+		ErrorStatusCodes:    responseErrorStatusCodes(),
+		BlockDirectIPAccess: options.BlockDirectIPAccess,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("render nginx main template: %w", err)
@@ -104,8 +116,10 @@ func RenderSiteUpstreamArtifacts(sites []SiteInput, upstreams []UpstreamInput) (
 	baseContent, err := renderTemplate("templates/nginx/conf.d/base.conf.tmpl", nginxBaseData{
 		ErrorStatusCodes:         responseErrorStatusCodes(),
 		HostMapEntries:           buildHostMapEntries(sortedSites),
+		ManagementSiteID:         managementSiteID(sortedSites),
 		ManagementAPIProxyTarget: managementAPIProxyTarget(),
 		UIProxyTarget:            uiProxyTarget(),
+		BlockDirectIPAccess:      options.BlockDirectIPAccess,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("render nginx base template: %w", err)
@@ -428,9 +442,20 @@ func errorPagePreviewPath(code int) string {
 type nginxBaseData struct {
 	ErrorStatusCodes         []int
 	HostMapEntries           []nginxHostMapEntry
+	ManagementSiteID         string
 	ManagementAPIProxyTarget string
 	TrustedProxyCIDRs        []string
 	UIProxyTarget            string
+	BlockDirectIPAccess      bool
+}
+
+func managementSiteID(sites []SiteInput) string {
+	for _, site := range sites {
+		if site.Enabled && isManagementSite(site) {
+			return site.ID
+		}
+	}
+	return ""
 }
 
 func managementAPIProxyTarget() string {

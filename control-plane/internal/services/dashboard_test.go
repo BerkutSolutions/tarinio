@@ -125,6 +125,16 @@ func TestDashboardService_StatsExposeCurrentWidgetData(t *testing.T) {
 	if stats.AttacksDay != 1 {
 		t.Fatalf("expected 1 attack, got %d", stats.AttacksDay)
 	}
+	if len(stats.AttacksSeries) != 24 {
+		t.Fatalf("expected 24 hourly attack buckets, got %#v", stats.AttacksSeries)
+	}
+	attackSeriesTotal := 0
+	for _, bucket := range stats.AttacksSeries {
+		attackSeriesTotal += bucket.Count
+	}
+	if attackSeriesTotal != stats.AttacksDay {
+		t.Fatalf("hourly attack series (%d) must match the authoritative daily count (%d): %#v", attackSeriesTotal, stats.AttacksDay, stats.AttacksSeries)
+	}
 	if stats.BlockedAttacksDay != 1 {
 		t.Fatalf("expected 1 blocked attack, got %d", stats.BlockedAttacksDay)
 	}
@@ -443,7 +453,6 @@ func TestDashboardService_BackfillsMissingEventAttackBreakdownsFromRequests(t *t
 		t.Fatalf("expected attacked URLs to remain event-derived when events are authoritative, got %#v", stats.MostAttackedURLs)
 	}
 }
-
 
 func TestDashboardService_BackfillsCountriesAndURLsWhenEventCountsExistButEventBreakdownsArePartial(t *testing.T) {
 	now := time.Now().UTC()

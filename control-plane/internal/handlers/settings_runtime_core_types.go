@@ -46,32 +46,36 @@ type RuntimeSecuritySettings struct {
 }
 
 type persistedRuntimeSettings struct {
-	UpdateChecksEnabled bool                    `json:"update_checks_enabled"`
-	Language            string                  `json:"language,omitempty"`
-	LastCheckedAt       string                  `json:"last_checked_at,omitempty"`
-	LatestVersion       string                  `json:"latest_version,omitempty"`
-	ReleaseURL          string                  `json:"release_url,omitempty"`
-	HasUpdate           bool                    `json:"has_update"`
-	Storage             StorageRetention        `json:"storage"`
-	Security            RuntimeSecuritySettings `json:"security,omitempty"`
-	Logging             loggingconfig.Settings  `json:"logging,omitempty"`
+	UpdateChecksEnabled   bool                    `json:"update_checks_enabled"`
+	Language              string                  `json:"language,omitempty"`
+	LastCheckedAt         string                  `json:"last_checked_at,omitempty"`
+	LatestVersion         string                  `json:"latest_version,omitempty"`
+	ReleaseURL            string                  `json:"release_url,omitempty"`
+	HasUpdate             bool                    `json:"has_update"`
+	Storage               StorageRetention        `json:"storage"`
+	Security              RuntimeSecuritySettings `json:"security,omitempty"`
+	LoginAppearance       string                  `json:"login_appearance,omitempty"`
+	HealthcheckAppearance string                  `json:"healthcheck_appearance,omitempty"`
+	Logging               loggingconfig.Settings  `json:"logging,omitempty"`
 }
 
 var runtimeSettingsState = struct {
-	mu                  sync.RWMutex
-	statePath           string
-	backend             storage.Backend
-	pepper              string
-	initialized         bool
-	updateChecksEnabled bool
-	language            string
-	lastCheckedAt       string
-	latestVersion       string
-	releaseURL          string
-	hasUpdate           bool
-	storage             StorageRetention
-	security            RuntimeSecuritySettings
-	logging             loggingconfig.Settings
+	mu                    sync.RWMutex
+	statePath             string
+	backend               storage.Backend
+	pepper                string
+	initialized           bool
+	updateChecksEnabled   bool
+	language              string
+	lastCheckedAt         string
+	latestVersion         string
+	releaseURL            string
+	hasUpdate             bool
+	storage               StorageRetention
+	security              RuntimeSecuritySettings
+	loginAppearance       string
+	healthcheckAppearance string
+	logging               loggingconfig.Settings
 }{
 	updateChecksEnabled: true,
 	language:            "en",
@@ -94,6 +98,8 @@ var runtimeSettingsState = struct {
 		LoginRateLimitWindowSecond: 300,
 		LoginRateLimitBlockSecond:  600,
 	},
+	loginAppearance:       "command-center",
+	healthcheckAppearance: "variant-1",
 	logging: loggingconfig.Normalize(loggingconfig.Settings{
 		Backend: loggingconfig.BackendOpenSearch,
 		Hot: loggingconfig.HotSettings{

@@ -43,6 +43,9 @@ func (s *AuthService) BeginPasskeyLogin(ctx context.Context, username string, re
 		if err != nil {
 			return PasskeyBeginResult{}, err
 		}
+		if len(items) == 0 {
+			return PasskeyBeginResult{}, errors.New("auth.passkeys.notFound")
+		}
 		waUser := newWebAuthnUser(user, items)
 		assertion, session, err = web.BeginLogin(waUser, webauthn.WithUserVerification(protocol.VerificationPreferred))
 		if err != nil {

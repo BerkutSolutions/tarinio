@@ -20,6 +20,9 @@ const SECURITY_REASON_LABELS = {
   auth: "requests.securityReason.auth",
   challenge: "requests.securityReason.challenge",
   access_blocked: "requests.securityReason.accessBlocked",
+  direct_ip_access: "requests.securityReason.directIPAccess",
+  direct_ip_blocked: "requests.securityReason.directIPBlocked",
+  unknown_host: "requests.securityReason.unknownHost",
 };
 
 function normalizeSecurityToken(value) {

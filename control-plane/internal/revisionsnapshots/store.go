@@ -41,6 +41,7 @@ type Snapshot struct {
 	VirtualPatches            []virtualpatches.VirtualPatch       `json:"virtual_patches,omitempty"`
 	ManagementHosts           []string                            `json:"management_hosts,omitempty"`
 	ManagementHostsConfigured bool                                `json:"management_hosts_configured,omitempty"`
+	BlockDirectIPAccess       bool                                `json:"block_direct_ip_access,omitempty"`
 	// LegacyManagementSiteID is accepted only to read snapshots produced by
 	// pre-persisted-management builds. It is never used for host ownership.
 	LegacyManagementSiteID string `json:"management_site_id,omitempty"`

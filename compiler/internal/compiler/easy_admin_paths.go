@@ -3,6 +3,7 @@ package compiler
 import (
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -83,10 +84,14 @@ func easyManagementProtectedPaths() []string {
 }
 
 func easyAdminAntibotExclusionRulesForSite(site SiteInput) []AntibotExclusionRuleInput {
-	// Management routes still pass through the anti-bot challenge. The challenge
-	// itself is served by dedicated internal locations, while a verified
-	// management session bypasses repeated checks in the site template.
-	return nil
+	if !isManagementSite(site) {
+		return nil
+	}
+	// Management login routes are deliberately not excluded: an unauthenticated
+	// visitor must complete the anti-bot check before seeing the login form.
+	// Static UI assets need to remain available, otherwise the challenge page and
+	// the login form cannot load their own logo, CSS and JavaScript.
+	return []AntibotExclusionRuleInput{{Path: "/static/", Methods: []string{"GET", "HEAD"}}}
 }
 
 func easyAdminAuthExclusionRulesForSite(site SiteInput) []AuthExclusionRuleInput {
@@ -234,7 +239,43 @@ func easyModSecurityBypassPathPatternForSite(site SiteInput) string {
 	if !isManagementSite(site) {
 		return ""
 	}
-	return easyAdminBypassPathPattern()
+	// Authentication requests carry credentials and must pass through CRS.
+	// Keep the remaining management self-protection bypasses unchanged.
+	exact := filterAdminPaths(easyAdminExactPaths, "/api/auth")
+	prefix := filterAdminPaths(easyAdminPrefixPaths, "/api/", "/api/auth/")
+	paths := make([]string, 0, len(exact)+len(prefix)+len(easyAdminSegmentPrefixes)+2)
+	paths = append(paths, exact...)
+	paths = append(paths, prefix...)
+	paths = append(paths, easyAdminSegmentPrefixes...)
+	paths = append(paths, "/login", "/login/2fa")
+	return adminPathPattern(paths)
+}
+
+func filterAdminPaths(paths []string, excluded ...string) []string {
+	result := make([]string, 0, len(paths))
+	for _, path := range paths {
+		if !slices.Contains(excluded, path) {
+			result = append(result, path)
+		}
+	}
+	return result
+}
+
+func adminPathPattern(paths []string) string {
+	parts := make([]string, 0, len(paths))
+	for _, path := range paths {
+		switch {
+		case path == "/":
+			parts = append(parts, "")
+		case strings.HasSuffix(path, "/"):
+			trimmed := strings.TrimSuffix(strings.TrimPrefix(path, "/"), "/")
+			parts = append(parts, regexp.QuoteMeta(trimmed)+"/.*")
+		default:
+			trimmed := strings.TrimPrefix(path, "/")
+			parts = append(parts, regexp.QuoteMeta(trimmed)+"(?:/.*)?")
+		}
+	}
+	return "^/(?:" + strings.Join(parts, "|") + ")$"
 }
 
 var easyReservedLimitExactPaths = []string{

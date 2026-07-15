@@ -43,6 +43,9 @@ func TestEasyModSecurityBypassPathPatternForSite_MatchesAppPingOnlyForManagement
 	if !regexp.MustCompile(managementPattern).MatchString("/api/app/ping") {
 		t.Fatalf("expected management ModSecurity bypass to match /api/app/ping, got %q", managementPattern)
 	}
+	if regexp.MustCompile(managementPattern).MatchString("/api/auth/login") {
+		t.Fatalf("credential endpoints must not bypass ModSecurity, got %q", managementPattern)
+	}
 	if ordinaryPattern := easyModSecurityBypassPathPatternForSite(SiteInput{ID: "site-a", PrimaryHost: "app.example.com"}); ordinaryPattern != "" {
 		t.Fatalf("expected ordinary site to have no ModSecurity bypass, got %q", ordinaryPattern)
 	}
@@ -103,11 +106,34 @@ func TestEasyAdminBypassPathPatternForSite_MatchesManagementMutationEndpoints(t 
 func TestEasyAdminAntibotExclusionRulesForSite_ManagementSite(t *testing.T) {
 	t.Setenv("CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID", "control-plane-access")
 	rules := easyAdminAntibotExclusionRulesForSite(SiteInput{ID: "control-plane-access", PrimaryHost: "ui"})
-	if len(rules) != 0 {
-		t.Fatalf("management routes must remain protected by antibot, got %#v", rules)
+	if len(rules) != 1 || rules[0].Path != "/static/" {
+		t.Fatalf("expected only the static asset exclusion, got %#v", rules)
+	}
+	if got := strings.Join(rules[0].Methods, ","); got != "GET,HEAD" {
+		t.Fatalf("expected safe methods only for static assets, got %q", got)
 	}
 	if extra := easyAdminAntibotExclusionRulesForSite(SiteInput{ID: "site-a", PrimaryHost: "example.com"}); len(extra) != 0 {
 		t.Fatalf("expected no management exclusions for regular site, got %#v", extra)
+	}
+}
+
+func TestEasyManagementLoginChallengeIsNotBypassedBySession(t *testing.T) {
+	artifacts, err := RenderEasyArtifacts(
+		[]SiteInput{{ID: "management-site", Enabled: true, PrimaryHost: "ui", ListenHTTP: true, ManagementConfigured: true, Management: true}},
+		[]EasyProfileInput{{SiteID: "management-site", AntibotChallenge: "javascript", AntibotURI: "/challenge"}},
+	)
+	if err != nil {
+		t.Fatalf("render management easy artifacts: %v", err)
+	}
+	var siteConf string
+	for _, artifact := range artifacts {
+		if artifact.Path == "nginx/easy/management-site.conf" {
+			siteConf = string(artifact.Content)
+			break
+		}
+	}
+	if !strings.Contains(siteConf, `if ($uri ~* "^/login(?:/2fa)?$") { set $waf_antibot_session_guard 0; }`) {
+		t.Fatalf("expected login routes to clear the session antibot bypass, got: %s", siteConf)
 	}
 }
 

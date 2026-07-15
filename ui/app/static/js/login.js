@@ -2,6 +2,7 @@ import { api } from "./api.js";
 import { getBrowserLanguage, getLanguage, setLanguage, t } from "./i18n.js";
 import { checkEntryAccess, onboardingUrl, secureAppUrl } from "./guard.js";
 import { BerkutWebAuthn } from "./webauthn.js";
+import { applyLoginAppearance } from "./login-appearance.js";
 
 const challengeStorageKey = "waf_login_2fa_challenge_id";
 const nextStorageKey = "waf_login_next";
@@ -63,6 +64,9 @@ function webAuthnSupported() {
 async function tryPasskeyLogin(usernameRaw) {
   const username = String(usernameRaw || "").trim();
   const begin = await api.post("/api/auth/passkeys/login/begin", { username });
+  if (String(begin?.error || "").trim()) {
+    throw new Error(begin.error);
+  }
   const options = begin?.options;
   const challengeID = String(begin?.challenge_id || "").trim();
   if (!options || !challengeID) {
@@ -80,6 +84,7 @@ async function tryPasskeyLogin(usernameRaw) {
 
 async function bootstrap() {
   await setLanguage(getBrowserLanguage());
+  await applyLoginAppearance();
   document.title = t("login.pageTitle");
 
   try {
@@ -125,7 +130,9 @@ async function bootstrap() {
         window.location.href = await nextLocation();
       } catch (error) {
         const errorKey = BerkutWebAuthn.errorKey ? BerkutWebAuthn.errorKey(error) : "";
-        if (Number(error?.status || 0) === 404) {
+        if (String(error?.message || "").trim() === "auth.passkeys.notFound") {
+          showError(t("auth.passkeys.notFound"));
+        } else if (Number(error?.status || 0) === 404) {
           showError(t("auth.passkeys.notAvailable"));
         } else {
           showError(errorKey || error?.message || t("login.errorFailed"));

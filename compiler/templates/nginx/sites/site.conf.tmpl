@@ -144,7 +144,11 @@ server {
 {{- if .IsManagementSite }}
     location = /login {
         limit_req zone=waf_management_login_req burst=20 nodelay;
-        limit_req_status 429;
+	include /etc/waf/nginx/ratelimits/{{ .SiteID }}.conf;
+        # Management login must pass through the same challenge guard as the
+        # rest of the site. The challenge and verification locations are
+        # separate and therefore cannot form a redirect loop here.
+        include /etc/waf/nginx/easy/{{ .SiteID }}.conf;
         proxy_pass {{ .UIProxyTarget }};
         proxy_set_header Host $http_host;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -154,7 +158,8 @@ server {
 
     location = /login/2fa {
         limit_req zone=waf_management_login_req burst=20 nodelay;
-        limit_req_status 429;
+	include /etc/waf/nginx/ratelimits/{{ .SiteID }}.conf;
+        include /etc/waf/nginx/easy/{{ .SiteID }}.conf;
         proxy_pass {{ .UIProxyTarget }};
         proxy_set_header Host $http_host;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -218,12 +223,11 @@ server {
 
 {{- if .IsManagementSite }}
     location ^~ /api/ {
-{{- if .UseCustomErrorPages }}
-        proxy_intercept_errors on;
-{{- else }}
+        # API clients must receive upstream status and JSON bodies unchanged.
+        # The easy include below still enforces WAF rules for the endpoint.
         proxy_intercept_errors off;
-{{- end }}
-        modsecurity off;
+	include /etc/waf/nginx/ratelimits/{{ .SiteID }}.conf;
+	include /etc/waf/nginx/easy/{{ .SiteID }}.conf;
         proxy_pass {{ .ManagementAPIProxyTarget }};
         proxy_set_header Host $http_host;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

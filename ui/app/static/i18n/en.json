@@ -1,4 +1,14 @@
 {
+  "app.incidents": "Incidents",
+  "app.runtimeHealthy": "Runtime healthy",
+  "app.runtimeUnavailable": "Runtime unavailable",
+  "app.sidebarCertificates": "Certificates",
+  "app.sidebarModeCRS": "CRS —",
+  "app.sidebarModeEnforce": "ENFORCE",
+  "app.sidebarModeL4": "L4",
+  "app.sidebarModeL7": "L7",
+  "app.sidebarModeModel": "MODEL",
+  "app.sidebarProtectionProfile": "Protection profile",
   "about.projectDescription": "TARINIO is a protection and traffic control layer that intercepts incoming web requests, analyzes and inspects them using WAF/CRS rules, applies limits and anti-DDoS measures (L4/L7), and centrally manages changes through revisions (compile/validate/apply/rollback), blocking attacks and unwanted traffic before it reaches the protected system.",
   "about.projectName": "Berkut Solutions - TARINIO",
   "about.subtitle": "Project description, version, and links.",
@@ -306,6 +316,15 @@
   "app.administration": "Administration",
   "app.antiddos": "Anti-DDoS",
   "app.owaspcrs": "OWASP CRS",
+  "app.sidebarAudit": "Audit",
+  "app.sidebarBrandLine1": "Web Application",
+  "app.sidebarBrandLine2": "Security Platform",
+  "app.sidebarBrandTitle": "TARINIO",
+  "app.sidebarGroup.management": "Management",
+  "app.sidebarGroup.monitoring": "Monitoring",
+  "app.sidebarGroup.protection": "Protection",
+  "app.sidebarGroup.system": "System",
+  "app.sidebarJournal": "Journal",
   "app.bans": "Bans",
   "app.brandSubtitle": "Tarinio",
   "app.brandTitle": "Berkut Solutions",
@@ -346,7 +365,7 @@
   "app.sites": "Services",
   "app.tls": "TLS / Certificates",
   "app.user.noRoles": "No roles",
-  "app.version": "v1.5.1",
+  "app.version": "v1.5.3",
   "auth.2fa.challengeMissing": "2FA challenge is missing. Please sign in again.",
   "auth.2fa.code": "2FA code",
   "auth.2fa.codeRequired": "2FA code is required",
@@ -359,6 +378,7 @@
   "auth.passkeys.loginBtn": "Sign in with passkey",
   "auth.passkeys.notAllowed": "Passkey request was cancelled or timed out.",
   "auth.passkeys.notAvailable": "Passkey login endpoints are not exposed by the current control-plane backend.",
+  "auth.passkeys.notFound": "No passkey was found for this account.",
   "auth.passkeys.notSupported": "Passkeys are not supported in this browser/device.",
   "auth.passkeys.securityError": "Passkey security check failed in browser.",
   "auth.passkeys.useAs2FA": "Use passkey",
@@ -484,7 +504,8 @@
   "dashboard.system.memoryTotal": "Memory total",
   "dashboard.system.memoryUsed": "Memory used",
   "dashboard.widgets.subtitle": "Show or hide widgets",
-  "dashboard.series.empty": "No request series yet.",
+  "dashboard.series.empty": "No attack series yet.",
+  "dashboard.series.attacks": "Attacks",
   "dashboard.series.blocked": "Blocked",
   "dashboard.series.requests": "Requests",
   "dashboard.value.attacksDay": "Attacks in the last 24h",
@@ -499,7 +520,7 @@
   "dashboard.widget.memory": "Memory utilization",
   "dashboard.widget.popularErrors": "Popular errors (4XX/5XX)",
   "dashboard.widget.requestsDay": "Number of requests",
-  "dashboard.widget.requestsSeries": "Requests over time (24h)",
+  "dashboard.widget.requestsSeries": "Requests and attacks over time (24h)",
   "dashboard.widget.servicesDown": "Components DOWN",
   "dashboard.widget.servicesUp": "Components UP",
   "dashboard.widget.topCountries": "Top attacker countries",
@@ -652,6 +673,10 @@
   "login.submit": "Sign in",
   "login.subtitle": "Traffic Analysis of Requests with Inspection, Normalization, Interception & Orchestration",
   "login.title": "Berkut Solutions - TARINIO",
+  "login.classic.title": "Protected sign-in",
+  "login.classic.description": "Access to the management plane is checked by anti-bot and account policies.",
+  "login.classic.time": "Local time",
+  "login2fa.classic.description": "The second factor confirms the protected management session.",
   "login.username": "Username",
   "login2fa.back": "Back",
   "login2fa.code": "TOTP code",
@@ -862,6 +887,11 @@
   "requests.securityReason.auth": "auth",
   "requests.securityReason.challenge": "challenge",
   "requests.securityReason.accessBlocked": "Access blocked",
+  "requests.securityReason.directIPAccess": "direct WAF IP access",
+  "requests.securityReason.directIPBlocked": "direct WAF IP access blocked",
+  "requests.securityReason.unknownHost": "unknown host",
+  "requests.global.directIp": "Direct WAF IP",
+  "requests.global.unknownHost": "Unknown host",
   "requests.securityBadge": "Security",
   "requests.type.request": "Request",
   "requests.type.security": "Security",
@@ -1055,6 +1085,9 @@
   "settings.security.vaultTls.title": "Vault TLS policy",
   "settings.security.vaultTls.hint": "By default, Vault TLS certificates are always verified.",
   "settings.security.vaultTls.allowInsecure": "Allow insecure Vault TLS mode (tls_skip_verify)",
+  "settings.security.directIp.title": "Direct WAF IP access",
+  "settings.security.directIp.hint": "Disabled: direct IP requests receive the branded 421 page. Enabled: WAF closes direct IP connections without a response (444).",
+  "settings.security.directIp.enabled": "Block direct access to the WAF IP",
   "settings.updates.available": "Update available",
   "settings.updates.availableVersion": "Update available: {{version}}",
   "settings.updates.checkCompleted": "Update check completed.",
@@ -1668,6 +1701,25 @@
   "auth.passkeys.neverUsed": "Never",
   "settings.language": "Interface language",
   "settings.languageHint": "Choose language",
+  "settings.loginAppearance.title": "Appearance",
+  "settings.loginAppearance.hint": "Choose one shared template for password login, passkey login, and two-factor verification.",
+  "settings.loginAppearance.label": "Template",
+  "settings.loginAppearance.commandCenter": "Variant 1",
+  "settings.loginAppearance.incidentConsole": "Variant 4",
+  "settings.loginAppearance.commandCenterClassic": "Variant 2",
+  "settings.loginAppearance.securityCard": "Variant 3",
+  "settings.loginAppearance.incidentConsoleClassic": "Variant 5",
+  "settings.loginAppearance.preview": "Preview login",
+  "settings.loginAppearance.preview2fa": "Preview 2FA",
+  "settings.healthcheckAppearance.title": "Healthcheck appearance",
+  "settings.healthcheckAppearance.hint": "Choose the template for the live system healthcheck and its preview.",
+  "settings.healthcheckAppearance.label": "Template",
+  "settings.healthcheckAppearance.variant1": "Variant 1",
+  "settings.healthcheckAppearance.variant2": "Variant 2",
+  "settings.healthcheckAppearance.variant3": "Variant 3",
+  "settings.healthcheckAppearance.variant4": "Variant 4",
+  "settings.healthcheckAppearance.variant5": "Variant 5",
+  "settings.healthcheckAppearance.preview": "Preview healthcheck",
   "settings.timezone.label": "Time zone",
   "settings.general": "General settings",
   "settings.autoLogout": "Auto-logout on inactivity",
@@ -2355,4 +2407,44 @@
   ,"sites.easy.errorpages.extended.524": "524 A Timeout Occurred"
   ,"sites.easy.errorpages.extended.525": "525 SSL Handshake Failed"
   ,"sites.easy.errorpages.extended.526": "526 Invalid SSL Certificate"
+  ,"sites.easy.errorpages.geoBlock": "Geo Block (HTTP 403)"
+  ,"sites.easy.errorpages.status.400": "400 Bad Request"
+  ,"sites.easy.errorpages.status.401": "401 Unauthorized"
+  ,"sites.easy.errorpages.status.402": "402 Payment Required"
+  ,"sites.easy.errorpages.status.403": "403 Forbidden"
+  ,"sites.easy.errorpages.status.404": "404 Not Found"
+  ,"sites.easy.errorpages.status.405": "405 Method Not Allowed"
+  ,"sites.easy.errorpages.status.406": "406 Not Acceptable"
+  ,"sites.easy.errorpages.status.407": "407 Proxy Authentication Required"
+  ,"sites.easy.errorpages.status.408": "408 Request Timeout"
+  ,"sites.easy.errorpages.status.409": "409 Conflict"
+  ,"sites.easy.errorpages.status.410": "410 Gone"
+  ,"sites.easy.errorpages.status.411": "411 Length Required"
+  ,"sites.easy.errorpages.status.412": "412 Precondition Failed"
+  ,"sites.easy.errorpages.status.413": "413 Payload Too Large"
+  ,"sites.easy.errorpages.status.414": "414 URI Too Long"
+  ,"sites.easy.errorpages.status.415": "415 Unsupported Media Type"
+  ,"sites.easy.errorpages.status.416": "416 Range Not Satisfiable"
+  ,"sites.easy.errorpages.status.417": "417 Expectation Failed"
+  ,"sites.easy.errorpages.status.418": "418 I'm a Teapot"
+  ,"sites.easy.errorpages.status.421": "421 Misdirected Request"
+  ,"sites.easy.errorpages.status.422": "422 Unprocessable Entity"
+  ,"sites.easy.errorpages.status.423": "423 Locked"
+  ,"sites.easy.errorpages.status.424": "424 Failed Dependency"
+  ,"sites.easy.errorpages.status.425": "425 Too Early"
+  ,"sites.easy.errorpages.status.426": "426 Upgrade Required"
+  ,"sites.easy.errorpages.status.428": "428 Precondition Required"
+  ,"sites.easy.errorpages.status.429": "429 Too Many Requests"
+  ,"sites.easy.errorpages.status.431": "431 Request Header Fields Too Large"
+  ,"sites.easy.errorpages.status.444": "444 No Response"
+  ,"sites.easy.errorpages.status.500": "500 Internal Server Error"
+  ,"sites.easy.errorpages.status.501": "501 Not Implemented"
+  ,"sites.easy.errorpages.status.502": "502 Bad Gateway"
+  ,"sites.easy.errorpages.status.503": "503 Service Unavailable"
+  ,"sites.easy.errorpages.status.504": "504 Gateway Timeout"
+  ,"sites.easy.errorpages.status.505": "505 HTTP Version Not Supported"
+  ,"sites.easy.errorpages.status.507": "507 Insufficient Storage"
+  ,"sites.easy.errorpages.status.508": "508 Loop Detected"
+  ,"sites.easy.errorpages.status.510": "510 Not Extended"
+  ,"sites.easy.errorpages.status.511": "511 Network Authentication Required"
 }

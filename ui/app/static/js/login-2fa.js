@@ -2,6 +2,7 @@ import { api } from "./api.js";
 import { getBrowserLanguage, getLanguage, setLanguage, t } from "./i18n.js";
 import { checkEntryAccess, onboardingUrl, secureAppUrl } from "./guard.js";
 import { BerkutWebAuthn } from "./webauthn.js";
+import { applyLoginAppearance } from "./login-appearance.js";
 
 const challengeStorageKey = "waf_login_2fa_challenge_id";
 const nextStorageKey = "waf_login_next";
@@ -93,6 +94,7 @@ async function confirmWithPasskey() {
 
 async function bootstrap() {
   await setLanguage(getBrowserLanguage());
+  await applyLoginAppearance();
 
   try {
     const access = await checkEntryAccess("login-2fa");

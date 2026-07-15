@@ -1,6 +1,8 @@
 import { api } from "./api.js";
 import { applyTranslations, getLanguage, setLanguage, t } from "./i18n.js";
 import { createNotificationCenter } from "./app.notifications.js";
+import { renderSidebarMenu } from "./app.sidebar-menu.js";
+import { refreshSidebarStatus } from "./app.sidebar-status.js";
 import "./webauthn.js";
 
 import { checkEntryAccess } from "./guard.js";
@@ -123,21 +125,23 @@ async function preflightSitesModules() {
   }
 }
 
+const sidebarIcon = (name) => `<img class="sidebar-icon-image" src="/static/icons/svg/${name}-32x32.svg" alt="" aria-hidden="true">`;
+
 const icons = {
-  dashboard: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 13h6V4H4v9Zm0 7h6v-5H4v5Zm8 0h8v-9h-8v9Zm0-18v7h8V2h-8Z"/></svg>',
-  sites: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 10.5 12 3l9 7.5V21h-7v-6H10v6H3v-10.5Z"/></svg>',
-  antiddos: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 1 4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5l-8-4Zm0 3.2L17 6.7v4.2c0 3.8-2.2 7.2-5 8.5-2.8-1.3-5-4.7-5-8.5V6.7l5-2.5Zm-1.2 3.3v3H8.8v2h2V15h2.4v-2.5h2v-2h-2v-3h-2.4Z"/></svg>',
-  owaspcrs: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 1 4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5l-8-4Zm0 3.2L17 6.7v4.2c0 3.8-2.2 7.2-5 8.5-2.8-1.3-5-4.7-5-8.5V6.7l5-2.5Zm-3 4.8h6v2H9v-2Zm0 4h6v2H9v-2Z"/></svg>',
-  tls: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 1 4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5l-8-4Zm0 10.2a2.3 2.3 0 1 1 0 4.6 2.3 2.3 0 0 1 0-4.6Zm4 6.8H8v-1.2c0-1.8 1.8-2.8 4-2.8s4 1 4 2.8V18Z"/></svg>',
-  requests: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2H3V5Zm0 4h18v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Zm4 3v2h4v-2H7Zm6 0v2h4v-2h-4Z"/></svg>',
-  revisions: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M5 3h14a2 2 0 0 1 2 2v4H3V5a2 2 0 0 1 2-2Zm-2 8h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-8Zm4 2v2h4v-2H7Zm6 0h4v2h-4v-2Zm-6 4v2h10v-2H7Z"/></svg>',
-  events: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></svg>',
-  bans: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 1 4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5l-8-4Zm0 3.2L17 6.7v4.2c0 3.8-2.2 7.2-5 8.5-2.8-1.3-5-4.7-5-8.5V6.7l5-2.5Zm-3 4.8h6v2H9V9Zm0 4h6v2H9v-2Z"/></svg>',
-  administration: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.4 0-8 2.2-8 5v1h16v-1c0-2.8-3.6-5-8-5Z"/></svg>',
-  activity: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 4h16v2H4V4Zm0 7h10v2H4v-2Zm0 7h16v2H4v-2Zm12-8h4v4h-4v-4Z"/></svg>',
-  settings: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.14 12.94a7.96 7.96 0 0 0 .06-.94 7.96 7.96 0 0 0-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.48 7.48 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.58.22-1.12.53-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.7 8.84a.5.5 0 0 0 .12.64l2.03 1.58a7.96 7.96 0 0 0-.06.94c0 .32.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.31.6.22l2.39-.96c.5.41 1.05.73 1.63.94l.36 2.54c.04.24.25.42.5.42h3.84c.25 0 .46-.18.5-.42l.36-2.54c.58-.21 1.13-.53 1.63-.94l2.39.96c.22.09.47 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2Z"/></svg>',
-  about: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M11 7h2V5h-2v2Zm0 12h2V9h-2v10ZM12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Z"/></svg>',
-  profile: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.4 0-8 2.2-8 5v1h16v-1c0-2.8-3.6-5-8-5Z"/></svg>',
+  dashboard: sidebarIcon("dashboard"),
+  sites: sidebarIcon("services"),
+  antiddos: sidebarIcon("antiddos"),
+  owaspcrs: sidebarIcon("owasp"),
+  tls: sidebarIcon("certificates"),
+  requests: sidebarIcon("requests"),
+  revisions: sidebarIcon("revisions"),
+  events: sidebarIcon("journal"),
+  incidents: sidebarIcon("incidents"),
+  bans: sidebarIcon("bans"),
+  administration: sidebarIcon("administration"),
+  activity: sidebarIcon("audit"),
+  settings: sidebarIcon("settings"),
+  profile: sidebarIcon("user"),
 };
 
 const sections = [
@@ -239,15 +243,7 @@ function formatMenuBadge(path, count) {
 function renderMenu() {
   const menu = document.getElementById("menu");
   const active = currentSection();
-  menu.innerHTML = sections
-    .filter((section) => !section.hiddenInMenu && canAccessSection(section.id))
-    .map((section) => `
-      <a class="sidebar-link ${section.id === active.id ? "active" : ""}" href="${sectionPath(section)}" data-path="${section.id}" title="${t(section.labelKey)}">
-        <span class="sidebar-link-icon">${icons[section.id] || ""}</span>
-        <span class="sidebar-link-label">${t(section.labelKey)}</span>
-      </a>
-    `)
-    .join("");
+  renderSidebarMenu({ menu, sections, active, icons, translate: t, sectionPath, canAccessSection });
 }
 
 function renderRBAC(user) {
@@ -627,9 +623,11 @@ async function loadMeta() {
       setVersion(`v${meta.app_version}`);
     }
     renderUpdateBadge(meta);
+    refreshSidebarStatus(api, t);
   } catch {
-    setVersion("v1.3.5");
+    setVersion("v1.5.3");
     renderUpdateBadge(null);
+    refreshSidebarStatus(api, t);
   }
 }
 
@@ -693,7 +691,7 @@ function bindVisibilityLifecycle() {
 
 async function bootstrap() {
   await applyTranslations(getLanguage());
-  setVersion("v1.3.5");
+  setVersion("v1.5.3");
 
   const access = await checkEntryAccess("app");
   if (!access.allowed) {

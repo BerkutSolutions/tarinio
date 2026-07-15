@@ -24,6 +24,12 @@ func NewManagementHostsService(store *managementhosts.Store, sites ManagementHos
 	return &ManagementHostsService{store: store, sites: sites, audits: audits}
 }
 func (s *ManagementHostsService) Get() (managementhosts.Settings, error) { return s.store.Get() }
+func (s *ManagementHostsService) UpdateDirectIPAccess(ctx context.Context, block bool) (item managementhosts.Settings, err error) {
+	defer func() {
+		recordAudit(ctx, s.audits, audits.AuditEvent{Action: "settings.direct_ip_access.update", ResourceType: "system_setting", ResourceID: "direct_ip_access", Status: auditStatus(err), Summary: "update direct IP access policy"})
+	}()
+	return s.store.UpdateDirectIPAccess(block)
+}
 func (s *ManagementHostsService) Update(ctx context.Context, hosts []string, version int64) (item managementhosts.Settings, err error) {
 	defer func() {
 		recordAudit(ctx, s.audits, audits.AuditEvent{Action: "settings.management_hosts.update", ResourceType: "system_setting", ResourceID: "management_hosts", Status: auditStatus(err), Summary: "update management hosts"})

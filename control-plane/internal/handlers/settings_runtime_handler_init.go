@@ -43,6 +43,7 @@ func NewSettingsRuntimeHandlerWithBackend(settingsRoot string, runtimeHealthURL 
 				runtimeSettingsState.hasUpdate = stored.HasUpdate
 				runtimeSettingsState.storage = normalizeStorageRetention(stored.Storage)
 				runtimeSettingsState.security = normalizeRuntimeSecuritySettings(stored.Security)
+				runtimeSettingsState.loginAppearance = normalizeLoginAppearance(stored.LoginAppearance)
 				runtimeSettingsState.logging = loggingconfig.Normalize(stored.Logging)
 				normalizePersistedUpdateStateLocked()
 				runtimeSettingsState.initialized = true
@@ -54,6 +55,7 @@ func NewSettingsRuntimeHandlerWithBackend(settingsRoot string, runtimeHealthURL 
 		runtimeSettingsState.initialized = true
 	}
 	runtimeSettingsState.security = normalizeRuntimeSecuritySettings(runtimeSettingsState.security)
+	runtimeSettingsState.loginAppearance = normalizeLoginAppearance(runtimeSettingsState.loginAppearance)
 	runtimeSettingsState.logging = reconcileLoggingSettingsFromEnv(runtimeSettingsState.logging, runtimeSettingsState.security)
 	savePersistedRuntimeSettingsLocked()
 	if runtimeRequestIndexes != nil {

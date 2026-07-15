@@ -1,4 +1,14 @@
 {
+  "app.incidents": "Инциденты",
+  "app.runtimeHealthy": "Система работает",
+  "app.runtimeUnavailable": "Система недоступна",
+  "app.sidebarCertificates": "Сертификаты",
+  "app.sidebarModeCRS": "CRS —",
+  "app.sidebarModeEnforce": "Принудительно",
+  "app.sidebarModeL4": "L4",
+  "app.sidebarModeL7": "L7",
+  "app.sidebarModeModel": "MODEL",
+  "app.sidebarProtectionProfile": "Профиль защиты",
   "about.projectDescription": "TARINIO — это уровень защиты и контроля трафика, который перехватывает входящие веб-запросы, анализирует и инспектирует их по правилам (WAF/CRS), применяет лимиты и антиддос-меры на уровне сети и приложения, и централизованно управляет изменениями через ревизии (компиляция/валидация/применение/откат), блокируя атаки и нежелательный трафик до попадания в защищаемую систему.",
   "about.projectName": "Berkut Solutions - TARINIO",
   "about.subtitle": "Описание проекта, версия и ссылки.",
@@ -306,6 +316,15 @@
   "app.administration": "Администрирование",
   "app.antiddos": "Анти-DDoS",
   "app.owaspcrs": "OWASP CRS",
+  "app.sidebarAudit": "Аудит",
+  "app.sidebarBrandLine1": "Защита веб-приложений",
+  "app.sidebarBrandLine2": "Платформа безопасности",
+  "app.sidebarBrandTitle": "TARINIO",
+  "app.sidebarGroup.management": "Управление",
+  "app.sidebarGroup.monitoring": "Мониторинг",
+  "app.sidebarGroup.protection": "Защита",
+  "app.sidebarGroup.system": "Система",
+  "app.sidebarJournal": "Журнал",
   "app.bans": "Баны",
   "app.brandSubtitle": "Tarinio",
   "app.brandTitle": "Berkut Solutions",
@@ -346,7 +365,7 @@
   "app.sites": "Сервисы",
   "app.tls": "TLS / Сертификаты",
   "app.user.noRoles": "Нет ролей",
-  "app.version": "Версия 1.5.1",
+  "app.version": "Версия 1.5.3",
   "auth.2fa.challengeMissing": "Запрос 2FA отсутствует. Пожалуйста, войдите снова.",
   "auth.2fa.code": "Код 2FA",
   "auth.2fa.codeRequired": "Нужен код 2FA",
@@ -359,6 +378,7 @@
   "auth.passkeys.loginBtn": "Войти с ключом доступа",
   "auth.passkeys.notAllowed": "Запрос passkey был отменен или истек по тайм-ауту.",
   "auth.passkeys.notAvailable": "Эндпоинты входа с passkey недоступны в текущем бэкенде control-plane.",
+  "auth.passkeys.notFound": "Ключ доступа не найден для этой учётной записи.",
   "auth.passkeys.notSupported": "Passkeys не поддерживаются в этом браузере/устройстве.",
   "auth.passkeys.securityError": "Проверка безопасности passkey не выполнена в браузере.",
   "auth.passkeys.useAs2FA": "Использовать ключ доступа",
@@ -484,7 +504,8 @@
   "dashboard.system.memoryTotal": "Всего памяти",
   "dashboard.system.memoryUsed": "Использовано памяти",
   "dashboard.widgets.subtitle": "Показать или скрыть виджеты",
-  "dashboard.series.empty": "Пока нет ряда запросов.",
+  "dashboard.series.empty": "Пока нет ряда атак.",
+  "dashboard.series.attacks": "Атаки",
   "dashboard.series.blocked": "Заблокированные",
   "dashboard.series.requests": "Запросы",
   "dashboard.value.attacksDay": "Атак за последние 24 часа",
@@ -499,7 +520,7 @@
   "dashboard.widget.memory": "Использование памяти",
   "dashboard.widget.popularErrors": "Популярные ошибки (4XX/5XX)",
   "dashboard.widget.requestsDay": "Количество запросов",
-  "dashboard.widget.requestsSeries": "Запросы во времени (24ч)",
+  "dashboard.widget.requestsSeries": "Запросы и атаки во времени (24ч)",
   "dashboard.widget.servicesDown": "Компоненты DOWN",
   "dashboard.widget.servicesUp": "Компоненты UP",
   "dashboard.widget.topCountries": "Топ стран атакующих",
@@ -647,6 +668,10 @@
   "login.submit": "Войти",
   "login.subtitle": "Анализ трафика запросов с инспекцией, нормализацией, перехватом и оркестрацией",
   "login.title": "Berkut Solutions - TARINIO",
+  "login.classic.title": "Защищённый вход",
+  "login.classic.description": "Доступ к контуру управления проверяется anti-bot и политиками учётной записи.",
+  "login.classic.time": "Локальное время",
+  "login2fa.classic.description": "Второй фактор подтверждает защищённую сессию управления.",
   "login.username": "Логин",
   "login2fa.back": "Назад",
   "login2fa.code": "Код TOTP",
@@ -851,6 +876,11 @@
   "requests.securityReason.auth": "auth",
   "requests.securityReason.challenge": "challenge",
   "requests.securityReason.accessBlocked": "Доступ заблокирован",
+  "requests.securityReason.directIPAccess": "прямой доступ к IP WAF",
+  "requests.securityReason.directIPBlocked": "прямой доступ к IP WAF заблокирован",
+  "requests.securityReason.unknownHost": "неизвестный Host",
+  "requests.global.directIp": "Прямой IP WAF",
+  "requests.global.unknownHost": "Неизвестный Host",
   "revisions.apply.action": "Запустить применение",
   "revisions.apply.empty": "Запросов на применение ещё не было.",
   "revisions.apply.loading": "Создание задания применения...",
@@ -1034,6 +1064,9 @@
   "settings.security.vaultTls.title": "Политика TLS для Vault",
   "settings.security.vaultTls.hint": "Проверка TLS для Vault.",
   "settings.security.vaultTls.allowInsecure": "Разрешить небезопасный режим TLS для Vault",
+  "settings.security.directIp.title": "Прямой доступ к IP WAF",
+  "settings.security.directIp.hint": "Выключено: запросы к IP получают брендированную страницу 421. Включено: WAF закрывает прямое подключение без ответа (444).",
+  "settings.security.directIp.enabled": "Блокировать прямой доступ к IP WAF",
   "settings.updates.available": "Доступно обновление",
   "settings.updates.availableVersion": "Доступно обновление: {{version}}",
   "settings.updates.checkCompleted": "Проверка обновлений выполнена",
@@ -1536,6 +1569,25 @@
   "auth.passkeys.neverUsed": "Никогда",
   "settings.language": "Язык интерфейса",
   "settings.languageHint": "Выберите язык",
+  "settings.loginAppearance.title": "Внешний вид",
+  "settings.loginAppearance.hint": "Выберите общий шаблон для входа по паролю, ключу доступа и двухфакторной проверки.",
+  "settings.loginAppearance.label": "Шаблон",
+  "settings.loginAppearance.commandCenter": "1 вариант",
+  "settings.loginAppearance.incidentConsole": "4 вариант",
+  "settings.loginAppearance.commandCenterClassic": "2 вариант",
+  "settings.loginAppearance.securityCard": "3 вариант",
+  "settings.loginAppearance.incidentConsoleClassic": "5 вариант",
+  "settings.loginAppearance.preview": "Просмотр входа",
+  "settings.loginAppearance.preview2fa": "Просмотр 2FA",
+  "settings.healthcheckAppearance.title": "Внешний вид healthcheck",
+  "settings.healthcheckAppearance.hint": "Выберите шаблон для живой проверки системы и её предпросмотра.",
+  "settings.healthcheckAppearance.label": "Шаблон",
+  "settings.healthcheckAppearance.variant1": "1 вариант",
+  "settings.healthcheckAppearance.variant2": "2 вариант",
+  "settings.healthcheckAppearance.variant3": "3 вариант",
+  "settings.healthcheckAppearance.variant4": "4 вариант",
+  "settings.healthcheckAppearance.variant5": "5 вариант",
+  "settings.healthcheckAppearance.preview": "Просмотреть healthcheck",
   "settings.timezone.label": "Часовой пояс",
   "settings.general": "Общие настройки",
   "settings.autoLogout": "Автовыход при неактивности",
@@ -2331,4 +2383,44 @@
   ,"sites.easy.errorpages.vendor": "специфично для вендора"
   ,"sites.easy.errorpages.diagnostic": "только диагностика"
   ,"sites.easy.errorpages.extended.451":"451 Недоступно по юридическим причинам","sites.easy.errorpages.extended.494":"494 Слишком большой заголовок запроса","sites.easy.errorpages.extended.495":"495 Ошибка SSL-сертификата","sites.easy.errorpages.extended.496":"496 Требуется SSL-сертификат","sites.easy.errorpages.extended.497":"497 HTTP-запрос отправлен на HTTPS-порт","sites.easy.errorpages.extended.499":"499 Клиент закрыл запрос","sites.easy.errorpages.extended.506":"506 Вариант также согласовывается","sites.easy.errorpages.extended.520":"520 Неизвестная ошибка","sites.easy.errorpages.extended.521":"521 Веб-сервер недоступен","sites.easy.errorpages.extended.522":"522 Время подключения истекло","sites.easy.errorpages.extended.523":"523 Источник недоступен","sites.easy.errorpages.extended.524":"524 Произошёл тайм-аут","sites.easy.errorpages.extended.525":"525 Ошибка SSL-рукопожатия","sites.easy.errorpages.extended.526":"526 Недействительный SSL-сертификат"
+  ,"sites.easy.errorpages.geoBlock":"Геоблокировка (HTTP 403)"
+  ,"sites.easy.errorpages.status.400":"400 Некорректный запрос"
+  ,"sites.easy.errorpages.status.401":"401 Требуется авторизация"
+  ,"sites.easy.errorpages.status.402":"402 Требуется оплата"
+  ,"sites.easy.errorpages.status.403":"403 Доступ запрещён"
+  ,"sites.easy.errorpages.status.404":"404 Не найдено"
+  ,"sites.easy.errorpages.status.405":"405 Метод не разрешён"
+  ,"sites.easy.errorpages.status.406":"406 Неприемлемо"
+  ,"sites.easy.errorpages.status.407":"407 Требуется аутентификация прокси"
+  ,"sites.easy.errorpages.status.408":"408 Тайм-аут запроса"
+  ,"sites.easy.errorpages.status.409":"409 Конфликт"
+  ,"sites.easy.errorpages.status.410":"410 Удалено"
+  ,"sites.easy.errorpages.status.411":"411 Требуется длина"
+  ,"sites.easy.errorpages.status.412":"412 Предусловие не выполнено"
+  ,"sites.easy.errorpages.status.413":"413 Слишком большой размер тела"
+  ,"sites.easy.errorpages.status.414":"414 Слишком длинный URI"
+  ,"sites.easy.errorpages.status.415":"415 Неподдерживаемый тип содержимого"
+  ,"sites.easy.errorpages.status.416":"416 Диапазон не удовлетворяется"
+  ,"sites.easy.errorpages.status.417":"417 Ожидание не выполнено"
+  ,"sites.easy.errorpages.status.418":"418 Я чайник"
+  ,"sites.easy.errorpages.status.421":"421 Неверно направленный запрос"
+  ,"sites.easy.errorpages.status.422":"422 Необрабатываемая сущность"
+  ,"sites.easy.errorpages.status.423":"423 Заблокировано"
+  ,"sites.easy.errorpages.status.424":"424 Сбой зависимого запроса"
+  ,"sites.easy.errorpages.status.425":"425 Слишком рано"
+  ,"sites.easy.errorpages.status.426":"426 Требуется обновление"
+  ,"sites.easy.errorpages.status.428":"428 Требуется предусловие"
+  ,"sites.easy.errorpages.status.429":"429 Слишком много запросов"
+  ,"sites.easy.errorpages.status.431":"431 Слишком большие поля заголовка"
+  ,"sites.easy.errorpages.status.444":"444 Нет ответа"
+  ,"sites.easy.errorpages.status.500":"500 Внутренняя ошибка сервера"
+  ,"sites.easy.errorpages.status.501":"501 Не реализовано"
+  ,"sites.easy.errorpages.status.502":"502 Неверный шлюз"
+  ,"sites.easy.errorpages.status.503":"503 Сервис недоступен"
+  ,"sites.easy.errorpages.status.504":"504 Тайм-аут шлюза"
+  ,"sites.easy.errorpages.status.505":"505 Версия HTTP не поддерживается"
+  ,"sites.easy.errorpages.status.507":"507 Недостаточно места"
+  ,"sites.easy.errorpages.status.508":"508 Обнаружен цикл"
+  ,"sites.easy.errorpages.status.510":"510 Не расширено"
+  ,"sites.easy.errorpages.status.511":"511 Требуется сетевая аутентификация"
 }

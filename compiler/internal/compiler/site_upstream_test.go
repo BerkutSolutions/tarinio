@@ -208,9 +208,12 @@ func TestRenderSiteUpstreamArtifacts_DefaultServerRoutesUnknownHostsToBranded421
 	}
 	content := string(baseArtifact.Content)
 	for _, fragment := range []string{
-		"set $waf_unknown_host 1;",
-		"if ($waf_site_id = \"_global\") {",
-		"rewrite ^ /__waf_errors/_global/421.html?rid=$request_id&ip=$remote_addr&ts=$msec last;",
+		`map "$waf_site_id:$uri" $waf_unknown_host {`,
+		`~^_global:(?!/\.well-known/acme-challenge/) 1;`,
+		"location ^~ /.well-known/acme-challenge/ {",
+		"modsecurity off;",
+		"error_page 421 /__waf_errors/_global/421.html?rid=$request_id&ip=$remote_addr&ts=$msec;",
+		"rewrite ^ /__waf_errors/_global/421.html last;",
 		"error_page 421 /__waf_errors/_global/421.html?rid=$request_id&ip=$remote_addr&ts=$msec;",
 		"location = /__waf_errors/_global/421.html {",
 		"alias /etc/waf/errors/_global/421.html;",
@@ -261,7 +264,8 @@ func TestRenderSiteUpstreamArtifacts_DefaultHTTPSServerUsesFirstActiveTLSRefAndR
 		"listen 443 ssl default_server;",
 		"server_name _;",
 		"include /etc/waf/tls/site-a.conf;",
-		"return 421;",
+		"error_page 418 =421 /__waf_errors/_global/421.html?rid=$request_id&ip=$remote_addr&ts=$msec;",
+		"return 418;",
 	} {
 		if !strings.Contains(content, fragment) {
 			t.Fatalf("expected nginx main config to contain %q, got: %s", fragment, content)
@@ -271,6 +275,35 @@ func TestRenderSiteUpstreamArtifacts_DefaultHTTPSServerUsesFirstActiveTLSRefAndR
 		if !strings.Contains(content, fmt.Sprintf("error_page %d /__waf_errors/_global/%d.html", code, code)) {
 			t.Fatalf("expected branded default TLS error page for %d, got: %s", code, content)
 		}
+	}
+}
+
+func TestRenderSiteUpstreamArtifacts_BlockDirectIPAccessUses444AndSecurityReasons(t *testing.T) {
+	artifacts, err := RenderSiteUpstreamArtifactsWithOptions(
+		[]SiteInput{{ID: "site-a", Enabled: true, PrimaryHost: "a.example.com", ListenHTTP: true, ListenHTTPS: true, DefaultUpstreamID: "up-a"}},
+		[]UpstreamInput{{ID: "up-a", SiteID: "site-a", Scheme: "http", Host: "app-a", Port: 8080, BasePath: "/"}},
+		DefaultServerOptions{BlockDirectIPAccess: true},
+	)
+	if err != nil {
+		t.Fatalf("render failed: %v", err)
+	}
+	contents := map[string]string{}
+	for _, artifact := range artifacts {
+		contents[artifact.Path] = string(artifact.Content)
+	}
+	for path, fragment := range map[string]string{
+		"nginx/nginx.conf":       "if ($waf_direct_ip_request = 1) {\n            return 444;",
+		"nginx/conf.d/base.conf": `"_global:1" "direct_ip_blocked";`,
+	} {
+		if !strings.Contains(contents[path], fragment) {
+			t.Fatalf("%s must contain %q, got: %s", path, fragment, contents[path])
+		}
+	}
+	if !strings.Contains(contents["nginx/conf.d/base.conf"], `"security_reason":"$waf_security_reason"`) {
+		t.Fatalf("access log must include normalized security_reason: %s", contents["nginx/conf.d/base.conf"])
+	}
+	if !strings.Contains(contents["nginx/conf.d/base.conf"], `~^[0-9][0-9]?[0-9]?\.[0-9][0-9]?[0-9]?\.[0-9][0-9]?[0-9]?\.[0-9][0-9]?[0-9]?$ 1;`) {
+		t.Fatalf("direct-IP regex must avoid brace quantifiers for nginx parsing: %s", contents["nginx/conf.d/base.conf"])
 	}
 }
 
@@ -299,7 +332,7 @@ func TestRenderSiteUpstreamArtifacts_DisabledServiceLeavesNoRuntimeArtifacts(t *
 			main = string(artifact.Content)
 		}
 	}
-	if !strings.Contains(main, "alias /etc/waf/errors/_global/421.html;") || !strings.Contains(main, "return 421;") {
+	if !strings.Contains(main, "alias /etc/waf/errors/_global/421.html;") || !strings.Contains(main, "error_page 418 =421 /__waf_errors/_global/421.html") || !strings.Contains(main, "return 418;") {
 		t.Fatalf("default TLS server must return branded 421, got: %s", main)
 	}
 }

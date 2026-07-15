@@ -109,12 +109,25 @@ func New(
 		http.MethodGet: {rbac.PermissionSettingsGeneralRead},
 		http.MethodPut: {rbac.PermissionSettingsGeneralWrite},
 	}, settingsRuntimeHandler))
+	mux.Handle("/api/public/login-appearance", &handlers.LoginAppearanceHandler{})
+	mux.Handle("/api/public/healthcheck-appearance", &handlers.HealthcheckAppearanceHandler{})
+	mux.Handle("/api/login-appearance/preview/", withAuth(authService, rbac.PermissionSettingsGeneralRead, &handlers.LoginAppearancePreviewHandler{}))
 	mux.Handle("/api/settings/management-hosts", withMethodAllPermissions(authService, map[string][]rbac.Permission{
 		http.MethodGet: {rbac.PermissionSettingsGeneralRead}, http.MethodPut: {rbac.PermissionSettingsGeneralWrite},
 	}, handlers.NewManagementHostsHandler(managementHostsService)))
 	mux.Handle("/api/settings/management-hosts/status", withMethodAllPermissions(authService, map[string][]rbac.Permission{
 		http.MethodGet: {rbac.PermissionSettingsGeneralRead},
 	}, handlers.NewManagementSafeguardStatusHandler(managementSafeguardStatusService)))
+	mux.Handle("/api/settings/direct-ip-access", withMethodAllPermissions(authService, map[string][]rbac.Permission{
+		http.MethodGet: {rbac.PermissionSettingsGeneralRead}, http.MethodPut: {rbac.PermissionSettingsGeneralWrite},
+	}, handlers.NewDirectIPAccessHandler(managementHostsService, func(ctx context.Context) error {
+		result, err := revisionCompileService.Create(ctx)
+		if err != nil {
+			return err
+		}
+		_, err = applyService.Apply(ctx, result.Revision.ID)
+		return err
+	})))
 	mux.Handle("/api/settings/runtime/check-updates", withMethodAllPermissions(authService, map[string][]rbac.Permission{
 		http.MethodPost: {rbac.PermissionSettingsGeneralWrite},
 	}, settingsRuntimeHandler))

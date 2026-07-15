@@ -40,8 +40,17 @@ func TestRenderSiteUpstreamArtifacts_ManagementSiteRoutesAPIToControlPlaneFromEn
 	if content == "" {
 		t.Fatal("expected site artifact for env-configured management site")
 	}
-	if !containsAll(content, "location ^~ /api/ {", "modsecurity off;", "proxy_pass http://control-plane:8080;") {
-		t.Fatalf("expected env-configured management site to route API without ModSecurity, got: %s", content)
+	api := managementAPIBlock(t, content)
+	if !containsAll(api,
+		"proxy_intercept_errors off;",
+		"include /etc/waf/nginx/ratelimits/ui.example.test.conf;",
+		"include /etc/waf/nginx/easy/ui.example.test.conf;",
+		"proxy_pass http://control-plane:8080;",
+	) {
+		t.Fatalf("expected env-configured management API guards and upstream routing, got: %s", api)
+	}
+	if strings.Contains(api, "modsecurity off;") {
+		t.Fatalf("management API must not get a location-level ModSecurity bypass: %s", api)
 	}
 }
 
@@ -80,8 +89,17 @@ func TestRenderSiteUpstreamArtifacts_ManagementSiteRoutesAPIToConfiguredManageme
 	if content == "" {
 		t.Fatal("expected site artifact for configured management site")
 	}
-	if !containsAll(content, "location ^~ /api/ {", "modsecurity off;", "proxy_pass http://control-plane-test:8080;") {
-		t.Fatalf("expected configured management site to route API without ModSecurity, got: %s", content)
+	api := managementAPIBlock(t, content)
+	if !containsAll(api,
+		"proxy_intercept_errors off;",
+		"include /etc/waf/nginx/ratelimits/control-plane-access.conf;",
+		"include /etc/waf/nginx/easy/control-plane-access.conf;",
+		"proxy_pass http://control-plane-test:8080;",
+	) {
+		t.Fatalf("expected configured management API guards and upstream routing, got: %s", api)
+	}
+	if strings.Contains(api, "modsecurity off;") {
+		t.Fatalf("management API must not get a location-level ModSecurity bypass: %s", api)
 	}
 }
 
@@ -128,7 +146,29 @@ func TestRenderSiteUpstreamArtifacts_LocalhostUsesBuiltInManagementRouting(t *te
 	if content == "" {
 		t.Fatal("expected site artifact for localhost site")
 	}
-	if !containsAll(content, "location ^~ /api/ {", "modsecurity off;", "proxy_pass http://control-plane:8080;") {
-		t.Fatalf("expected localhost management API routing without ModSecurity, got: %s", content)
+	api := managementAPIBlock(t, content)
+	if !containsAll(api,
+		"proxy_intercept_errors off;",
+		"include /etc/waf/nginx/ratelimits/localhost.conf;",
+		"include /etc/waf/nginx/easy/localhost.conf;",
+		"proxy_pass http://control-plane:8080;",
+	) {
+		t.Fatalf("expected localhost management API guards and upstream routing, got: %s", api)
 	}
+	if strings.Contains(api, "modsecurity off;") {
+		t.Fatalf("management API must not get a location-level ModSecurity bypass: %s", api)
+	}
+}
+
+func managementAPIBlock(t *testing.T, content string) string {
+	t.Helper()
+	start := strings.Index(content, "location ^~ /api/ {")
+	if start < 0 {
+		t.Fatalf("management API location is missing: %s", content)
+	}
+	block := content[start:]
+	if next := strings.Index(block, "\n    location "); next >= 0 {
+		block = block[:next]
+	}
+	return block
 }

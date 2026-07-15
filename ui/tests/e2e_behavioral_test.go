@@ -2,6 +2,7 @@ package tests
 
 import (
 	"crypto/tls"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
@@ -342,6 +343,75 @@ func TestE2EBehavioral(t *testing.T) {
 		if !strings.Contains(bodyLower, "421") {
 			t.Fatalf("unknown host: expected branded page to expose 421 semantics in body, body=%.300s", bodyStr)
 		}
+	})
+
+	t.Run("UnknownHost_ACMEHTTP01Bypasses421", func(t *testing.T) {
+		resp := doRuntimeGETForHost("unknown-host-e2e.test", "/.well-known/acme-challenge/e2e-missing-token", nil)
+		body, _ := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		if resp.StatusCode != http.StatusNotFound {
+			t.Fatalf("unknown-host ACME HTTP-01 must reach the challenge location and return 404 for an absent token, got %d body=%s", resp.StatusCode, body)
+		}
+		bodyLower := strings.ToLower(string(body))
+		if strings.Contains(bodyLower, "421 misdirected request") || strings.Contains(bodyLower, "host not configured") {
+			t.Fatalf("unknown-host ACME HTTP-01 must not be replaced with the branded 421 page, body=%s", body)
+		}
+	})
+
+	t.Run("DirectIPAccessPolicy_ReturnsBranded421OrDropsConnection", func(t *testing.T) {
+		settingsResp := requestE2EJSON(t, client, http.MethodGet, requestBaseURL+"/api/settings/direct-ip-access", requestHostOverride, nil)
+		var previous struct {
+			BlockDirectIPAccess bool `json:"block_direct_ip_access"`
+		}
+		if err := json.NewDecoder(settingsResp.Body).Decode(&previous); err != nil {
+			_ = settingsResp.Body.Close()
+			t.Fatalf("decode direct IP settings: %v", err)
+		}
+		_ = settingsResp.Body.Close()
+
+		setPolicy := func(block bool) {
+			t.Helper()
+			resp := requestE2EJSON(t, client, http.MethodPut, requestBaseURL+"/api/settings/direct-ip-access", requestHostOverride, map[string]any{"block_direct_ip_access": block})
+			body, _ := io.ReadAll(resp.Body)
+			_ = resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				t.Fatalf("set direct IP policy=%t: status=%d body=%s", block, resp.StatusCode, body)
+			}
+		}
+		t.Cleanup(func() { setPolicy(previous.BlockDirectIPAccess) })
+
+		directRequest := func() (*http.Response, error) {
+			req, err := http.NewRequest(http.MethodGet, runtimeURL+"/", nil)
+			if err != nil {
+				return nil, err
+			}
+			req.Host = "127.0.0.1"
+			return (&http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}).Do(req)
+		}
+
+		setPolicy(false)
+		resp, err := directRequest()
+		if err != nil {
+			t.Fatalf("direct IP request with policy disabled: %v", err)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		bodyLower := strings.ToLower(string(body))
+		if (resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusMisdirectedRequest) || !strings.Contains(bodyLower, "<html") || strings.Contains(bodyLower, "nginx/") || !strings.Contains(bodyLower, "421") {
+			t.Fatalf("direct IP with policy disabled must return branded 421 semantics, status=%d body=%s", resp.StatusCode, body)
+		}
+
+		setPolicy(true)
+		deadline := time.Now().Add(30 * time.Second)
+		for time.Now().Before(deadline) {
+			resp, err = directRequest()
+			if err != nil {
+				return
+			}
+			_ = resp.Body.Close()
+			time.Sleep(500 * time.Millisecond)
+		}
+		t.Fatal("direct IP request stayed open after 444 policy was applied")
 	})
 
 	// trimmed: rest of file unchanged in intent; keeping remaining tests from current repository state is required for full suite

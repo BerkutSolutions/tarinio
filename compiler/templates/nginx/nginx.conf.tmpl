@@ -30,10 +30,17 @@ http {
         location = /__waf_errors/_global/{{ . }}.html {
             internal;
             allow all;
+            default_type text/html;
             alias /etc/waf/errors/_global/{{ . }}.html;
         }
 {{- end }}
-        return 421;
+        error_page 418 =421 /__waf_errors/_global/421.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+{{- if .BlockDirectIPAccess }}
+        if ($waf_direct_ip_request = 1) {
+            return 444;
+        }
+{{- end }}
+        return 418;
     }
 {{- end }}
     include {{ .SitesIncludeGlob }};
