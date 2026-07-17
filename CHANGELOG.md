@@ -1,5 +1,9 @@
 ## [1.5.5] - 17.07.2026
 
+### Dependency security
+
+- **CVE-2026-54466 / CWE-130.** Updated the transitive documentation-development dependency `websocket-driver` to 0.7.5 through the root npm override. This rejects malformed oversized WebSocket length headers.
+
 ### E2E runner
 
 - Windows PowerShell E2E runner now captures Docker BuildKit stdout/stderr safely and determines success from the Docker exit code, so normal build progress no longer aborts the test run.
