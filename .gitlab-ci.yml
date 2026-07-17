@@ -24,18 +24,9 @@ default:
 variables:
   GIT_DEPTH: "0"
   GOTOOLCHAIN: auto
-  GOCACHE: "$CI_PROJECT_DIR/.cache/go-build"
-  GOMODCACHE: "$CI_PROJECT_DIR/.cache/go-mod"
-  NPM_CONFIG_CACHE: "$CI_PROJECT_DIR/.cache/npm"
-  TRIVY_CACHE_DIR: "$CI_PROJECT_DIR/.cache/trivy"
-
-cache:
-  key: "$CI_COMMIT_REF_SLUG"
-  paths:
-    - .cache/go-build/
-    - .cache/go-mod/
-    - .cache/npm/
-    - .cache/trivy/
+  GOCACHE: /home/gitlab-runner/.cache/tarinio/go-build
+  GOMODCACHE: /home/gitlab-runner/.cache/tarinio/go-mod
+  TRIVY_CACHE_DIR: /home/gitlab-runner/.cache/tarinio/trivy
 
 validate:repository:
   stage: validate
@@ -62,11 +53,11 @@ docs:build:
   stage: unit
   timeout: 30m
   script:
-    - mkdir -p "$NPM_CONFIG_CACHE"
+    - mkdir -p .ci-npm-cache
     - >-
       docker run --rm --pull=always --user "$(id -u):$(id -g)"
       --tmpfs /tmp:rw,noexec,nosuid,size=512m
-      -e HOME=/tmp -e NPM_CONFIG_CACHE=/workspace/.cache/npm
+      -e HOME=/tmp -e NPM_CONFIG_CACHE=/workspace/.ci-npm-cache
       -v "$CI_PROJECT_DIR:/workspace" -w /workspace node:24-bookworm
       bash -lc 'npm ci --prefer-online --no-audit --fund=false && npm run docs:build'
   artifacts:
@@ -156,10 +147,10 @@ security:npm-audit:
   stage: security
   timeout: 25m
   script:
-    - mkdir -p "$NPM_CONFIG_CACHE"
+    - mkdir -p .ci-npm-cache
     - >-
       docker run --rm --pull=always --user "$(id -u):$(id -g)"
       --tmpfs /tmp:rw,noexec,nosuid,size=512m
-      -e HOME=/tmp -e NPM_CONFIG_CACHE=/workspace/.cache/npm
+      -e HOME=/tmp -e NPM_CONFIG_CACHE=/workspace/.ci-npm-cache
       -v "$CI_PROJECT_DIR:/workspace" -w /workspace node:24-bookworm
       bash -lc 'npm ci --prefer-online --no-audit --fund=false && npm audit --omit=dev --audit-level=moderate'
