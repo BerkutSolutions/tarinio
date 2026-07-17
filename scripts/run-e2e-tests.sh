@@ -13,6 +13,7 @@
 #   E2E_PASS          admin credential (default: e2e-password-1234)
 #   E2E_TIMEOUT       seconds to wait for healthcheck (default: 180)
 #   E2E_FILTER        go test -run filter (default: TestE2E)
+#   E2E_FRESH_ONBOARDING set to 1 to verify clean first-run onboarding and HTTPS
 #   COMPOSE_CMD       docker compose command (auto-detected)
 #   GO_CMD            go binary (default: go)
 #   E2E_KEEP_STACK    set to 1 to skip teardown (debug)
@@ -29,11 +30,18 @@ E2E_USER="${E2E_USER:-e2e-admin}"
 E2E_PASS="${E2E_PASS:-e2e-password-1234}"
 E2E_TIMEOUT="${E2E_TIMEOUT:-180}"
 E2E_FILTER="${E2E_FILTER:-TestE2E}"
+E2E_FRESH_ONBOARDING="${E2E_FRESH_ONBOARDING:-0}"
 E2E_KEEP_STACK="${E2E_KEEP_STACK:-0}"
 GO_CMD="${GO_CMD:-go}"
 E2E_LOG_DIR="${E2E_LOG_DIR:-$REPO_ROOT/.work/logs}"
 mkdir -p "$E2E_LOG_DIR"
 E2E_LOG_FILE="$E2E_LOG_DIR/e2e-$(date +%Y%m%d_%H%M%S).log"
+
+if [ "$E2E_FRESH_ONBOARDING" = "1" ]; then
+  export E2E_BOOTSTRAP_ADMIN_ENABLED=false
+  export E2E_DEV_FAST_START_ENABLED=false
+  export E2E_RUNTIME_STARTUP_BUNDLE_WAIT_SECONDS=0
+fi
 
 if [ -t 1 ]; then
   C_RESET="$(printf '\033[0m')"
@@ -391,58 +399,57 @@ until curl -fsS "$E2E_BASE_URL/healthz" >/dev/null 2>&1; do
 done
 ok "Control-plane healthy after ${elapsed}s"
 
-# Wait for bootstrap admin.
-step "Waiting for bootstrap admin"
-elapsed=0
-until curl -fsS -X POST "$E2E_BASE_URL/api/auth/login" \
+if [ "$E2E_FRESH_ONBOARDING" != "1" ]; then
+  step "Waiting for bootstrap admin"
+  elapsed=0
+  until curl -fsS -X POST "$E2E_BASE_URL/api/auth/login" \
+      -H "Content-Type: application/json" \
+      -d "{\"username\":\"${E2E_USER}\",\"password\":\"${E2E_PASS}\"}" \
+      >/dev/null 2>&1; do
+    [ "$elapsed" -ge 30 ] && {
+      fail_msg "admin login timeout"
+      exit 1
+    }
+    sleep 2
+    elapsed=$((elapsed + 2))
+  done
+  ok "Admin ready"
+
+  step "Waiting for runtime healthz (timeout ${E2E_TIMEOUT}s)"
+  elapsed=0
+  until curl -fsS "$E2E_RUNTIME_HEALTH_URL/healthz" >/dev/null 2>&1; do
+    [ "$elapsed" -ge "$E2E_TIMEOUT" ] && {
+      fail_msg "runtime healthz timeout"
+      $COMPOSE_CMD -f docker-compose.yml logs runtime --tail=50 >&2
+      exit 1
+    }
+    sleep 2
+    elapsed=$((elapsed + 2))
+  done
+  ok "Runtime healthy after ${elapsed}s"
+
+  step "Compiling and applying initial revision"
+  CP_COOKIE_JAR="$(mktemp)"
+  curl -sS -c "$CP_COOKIE_JAR" -X POST "$E2E_BASE_URL/api/auth/login" \
     -H "Content-Type: application/json" \
-    -d "{\"username\":\"${E2E_USER}\",\"password\":\"${E2E_PASS}\"}" \
-    >/dev/null 2>&1; do
-  [ "$elapsed" -ge 30 ] && {
-    fail_msg "admin login timeout"
-    exit 1
-  }
-  sleep 2
-  elapsed=$((elapsed + 2))
-done
-ok "Admin ready"
-
-# Wait for runtime health.
-step "Waiting for runtime healthz (timeout ${E2E_TIMEOUT}s)"
-elapsed=0
-until curl -fsS "$E2E_RUNTIME_HEALTH_URL/healthz" >/dev/null 2>&1; do
-  [ "$elapsed" -ge "$E2E_TIMEOUT" ] && {
-    fail_msg "runtime healthz timeout"
-    $COMPOSE_CMD -f docker-compose.yml logs runtime --tail=50 >&2
-    exit 1
-  }
-  sleep 2
-  elapsed=$((elapsed + 2))
-done
-ok "Runtime healthy after ${elapsed}s"
-
-# Initial compile+apply so runtime has a valid revision.
-step "Compiling and applying initial revision"
-CP_COOKIE_JAR="$(mktemp)"
-curl -sS -c "$CP_COOKIE_JAR" -X POST "$E2E_BASE_URL/api/auth/login" \
-  -H "Content-Type: application/json" \
-  -d "{\"username\":\"${E2E_USER}\",\"password\":\"${E2E_PASS}\"}" >/dev/null
-COMPILE_OUT="$(curl -sS -b "$CP_COOKIE_JAR" -X POST "$E2E_BASE_URL/api/revisions/compile" \
-  -H "Content-Type: application/json" -d '{}')"
-printf '%s\n' "[compile] $COMPILE_OUT" >>"$E2E_LOG_FILE"
-REV_ID="$(printf '%s' "$COMPILE_OUT" | grep -o '"revision_id":"[^"]*"' | cut -d'"' -f4)"
-if [ -z "$REV_ID" ]; then
-  REV_ID="$(printf '%s' "$COMPILE_OUT" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)"
+    -d "{\"username\":\"${E2E_USER}\",\"password\":\"${E2E_PASS}\"}" >/dev/null
+  COMPILE_OUT="$(curl -sS -b "$CP_COOKIE_JAR" -X POST "$E2E_BASE_URL/api/revisions/compile" \
+    -H "Content-Type: application/json" -d '{}')"
+  printf '%s\n' "[compile] $COMPILE_OUT" >>"$E2E_LOG_FILE"
+  REV_ID="$(printf '%s' "$COMPILE_OUT" | grep -o '"revision_id":"[^"]*"' | cut -d'"' -f4)"
+  if [ -z "$REV_ID" ]; then
+    REV_ID="$(printf '%s' "$COMPILE_OUT" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)"
+  fi
+  if [ -n "$REV_ID" ]; then
+    sleep 3
+    APPLY_OUT="$(curl -sS -b "$CP_COOKIE_JAR" -X POST "$E2E_BASE_URL/api/revisions/$REV_ID/apply" \
+      -H "Content-Type: application/json" -d '{}' 2>&1 || true)"
+    printf '%s\n' "[apply] $APPLY_OUT" >>"$E2E_LOG_FILE"
+    sleep 5
+  fi
+  rm -f "$CP_COOKIE_JAR"
+  ok "Initial revision ready (id=$REV_ID)"
 fi
-if [ -n "$REV_ID" ]; then
-  sleep 3
-  APPLY_OUT="$(curl -sS -b "$CP_COOKIE_JAR" -X POST "$E2E_BASE_URL/api/revisions/$REV_ID/apply" \
-    -H "Content-Type: application/json" -d '{}' 2>&1 || true)"
-  printf '%s\n' "[apply] $APPLY_OUT" >>"$E2E_LOG_FILE"
-  sleep 5
-fi
-rm -f "$CP_COOKIE_JAR"
-ok "Initial revision ready (id=$REV_ID)"
 
 # Run tests.
 step "Running tests: $E2E_FILTER"
@@ -457,7 +464,8 @@ WAF_E2E_RUNTIME_HTTPS_URL="$E2E_RUNTIME_HTTPS_URL"
 WAF_E2E_RUNTIME_HEALTH_URL="$E2E_RUNTIME_HEALTH_URL"
 WAF_E2E_RUNTIME_API_TOKEN="e2e-test-runtime-token"
 WAF_E2E_MANAGEMENT_HOST="${WAF_E2E_MANAGEMENT_HOST:-e2e-management.test}"
-export WAF_E2E_BASE_URL WAF_E2E_USERNAME WAF_E2E_PASSWORD WAF_E2E_RUNTIME_URL WAF_E2E_RUNTIME_HTTPS_URL WAF_E2E_RUNTIME_HEALTH_URL WAF_E2E_RUNTIME_API_TOKEN WAF_E2E_MANAGEMENT_HOST GO_CMD E2E_FILTER
+WAF_E2E_FRESH_ONBOARDING="${E2E_FRESH_ONBOARDING}"
+export WAF_E2E_BASE_URL WAF_E2E_USERNAME WAF_E2E_PASSWORD WAF_E2E_RUNTIME_URL WAF_E2E_RUNTIME_HTTPS_URL WAF_E2E_RUNTIME_HEALTH_URL WAF_E2E_RUNTIME_API_TOKEN WAF_E2E_MANAGEMENT_HOST WAF_E2E_FRESH_ONBOARDING GO_CMD E2E_FILTER
 TEST_SUMMARY_FILE="$(mktemp)"
 E2E_SUMMARY_OUT="$TEST_SUMMARY_FILE" run_go_e2e_stream || TEST_EXIT=$?
 cat "$TEST_LOG" >>"$E2E_LOG_FILE"

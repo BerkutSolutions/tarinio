@@ -1,5 +1,9 @@
 ## [1.5.5] - 17.07.2026
 
+### DevSecOps CI
+
+- GitLab CI now gates the private source repository with repository validation, full Go tests, a separate documentation build, standard and clean-onboarding Docker E2E suites, Gitleaks, Trivy, govulncheck, and npm audit. No release or GitHub publication job is enabled.
+
 ### Dependency security
 
 - **CVE-2026-54466 / CWE-130.** Updated the transitive documentation-development dependency `websocket-driver` to 0.7.5 through the root npm override. This rejects malformed oversized WebSocket length headers.
