@@ -21,3 +21,4 @@ FROM nginx:1.27-alpine
 
 COPY ui/nginx.conf /etc/nginx/conf.d/default.conf
 COPY ui/app /usr/share/nginx/html
+RUN chmod -R a+rX /usr/share/nginx/html
