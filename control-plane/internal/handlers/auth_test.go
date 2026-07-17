@@ -160,7 +160,7 @@ func TestSetSessionCookieForRequest_UsesForwardedProto(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
 	req.Header.Set("X-Forwarded-Proto", "https")
 
-	SetSessionCookieForRequest(resp, req, "session-1")
+	SetBootstrapSessionCookieForRequest(resp, req, "session-1")
 
 	foundSecure := false
 	for _, cookie := range resp.Result().Cookies() {
@@ -172,6 +172,51 @@ func TestSetSessionCookieForRequest_UsesForwardedProto(t *testing.T) {
 	if !foundSecure {
 		t.Fatal("expected secure session cookie when X-Forwarded-Proto=https")
 	}
+}
+
+func TestSetSessionCookieForRequest_UsesDedicatedHTTPBootstrapCookies(t *testing.T) {
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/bootstrap", nil)
+
+	SetBootstrapSessionCookieForRequest(resp, req, "session-1")
+
+	foundSession := false
+	foundBoot := false
+	for _, cookie := range resp.Result().Cookies() {
+		if cookie.Name == SessionHTTPBootstrapCookieName && !cookie.Secure {
+			foundSession = true
+		}
+		if cookie.Name == SessionHTTPBootstrapBootCookieName && !cookie.Secure {
+			foundBoot = true
+		}
+	}
+	if !foundSession || !foundBoot {
+		t.Fatalf("HTTP bootstrap response must set dedicated cookie pair, got %+v", resp.Result().Cookies())
+	}
+}
+
+func TestReadSessionID_FallsBackToHTTPBootstrapCookie(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
+	req.AddCookie(&http.Cookie{Name: SessionHTTPBootstrapCookieName, Value: "bootstrap-session"})
+
+	if sessionID, ok := readSessionID(req); !ok || sessionID != "bootstrap-session" {
+		t.Fatalf("readSessionID must accept HTTP bootstrap cookie, got %q ok=%t", sessionID, ok)
+	}
+}
+
+func TestSetSessionCookieForRequest_RefreshesHTTPBootstrapCookie(t *testing.T) {
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
+	req.AddCookie(&http.Cookie{Name: SessionHTTPBootstrapCookieName, Value: "bootstrap-session"})
+
+	SetSessionCookieForRequest(resp, req, "bootstrap-session")
+
+	for _, cookie := range resp.Result().Cookies() {
+		if cookie.Name == SessionHTTPBootstrapCookieName && cookie.Value == "bootstrap-session" {
+			return
+		}
+	}
+	t.Fatalf("HTTP bootstrap session must be refreshed with its dedicated cookie, got %+v", resp.Result().Cookies())
 }
 
 func TestAuthHandler_UpdateMePreferences(t *testing.T) {

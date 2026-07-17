@@ -28,13 +28,13 @@ services:
       VAULT_PATH_PREFIX: tarinio
       VAULT_TOKEN: ""
       VAULT_TOKEN_FILE: /var/run/waf-app-token/token
-      CONTROL_PLANE_BOOTSTRAP_ADMIN_ENABLED: "true"
+      CONTROL_PLANE_BOOTSTRAP_ADMIN_ENABLED: "${E2E_BOOTSTRAP_ADMIN_ENABLED:-true}"
       CONTROL_PLANE_BOOTSTRAP_ADMIN_ID: e2e-admin
       CONTROL_PLANE_BOOTSTRAP_ADMIN_USERNAME: e2e-admin
       CONTROL_PLANE_BOOTSTRAP_ADMIN_EMAIL: e2e@tarinio.test
       CONTROL_PLANE_BOOTSTRAP_ADMIN_PASSWORD: e2e-password-1234
       CONTROL_PLANE_ACME_ENABLED: "false"
-      CONTROL_PLANE_DEV_FAST_START_ENABLED: "true"
+      CONTROL_PLANE_DEV_FAST_START_ENABLED: "${E2E_DEV_FAST_START_ENABLED:-true}"
       CONTROL_PLANE_DEV_FAST_START_HOST: "e2e-management.test"
       CONTROL_PLANE_DEV_FAST_START_CERTIFICATE_ID: "e2e-management-tls"
       CONTROL_PLANE_DEV_FAST_START_MANAGEMENT_SITE_ID: "control-plane-access"
@@ -81,7 +81,7 @@ services:
       # The control plane atomically stages the initial TLS revision. Waiting for
       # that pointer avoids booting runtime between pointer publication and key
       # material availability on the shared read-only volume.
-      WAF_RUNTIME_STARTUP_BUNDLE_WAIT_SECONDS: "120"
+      WAF_RUNTIME_STARTUP_BUNDLE_WAIT_SECONDS: "${E2E_RUNTIME_STARTUP_BUNDLE_WAIT_SECONDS:-120}"
       CONTROL_PLANE_SECURITY_PEPPER: e2e-test-pepper-do-not-use-in-prod
       WAF_BOOTSTRAP_UI_UPSTREAM: "http://ui:80"
       OPENSEARCH_ENDPOINT: ""

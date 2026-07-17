@@ -17,6 +17,8 @@ import (
 
 const SessionCookieName = "waf_session"
 const SessionBootCookieName = "waf_session_boot"
+const SessionHTTPBootstrapCookieName = "waf_session_http_bootstrap"
+const SessionHTTPBootstrapBootCookieName = "waf_session_http_bootstrap_token"
 
 var sessionCookieMaxAgeSeconds = int((time.Hour).Seconds())
 
@@ -182,7 +184,7 @@ func (h *AuthHandler) bootstrap(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 		return
 	}
-	SetSessionCookieForRequest(w, r, session.ID)
+	SetBootstrapSessionCookieForRequest(w, r, session.ID)
 	writeJSON(w, http.StatusOK, session)
 }
 
@@ -595,17 +597,34 @@ func SetSessionCookieTTL(ttl time.Duration) {
 }
 
 func SetSessionCookieForRequest(w http.ResponseWriter, r *http.Request, sessionID string) {
-	secure := requestIsSecure(r)
-	SetSessionCookieWithOptions(w, sessionID, secure)
+	if !requestIsSecure(r) {
+		if _, err := r.Cookie(SessionHTTPBootstrapCookieName); err == nil {
+			setSessionCookiePair(w, sessionID, false, SessionHTTPBootstrapCookieName, SessionHTTPBootstrapBootCookieName)
+			return
+		}
+	}
+	SetSessionCookieWithOptions(w, sessionID, requestIsSecure(r))
+}
+
+func SetBootstrapSessionCookieForRequest(w http.ResponseWriter, r *http.Request, sessionID string) {
+	if requestIsSecure(r) {
+		SetSessionCookieWithOptions(w, sessionID, true)
+		return
+	}
+	setSessionCookiePair(w, sessionID, false, SessionHTTPBootstrapCookieName, SessionHTTPBootstrapBootCookieName)
 }
 
 func SetSessionCookieWithOptions(w http.ResponseWriter, sessionID string, secure bool) {
+	setSessionCookiePair(w, sessionID, secure, SessionCookieName, SessionBootCookieName)
+}
+
+func setSessionCookiePair(w http.ResponseWriter, sessionID string, secure bool, sessionCookieName, bootCookieName string) {
 	sessionBootTokenMu.RLock()
 	bootToken := sessionBootToken
 	sessionBootTokenMu.RUnlock()
 
 	http.SetCookie(w, &http.Cookie{
-		Name:     SessionCookieName,
+		Name:     sessionCookieName,
 		Value:    sessionID,
 		Path:     "/",
 		MaxAge:   sessionCookieMaxAgeSeconds,
@@ -614,7 +633,7 @@ func SetSessionCookieWithOptions(w http.ResponseWriter, sessionID string, secure
 		Secure:   secure,
 	})
 	http.SetCookie(w, &http.Cookie{
-		Name:     SessionBootCookieName,
+		Name:     bootCookieName,
 		Value:    bootToken,
 		Path:     "/",
 		MaxAge:   sessionCookieMaxAgeSeconds,
@@ -629,49 +648,43 @@ func clearSessionCookie(w http.ResponseWriter) {
 }
 
 func ClearSessionCookie(w http.ResponseWriter) {
+	clearSessionCookiePair(w, SessionCookieName, SessionBootCookieName, false)
+	clearSessionCookiePair(w, SessionCookieName, SessionBootCookieName, true)
+	clearSessionCookiePair(w, SessionHTTPBootstrapCookieName, SessionHTTPBootstrapBootCookieName, false)
+}
+
+func clearSessionCookiePair(w http.ResponseWriter, sessionCookieName, bootCookieName string, secure bool) {
 	http.SetCookie(w, &http.Cookie{
-		Name:     SessionCookieName,
+		Name:     sessionCookieName,
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
 		SameSite: http.SameSiteStrictMode,
+		Secure:   secure,
 	})
 	http.SetCookie(w, &http.Cookie{
-		Name:     SessionCookieName,
+		Name:     bootCookieName,
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
 		SameSite: http.SameSiteStrictMode,
-		Secure:   true,
-	})
-	http.SetCookie(w, &http.Cookie{
-		Name:     SessionBootCookieName,
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: true,
-		SameSite: http.SameSiteStrictMode,
-	})
-	http.SetCookie(w, &http.Cookie{
-		Name:     SessionBootCookieName,
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: true,
-		SameSite: http.SameSiteStrictMode,
-		Secure:   true,
+		Secure:   secure,
 	})
 }
 
 func readSessionID(r *http.Request) (string, bool) {
-	cookie, err := r.Cookie(SessionCookieName)
-	if err != nil {
-		return "", false
+	for _, name := range []string{SessionCookieName, SessionHTTPBootstrapCookieName} {
+		cookie, err := r.Cookie(name)
+		if err != nil {
+			continue
+		}
+		if value := strings.TrimSpace(cookie.Value); value != "" {
+			return value, true
+		}
 	}
-	value := strings.TrimSpace(cookie.Value)
-	return value, value != ""
+	return "", false
 }
 
 func SessionBootToken() string {

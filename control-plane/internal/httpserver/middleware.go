@@ -36,22 +36,10 @@ func withMethodPermissions(authService authenticator, permissions map[string]rba
 
 func withMethodAllPermissions(authService authenticator, permissions map[string][]rbac.Permission, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie(handlers.SessionCookieName)
-		if err != nil || cookie.Value == "" {
+		session, status, ok := authenticateRequestSession(r, authService)
+		if !ok {
 			handlers.ClearSessionCookie(w)
-			handlers.WriteJSON(w, http.StatusUnauthorized, map[string]any{"error": "authentication required"})
-			return
-		}
-		bootCookie, bootErr := r.Cookie(handlers.SessionBootCookieName)
-		if bootErr != nil || bootCookie.Value == "" || bootCookie.Value != handlers.SessionBootToken() {
-			handlers.ClearSessionCookie(w)
-			handlers.WriteJSON(w, http.StatusUnauthorized, map[string]any{"error": "session expired after restart"})
-			return
-		}
-		session, err := authService.Authenticate(cookie.Value)
-		if err != nil {
-			handlers.ClearSessionCookie(w)
-			handlers.WriteJSON(w, http.StatusUnauthorized, map[string]any{"error": "authentication required"})
+			handlers.WriteJSON(w, http.StatusUnauthorized, map[string]any{"error": status})
 			return
 		}
 		for _, permission := range permissions[r.Method] {
@@ -63,7 +51,34 @@ func withMethodAllPermissions(authService authenticator, permissions map[string]
 				return
 			}
 		}
-		handlers.SetSessionCookieForRequest(w, r, cookie.Value)
+		handlers.SetSessionCookieForRequest(w, r, session.SessionID)
 		next.ServeHTTP(w, r.WithContext(auth.ContextWithSession(r.Context(), session)))
 	})
+}
+
+func authenticateRequestSession(r *http.Request, authService authenticator) (auth.SessionView, string, bool) {
+	candidates := [][2]string{
+		{handlers.SessionCookieName, handlers.SessionBootCookieName},
+		{handlers.SessionHTTPBootstrapCookieName, handlers.SessionHTTPBootstrapBootCookieName},
+	}
+	bootMismatch := false
+	for _, candidate := range candidates {
+		cookie, cookieErr := r.Cookie(candidate[0])
+		bootCookie, bootErr := r.Cookie(candidate[1])
+		if cookieErr != nil || bootErr != nil || cookie.Value == "" || bootCookie.Value == "" {
+			continue
+		}
+		if bootCookie.Value != handlers.SessionBootToken() {
+			bootMismatch = true
+			continue
+		}
+		session, err := authService.Authenticate(cookie.Value)
+		if err == nil {
+			return session, "", true
+		}
+	}
+	if bootMismatch {
+		return auth.SessionView{}, "session expired after restart", false
+	}
+	return auth.SessionView{}, "authentication required", false
 }

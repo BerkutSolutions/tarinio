@@ -15,6 +15,11 @@
 - Global Anti-DDoS L7 limits now exclude every explicitly configured management host, including installations whose panel has a custom service ID; onboarding and the control-plane API cannot self-rate-limit with HTTP 429.
 - The management shell and onboarding no longer replace their DOM with the legacy synthetic 429 fallback after a background API request or a failed static asset; real rate-limit responses remain handled by the branded runtime error page.
 - The UI image normalizes readable static-asset permissions after copy, so onboarding and the management shell cannot degrade to a raw nginx 403 when source-file ACLs are restrictive.
+- A fresh HTTP onboarding now uses a dedicated session-cookie pair. It remains valid even if the browser retains stale Secure cookies from a deleted previous deployment, and switches to the normal Secure session on HTTPS login.
+
+### E2E onboarding
+
+- The E2E runner supports a clean onboarding mode without a seeded administrator or fast-start revision. It verifies first-run bootstrap, self-signed TLS issue and binding, revision apply, and authenticated HTTPS login.
 
 ### Исправления уязвимостей и защита данных
 

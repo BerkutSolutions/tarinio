@@ -2,7 +2,8 @@
 param(
     [string]$Filter = "TestE2E",
     [int]$TimeoutSeconds = 180,
-    [switch]$KeepStack
+    [switch]$KeepStack,
+    [switch]$FreshOnboarding
 )
 
 $ErrorActionPreference = "Stop"
@@ -64,6 +65,12 @@ function Wait-ForUrl {
 }
 
 try {
+    if ($FreshOnboarding) {
+        $env:E2E_BOOTSTRAP_ADMIN_ENABLED = "false"
+        $env:E2E_DEV_FAST_START_ENABLED = "false"
+        $env:E2E_RUNTIME_STARTUP_BUNDLE_WAIT_SECONDS = "0"
+    }
+
     & docker compose version | Out-Null
     if ($LASTEXITCODE -ne 0) {
         throw "docker compose is required"
@@ -76,30 +83,32 @@ try {
     Wait-ForUrl "$controlPlaneUrl/healthz" "control-plane"
     Wait-ForUrl "$baseUrl/login" "ui"
 
-    $loginBody = @{ username = $user; password = $password } | ConvertTo-Json -Compress
-    $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
-    Invoke-WebRequest -Uri "$baseUrl/api/auth/login" -Method Post -ContentType "application/json" -Body $loginBody -WebSession $session -UseBasicParsing | Out-Null
-    Wait-ForUrl "$runtimeHealthUrl/healthz" "runtime"
+    if (-not $FreshOnboarding) {
+        $loginBody = @{ username = $user; password = $password } | ConvertTo-Json -Compress
+        $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+        Invoke-WebRequest -Uri "$baseUrl/api/auth/login" -Method Post -ContentType "application/json" -Body $loginBody -WebSession $session -UseBasicParsing | Out-Null
+        Wait-ForUrl "$runtimeHealthUrl/healthz" "runtime"
 
-    $compile = Invoke-RestMethod -Uri "$baseUrl/api/revisions/compile" -Method Post -ContentType "application/json" -Body "{}" -WebSession $session
-    $revisionId = if ($compile.revision_id) {
-        $compile.revision_id
-    } elseif ($compile.id) {
-        $compile.id
-    } elseif ($compile.revision -and $compile.revision.id) {
-        $compile.revision.id
+        $compile = Invoke-RestMethod -Uri "$baseUrl/api/revisions/compile" -Method Post -ContentType "application/json" -Body "{}" -WebSession $session
+        $revisionId = if ($compile.revision_id) {
+            $compile.revision_id
+        } elseif ($compile.id) {
+            $compile.id
+        } elseif ($compile.revision -and $compile.revision.id) {
+            $compile.revision.id
+        }
+        if (-not $revisionId) {
+            throw "compile did not return a revision ID: $($compile | ConvertTo-Json -Compress)"
+        }
+        try {
+            Invoke-RestMethod -Uri "$baseUrl/api/revisions/$revisionId/apply" -Method Post -ContentType "application/json" -Body "{}" -WebSession $session | Out-Null
+        } catch {
+            # Match the POSIX runner: the initial apply is a warm-up. The e2e cases
+            # perform their own compile/apply after runtime readiness settles.
+            Write-Warning "Initial apply did not complete: $($_.Exception.Message)"
+        }
+        Start-Sleep -Seconds 5
     }
-    if (-not $revisionId) {
-        throw "compile did not return a revision ID: $($compile | ConvertTo-Json -Compress)"
-    }
-    try {
-        Invoke-RestMethod -Uri "$baseUrl/api/revisions/$revisionId/apply" -Method Post -ContentType "application/json" -Body "{}" -WebSession $session | Out-Null
-    } catch {
-        # Match the POSIX runner: the initial apply is a warm-up. The e2e cases
-        # perform their own compile/apply after runtime readiness settles.
-        Write-Warning "Initial apply did not complete: $($_.Exception.Message)"
-    }
-    Start-Sleep -Seconds 5
 
     $env:WAF_E2E_BASE_URL = $baseUrl
     $env:WAF_E2E_USERNAME = $user
@@ -110,6 +119,7 @@ try {
     $env:WAF_E2E_RUNTIME_API_TOKEN = "e2e-test-runtime-token"
     $env:WAF_E2E_MANAGEMENT_HOST = "e2e-management.test"
     $env:WAF_E2E_ANTIBOT_HOST = "e2e-antibot.test"
+    $env:WAF_E2E_FRESH_ONBOARDING = if ($FreshOnboarding) { "1" } else { "" }
 
     Push-Location $repoRoot
     try {
