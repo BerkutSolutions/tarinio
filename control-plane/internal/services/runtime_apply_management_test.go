@@ -33,3 +33,23 @@ func TestApplyAntiDDoSRateOverrides_SkipsConfiguredManagementSite(t *testing.T) 
 		t.Fatalf("expected only non-management site override, got %+v", items)
 	}
 }
+
+func TestApplyAntiDDoSRateOverrides_SkipsExplicitManagementSiteWithCustomID(t *testing.T) {
+	items := applyAntiDDoSRateOverrides(
+		[]pipeline.SiteInput{
+			{ID: "easy-waf.example.test", Enabled: true, Management: true},
+			{ID: "site-a", Enabled: true},
+		},
+		nil,
+		antiddos.Settings{
+			EnforceL7Rate: true,
+			L7RequestsPS:  120,
+			L7Burst:       240,
+			L7StatusCode:  429,
+		},
+	)
+
+	if len(items) != 1 || items[0].SiteID != "site-a" {
+		t.Fatalf("expected only non-management site override, got %+v", items)
+	}
+}

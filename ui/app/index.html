@@ -16,6 +16,11 @@
   </style>
   <script>
     (function () {
+      // Do not replace the application shell with the legacy client-side 429
+      // fallback after a background request. Branded nginx error artifacts
+      // remain the single source of truth for actual blocked responses.
+      window.__wafRenderBlocked = function () {};
+      return;
       function escapeHTML(value) {
         return String(value == null ? "" : value).replace(/[&<>"']/g, function (char) {
           return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char] || char;
@@ -126,7 +131,7 @@
         if (tag !== "link" && tag !== "script" && tag !== "img") return;
         var source = String(target.href || target.src || "");
         if (source.indexOf("/static/") >= 0) {
-          window.__wafRenderBlocked({ code: 429 });
+          return;
         }
       }, true);
       fetch("/api/auth/me", { credentials: "include", cache: "no-store", headers: { Accept: "application/json" } })
@@ -142,8 +147,8 @@
   <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon32.png">
   <link rel="icon" type="image/png" sizes="48x48" href="/static/favicon48.png">
   <link rel="icon" type="image/png" sizes="64x64" href="/static/favicon64.png">
-  <link rel="stylesheet" href="/static/styles.css?v=20260419-profile-spacing-2" onerror="window.__wafRenderBlocked && window.__wafRenderBlocked({ code: 429 })">
-  <link rel="stylesheet" href="/static/waf.css?v=20260715-sidebar-svg-1" onerror="window.__wafRenderBlocked && window.__wafRenderBlocked({ code: 429 })">
+  <link rel="stylesheet" href="/static/styles.css?v=20260419-profile-spacing-2">
+  <link rel="stylesheet" href="/static/waf.css?v=20260715-sidebar-svg-1">
 </head>
 <body>
   <div class="app-shell">
@@ -212,6 +217,6 @@
 
   <div id="app-toast-container" aria-live="polite" aria-atomic="true"></div>
 
-  <script type="module" src="/static/js/app.js?v=20260715-sidebar-svg-1" onload="window.__wafMarkBoot && window.__wafMarkBoot()" onerror="window.__wafRenderBlocked && window.__wafRenderBlocked({ code: 429 })"></script>
+  <script type="module" src="/static/js/app.js?v=20260715-sidebar-svg-1" onload="window.__wafMarkBoot && window.__wafMarkBoot()"></script>
 </body>
 </html>

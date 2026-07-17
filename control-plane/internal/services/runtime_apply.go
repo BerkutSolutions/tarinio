@@ -477,8 +477,10 @@ func applyAntiDDoSRateOverrides(siteInputs []pipeline.SiteInput, items []pipelin
 		if _, exists := bySite[site.ID]; exists {
 			continue
 		}
-		if isManagementSiteID(strings.TrimSpace(site.ID)) {
-			// Never enforce global anti-ddos L7 override on the management UI site.
+		if site.Management || isManagementSiteID(strings.TrimSpace(site.ID)) {
+			// Never enforce the global anti-ddos L7 override on a management
+			// site. Explicit management hosts use arbitrary service IDs, so the
+			// legacy ID check alone would self-rate-limit the control plane.
 			continue
 		}
 		bySite[site.ID] = pipeline.RateLimitPolicyInput{

@@ -333,3 +333,23 @@ func TestUIContract_LocalhostServiceIDIsNotRewrittenToLegacyManagementID(t *test
 		}
 	}
 }
+
+func TestUIContract_ManagementShellNeverReplacesItselfAfterBackgroundRateLimit(t *testing.T) {
+	pages := []string{
+		filepath.Join("..", "app", "index.html"),
+		filepath.Join("..", "app", "onboarding.html"),
+	}
+	for _, page := range pages {
+		raw, err := os.ReadFile(page)
+		if err != nil {
+			t.Fatalf("read %s: %v", page, err)
+		}
+		content := string(raw)
+		if !strings.Contains(content, "window.__wafRenderBlocked = function () {};") {
+			t.Fatalf("%s must keep the legacy fallback renderer inert", page)
+		}
+		if strings.Contains(content, `window.__wafRenderBlocked({ code: 429 })`) {
+			t.Fatalf("%s must not turn a failed asset into a synthetic 429 page", page)
+		}
+	}
+}

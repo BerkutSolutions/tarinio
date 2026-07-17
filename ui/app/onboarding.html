@@ -14,6 +14,12 @@
   </style>
   <script>
     (function () {
+      // A background API request must never replace onboarding with a legacy
+      // client-side fallback. Real nginx 429 responses use branded error
+      // artifacts; the management safeguard prevents normal onboarding from
+      // reaching this path in the first place.
+      window.__wafRenderBlocked = function () {};
+      return;
       function escapeHTML(value) {
         return String(value == null ? "" : value).replace(/[&<>"']/g, function (char) {
           return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char] || char;
@@ -120,7 +126,7 @@
         if (tag !== "link" && tag !== "script" && tag !== "img") return;
         var source = String(target.href || target.src || "");
         if (source.indexOf("/static/") >= 0) {
-          window.__wafRenderBlocked({ code: 429 });
+          return;
         }
       }, true);
       fetch("/api/auth/me", { credentials: "include", cache: "no-store", headers: { Accept: "application/json" } })
@@ -136,8 +142,8 @@
   <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon32.png">
   <link rel="icon" type="image/png" sizes="48x48" href="/static/favicon48.png">
   <link rel="icon" type="image/png" sizes="64x64" href="/static/favicon64.png">
-  <link rel="stylesheet" href="/static/styles.css?v=20260419-profile-spacing-2" onerror="window.__wafRenderBlocked && window.__wafRenderBlocked({ code: 429 })">
-  <link rel="stylesheet" href="/static/waf.css?v=20260419-profile-spacing-2" onerror="window.__wafRenderBlocked && window.__wafRenderBlocked({ code: 429 })">
+  <link rel="stylesheet" href="/static/styles.css?v=20260419-profile-spacing-2">
+  <link rel="stylesheet" href="/static/waf.css?v=20260419-profile-spacing-2">
 </head>
 <body>
   <main class="waf-onboarding-shell">
@@ -265,6 +271,6 @@
       </div>
     </section>
   </main>
-  <script type="module" src="/static/js/onboarding.js?v=20260418-v1-1-21-1" onerror="window.__wafRenderBlocked && window.__wafRenderBlocked({ code: 429 })"></script>
+  <script type="module" src="/static/js/onboarding.js?v=20260418-v1-1-21-1"></script>
 </body>
 </html>
