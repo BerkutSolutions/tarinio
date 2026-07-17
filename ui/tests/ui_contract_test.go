@@ -345,8 +345,8 @@ func TestUIContract_ManagementShellNeverReplacesItselfAfterBackgroundRateLimit(t
 			t.Fatalf("read %s: %v", page, err)
 		}
 		content := string(raw)
-		if !strings.Contains(content, "window.__wafRenderBlocked = function () {};") {
-			t.Fatalf("%s must keep the legacy fallback renderer inert", page)
+		if !strings.Contains(content, `type="text/plain" data-retired-legacy-rate-limit-fallback="true"`) {
+			t.Fatalf("%s must keep the retired legacy fallback script non-executable", page)
 		}
 		if strings.Contains(content, `window.__wafRenderBlocked({ code: 429 })`) {
 			t.Fatalf("%s must not turn a failed asset into a synthetic 429 page", page)
