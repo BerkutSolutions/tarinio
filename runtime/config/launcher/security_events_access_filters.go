@@ -59,6 +59,12 @@ func shouldSkipInternalManagementRequest(item parsedAccess) bool {
 // telemetry. Its requests remain in the technical nginx access log, while the
 // Requests view, dashboard counters and storage represent protected services.
 func shouldSkipRequestTelemetry(item parsedAccess) bool {
+	// The panel's ordinary API/UI traffic is operational noise, but a rejected
+	// request is a security signal. Keep it in Requests so CRS, access-policy
+	// and direct-IP blocks against the management host are diagnosable.
+	if item.status == 403 || item.status == 444 {
+		return false
+	}
 	if item.management {
 		return true
 	}

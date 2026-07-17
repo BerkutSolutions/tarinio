@@ -1,5 +1,10 @@
 ## [1.5.5] - 17.07.2026
 
+### Management hosts and request security telemetry
+
+- Initial onboarding persists its panel domain in management hosts before the first revision is compiled; CRS therefore cannot lock the control-plane API after initial setup.
+- Requests now retain 403/444 blocks against the management host as security records while ordinary management UI/API traffic remains excluded.
+
 ### Исправления уязвимостей и защита данных
 
 #### Учётные записи, права и секреты

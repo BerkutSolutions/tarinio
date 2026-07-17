@@ -10,6 +10,11 @@ func TestRequestTelemetrySkipsManagementHostButKeepsProtectedServicePaths(t *tes
 	if shouldTrackRequestBurst(management) {
 		t.Fatal("management-host traffic must not affect burst telemetry")
 	}
+	blockedManagement := management
+	blockedManagement.status = 403
+	if shouldSkipRequestTelemetry(blockedManagement) {
+		t.Fatal("blocked management-host request must be retained for security diagnostics")
+	}
 	protected := parsedAccess{siteID: "customer_site", host: "customer.example", path: "/api/sites"}
 	if shouldSkipRequestTelemetry(protected) {
 		t.Fatal("a protected service path must not be filtered by its name alone")
@@ -25,5 +30,12 @@ func TestRequestTelemetrySkipsManagementHostButKeepsProtectedServicePaths(t *tes
 	internal := parsedAccess{siteID: "", host: "localhost", path: "/api/sites"}
 	if !shouldSkipRequestTelemetry(internal) {
 		t.Fatal("internal control-plane traffic must stay excluded")
+	}
+}
+
+func TestBlockedManagementRequestIsMarkedAsSecurityRecord(t *testing.T) {
+	record := newRequestLogRecord(parsedAccess{status: 403, securityReason: "modsecurity"})
+	if record.RowType != "security" || record.SecurityReason != "modsecurity" {
+		t.Fatalf("blocked management record must retain its security classification, got %+v", record)
 	}
 }

@@ -1,6 +1,7 @@
 import { api } from "./api.js";
 import { getBrowserLanguage, setLanguage, t } from "./i18n.js";
 import { checkEntryAccess, markOnboardingRedirecting } from "./guard.js";
+import { ensureOnboardingManagementHost } from "./onboarding-management-hosts.js";
 import { escapeHtml, notify, setError, setLoading } from "./ui.js";
 
 const state = {
@@ -570,6 +571,8 @@ async function ensureSiteAndTLS() {
       await api.put(`/api/upstreams/${encodeURIComponent(upstream.id)}`, upstream, onboardingNoAutoApplyOptions);
     }
   }
+
+  await ensureOnboardingManagementHost(api, site.primary_host, onboardingNoAutoApplyOptions);
 
   state.site = sites.find((item) => item.id === site.id) || site;
   state.upstream = upstreams.find((item) => item.id === upstream.id) || upstream;

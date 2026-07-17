@@ -54,7 +54,6 @@ func (s CandidateStager) Stage(bundle *RevisionBundle) (string, error) {
 	if err := os.MkdirAll(candidateRoot, 0o755); err != nil {
 		return "", fmt.Errorf("create candidate directory: %w", err)
 	}
-
 	files := append([]BundleFile(nil), bundle.Files...)
 	sort.Slice(files, func(i, j int) bool {
 		return files[i].Path < files[j].Path
@@ -68,8 +67,7 @@ func (s CandidateStager) Stage(bundle *RevisionBundle) (string, error) {
 		if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
 			return "", fmt.Errorf("create staged file directory for %s: %w", file.Path, err)
 		}
-		resolvedParent, err := filepath.EvalSymlinks(filepath.Dir(targetPath))
-		if err != nil || !isPathWithinStagingRoot(resolvedParent, candidateRoot) {
+		if !isStagingDirectorySafe(filepath.Dir(targetPath), candidateRoot) {
 			return "", fmt.Errorf("staged file directory for %s is outside candidate root", file.Path)
 		}
 		if err := os.WriteFile(targetPath, file.Content, 0o644); err != nil {
@@ -78,4 +76,30 @@ func (s CandidateStager) Stage(bundle *RevisionBundle) (string, error) {
 	}
 
 	return candidateRoot, nil
+}
+
+// isStagingDirectorySafe rejects symlink traversal below candidateRoot without
+// resolving the root itself. The root is created by Stage; resolving it through
+// EvalSymlinks is not portable on Windows volumes that deny reparse-point
+// inspection even for ordinary directories.
+func isStagingDirectorySafe(directory, candidateRoot string) bool {
+	if !isPathWithinStagingRoot(directory, candidateRoot) {
+		return false
+	}
+	rel, err := filepath.Rel(filepath.Clean(candidateRoot), filepath.Clean(directory))
+	if err != nil || rel == "." {
+		return err == nil
+	}
+	current := candidateRoot
+	for _, part := range strings.Split(rel, string(filepath.Separator)) {
+		if part == "" || part == "." {
+			continue
+		}
+		current = filepath.Join(current, part)
+		info, err := os.Lstat(current)
+		if err != nil || info.Mode()&os.ModeSymlink != 0 {
+			return false
+		}
+	}
+	return true
 }

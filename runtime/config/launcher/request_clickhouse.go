@@ -24,22 +24,24 @@ import (
 )
 
 type requestLogRecord struct {
-	EventHash    string `json:"event_hash"`
-	Stream       string `json:"stream"`
-	IngestedAt   string `json:"ingested_at"`
-	Timestamp    string `json:"timestamp"`
-	RequestID    string `json:"request_id"`
-	ClientIP     string `json:"client_ip"`
-	Country      string `json:"country"`
-	City         string `json:"city"`
-	Method       string `json:"method"`
-	URI          string `json:"uri"`
-	Status       int    `json:"status"`
-	Site         string `json:"site"`
-	Host         string `json:"host"`
-	UpstreamAddr string `json:"upstream_addr"`
-	Referer      string `json:"referer"`
-	UserAgent    string `json:"user_agent"`
+	EventHash      string `json:"event_hash"`
+	Stream         string `json:"stream"`
+	IngestedAt     string `json:"ingested_at"`
+	Timestamp      string `json:"timestamp"`
+	RequestID      string `json:"request_id"`
+	ClientIP       string `json:"client_ip"`
+	Country        string `json:"country"`
+	City           string `json:"city"`
+	Method         string `json:"method"`
+	URI            string `json:"uri"`
+	Status         int    `json:"status"`
+	Site           string `json:"site"`
+	Host           string `json:"host"`
+	UpstreamAddr   string `json:"upstream_addr"`
+	Referer        string `json:"referer"`
+	UserAgent      string `json:"user_agent"`
+	RowType        string `json:"row_type,omitempty"`
+	SecurityReason string `json:"security_reason,omitempty"`
 }
 
 type requestClickHouseConfig struct {
@@ -469,24 +471,43 @@ func clickHouseClientWithoutRedirects(client *http.Client) *http.Client {
 
 func newRequestLogRecord(item parsedAccess) requestLogRecord {
 	record := requestLogRecord{
-		Stream:       "runtime",
-		IngestedAt:   item.when.UTC().Format(time.RFC3339Nano),
-		Timestamp:    item.when.UTC().Format(time.RFC3339Nano),
-		RequestID:    item.requestID,
-		ClientIP:     item.ip,
-		Country:      item.country,
-		City:         item.city,
-		Method:       item.method,
-		URI:          item.path,
-		Status:       item.status,
-		Site:         item.siteID,
-		Host:         item.host,
-		UpstreamAddr: item.upstreamAddr,
-		Referer:      item.referer,
-		UserAgent:    item.userAgent,
+		Stream:         "runtime",
+		IngestedAt:     item.when.UTC().Format(time.RFC3339Nano),
+		Timestamp:      item.when.UTC().Format(time.RFC3339Nano),
+		RequestID:      item.requestID,
+		ClientIP:       item.ip,
+		Country:        item.country,
+		City:           item.city,
+		Method:         item.method,
+		URI:            item.path,
+		Status:         item.status,
+		Site:           item.siteID,
+		Host:           item.host,
+		UpstreamAddr:   item.upstreamAddr,
+		Referer:        item.referer,
+		UserAgent:      item.userAgent,
+		RowType:        requestRowTypeForAccess(item),
+		SecurityReason: requestSecurityReasonForAccess(item),
 	}
 	record.EventHash = requestRecordHash(record)
 	return record
+}
+
+func requestRowTypeForAccess(item parsedAccess) string {
+	if item.status == 403 || item.status == 444 {
+		return "security"
+	}
+	return "request"
+}
+
+func requestSecurityReasonForAccess(item parsedAccess) string {
+	if reason := strings.TrimSpace(item.securityReason); reason != "" {
+		return reason
+	}
+	if item.status == 403 || item.status == 444 {
+		return "access_blocked"
+	}
+	return ""
 }
 
 func requestRecordHash(record requestLogRecord) string {
@@ -512,8 +533,10 @@ func requestRecordHash(record requestLogRecord) string {
 
 func requestRecordToMap(record requestLogRecord) map[string]any {
 	return map[string]any{
-		"stream":      record.Stream,
-		"ingested_at": record.IngestedAt,
+		"stream":          record.Stream,
+		"ingested_at":     record.IngestedAt,
+		"row_type":        record.RowType,
+		"security_reason": record.SecurityReason,
 		"entry": map[string]any{
 			"timestamp":     record.Timestamp,
 			"request_id":    record.RequestID,
@@ -538,29 +561,33 @@ func loadRequestLogRecordFromArchiveLine(line string) (requestLogRecord, bool) {
 		return requestLogRecord{}, false
 	}
 	var row struct {
-		Stream     string         `json:"stream"`
-		IngestedAt string         `json:"ingested_at"`
-		Entry      map[string]any `json:"entry"`
+		Stream         string         `json:"stream"`
+		IngestedAt     string         `json:"ingested_at"`
+		RowType        string         `json:"row_type"`
+		SecurityReason string         `json:"security_reason"`
+		Entry          map[string]any `json:"entry"`
 	}
 	if err := json.Unmarshal([]byte(line), &row); err != nil {
 		return requestLogRecord{}, false
 	}
 	record := requestLogRecord{
-		Stream:       strings.TrimSpace(row.Stream),
-		IngestedAt:   strings.TrimSpace(row.IngestedAt),
-		Timestamp:    strings.TrimSpace(asString(row.Entry["timestamp"])),
-		RequestID:    strings.TrimSpace(asString(row.Entry["request_id"])),
-		ClientIP:     strings.TrimSpace(asString(row.Entry["client_ip"])),
-		Country:      strings.TrimSpace(asString(row.Entry["country"])),
-		City:         strings.TrimSpace(asString(row.Entry["city"])),
-		Method:       strings.TrimSpace(asString(row.Entry["method"])),
-		URI:          strings.TrimSpace(asString(row.Entry["uri"])),
-		Status:       parseIntValue(row.Entry["status"]),
-		Site:         strings.TrimSpace(asString(row.Entry["site"])),
-		Host:         strings.TrimSpace(asString(row.Entry["host"])),
-		UpstreamAddr: strings.TrimSpace(asString(row.Entry["upstream_addr"])),
-		Referer:      strings.TrimSpace(asString(row.Entry["referer"])),
-		UserAgent:    strings.TrimSpace(asString(row.Entry["user_agent"])),
+		Stream:         strings.TrimSpace(row.Stream),
+		IngestedAt:     strings.TrimSpace(row.IngestedAt),
+		RowType:        strings.TrimSpace(row.RowType),
+		SecurityReason: strings.TrimSpace(row.SecurityReason),
+		Timestamp:      strings.TrimSpace(asString(row.Entry["timestamp"])),
+		RequestID:      strings.TrimSpace(asString(row.Entry["request_id"])),
+		ClientIP:       strings.TrimSpace(asString(row.Entry["client_ip"])),
+		Country:        strings.TrimSpace(asString(row.Entry["country"])),
+		City:           strings.TrimSpace(asString(row.Entry["city"])),
+		Method:         strings.TrimSpace(asString(row.Entry["method"])),
+		URI:            strings.TrimSpace(asString(row.Entry["uri"])),
+		Status:         parseIntValue(row.Entry["status"]),
+		Site:           strings.TrimSpace(asString(row.Entry["site"])),
+		Host:           strings.TrimSpace(asString(row.Entry["host"])),
+		UpstreamAddr:   strings.TrimSpace(asString(row.Entry["upstream_addr"])),
+		Referer:        strings.TrimSpace(asString(row.Entry["referer"])),
+		UserAgent:      strings.TrimSpace(asString(row.Entry["user_agent"])),
 	}
 	if record.Stream == "" {
 		record.Stream = "runtime"

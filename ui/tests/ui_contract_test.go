@@ -25,12 +25,13 @@ func TestUIContract_OnboardingAndSidebarMarkers(t *testing.T) {
 		},
 		{
 			name:  "onboarding js",
-			files: []string{filepath.Join("..", "app", "static", "js", "onboarding.js")},
+			files: []string{filepath.Join("..", "app", "static", "js", "onboarding.js"), filepath.Join("..", "app", "static", "js", "onboarding-management-hosts.js")},
 			markers: []string{
 				`"X-WAF-Auto-Apply-Disabled": "1"`,
 				`/api/revisions/compile`,
 				`/apply`,
 				`has_active_revision`,
+				`/api/settings/management-hosts`,
 			},
 		},
 		{
