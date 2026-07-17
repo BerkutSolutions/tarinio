@@ -461,10 +461,11 @@ func New(cfg config.Config) (*App, error) {
 	var letsEncryptClient services.LetsEncryptClient
 	if cfg.ACME.Enabled && !cfg.ACME.UseDevelopmentClient {
 		client, err := services.NewACMELetsEncryptClient(services.ACMEClientConfig{
-			Email:        cfg.ACME.Email,
-			DirectoryURL: cfg.ACME.DirectoryURL,
-			StateDir:     cfg.ACME.StateDir,
-			ChallengeDir: cfg.ACME.ChallengeDir,
+			Email:               cfg.ACME.Email,
+			DirectoryURL:        cfg.ACME.DirectoryURL,
+			CustomDirectoryURLs: cfg.ACME.CustomDirectoryURLs,
+			StateDir:            cfg.ACME.StateDir,
+			ChallengeDir:        cfg.ACME.ChallengeDir,
 		})
 		if err != nil {
 			return nil, err

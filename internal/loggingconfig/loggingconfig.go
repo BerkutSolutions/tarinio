@@ -52,6 +52,7 @@ type RetentionSettings struct {
 
 type OpenSearchSettings struct {
 	Endpoint      string `json:"endpoint,omitempty"`
+	TLSCAFile     string `json:"tls_ca_file,omitempty"`
 	IndexPrefix   string `json:"index_prefix,omitempty"`
 	Username      string `json:"username,omitempty"`
 	Password      string `json:"password,omitempty"`
@@ -65,6 +66,7 @@ type OpenSearchSettings struct {
 
 type ClickHouseSettings struct {
 	Endpoint         string `json:"endpoint,omitempty"`
+	TLSCAFile        string `json:"tls_ca_file,omitempty"`
 	Database         string `json:"database,omitempty"`
 	Username         string `json:"username,omitempty"`
 	Password         string `json:"password,omitempty"`
@@ -97,6 +99,7 @@ func Normalize(input Settings) Settings {
 	}
 
 	input.OpenSearch.Endpoint = normalizeEndpoint(input.OpenSearch.Endpoint)
+	input.OpenSearch.TLSCAFile = strings.TrimSpace(input.OpenSearch.TLSCAFile)
 	input.OpenSearch.IndexPrefix = normalizeIdentifier(input.OpenSearch.IndexPrefix)
 	if input.OpenSearch.IndexPrefix == "" {
 		input.OpenSearch.IndexPrefix = "waf-hot"
@@ -120,6 +123,7 @@ func Normalize(input Settings) Settings {
 	}
 
 	input.ClickHouse.Endpoint = normalizeEndpoint(input.ClickHouse.Endpoint)
+	input.ClickHouse.TLSCAFile = strings.TrimSpace(input.ClickHouse.TLSCAFile)
 	input.ClickHouse.Database = normalizeIdentifier(input.ClickHouse.Database)
 	if input.ClickHouse.Database == "" {
 		input.ClickHouse.Database = "waf_logs"

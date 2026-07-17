@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 set -eu
+umask 077
 
 PROFILE="${PROFILE:-default}"
 INSTALL_DIR="${INSTALL_DIR:-/opt/tarinio}"
@@ -87,9 +88,14 @@ write_env_value() {
   key="$1"
   value="$2"
   tmp_file=".env.tmp.$$"
+  trap 'rm -f "$tmp_file"' HUP INT TERM
+  : >"$tmp_file"
+  chmod 600 "$tmp_file"
   if [ ! -f .env ]; then
     printf '%s=%s\n' "$key" "$value" >"$tmp_file"
     mv "$tmp_file" .env
+    chmod 600 .env
+    trap - HUP INT TERM
     return 0
   fi
   awk -F= -v key="$key" -v value="$value" '
@@ -107,6 +113,8 @@ write_env_value() {
     }
   ' .env >"$tmp_file"
   mv "$tmp_file" .env
+  chmod 600 .env
+  trap - HUP INT TERM
 }
 
 shell_quote() {

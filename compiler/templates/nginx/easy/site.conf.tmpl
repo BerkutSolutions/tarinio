@@ -49,13 +49,6 @@ if ($waf_easy_admin_guard = 1) {
     set $waf_rate_limited_active 0;
     set $waf_rate_limited_escalated 0;
 }
-if ($waf_rate_limited_escalated = 1) {
-    return 403;
-}
-if ($waf_rate_limited_active = 1) {
-    return 429;
-}
-
 if ($request_method !~ {{ .AllowedMethodsPattern }}) {
     return 405;
 }
@@ -269,6 +262,15 @@ if ($waf_antibot_stage_guard = "0:0:1:1") { return 302 $waf_antibot_effective_re
 if ($waf_antibot_guard = "0:0:1") { return 302 $waf_antibot_effective_redirect?return_uri=$uri&return_args=$args; }
 {{- end }}
 if ($waf_antibot_guard ~ "^0:0:") { return 403; }
+{{- end }}
+
+if ($waf_rate_limited_escalated = 1) {
+    return 403;
+}
+if ($waf_rate_limited_active = 1) {
+    return 429;
+}
+{{- if .AntibotEnabled }}
 add_header X-WAF-Antibot-Mode "$waf_antibot_effective_challenge" always;
 {{- if .AntibotRecaptchaHint }}
 add_header X-WAF-Antibot-Provider "recaptcha" always;

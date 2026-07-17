@@ -2,6 +2,19 @@
 
 `default` is the standalone production-oriented compose profile.
 
+## Automatic CRS updates
+
+The runtime obtains the SHA-256 digest for the exact `minimal` archive from
+the official `coreruleset/coreruleset` GitHub Release API. It validates that
+the release page and download URL belong to that repository, then verifies the
+downloaded archive before atomically activating it. No `.env` edit is required
+when a new CRS release is published.
+
+`WAF_CRS_TRUSTED_SHA256` remains an optional protected override for an
+operator-managed release pin for a controlled rollout. It takes precedence
+over the official release digest and must therefore be treated as a protected
+deployment configuration value.
+
 ## Key properties
 
 - No automatic bootstrap admin creation by default.

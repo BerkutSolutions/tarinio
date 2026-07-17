@@ -63,11 +63,13 @@ docker compose --profile tools exec toolbox /tools/cluster-status.sh
 docker compose --profile tools exec toolbox /tools/mini-ddos.sh
 ```
 
-7. Open Grafana:
+7. Set unique `HA_GRAFANA_ADMIN_USER` and `HA_GRAFANA_ADMIN_PASSWORD` in
+   `.env`, then open Grafana:
 
 - `http://localhost:13000`
-- user `admin`
-- password `admin`
+- Prometheus and Grafana bind to loopback only. Do not expose them with an
+  unauthenticated reverse proxy; use an authenticated tunnel or a protected
+  ingress when remote access is required.
 
 ## 20 Service Lab
 

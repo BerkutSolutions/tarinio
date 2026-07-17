@@ -143,6 +143,10 @@ func (s *EnterpriseService) UpdateSettings(ctx context.Context, input Enterprise
 	if err != nil {
 		return enterprise.SettingsView{}, err
 	}
+	if strings.TrimSpace(current.OIDC.IssuerURL) != strings.TrimSpace(input.OIDC.IssuerURL) &&
+		strings.TrimSpace(current.OIDC.ClientSecret) != "" && strings.TrimSpace(input.OIDC.ClientSecret) == "" {
+		return enterprise.SettingsView{}, errors.New("OIDC client secret must be supplied when changing issuer")
+	}
 	current.OIDC = input.OIDC
 	current.Approvals = input.Approvals
 	current.SCIM.Enabled = input.SCIM.Enabled
@@ -518,7 +522,7 @@ func (s *EnterpriseService) ListSCIMUsers() ([]SCIMUserRecord, error) {
 	}
 	out := make([]SCIMUserRecord, 0, len(items))
 	for _, item := range items {
-		if item.AuthSource != "scim" && item.AuthSource != "oidc" {
+		if item.AuthSource != "scim" {
 			continue
 		}
 		out = append(out, scimUserFromUser(item))
@@ -530,6 +534,9 @@ func (s *EnterpriseService) GetSCIMUser(id string) (SCIMUserRecord, bool, error)
 	item, ok, err := s.users.Get(id)
 	if err != nil || !ok {
 		return SCIMUserRecord{}, ok, err
+	}
+	if item.AuthSource != "scim" {
+		return SCIMUserRecord{}, false, nil
 	}
 	return scimUserFromUser(item), true, nil
 }
@@ -557,6 +564,9 @@ func (s *EnterpriseService) DeactivateSCIMUser(id string) (SCIMUserRecord, error
 	}
 	if !ok {
 		return SCIMUserRecord{}, fmt.Errorf("user %s not found", id)
+	}
+	if current.AuthSource != "scim" {
+		return SCIMUserRecord{}, fmt.Errorf("user %s is not managed by SCIM", id)
 	}
 	current.IsActive = false
 	updated, err := s.users.Update(current)
@@ -884,10 +894,18 @@ func writeTarFile(tw *tar.Writer, name string, content []byte) error {
 
 func normalizeNextPath(value string) string {
 	trimmed := strings.TrimSpace(value)
-	if trimmed == "" || !strings.HasPrefix(trimmed, "/") {
+	if trimmed == "" || !strings.HasPrefix(trimmed, "/") || strings.HasPrefix(trimmed, "//") || strings.Contains(trimmed, "\\") {
 		return "/healthcheck"
 	}
-	return trimmed
+	parsed, err := url.ParseRequestURI(trimmed)
+	if err != nil || parsed.IsAbs() || parsed.Host != "" || parsed.User != nil || parsed.Opaque != "" {
+		return "/healthcheck"
+	}
+	decodedPath, err := url.PathUnescape(parsed.EscapedPath())
+	if err != nil || strings.HasPrefix(decodedPath, "//") || strings.Contains(decodedPath, "\\") {
+		return "/healthcheck"
+	}
+	return parsed.String()
 }
 
 func permissionsToStrings(items []rbac.Permission) []string {

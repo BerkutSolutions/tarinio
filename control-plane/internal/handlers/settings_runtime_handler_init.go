@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -35,6 +36,9 @@ func NewSettingsRuntimeHandlerWithBackend(settingsRoot string, runtimeHealthURL 
 		if err == nil {
 			var stored persistedRuntimeSettings
 			if jsonErr := json.Unmarshal(content, &stored); jsonErr == nil {
+				if !bytes.Contains(content, []byte(`"require_certificate_export_approval"`)) {
+					stored.Security.RequireCertificateExportApproval = true
+				}
 				runtimeSettingsState.updateChecksEnabled = stored.UpdateChecksEnabled
 				runtimeSettingsState.language = normalizeRuntimeLanguage(stored.Language)
 				runtimeSettingsState.lastCheckedAt = stored.LastCheckedAt

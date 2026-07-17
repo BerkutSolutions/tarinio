@@ -445,7 +445,7 @@ func (s *runtimeStatus) handlers(process *runtimeProcess, securitySource *securi
 		}
 		status, err := process.crsManager.CheckForUpdates(dryRun)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadGateway)
+			writeCRSRuntimeError(w, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, status)
@@ -477,7 +477,7 @@ func (s *runtimeStatus) handlers(process *runtimeProcess, securitySource *securi
 		}
 		status, changed, err := process.crsManager.UpdateToLatest(false)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadGateway)
+			writeCRSRuntimeError(w, err)
 			return
 		}
 		if changed {
@@ -585,6 +585,13 @@ func run() error {
 	}
 
 	process := newRuntimeProcess(runtimeRoot, crsPath, status, manager, modsecurityModulePath, geoIPModulePath)
+	startupBundleWait, err := startupBundleWaitDurationFromEnv()
+	if err != nil {
+		return err
+	}
+	if err := waitForInitialBundle(runtimeRoot, startupBundleWait); err != nil {
+		return err
+	}
 	securitySource := newSecurityEventSource("/var/log/nginx/access.log")
 	requestSource := newRequestStreamSource(
 		"/var/log/nginx/access.log",

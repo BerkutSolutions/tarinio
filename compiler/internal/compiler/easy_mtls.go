@@ -30,6 +30,9 @@ func ValidateMTLS(input MTLSInput) error {
 	if strings.TrimSpace(input.MTLSClientCARef) == "" {
 		return fmt.Errorf("mtls_client_ca_ref must be set when mtls_enabled=true")
 	}
+	if err := validateNginxCertificatePath(input.MTLSClientCARef, "mtls_client_ca_ref"); err != nil {
+		return err
+	}
 	if input.MTLSVerifyDepth < 0 {
 		return fmt.Errorf("mtls_verify_depth must be >= 0, got %d", input.MTLSVerifyDepth)
 	}
@@ -46,6 +49,13 @@ func ValidateUpstreamMTLS(input UpstreamMTLSInput) error {
 	}
 	if strings.TrimSpace(input.UpstreamMTLSKeyRef) == "" {
 		return fmt.Errorf("upstream_mtls_key_ref must be set when upstream_mtls_enabled=true")
+	}
+	for field, value := range map[string]string{"upstream_mtls_cert_ref": input.UpstreamMTLSCertRef, "upstream_mtls_key_ref": input.UpstreamMTLSKeyRef, "upstream_mtls_ca_ref": input.UpstreamMTLSCARef} {
+		if strings.TrimSpace(value) != "" {
+			if err := validateNginxCertificatePath(value, field); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -23,6 +24,27 @@ type RuntimeCRSStatus struct {
 	HourlyAutoUpdateEnabled bool   `json:"hourly_auto_update_enabled"`
 	FirstStartPending       bool   `json:"first_start_pending"`
 	LastError               string `json:"last_error,omitempty"`
+	LastErrorCode           string `json:"last_error_code,omitempty"`
+}
+
+type RuntimeCRSError struct {
+	Code    string
+	Message string
+}
+
+func (e *RuntimeCRSError) Error() string {
+	if e == nil || strings.TrimSpace(e.Message) == "" {
+		return "runtime CRS request failed"
+	}
+	return e.Message
+}
+
+func RuntimeCRSErrorCode(err error) string {
+	var runtimeErr *RuntimeCRSError
+	if errors.As(err, &runtimeErr) {
+		return strings.TrimSpace(runtimeErr.Code)
+	}
+	return ""
 }
 
 type RuntimeCRSService struct {
@@ -112,7 +134,18 @@ func (s *RuntimeCRSService) requestJSON(ctx context.Context, method, path string
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-		msg := strings.TrimSpace(string(raw))
+		var failure struct {
+			Code  string `json:"code"`
+			Error string `json:"error"`
+		}
+		_ = json.Unmarshal(raw, &failure)
+		msg := strings.TrimSpace(failure.Error)
+		if strings.TrimSpace(failure.Code) != "" {
+			return &RuntimeCRSError{Code: strings.TrimSpace(failure.Code), Message: msg}
+		}
+		if msg == "" {
+			msg = strings.TrimSpace(string(raw))
+		}
 		if msg == "" {
 			msg = fmt.Sprintf("runtime CRS endpoint returned status %d", resp.StatusCode)
 		}

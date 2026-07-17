@@ -12,6 +12,7 @@ import (
 
 func main() {
 	output := flag.String("output", "", "release artifacts directory")
+	trustedPublicKey := flag.String("trusted-public-key", "", "protected trusted Ed25519 public key PEM path")
 	flag.Parse()
 
 	dir := strings.TrimSpace(*output)
@@ -23,7 +24,7 @@ func main() {
 	if err != nil {
 		absDir = dir
 	}
-	if err := releaseartifacts.Verify(absDir); err != nil {
+	if err := releaseartifacts.Verify(absDir, strings.TrimSpace(*trustedPublicKey)); err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}

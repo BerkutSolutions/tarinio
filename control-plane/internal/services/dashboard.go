@@ -46,10 +46,11 @@ type DashboardService struct {
 		items []events.Event
 	}
 	// dismissedServiceErrors хранит ID ошибок сервисов, которые пользователь скрыл.
-	// Хранится in-memory (сбрасывается при перезапуске — это нормально для этого кейса).
+	// Состояние намеренно локальное для сессии отображения, но никогда не разделяется
+	// между пользователями: ключ верхнего уровня — стабильный ID пользователя.
 	dismissedServiceErrors struct {
-		mu  sync.RWMutex
-		ids map[string]struct{}
+		mu     sync.RWMutex
+		byUser map[string]map[string]struct{}
 	}
 }
 
@@ -227,7 +228,7 @@ func NewDashboardService(events dashboardEventReader, requests RuntimeRequestCol
 			interval: 15 * time.Second,
 		},
 	}
-	s.dismissedServiceErrors.ids = make(map[string]struct{})
+	s.dismissedServiceErrors.byUser = make(map[string]map[string]struct{})
 	return s
 }
 
@@ -240,38 +241,53 @@ func (s *DashboardService) WithContainerIssueReader(c dashboardContainerIssueRea
 	s.containers = c
 }
 
-// DismissServiceErrors помечает ошибки сервиса как скрытые по их ID.
-func (s *DashboardService) DismissServiceErrors(errorIDs []string) {
-	if s == nil || len(errorIDs) == 0 {
+// DismissServiceErrors помечает ошибки сервиса как скрытые только для actorID.
+// Пустой actorID не допускается, чтобы вызов без аутентифицированной сессии не
+// превратился в общее состояние скрытия.
+func (s *DashboardService) DismissServiceErrors(actorID string, errorIDs []string) {
+	actorID = strings.TrimSpace(actorID)
+	if s == nil || actorID == "" || len(errorIDs) == 0 {
 		return
 	}
 	s.dismissedServiceErrors.mu.Lock()
 	defer s.dismissedServiceErrors.mu.Unlock()
+	if s.dismissedServiceErrors.byUser[actorID] == nil {
+		s.dismissedServiceErrors.byUser[actorID] = make(map[string]struct{})
+	}
 	for _, id := range errorIDs {
 		if id = strings.TrimSpace(id); id != "" {
-			s.dismissedServiceErrors.ids[id] = struct{}{}
+			s.dismissedServiceErrors.byUser[actorID][id] = struct{}{}
 		}
 	}
 }
 
-// isDismissed проверяет скрыта ли ошибка пользователем.
-func (s *DashboardService) isDismissed(id string) bool {
+// isDismissed проверяет скрыта ли ошибка конкретным пользователем.
+func (s *DashboardService) isDismissed(actorID, id string) bool {
+	if strings.TrimSpace(actorID) == "" {
+		return false
+	}
 	s.dismissedServiceErrors.mu.RLock()
 	defer s.dismissedServiceErrors.mu.RUnlock()
-	_, ok := s.dismissedServiceErrors.ids[id]
+	_, ok := s.dismissedServiceErrors.byUser[actorID][id]
 	return ok
 }
 
 func (s *DashboardService) Stats() (DashboardStats, error) {
+	return s.StatsForActor("")
+}
+
+// StatsForActor returns a dashboard snapshot while applying only this actor's
+// local dismissals. Cached snapshots deliberately remain unfiltered.
+func (s *DashboardService) StatsForActor(actorID string) (DashboardStats, error) {
 	if cached, ok := s.snapshot(); ok {
-		return cached, nil
+		return s.filterDismissedServiceErrors(cached, actorID), nil
 	}
 	stats, err := s.buildSnapshot()
 	if err != nil {
 		return DashboardStats{}, err
 	}
 	s.storeSnapshot(stats)
-	return stats, nil
+	return s.filterDismissedServiceErrors(stats, actorID), nil
 }
 
 func (s *DashboardService) Probe(kind string, query url.Values) error {
@@ -384,10 +400,6 @@ func (s *DashboardService) collectUpstreamErrors() map[string][]DashboardService
 		id := fmt.Sprintf("%s|%s|%s", issue.Container, issue.Severity, issue.NormalizedLog)
 		// ID детерминирован — используем для dismiss проверки.
 		errorID := shortHashID(id)
-
-		if s.isDismissed(errorID) {
-			continue
-		}
 
 		out[host] = append(out[host], DashboardServiceError{
 			ID:            errorID,

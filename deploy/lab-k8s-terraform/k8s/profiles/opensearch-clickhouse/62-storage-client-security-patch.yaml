@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: runtime
+  namespace: tarinio-lab
+spec:
+  template:
+    spec:
+      containers:
+        - name: runtime
+          env:
+            - name: WAF_CLICKHOUSE_ALLOWED_ENDPOINTS
+              value: https://clickhouse:8443
+          volumeMounts:
+            - name: opensearch-tls
+              mountPath: /etc/waf/storage-ca/opensearch
+              readOnly: true
+            - name: clickhouse-tls
+              mountPath: /etc/waf/storage-ca/clickhouse
+              readOnly: true
+      volumes:
+        - name: opensearch-tls
+          secret:
+            secretName: tarinio-lab-opensearch-tls
+        - name: clickhouse-tls
+          secret:
+            secretName: tarinio-lab-clickhouse-tls

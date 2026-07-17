@@ -9,6 +9,13 @@ function formatStatusDate(value, ctx) {
   return formatDate(value);
 }
 
+function localizeCRSError(error, ctx) {
+  const code = String(error?.payload?.code || error?.code || error?.last_error_code || "").trim();
+  const key = `owaspCrs.errors.${code}`;
+  const translated = code ? ctx.t(key) : "";
+  return translated && translated !== key ? translated : ctx.t("owaspCrs.errors.crs_update_failed");
+}
+
 function toConsoleLine(item, ctx) {
   const timestamp = escapeHtml(item?.at || "");
   const message = escapeHtml(item?.message || ctx.t("app.error"));
@@ -26,7 +33,7 @@ function renderStatusCard(status, ctx, uiState) {
   const firstStartPending = Boolean(status?.first_start_pending);
   const currentHourlyAuto = Boolean(status?.hourly_auto_update_enabled);
   const hourlyAuto = Boolean(uiState?.hourlyAutoDraft);
-  const lastError = String(status?.last_error || "").trim();
+  const lastError = status?.last_error_code ? localizeCRSError(status, ctx) : "";
   const consoleLines = Array.isArray(uiState?.consoleLines) ? uiState.consoleLines : [];
   const pendingAction = String(uiState?.pendingAction || "").trim();
   const busy = pendingAction !== "";
@@ -150,7 +157,7 @@ export async function renderOWASPCRS(container, ctx) {
       ctx.notify(ctx.t("owaspCrs.actions.done"), "success");
       return result;
     } catch (error) {
-      const message = error?.message || ctx.t("app.error");
+      const message = localizeCRSError(error, ctx);
       pushConsole(`${ctx.t("owaspCrs.console.failed")}: ${message}`, "error");
       render();
       ctx.notify(message, "error");

@@ -105,7 +105,7 @@ build_ere_pattern() {
 }
 
 redact_sensitive() {
-  printf "%s" "$1"
+  printf '%s' '<redacted command>'
 }
 
 run() {

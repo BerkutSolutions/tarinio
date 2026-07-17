@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"waf/control-plane/internal/jobs"
+	"waf/control-plane/internal/revisions"
 	"waf/control-plane/internal/virtualpatches"
 )
 
@@ -53,6 +55,36 @@ func (m *mockVirtualPatchStore) Delete(id string) error {
 		}
 	}
 	return fmt.Errorf("virtual patch %s not found", id)
+}
+
+type virtualPatchAutoCompile struct{ calls int }
+
+func (f *virtualPatchAutoCompile) Create(context.Context) (CompileRequestResult, error) {
+	f.calls++
+	return CompileRequestResult{Revision: revisions.Revision{ID: "rev-virtual-patch"}}, nil
+}
+
+type virtualPatchAutoApply struct{ calls int }
+
+func (f *virtualPatchAutoApply) Apply(context.Context, string) (jobs.Job, error) {
+	f.calls++
+	return jobs.Job{Status: jobs.StatusSucceeded}, nil
+}
+
+func TestVirtualPatchService_CreateTriggersCompileAndApply(t *testing.T) {
+	compile := &virtualPatchAutoCompile{}
+	apply := &virtualPatchAutoApply{}
+	ConfigureAutoApply(compile, apply, NewNoopDistributedCoordinator())
+	t.Cleanup(func() { ConfigureAutoApply(nil, nil, nil) })
+
+	service := NewVirtualPatchService(&mockVirtualPatchStore{})
+	_, err := service.Create(context.Background(), virtualpatches.VirtualPatch{SiteID: "site-auto", Pattern: "/protected", Target: "uri", Action: "block"})
+	if err != nil {
+		t.Fatalf("create virtual patch: %v", err)
+	}
+	if compile.calls != 1 || apply.calls != 1 {
+		t.Fatalf("expected compile/apply once, got compile=%d apply=%d", compile.calls, apply.calls)
+	}
 }
 
 func TestVirtualPatchService_CreateAndListActive(t *testing.T) {

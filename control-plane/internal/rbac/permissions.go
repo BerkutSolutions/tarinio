@@ -24,6 +24,7 @@ const (
 
 	PermissionCertificatesRead  Permission = "certificates.read"
 	PermissionCertificatesWrite Permission = "certificates.write"
+	PermissionCertificatesExport Permission = "certificates.export"
 	PermissionTLSRead           Permission = "tls.read"
 	PermissionTLSWrite          Permission = "tls.write"
 
@@ -81,6 +82,7 @@ func AllPermissions() []Permission {
 		PermissionOWASPCRSWrite,
 		PermissionCertificatesRead,
 		PermissionCertificatesWrite,
+		PermissionCertificatesExport,
 		PermissionTLSRead,
 		PermissionTLSWrite,
 		PermissionPoliciesRead,

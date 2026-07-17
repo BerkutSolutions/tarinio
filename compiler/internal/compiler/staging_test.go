@@ -95,3 +95,18 @@ func TestCandidateStager_RejectsInvalidBundle(t *testing.T) {
 		t.Fatalf("expected validation error, got %v", err)
 	}
 }
+
+func TestCandidateStager_RejectsTraversalInRevisionOrArtifactPath(t *testing.T) {
+	root := t.TempDir()
+	for _, revisionID := range []string{"../outside", "rev/child"} {
+		bundle, err := AssembleRevisionBundle(
+			RevisionInput{ID: revisionID, Version: 1, CreatedAt: "2026-03-31T12:00:00Z"},
+			[]ArtifactOutput{newArtifact("nginx/nginx.conf", ArtifactKindNginxConfig, []byte("ok"))},
+		)
+		if err == nil {
+			if _, err = (CandidateStager{Root: root}).Stage(bundle); err == nil {
+				t.Fatalf("expected revision id %q to be rejected", revisionID)
+			}
+		}
+	}
+}

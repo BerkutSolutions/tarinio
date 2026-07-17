@@ -38,6 +38,14 @@ func TestValidateMTLS_NegativeDepth(t *testing.T) {
 	}
 }
 
+func TestValidateMTLS_RejectsDirectiveInjectionAndUnapprovedRoot(t *testing.T) {
+	for _, path := range []string{"/etc/ssl/ca.crt\nssl_verify_client off", "/tmp/ca.crt"} {
+		if err := ValidateMTLS(MTLSInput{MTLSEnabled: true, MTLSClientCARef: path}); err == nil {
+			t.Fatalf("expected unsafe mTLS path %q to be rejected", path)
+		}
+	}
+}
+
 // --- ValidateUpstreamMTLS ---
 
 func TestValidateUpstreamMTLS_Disabled(t *testing.T) {
@@ -60,6 +68,13 @@ func TestValidateUpstreamMTLS_EnabledNoKey(t *testing.T) {
 	err := ValidateUpstreamMTLS(UpstreamMTLSInput{UpstreamMTLSEnabled: true, UpstreamMTLSCertRef: "/c.crt", UpstreamMTLSKeyRef: ""})
 	if err == nil {
 		t.Fatal("expected error for missing key ref")
+	}
+}
+
+func TestValidateUpstreamMTLS_RejectsDirectiveInjection(t *testing.T) {
+	err := ValidateUpstreamMTLS(UpstreamMTLSInput{UpstreamMTLSEnabled: true, UpstreamMTLSCertRef: "/etc/ssl/client.crt", UpstreamMTLSKeyRef: "/etc/ssl/client.key;proxy_pass http://evil"})
+	if err == nil {
+		t.Fatal("expected injected mTLS key path to be rejected")
 	}
 }
 

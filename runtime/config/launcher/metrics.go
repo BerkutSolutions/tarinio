@@ -297,7 +297,7 @@ func normalizeRuntimeRoute(path string) string {
 	case "/crs/update":
 		return "/crs/update"
 	default:
-		return path
+		return "unknown"
 	}
 }
 

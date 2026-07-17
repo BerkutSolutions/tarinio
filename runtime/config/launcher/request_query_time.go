@@ -41,6 +41,9 @@ func requestDayArchiveKeys(options requestQueryOptions) []string {
 		}
 		start = time.Date(options.Since.UTC().Year(), options.Since.UTC().Month(), options.Since.UTC().Day(), 0, 0, 0, 0, time.UTC)
 		end = time.Now().UTC()
+		if start.Before(end.AddDate(0, 0, -maxRequestHistoryDays)) {
+			start = end.AddDate(0, 0, -maxRequestHistoryDays)
+		}
 	}
 	keys := make([]string, 0, 2)
 	for day := start; !day.After(end); day = day.AddDate(0, 0, 1) {

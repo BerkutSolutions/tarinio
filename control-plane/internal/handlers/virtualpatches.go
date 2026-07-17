@@ -79,7 +79,7 @@ func (h *VirtualPatchesHandler) create(w http.ResponseWriter, r *http.Request, s
 		return
 	}
 	patch.SiteID = siteID
-	created, err := h.svc.Create(r.Context(), patch)
+	created, err := h.svc.Create(withActorIP(r), patch)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 		return
@@ -88,7 +88,7 @@ func (h *VirtualPatchesHandler) create(w http.ResponseWriter, r *http.Request, s
 }
 
 func (h *VirtualPatchesHandler) delete(w http.ResponseWriter, r *http.Request, patchID string) {
-	if err := h.svc.Delete(r.Context(), patchID); err != nil {
+	if err := h.svc.Delete(withActorIP(r), patchID); err != nil {
 		status := http.StatusInternalServerError
 		if strings.Contains(err.Error(), "not found") {
 			status = http.StatusNotFound

@@ -23,6 +23,11 @@ func parseLoggingSettings(raw map[string]any, current loggingconfig.Settings, pe
 	}
 	current = loggingconfig.Normalize(current)
 	incoming = loggingconfig.Normalize(incoming)
+	if strings.TrimSpace(current.Vault.Address) != "" &&
+		strings.TrimSpace(current.Vault.Address) != strings.TrimSpace(incoming.Vault.Address) &&
+		strings.TrimSpace(incoming.Vault.Token) == loggingconfig.MaskedSecretValue {
+		return loggingconfig.Settings{}, fmt.Errorf("vault token must be supplied when changing vault address")
+	}
 
 	if strings.TrimSpace(incoming.ClickHouse.Password) == loggingconfig.MaskedSecretValue {
 		incoming.ClickHouse.PasswordEnc = current.ClickHouse.PasswordEnc
@@ -86,6 +91,13 @@ func parseLoggingSettings(raw map[string]any, current loggingconfig.Settings, pe
 	}
 	if incoming.Cold.Backend == loggingconfig.BackendClickHouse && strings.TrimSpace(incoming.ClickHouse.Endpoint) == "" {
 		return loggingconfig.Settings{}, fmt.Errorf("clickhouse endpoint is required when backend is clickhouse")
+	}
+	if incoming.Cold.Backend == loggingconfig.BackendClickHouse {
+		endpoint, err := loggingconfig.ValidateClickHouseEndpoint(incoming.ClickHouse.Endpoint, loggingconfig.AllowedClickHouseEndpointsFromEnv())
+		if err != nil {
+			return loggingconfig.Settings{}, err
+		}
+		incoming.ClickHouse.Endpoint = endpoint
 	}
 	if (incoming.Hot.Backend == loggingconfig.BackendOpenSearch || incoming.Cold.Backend == loggingconfig.BackendOpenSearch) && strings.TrimSpace(incoming.OpenSearch.Endpoint) == "" {
 		return loggingconfig.Settings{}, fmt.Errorf("opensearch endpoint is required when opensearch storage is enabled")

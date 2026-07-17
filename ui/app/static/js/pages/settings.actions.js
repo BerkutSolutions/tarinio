@@ -20,6 +20,8 @@ export function bindSettingsActions(params) {
     storageHotIndexDays,
     storageColdIndexDays,
     securityAllowInsecureVaultTLS,
+    securityRequireCertificateExportApproval,
+    blockDirectIPAccess,
     securityLoginRateEnabled,
     securityLoginRateAttempts,
     securityLoginRateWindow,
@@ -106,6 +108,7 @@ export function bindSettingsActions(params) {
       const payload = {
         security: {
           allow_insecure_vault_tls: !!securityAllowInsecureVaultTLS?.checked,
+          require_certificate_export_approval: !!securityRequireCertificateExportApproval?.checked,
           login_rate_limit_enabled: !!securityLoginRateEnabled?.checked,
           login_rate_limit_max_attempts: Number(securityLoginRateAttempts?.value || "10"),
           login_rate_limit_window_seconds: Number(securityLoginRateWindow?.value || "300"),
@@ -113,6 +116,7 @@ export function bindSettingsActions(params) {
         },
       };
       await ctx.api.put("/api/settings/runtime", payload);
+      await ctx.api.put("/api/settings/direct-ip-access", { block_direct_ip_access: !!blockDirectIPAccess?.checked });
       syncVaultTLSControls();
       setAlert(ctx.t("settings.saved"), true);
       await renderRuntime();

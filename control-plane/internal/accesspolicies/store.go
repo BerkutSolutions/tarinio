@@ -207,6 +207,11 @@ func validateAccessPolicy(item AccessPolicy) error {
 			return fmt.Errorf("access policy denylist contains invalid value %q", value)
 		}
 	}
+	for _, value := range item.TrustedProxyCIDRs {
+		if err := validateCIDROrIP(value); err != nil {
+			return fmt.Errorf("access policy trusted_proxy_cidrs contains invalid value %q", value)
+		}
+	}
 	return nil
 }
 
@@ -215,6 +220,7 @@ func normalizeAccessPolicy(item AccessPolicy) AccessPolicy {
 	item.SiteID = normalizeID(item.SiteID)
 	item.AllowList = normalizeCIDRList(item.AllowList)
 	item.DenyList = normalizeCIDRList(item.DenyList)
+	item.TrustedProxyCIDRs = normalizeCIDRList(item.TrustedProxyCIDRs)
 	return item
 }
 

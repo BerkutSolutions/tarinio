@@ -189,6 +189,28 @@ func TestRenderEasyArtifacts_AdminBypassOnlyForManagementSites(t *testing.T) {
 	}
 }
 
+func TestRenderEasyArtifacts_AntibotChallengePrecedesRateLimitFallback(t *testing.T) {
+	artifacts, err := RenderEasyArtifacts(
+		[]SiteInput{{ID: "panel", Enabled: true, PrimaryHost: "panel.example", ListenHTTP: true, Management: true}},
+		[]EasyProfileInput{{SiteID: "panel", AllowedMethods: []string{"GET"}, AntibotChallenge: "javascript", AntibotURI: "/challenge"}},
+	)
+	if err != nil {
+		t.Fatalf("render easy artifacts: %v", err)
+	}
+	var content string
+	for _, artifact := range artifacts {
+		if artifact.Path == "nginx/easy/panel.conf" {
+			content = string(artifact.Content)
+			break
+		}
+	}
+	challenge := strings.Index(content, `if ($waf_antibot_guard = "0:0:1") { return 302`)
+	rateLimit := strings.Index(content, "if ($waf_rate_limited_active = 1) {")
+	if challenge < 0 || rateLimit < 0 || challenge > rateLimit {
+		t.Fatalf("antibot challenge must run before rate-limit fallback, got:\n%s", content)
+	}
+}
+
 func TestRenderEasyArtifacts_ModSecurityEasyFileWithoutCustomConfig(t *testing.T) {
 	artifacts, err := RenderEasyArtifacts(
 		[]SiteInput{

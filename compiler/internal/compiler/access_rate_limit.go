@@ -69,6 +69,11 @@ func RenderAccessRateLimitArtifacts(
 		policy.AllowCIDRs = sortedUnique(policy.AllowCIDRs)
 		policy.DenyCIDRs = sortedUnique(policy.DenyCIDRs)
 		policy.TrustedProxyCIDRs = sortedUnique(policy.TrustedProxyCIDRs)
+		for _, cidr := range policy.TrustedProxyCIDRs {
+			if err := validateNginxCIDROrIP(cidr, fmt.Sprintf("access policy %s trusted proxy CIDR", policy.ID)); err != nil {
+				return nil, err
+			}
+		}
 		policy.DefaultAction = normalizeDefaultAction(policy.DefaultAction)
 		accessBySite[policy.SiteID] = policy
 	}

@@ -28,13 +28,22 @@ func NewVirtualPatchService(store VirtualPatchStore) *VirtualPatchService {
 }
 
 // Create adds a new virtual patch for a site.
-func (s *VirtualPatchService) Create(_ context.Context, patch virtualpatches.VirtualPatch) (virtualpatches.VirtualPatch, error) {
+func (s *VirtualPatchService) Create(ctx context.Context, patch virtualpatches.VirtualPatch) (virtualpatches.VirtualPatch, error) {
 	patch = virtualpatches.Normalize(patch)
+	if strings.TrimSpace(patch.ID) == "" {
+		patch.ID = generateVirtualPatchID()
+	}
 	if err := virtualpatches.Validate(patch); err != nil {
 		return virtualpatches.VirtualPatch{}, err
 	}
-	patch.ID = generateVirtualPatchID()
-	return s.store.Create(patch)
+	created, err := s.store.Create(patch)
+	if err != nil {
+		return virtualpatches.VirtualPatch{}, err
+	}
+	if err := runAutoApply(ctx); err != nil {
+		return virtualpatches.VirtualPatch{}, err
+	}
+	return created, nil
 }
 
 // List returns all patches for a site (both active and expired).
@@ -56,12 +65,15 @@ func (s *VirtualPatchService) ListActive(_ context.Context, siteID string) ([]vi
 }
 
 // Delete removes a patch by ID.
-func (s *VirtualPatchService) Delete(_ context.Context, id string) error {
+func (s *VirtualPatchService) Delete(ctx context.Context, id string) error {
 	id = strings.TrimSpace(id)
 	if id == "" {
 		return fmt.Errorf("virtual patch id is required")
 	}
-	return s.store.Delete(id)
+	if err := s.store.Delete(id); err != nil {
+		return err
+	}
+	return runAutoApply(ctx)
 }
 
 // generateVirtualPatchID creates a time-based unique ID for a virtual patch.

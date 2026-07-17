@@ -86,6 +86,7 @@ func TestRequestStreamPrunesOpenSearchByHotDaysWhenColdIsClickHouse(t *testing.T
 	clickhouse := newFakeClickHouse()
 	clickhouseServer := httptest.NewServer(clickhouse)
 	defer clickhouseServer.Close()
+	t.Setenv(loggingconfig.ClickHouseAllowedEndpointsEnv, clickhouseServer.URL)
 
 	opensearch := newFakeOpenSearch([]requestLogRecord{
 		{

@@ -63,13 +63,13 @@ services:
       VAULT_MOUNT: ${VAULT_MOUNT:-secret}
       VAULT_PATH_PREFIX: ${VAULT_PATH_PREFIX:-tarinio}
       VAULT_TOKEN: ${VAULT_TOKEN:-}
-      VAULT_TOKEN_FILE: /var/run/waf-secrets/root-token
+      VAULT_TOKEN_FILE: /var/run/waf-app-token/token
     volumes:
       - waf-runtime-data:/var/lib/waf
       - waf-control-plane-data:/var/lib/waf/control-plane
       - waf-certificates-data:/var/lib/waf/control-plane/certificate-materials
       - waf-l4-adaptive:/etc/waf/l4guard-adaptive:ro
-      - waf-vault-bootstrap-data:/var/run/waf-secrets:ro
+      - waf-vault-app-token-data:/var/run/waf-app-token:ro
       - /var/run/docker.sock:/var/run/docker.sock
     expose:
       - "8080"
@@ -112,7 +112,7 @@ services:
       VAULT_MOUNT: ${VAULT_MOUNT:-secret}
       VAULT_PATH_PREFIX: ${VAULT_PATH_PREFIX:-tarinio}
       VAULT_TOKEN: ${VAULT_TOKEN:-}
-      VAULT_TOKEN_FILE: /var/run/waf-secrets/root-token
+      VAULT_TOKEN_FILE: /var/run/waf-app-token/token
       # L4 thresholds are sourced from runtime bundle (/etc/waf/l4guard/config.json),
       # compiled from control-plane anti-DDoS settings.
       WAF_L4_GUARD_ADAPTIVE_PATH: /etc/waf/l4guard-adaptive/adaptive.json
@@ -128,7 +128,7 @@ services:
       - waf-control-plane-data:/var/lib/waf/control-plane:ro
       - waf-nginx-logs:/var/log/nginx
       - waf-l4-adaptive:/etc/waf/l4guard-adaptive:ro
-      - waf-vault-bootstrap-data:/var/run/waf-secrets:ro
+      - waf-vault-app-token-data:/var/run/waf-app-token:ro
     ports:
       - "80:80"
       - "443:443"
@@ -206,6 +206,7 @@ services:
     volumes:
       - waf-vault-data:/vault/file
       - waf-vault-bootstrap-data:/vault/bootstrap
+      - waf-vault-app-token-data:/vault/app-token
       - ./vault/entrypoint.sh:/usr/local/bin/tarinio-vault-entrypoint:ro
     healthcheck:
       test: ["CMD-SHELL", "vault status -address=http://127.0.0.1:8200 >/dev/null 2>&1; code=$$?; [ \"$$code\" = \"0\" ]"]
@@ -318,6 +319,8 @@ volumes:
     name: ${WAF_STACK_NAME:-waf}-vault-data
   waf-vault-bootstrap-data:
     name: ${WAF_STACK_NAME:-waf}-vault-bootstrap-data
+  waf-vault-app-token-data:
+    name: ${WAF_STACK_NAME:-waf}-vault-app-token-data
   waf-l4-adaptive:
     name: ${WAF_STACK_NAME:-waf}-l4-adaptive
   waf-sentinel-state:

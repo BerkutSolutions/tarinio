@@ -25,6 +25,7 @@ try {
   $baseUrl = "http://127.0.0.1:$ControlPlaneLocalPort"
   $adminPassword = Decode-SecretValue -Namespace $Namespace -SecretName "tarinio-lab-secrets" -Key "CONTROL_PLANE_BOOTSTRAP_ADMIN_PASSWORD"
   $opensearchPassword = Decode-SecretValue -Namespace $Namespace -SecretName "tarinio-lab-secrets" -Key "OPENSEARCH_PASSWORD"
+  $clickhousePassword = Decode-SecretValue -Namespace $Namespace -SecretName "tarinio-lab-secrets" -Key "CLICKHOUSE_PASSWORD"
 
   $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
   $loginBody = @{
@@ -58,8 +59,9 @@ try {
         write_activity_to_cold = $false
       }
       opensearch = @{
-        endpoint       = "http://opensearch:9200"
-        username       = "admin"
+        endpoint       = "https://opensearch:9200"
+        tls_ca_file    = "/etc/waf/storage-ca/opensearch/ca.crt"
+        username       = "waf-runtime"
         password       = $opensearchPassword
         index_prefix   = "waf-hot"
         requests_index = "waf-requests"
@@ -67,9 +69,10 @@ try {
         activity_index = "waf-activity"
       }
       clickhouse = @{
-        endpoint          = "http://clickhouse:8123"
-        username          = "default"
-        password          = ""
+        endpoint          = "https://clickhouse:8443"
+        tls_ca_file       = "/etc/waf/storage-ca/clickhouse/ca.crt"
+        username          = "waf-runtime"
+        password          = $clickhousePassword
         database          = "waf_logs"
         table             = "request_logs"
         migration_enabled = $true

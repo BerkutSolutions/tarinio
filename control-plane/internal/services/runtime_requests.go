@@ -14,6 +14,7 @@ import (
 const runtimeRequestsHTTPTimeout = 8 * time.Second
 const runtimeRequestsCollectAttemptTimeout = 2 * time.Second
 const runtimeRequestsProbeAttemptTimeout = 1200 * time.Millisecond
+const runtimeRequestsMaxResponseBytes = 4 << 20
 
 type RuntimeRequestCollector interface {
 	Collect() ([]map[string]any, error)
@@ -151,9 +152,12 @@ func (c *HTTPRuntimeRequestCollector) CollectWithOptions(query url.Values) ([]ma
 				return nil, fmt.Errorf("runtime requests endpoint returned %d", resp.StatusCode)
 			}
 
-			body, err := io.ReadAll(resp.Body)
+			body, err := io.ReadAll(io.LimitReader(resp.Body, runtimeRequestsMaxResponseBytes+1))
 			if err != nil {
 				return nil, err
+			}
+			if len(body) > runtimeRequestsMaxResponseBytes {
+				return nil, fmt.Errorf("runtime requests response exceeds %d byte limit", runtimeRequestsMaxResponseBytes)
 			}
 
 			var list []map[string]any

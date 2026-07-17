@@ -20,6 +20,58 @@ func (f *fakeDashboardEventReader) List() ([]events.Event, error) {
 
 func (f *fakeDashboardEventReader) Probe() error { return f.err }
 
+func TestDashboardService_DismissalsAreActorScoped(t *testing.T) {
+	service := NewDashboardService(&fakeDashboardEventReader{}, nil, nil)
+	stats := DashboardStats{Services: []DashboardServiceStatus{{
+		Name: "runtime",
+		UpstreamErrors: []DashboardServiceError{
+			{ID: "shared-error", Message: "upstream timed out"},
+		},
+		HasErrors: true,
+	}}}
+
+	service.DismissServiceErrors("operator-a", []string{"shared-error"})
+	for _, check := range []struct {
+		actor string
+		want  int
+	}{
+		{actor: "operator-a", want: 0},
+		{actor: "operator-b", want: 1},
+		{actor: "", want: 1},
+	} {
+		got := service.filterDismissedServiceErrors(stats, check.actor)
+		if actual := len(got.Services[0].UpstreamErrors); actual != check.want {
+			t.Fatalf("actor %q: expected %d visible errors, got %d", check.actor, check.want, actual)
+		}
+	}
+	if !stats.Services[0].HasErrors || len(stats.Services[0].UpstreamErrors) != 1 {
+		t.Fatal("filter must not mutate the shared dashboard snapshot")
+	}
+}
+
+func TestDashboardService_StatsForActorWithoutProcessDetailsKeepsContractButRedactsInventory(t *testing.T) {
+	service := NewDashboardService(&fakeDashboardEventReader{}, nil, nil)
+	service.storeSnapshot(DashboardStats{System: DashboardSystemStats{
+		TopCPUProcesses:    []DashboardProcessStats{{PID: 1, Name: "init", Command: "init --secret"}},
+		TopMemoryProcesses: []DashboardProcessStats{{PID: 2, Name: "worker", Command: "worker --token"}},
+	}})
+
+	redacted, err := service.StatsForActorWithProcessDetails("viewer", false)
+	if err != nil {
+		t.Fatalf("redacted stats: %v", err)
+	}
+	if len(redacted.System.TopCPUProcesses) != 0 || len(redacted.System.TopMemoryProcesses) != 0 {
+		t.Fatal("non-administrative dashboard response exposed host-process inventory")
+	}
+	privileged, err := service.StatsForActorWithProcessDetails("admin", true)
+	if err != nil {
+		t.Fatalf("privileged stats: %v", err)
+	}
+	if len(privileged.System.TopCPUProcesses) != 1 || len(privileged.System.TopMemoryProcesses) != 1 {
+		t.Fatal("administrative dashboard response lost process inventory")
+	}
+}
+
 type fakeDashboardRequestCollector struct {
 	items []map[string]any
 	err   error

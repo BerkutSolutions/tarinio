@@ -22,10 +22,13 @@ func buildVirtualPatchModSecurityRules(patches []VirtualPatchInput) []string {
 		if _, err := regexp.Compile(pattern); err != nil {
 			continue
 		}
+		if strings.IndexFunc(pattern, func(r rune) bool { return r < 0x20 || r == 0x7f }) >= 0 {
+			continue
+		}
 		target := targetVariable(p.Target)
 		action := secRuleAction(p.Action, ruleID, p.ID)
 		lines = append(lines,
-			fmt.Sprintf(`SecRule %s "@rx %s" "%s"`, target, pattern, action),
+			fmt.Sprintf(`SecRule %s "@rx %s" "%s"`, target, escapeModSecurityQuoted(pattern), action),
 		)
 		ruleID++
 	}
@@ -46,10 +49,15 @@ func targetVariable(target string) string {
 
 // secRuleAction builds the ModSecurity action string for a virtual patch rule.
 func secRuleAction(action string, ruleID int, patchID string) string {
-	msg := fmt.Sprintf("Virtual patch %s", patchID)
+	msg := fmt.Sprintf("Virtual patch %s", strings.ReplaceAll(patchID, "'", "\\'"))
 	base := fmt.Sprintf("id:%d,phase:2,t:none,log,msg:'%s'", ruleID, msg)
 	if strings.ToLower(strings.TrimSpace(action)) == "block" {
 		return base + ",deny,status:403"
 	}
 	return base + ",pass"
+}
+
+func escapeModSecurityQuoted(value string) string {
+	value = strings.ReplaceAll(value, `\`, `\\`)
+	return strings.ReplaceAll(value, `"`, `\"`)
 }

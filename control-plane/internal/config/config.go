@@ -45,6 +45,7 @@ type ACMEConfig struct {
 	UseDevelopmentClient bool
 	Email                string
 	DirectoryURL         string
+	CustomDirectoryURLs  []string
 	StateDir             string
 	ChallengeDir         string
 }
@@ -93,11 +94,11 @@ type MetricsConfig struct {
 }
 
 type SentinelBanSyncConfig struct {
-	Enabled             bool
-	AdaptivePath        string
-	StatePath           string
-	PollIntervalSeconds int
-	MinScore            float64
+	Enabled              bool
+	AdaptivePath         string
+	StatePath            string
+	PollIntervalSeconds  int
+	MinScore             float64
 	MaxPromotionsPerTick int
 }
 
@@ -214,6 +215,13 @@ func LoadFromEnv() (Config, error) {
 	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_ACME_DIRECTORY_URL")); value != "" {
 		cfg.ACME.DirectoryURL = value
 	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_ACME_CUSTOM_DIRECTORY_URLS")); value != "" {
+		for _, item := range strings.Split(value, ",") {
+			if item = strings.TrimSpace(item); item != "" {
+				cfg.ACME.CustomDirectoryURLs = append(cfg.ACME.CustomDirectoryURLs, item)
+			}
+		}
+	}
 	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_ACME_STATE_DIR")); value != "" {
 		cfg.ACME.StateDir = value
 	}
@@ -309,6 +317,19 @@ func LoadFromEnv() (Config, error) {
 	}
 	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_REDIS_PASSWORD")); value != "" {
 		cfg.Redis.Password = value
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_REDIS_TLS_ENABLED")); value != "" {
+		enabled, err := strconv.ParseBool(value)
+		if err != nil {
+			return Config{}, fmt.Errorf("redis TLS enabled must be boolean: %w", err)
+		}
+		cfg.Redis.TLS = enabled
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_REDIS_TLS_CA_FILE")); value != "" {
+		cfg.Redis.TLSCAFile = value
+	}
+	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_REDIS_TLS_SERVER_NAME")); value != "" {
+		cfg.Redis.TLSServerName = value
 	}
 	if value := strings.TrimSpace(os.Getenv("CONTROL_PLANE_REDIS_DB")); value != "" {
 		db, err := redis.ParseDB(value)

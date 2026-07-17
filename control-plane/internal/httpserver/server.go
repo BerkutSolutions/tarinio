@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"waf/control-plane/internal/certificateexportapprovals"
 	"waf/control-plane/internal/certificatematerials"
 	"waf/control-plane/internal/handlers"
 	"waf/control-plane/internal/jobs"
@@ -95,16 +96,22 @@ func New(
 		stateBackend,
 		strings.TrimSpace(os.Getenv("CONTROL_PLANE_SECURITY_PEPPER")),
 	)
+	certificateExportApprovalStore, _ := certificateexportapprovals.NewStore(filepath.Join(revisionStoreDir, "certificate-export-approvals"), stateBackend)
+	certificateExportHandler := handlers.NewCertificateMaterialExportHandler(certificateMaterialReader, certificateExportApprovalStore)
+	certificateExportHandler.SetStepUpVerifier(authService)
+	certificateExportHandler.SetApprovalRequiredProvider(handlers.CertificateExportApprovalRequired)
 	administrationUsersHandler := handlers.NewAdministrationUsersHandlerWithSessions(userStore, roleStore, sessionStore)
 	administrationRolesHandler := handlers.NewAdministrationRolesHandler(roleStore, userStore)
 	zeroTrustHealthHandler := handlers.NewZeroTrustHealthHandler(userStore, roleStore)
-	mux.Handle("/healthz", handlers.NewHealthHandler(revisionService, revisionCatalogService, setupService, sessionStore, userStore, roleStore, revisionCompileService, runtimeReadyProbe, runtimeSecurityProbe, runtimeRequestProbe, runtimeCRSService))
+	detailedHealthHandler := handlers.NewHealthHandler(revisionService, revisionCatalogService, setupService, sessionStore, userStore, roleStore, revisionCompileService, runtimeReadyProbe, runtimeSecurityProbe, runtimeRequestProbe, runtimeCRSService)
+	mux.Handle("/healthz", handlers.NewLivenessHandler())
+	mux.Handle("/api/administration/health", withAuth(authService, rbac.PermissionAdministrationRead, detailedHealthHandler))
 	mux.Handle("/metrics", metricsHandler(metrics.Registry(), metricsToken))
 	mux.Handle("/api/setup/status", handlers.NewSetupHandler(setupService))
 	mux.Handle("/api/app/meta", withAuth(authService, "", handlers.NewAppMetaHandler(haEnabled, haNodeID)))
 	mux.Handle("/api/app/ping", withAuth(authService, rbac.PermissionAuthSelf, handlers.NewAppPingHandler()))
-	mux.Handle("/api/app/compat", withAuth(authService, rbac.PermissionAuthSelf, handlers.NewAppCompatHandler(runtimeRoot, revisionStoreDir)))
-	mux.Handle("/api/app/compat/fix", withAuth(authService, rbac.PermissionAuthSelf, handlers.NewAppCompatHandler(runtimeRoot, revisionStoreDir)))
+	mux.Handle("/api/app/compat", withAuth(authService, rbac.PermissionSettingsAboutRead, handlers.NewAppCompatHandler(runtimeRoot, revisionStoreDir)))
+	mux.Handle("/api/app/compat/fix", withAuth(authService, rbac.PermissionSettingsGeneralWrite, handlers.NewAppCompatHandler(runtimeRoot, revisionStoreDir)))
 	mux.Handle("/api/settings/runtime", withMethodAllPermissions(authService, map[string][]rbac.Permission{
 		http.MethodGet: {rbac.PermissionSettingsGeneralRead},
 		http.MethodPut: {rbac.PermissionSettingsGeneralWrite},
@@ -158,6 +165,7 @@ func New(
 	mux.Handle("/api/auth/2fa/setup", withAuth(authService, rbac.PermissionAuthSelf, handlers.NewAuthHandler(authService)))
 	mux.Handle("/api/auth/2fa/enable", withAuth(authService, rbac.PermissionAuthSelf, handlers.NewAuthHandler(authService)))
 	mux.Handle("/api/auth/2fa/disable", withAuth(authService, rbac.PermissionAuthSelf, handlers.NewAuthHandler(authService)))
+	mux.Handle("/api/auth/step-up/totp", withAuth(authService, rbac.PermissionAuthSelf, handlers.NewAuthHandler(authService)))
 	mux.Handle("/api/auth/change-password", withAuth(authService, rbac.PermissionAuthSelf, handlers.NewAuthHandler(authService)))
 	mux.Handle("/api/auth/login/2fa/passkey/begin", handlers.NewAuthHandler(authService))
 	mux.Handle("/api/auth/login/2fa/passkey/finish", handlers.NewAuthHandler(authService))
@@ -210,8 +218,10 @@ func New(
 	certificateACMEHandler := handlers.NewCertificateACMEHandler(certificateACMEService, certificateSelfSignedService)
 	mux.Handle("/api/certificate-materials/upload", withAuth(authService, rbac.PermissionCertificatesWrite, handlers.NewCertificateUploadHandler(certificateUploadService)))
 	mux.Handle("/api/certificate-materials/import-archive", withAuth(authService, rbac.PermissionCertificatesWrite, handlers.NewCertificateUploadHandler(certificateUploadService)))
-	mux.Handle("/api/certificate-materials/export", withAuth(authService, rbac.PermissionCertificatesRead, handlers.NewCertificateMaterialExportHandler(certificateMaterialReader)))
-	mux.Handle("/api/certificate-materials/export/", withAuth(authService, rbac.PermissionCertificatesRead, handlers.NewCertificateMaterialExportHandler(certificateMaterialReader)))
+	mux.Handle("/api/certificate-materials/export", withAuth(authService, rbac.PermissionCertificatesExport, certificateExportHandler))
+	mux.Handle("/api/certificate-materials/export/", withAuth(authService, rbac.PermissionCertificatesExport, certificateExportHandler))
+	mux.Handle("/api/certificate-materials/export-approvals", withAuth(authService, rbac.PermissionCertificatesExport, certificateExportHandler))
+	mux.Handle("/api/certificate-materials/export-approvals/", withAuth(authService, rbac.PermissionCertificatesExport, certificateExportHandler))
 	mux.Handle("/api/certificates/acme/issue", withAuth(authService, rbac.PermissionCertificatesWrite, certificateACMEHandler))
 	mux.Handle("/api/certificates/acme/renew/", withAuth(authService, rbac.PermissionCertificatesWrite, certificateACMEHandler))
 	mux.Handle("/api/certificates/self-signed/issue", withAuth(authService, rbac.PermissionCertificatesWrite, certificateACMEHandler))
@@ -293,7 +303,7 @@ func New(
 		http.MethodGet: {rbac.PermissionDashboardRead, rbac.PermissionReportsRead},
 	}, handlers.NewDashboardHandler(dashboardService)))
 	mux.Handle("/api/dashboard/services/", withMethodAllPermissions(authService, map[string][]rbac.Permission{
-		http.MethodDelete: {rbac.PermissionDashboardRead},
+		http.MethodDelete: {rbac.PermissionDashboardRead, rbac.PermissionAdministrationWrite},
 	}, handlers.NewDashboardHandler(dashboardService)))
 	mux.Handle("/api/dashboard/containers/overview", withMethodAllPermissions(authService, map[string][]rbac.Permission{
 		http.MethodGet: {rbac.PermissionDashboardRead, rbac.PermissionReportsRead},

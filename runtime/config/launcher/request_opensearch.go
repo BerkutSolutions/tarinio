@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,6 +23,7 @@ import (
 type requestOpenSearchConfig struct {
 	Enabled       bool
 	Endpoint      string
+	TLSCAFile     string
 	Username      string
 	Password      string
 	APIKey        string
@@ -115,6 +118,7 @@ func (s *requestOpenSearchStore) currentConfig() (requestOpenSearchConfig, error
 	return requestOpenSearchConfig{
 		Enabled:       true,
 		Endpoint:      logging.OpenSearch.Endpoint,
+		TLSCAFile:     logging.OpenSearch.TLSCAFile,
 		Username:      logging.OpenSearch.Username,
 		Password:      password,
 		APIKey:        apiKey,
@@ -553,6 +557,10 @@ func (s *requestOpenSearchStore) doRawRequest(cfg requestOpenSearchConfig, metho
 	if client == nil {
 		client = &http.Client{Timeout: 10 * time.Second}
 	}
+	client, err = storageHTTPClient(client, cfg.TLSCAFile)
+	if err != nil {
+		return err
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
@@ -566,6 +574,37 @@ func (s *requestOpenSearchStore) doRawRequest(cfg requestOpenSearchConfig, metho
 		return handle(resp)
 	}
 	return nil
+}
+
+func storageHTTPClient(client *http.Client, caFile string) (*http.Client, error) {
+	if strings.TrimSpace(caFile) == "" {
+		return client, nil
+	}
+	pem, err := os.ReadFile(strings.TrimSpace(caFile))
+	if err != nil {
+		return nil, fmt.Errorf("read storage TLS CA file: %w", err)
+	}
+	roots := x509.NewCertPool()
+	if !roots.AppendCertsFromPEM(pem) {
+		return nil, fmt.Errorf("storage TLS CA file contains no certificate")
+	}
+	copy := *client
+	transport, ok := client.Transport.(*http.Transport)
+	if !ok || transport == nil {
+		transport = http.DefaultTransport.(*http.Transport)
+	}
+	transportCopy := transport.Clone()
+	if transportCopy.TLSClientConfig == nil {
+		transportCopy.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+	} else {
+		transportCopy.TLSClientConfig = transportCopy.TLSClientConfig.Clone()
+		if transportCopy.TLSClientConfig.MinVersion < tls.VersionTLS12 {
+			transportCopy.TLSClientConfig.MinVersion = tls.VersionTLS12
+		}
+	}
+	transportCopy.TLSClientConfig.RootCAs = roots
+	copy.Transport = transportCopy
+	return &copy, nil
 }
 
 func buildOpenSearchRequestQuery(options requestQueryOptions) map[string]any {

@@ -1,0 +1,15 @@
+<clickhouse>
+  <http_port remove="remove"/>
+  <tcp_port remove="remove"/>
+  <https_port>8443</https_port>
+  <openSSL>
+    <server>
+      <certificateFile>/etc/clickhouse-server/tls/tls.crt</certificateFile>
+      <privateKeyFile>/etc/clickhouse-server/tls/tls.key</privateKeyFile>
+      <caConfig>/etc/clickhouse-server/tls/ca.crt</caConfig>
+    </server>
+  </openSSL>
+  <users>
+    <default remove="remove"/>
+  </users>
+</clickhouse>

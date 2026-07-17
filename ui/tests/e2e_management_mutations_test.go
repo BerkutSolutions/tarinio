@@ -41,8 +41,10 @@ func TestE2EManagementHostMutationWorkflow(t *testing.T) {
 		// The bootstrap management site has a TLS binding. Its first apply
 		// replaces the bootstrap HTTP listener, so remaining mutations must
 		// traverse the active HTTPS listener.
-		client, requestBaseURL, _ = newE2EClientAndBase(t, activeRuntimeURL)
-		loginE2EUser(t, client, requestBaseURL, host)
+		var requestHostOverride string
+		client, requestBaseURL, requestHostOverride = newE2EClientAndBase(t, activeRuntimeURL)
+		requestHostOverride = host
+		loginE2EUser(t, client, requestBaseURL, requestHostOverride)
 	}
 	id := "e2e-management-" + strings.ReplaceAll(time.Now().UTC().Format("150405.000000000"), ".", "")
 	userID, policyID, upstreamID := id+"-user", id+"-policy", id+"-upstream"

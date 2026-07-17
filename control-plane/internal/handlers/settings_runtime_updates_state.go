@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -173,6 +174,9 @@ func loadPersistedRuntimeSettingsLocked() {
 	var stored persistedRuntimeSettings
 	if err := json.Unmarshal(content, &stored); err != nil {
 		return
+	}
+	if !bytes.Contains(content, []byte(`"require_certificate_export_approval"`)) {
+		stored.Security.RequireCertificateExportApproval = true
 	}
 	runtimeSettingsState.updateChecksEnabled = stored.UpdateChecksEnabled
 	runtimeSettingsState.language = normalizeRuntimeLanguage(stored.Language)

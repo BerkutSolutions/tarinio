@@ -7,6 +7,17 @@ import (
 	"waf/control-plane/internal/services"
 )
 
+func writeOWASPCRSError(w http.ResponseWriter, err error) {
+	code := services.RuntimeCRSErrorCode(err)
+	if code == "" {
+		code = "crs_update_failed"
+	}
+	writeJSON(w, http.StatusBadGateway, map[string]string{
+		"code":  code,
+		"error": "CRS update request failed",
+	})
+}
+
 type owaspCRSService interface {
 	Status(ctx context.Context) (services.RuntimeCRSStatus, error)
 	CheckUpdates(ctx context.Context, dryRun bool) (services.RuntimeCRSStatus, error)
@@ -27,7 +38,7 @@ func (h *OWASPCRSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case r.URL.Path == "/api/owasp-crs/status" && r.Method == http.MethodGet:
 		status, err := h.service.Status(r.Context())
 		if err != nil {
-			writeJSON(w, http.StatusBadGateway, map[string]any{"error": err.Error()})
+			writeOWASPCRSError(w, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, status)
@@ -47,7 +58,7 @@ func (h *OWASPCRSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		status, err := h.service.CheckUpdates(r.Context(), dryRun)
 		if err != nil {
-			writeJSON(w, http.StatusBadGateway, map[string]any{"error": err.Error()})
+			writeOWASPCRSError(w, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, status)
@@ -64,7 +75,7 @@ func (h *OWASPCRSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 			status, err := h.service.SetHourlyAutoUpdate(r.Context(), value)
 			if err != nil {
-				writeJSON(w, http.StatusBadGateway, map[string]any{"error": err.Error()})
+				writeOWASPCRSError(w, err)
 				return
 			}
 			writeJSON(w, http.StatusOK, status)
@@ -72,7 +83,7 @@ func (h *OWASPCRSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		status, err := h.service.Update(r.Context())
 		if err != nil {
-			writeJSON(w, http.StatusBadGateway, map[string]any{"error": err.Error()})
+			writeOWASPCRSError(w, err)
 			return
 		}
 		writeJSON(w, http.StatusOK, status)

@@ -54,11 +54,15 @@ type state struct {
 	LoginChallenges     []LoginChallenge     `json:"login_challenges"`
 	TOTPSetupChallenges []TOTPSetupChallenge `json:"totp_setup_challenges"`
 	OIDCLoginChallenges []OIDCLoginChallenge `json:"oidc_login_challenges"`
+	StepUpFailures      []StepUpFailure      `json:"step_up_failures,omitempty"`
+	StepUpAssertions    []StepUpAssertion    `json:"step_up_assertions,omitempty"`
 }
 
 type Store struct {
-	state *storage.JSONState
-	mu    sync.Mutex
+	state     *storage.JSONState
+	mu        sync.Mutex
+	atomic    storage.AtomicDocumentBackend
+	atomicKey string
 }
 
 func NewStore(root string) (*Store, error) {
@@ -75,9 +79,11 @@ func NewPostgresStore(root string, backend storage.Backend) (*Store, error) {
 	if strings.TrimSpace(root) == "" {
 		return nil, errors.New("sessions store root is required")
 	}
-	return &Store{
-		state: storage.NewBackendJSONState(backend, "sessions/sessions.json", filepath.Join(root, "sessions.json")),
-	}, nil
+	store := &Store{state: storage.NewBackendJSONState(backend, "sessions/sessions.json", filepath.Join(root, "sessions.json")), atomicKey: "sessions/sessions.json"}
+	if atomic, ok := backend.(storage.AtomicDocumentBackend); ok {
+		store.atomic = atomic
+	}
+	return store, nil
 }
 
 func (s *Store) CreateSession(userID string, username string, roleIDs []string, ttl time.Duration) (Session, error) {
@@ -244,6 +250,9 @@ func (s *Store) CreateLoginChallenge(userID string, ttl time.Duration) (LoginCha
 }
 
 func (s *Store) ConsumeLoginChallenge(id string) (LoginChallenge, bool, error) {
+	if s.atomic != nil {
+		return s.consumeLoginChallengeAtomic(id)
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -267,6 +276,35 @@ func (s *Store) ConsumeLoginChallenge(id string) (LoginChallenge, bool, error) {
 		return LoginChallenge{}, false, err
 	}
 	return LoginChallenge{}, false, nil
+}
+
+func (s *Store) consumeLoginChallengeAtomic(id string) (LoginChallenge, bool, error) {
+	needle := strings.TrimSpace(id)
+	var consumed LoginChallenge
+	var found bool
+	err := s.atomic.UpdateDocument(s.atomicKey, func(raw []byte) ([]byte, error) {
+		current := &state{}
+		if len(raw) > 0 && string(raw) != "{}" {
+			if err := json.Unmarshal(raw, current); err != nil {
+				return nil, fmt.Errorf("decode sessions store: %w", err)
+			}
+		}
+		pruneExpired(current, time.Now().UTC())
+		for i, item := range current.LoginChallenges {
+			if item.ID != needle {
+				continue
+			}
+			consumed, found = item, true
+			current.LoginChallenges = append(current.LoginChallenges[:i], current.LoginChallenges[i+1:]...)
+			break
+		}
+		out, err := json.MarshalIndent(current, "", "  ")
+		if err != nil {
+			return nil, err
+		}
+		return append(out, '\n'), nil
+	})
+	return consumed, found, err
 }
 
 func (s *Store) GetLoginChallenge(id string) (LoginChallenge, bool, error) {
@@ -351,6 +389,9 @@ func (s *Store) CreateOIDCLoginChallenge(nextPath string, ttl time.Duration) (OI
 }
 
 func (s *Store) ConsumeOIDCLoginChallenge(state string) (OIDCLoginChallenge, bool, error) {
+	if s.atomic != nil {
+		return s.consumeOIDCLoginChallengeAtomic(state)
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -377,7 +418,43 @@ func (s *Store) ConsumeOIDCLoginChallenge(state string) (OIDCLoginChallenge, boo
 	return OIDCLoginChallenge{}, false, nil
 }
 
+func (s *Store) consumeOIDCLoginChallengeAtomic(stateValue string) (OIDCLoginChallenge, bool, error) {
+	needle := strings.TrimSpace(stateValue)
+	var consumed OIDCLoginChallenge
+	var found bool
+	err := s.atomic.UpdateDocument(s.atomicKey, func(raw []byte) ([]byte, error) {
+		current := &state{}
+		if len(raw) > 0 && string(raw) != "{}" {
+			if err := json.Unmarshal(raw, current); err != nil {
+				return nil, fmt.Errorf("decode sessions store: %w", err)
+			}
+		}
+		now := time.Now().UTC()
+		pruneExpired(current, now)
+		for i, item := range current.OIDCLoginChallenges {
+			if item.State != needle {
+				continue
+			}
+			consumed, found = item, true
+			current.OIDCLoginChallenges = append(current.OIDCLoginChallenges[:i], current.OIDCLoginChallenges[i+1:]...)
+			break
+		}
+		out, err := json.MarshalIndent(current, "", "  ")
+		if err != nil {
+			return nil, err
+		}
+		return append(out, '\n'), nil
+	})
+	if err != nil {
+		return OIDCLoginChallenge{}, false, err
+	}
+	return consumed, found, nil
+}
+
 func (s *Store) ConsumeTOTPSetupChallenge(id string) (TOTPSetupChallenge, bool, error) {
+	if s.atomic != nil {
+		return s.consumeTOTPSetupChallengeAtomic(id)
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -429,6 +506,35 @@ func (s *Store) saveLocked(current *state) error {
 		return fmt.Errorf("write sessions store: %w", err)
 	}
 	return nil
+}
+
+func (s *Store) consumeTOTPSetupChallengeAtomic(id string) (TOTPSetupChallenge, bool, error) {
+	needle := strings.TrimSpace(id)
+	var consumed TOTPSetupChallenge
+	var found bool
+	err := s.atomic.UpdateDocument(s.atomicKey, func(raw []byte) ([]byte, error) {
+		current := &state{}
+		if len(raw) > 0 && string(raw) != "{}" {
+			if err := json.Unmarshal(raw, current); err != nil {
+				return nil, fmt.Errorf("decode sessions store: %w", err)
+			}
+		}
+		pruneExpired(current, time.Now().UTC())
+		for i, item := range current.TOTPSetupChallenges {
+			if item.ID != needle {
+				continue
+			}
+			consumed, found = item, true
+			current.TOTPSetupChallenges = append(current.TOTPSetupChallenges[:i], current.TOTPSetupChallenges[i+1:]...)
+			break
+		}
+		out, err := json.MarshalIndent(current, "", "  ")
+		if err != nil {
+			return nil, err
+		}
+		return append(out, '\n'), nil
+	})
+	return consumed, found, err
 }
 
 func pruneExpired(current *state, now time.Time) {

@@ -3,7 +3,9 @@ package compiler
 import (
 	"errors"
 	"fmt"
+	"path"
 	"sort"
+	"strings"
 )
 
 type modSecurityBaseData struct{}
@@ -43,7 +45,11 @@ func RenderWAFArtifacts(sites []SiteInput, policies []WAFPolicyInput) ([]Artifac
 				return nil, fmt.Errorf("waf policy %s mode must be detection or prevention", policy.ID)
 			}
 		}
-		policy.CustomRuleIncludes = sortedUnique(policy.CustomRuleIncludes)
+		includes, err := normalizeTrustedModSecurityIncludes(policy.CustomRuleIncludes)
+		if err != nil {
+			return nil, fmt.Errorf("waf policy %s custom_rule_includes: %w", policy.ID, err)
+		}
+		policy.CustomRuleIncludes = includes
 		policyBySite[policy.SiteID] = policy
 	}
 
@@ -103,6 +109,28 @@ func RenderWAFArtifacts(sites []SiteInput, policies []WAFPolicyInput) ([]Artifac
 	}
 
 	return artifacts, nil
+}
+
+func normalizeTrustedModSecurityIncludes(values []string) ([]string, error) {
+	trusted := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(strings.ReplaceAll(value, `\`, "/"))
+		if value == "" {
+			continue
+		}
+		if strings.HasPrefix(value, "/rules/") {
+			value = strings.TrimPrefix(value, "/")
+		}
+		if !strings.HasPrefix(value, "rules/") || strings.ContainsAny(value, "\r\n\"';{}") {
+			return nil, errors.New("must be a relative rules/*.conf path")
+		}
+		clean := path.Clean(value)
+		if clean == "." || clean == "rules" || strings.HasPrefix(clean, "../") || !strings.HasSuffix(clean, ".conf") {
+			return nil, errors.New("must be a relative rules/*.conf path")
+		}
+		trusted = append(trusted, "/etc/waf/modsecurity/"+clean)
+	}
+	return sortedUnique(trusted), nil
 }
 
 func engineMode(mode WAFMode) string {

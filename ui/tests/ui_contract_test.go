@@ -37,7 +37,7 @@ func TestUIContract_OnboardingAndSidebarMarkers(t *testing.T) {
 			name:  "guard",
 			files: []string{filepath.Join("..", "app", "static", "js", "guard.js")},
 			markers: []string{
-				`const initializationIncomplete = Boolean(setup && !setup.has_active_revision);`,
+				`const onboardingRequired = Boolean(setup.needs_bootstrap);`,
 				`replace(httpUrl("/onboarding/user-creation"));`,
 			},
 		},

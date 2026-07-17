@@ -29,7 +29,7 @@ func TestE2EUIAssetsAndRouting(t *testing.T) {
 		markers []string
 	}{
 		{name: "dashboard", path: "/dashboard", markers: []string{`id="content-area"`}},
-		{name: "healthcheck", path: "/healthcheck", markers: []string{`id="healthcheck-steps"`}},
+		{name: "healthcheck", path: "/healthcheck", markers: []string{`id="healthcheck-app"`, `/static/js/healthcheck.js`}},
 		{name: "services", path: "/services", markers: []string{`id="content-area"`}},
 		{name: "requests", path: "/requests", markers: []string{`id="content-area"`}},
 		{name: "settings", path: "/settings", markers: []string{`id="content-area"`}},
@@ -181,10 +181,53 @@ func loginE2EUser(t *testing.T, client *http.Client, requestBaseURL, requestHost
 		"username": username,
 		"password": password,
 	})
+	if loginResp.StatusCode == http.StatusForbidden {
+		_ = loginResp.Body.Close()
+		completeE2ELoginChallenge(t, client, requestBaseURL, requestHostOverride)
+		loginResp = postJSON(t, client, requestBaseURL+"/api/auth/login", requestHostOverride, map[string]any{
+			"username": username,
+			"password": password,
+		})
+	}
 	if loginResp.StatusCode != http.StatusOK {
 		t.Fatalf("login failed: status=%d body=%s", loginResp.StatusCode, mustReadBody(t, loginResp.Body))
 	}
 	_ = mustReadBody(t, loginResp.Body)
+}
+
+func completeE2ELoginChallenge(t *testing.T, client *http.Client, requestBaseURL, requestHostOverride string) {
+	t.Helper()
+	loginPage, err := doE2ERequest(client, http.MethodGet, requestBaseURL+"/login", requestHostOverride, "text/html", nil, false)
+	if err != nil {
+		t.Fatalf("open login challenge: %v", err)
+	}
+	challengeLocation := strings.TrimSpace(loginPage.Header.Get("Location"))
+	_ = loginPage.Body.Close()
+	if loginPage.StatusCode != http.StatusFound && loginPage.StatusCode != http.StatusSeeOther || !strings.Contains(challengeLocation, "/challenge") {
+		t.Fatalf("expected login challenge after 403, got status=%d location=%q", loginPage.StatusCode, challengeLocation)
+	}
+	challengeLocation = localAntibotLocation(challengeLocation)
+	challengeURL := absolutizeLocation(requestBaseURL, challengeLocation)
+	challengePage, err := doE2ERequest(client, http.MethodGet, challengeURL, requestHostOverride, "text/html", nil, false)
+	if err != nil {
+		t.Fatalf("open login challenge page: %v", err)
+	}
+	_ = challengePage.Body.Close()
+	if challengePage.StatusCode != http.StatusOK {
+		t.Fatalf("login challenge page: status=%d", challengePage.StatusCode)
+	}
+	verifyURL, err := buildVerifyURL(requestBaseURL, challengeLocation, antibotVerifyURI("/challenge"))
+	if err != nil {
+		t.Fatalf("build login challenge verification URL: %v", err)
+	}
+	verifyResp, err := doE2ERequest(client, http.MethodGet, verifyURL, requestHostOverride, "text/html", nil, false)
+	if err != nil {
+		t.Fatalf("verify login challenge: %v", err)
+	}
+	_ = verifyResp.Body.Close()
+	if verifyResp.StatusCode != http.StatusNoContent {
+		t.Fatalf("login challenge verification: status=%d", verifyResp.StatusCode)
+	}
 }
 
 func getWithAuthRetry429(t *testing.T, client *http.Client, endpoint, hostOverride string, retries int) *http.Response {

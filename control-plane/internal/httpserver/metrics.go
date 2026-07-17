@@ -16,11 +16,15 @@ func metricsHandler(registry *observability.Registry, token string) http.Handler
 			return
 		}
 		expected := strings.TrimSpace(token)
+		if expected == "" {
+			http.Error(w, "metrics token is not configured", http.StatusServiceUnavailable)
+			return
+		}
 		presented := strings.TrimSpace(r.Header.Get(metricsTokenHeader))
 		if presented == "" {
 			presented = strings.TrimSpace(r.URL.Query().Get("token"))
 		}
-		if expected != "" && presented != expected {
+		if presented != expected {
 			http.Error(w, "forbidden", http.StatusForbidden)
 			return
 		}

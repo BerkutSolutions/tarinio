@@ -11,6 +11,7 @@ import (
 func defaultLoggingSettingsFromEnv(current loggingconfig.Settings, security RuntimeSecuritySettings) loggingconfig.Settings {
 	current = loggingconfig.Normalize(current)
 	clickhouseEndpoint := strings.TrimRight(strings.TrimSpace(os.Getenv("CLICKHOUSE_ENDPOINT")), "/")
+	clickhouseTLSCAFile := strings.TrimSpace(os.Getenv("CLICKHOUSE_TLS_CA_FILE"))
 	clickhouseUser := strings.TrimSpace(os.Getenv("CLICKHOUSE_USER"))
 	if clickhouseUser == "" {
 		clickhouseUser = "waf"
@@ -21,6 +22,7 @@ func defaultLoggingSettingsFromEnv(current loggingconfig.Settings, security Runt
 		clickhouseDatabase = "waf_logs"
 	}
 	opensearchEndpoint := strings.TrimRight(strings.TrimSpace(os.Getenv("OPENSEARCH_ENDPOINT")), "/")
+	opensearchTLSCAFile := strings.TrimSpace(os.Getenv("OPENSEARCH_TLS_CA_FILE"))
 	if opensearchEndpoint == "" {
 		opensearchEndpoint = "http://opensearch:9200"
 	}
@@ -48,6 +50,9 @@ func defaultLoggingSettingsFromEnv(current loggingconfig.Settings, security Runt
 	if clickhousePassword != "" || strings.TrimSpace(current.ClickHouse.PasswordEnc) != "" {
 		current.Cold.Backend = loggingconfig.BackendClickHouse
 		current.ClickHouse.Endpoint = clickhouseEndpoint
+		if clickhouseTLSCAFile != "" {
+			current.ClickHouse.TLSCAFile = clickhouseTLSCAFile
+		}
 		current.ClickHouse.Username = clickhouseUser
 		current.ClickHouse.Database = clickhouseDatabase
 		current.ClickHouse.Table = "request_logs"
@@ -60,6 +65,9 @@ func defaultLoggingSettingsFromEnv(current loggingconfig.Settings, security Runt
 			current.Cold.Backend = loggingconfig.BackendOpenSearch
 		}
 		current.OpenSearch.Endpoint = opensearchEndpoint
+		if opensearchTLSCAFile != "" {
+			current.OpenSearch.TLSCAFile = opensearchTLSCAFile
+		}
 		current.OpenSearch.Username = opensearchUsername
 		current.OpenSearch.IndexPrefix = opensearchIndexPrefix
 		current.OpenSearch.RequestsIndex = opensearchIndexPrefix + "-requests"
@@ -192,6 +200,9 @@ func reconcileLoggingSettingsFromEnv(current loggingconfig.Settings, security Ru
 	if database := strings.TrimSpace(os.Getenv("CLICKHOUSE_DB")); database != "" {
 		current.ClickHouse.Database = database
 	}
+	if caFile := strings.TrimSpace(os.Getenv("CLICKHOUSE_TLS_CA_FILE")); caFile != "" {
+		current.ClickHouse.TLSCAFile = caFile
+	}
 	if endpoint := strings.TrimRight(strings.TrimSpace(os.Getenv("OPENSEARCH_ENDPOINT")), "/"); endpoint != "" {
 		current.OpenSearch.Endpoint = endpoint
 	} else if (current.Hot.Backend == loggingconfig.BackendOpenSearch || current.Cold.Backend == loggingconfig.BackendOpenSearch) && strings.TrimSpace(current.OpenSearch.Endpoint) == "" {
@@ -204,6 +215,9 @@ func reconcileLoggingSettingsFromEnv(current loggingconfig.Settings, security Ru
 	}
 	if prefix := strings.TrimSpace(os.Getenv("OPENSEARCH_INDEX_PREFIX")); prefix != "" {
 		current.OpenSearch.IndexPrefix = prefix
+	}
+	if caFile := strings.TrimSpace(os.Getenv("OPENSEARCH_TLS_CA_FILE")); caFile != "" {
+		current.OpenSearch.TLSCAFile = caFile
 	}
 	if addr := strings.TrimRight(strings.TrimSpace(os.Getenv("VAULT_ADDR")), "/"); addr != "" {
 		current.Vault.Address = addr

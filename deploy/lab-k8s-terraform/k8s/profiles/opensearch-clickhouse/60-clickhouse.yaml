@@ -30,20 +30,39 @@ spec:
           image: clickhouse/clickhouse-server:24.8
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 8123
-            - containerPort: 9000
+            - containerPort: 8443
           readinessProbe:
             tcpSocket:
-              port: 8123
+              port: 8443
             initialDelaySeconds: 10
             periodSeconds: 10
           volumeMounts:
             - name: clickhouse-data
               mountPath: /var/lib/clickhouse
+            - name: clickhouse-config
+              mountPath: /etc/clickhouse-server/config.d/10-tls-only.xml
+              subPath: 10-tls-only.xml
+              readOnly: true
+            - name: clickhouse-tls
+              mountPath: /etc/clickhouse-server/tls
+              readOnly: true
+            - name: clickhouse-users
+              mountPath: /etc/clickhouse-server/users.d/50-waf-runtime.xml
+              subPath: 50-waf-runtime.xml
+              readOnly: true
       volumes:
         - name: clickhouse-data
           persistentVolumeClaim:
             claimName: clickhouse-data
+        - name: clickhouse-config
+          configMap:
+            name: tarinio-lab-clickhouse-config
+        - name: clickhouse-tls
+          secret:
+            secretName: tarinio-lab-clickhouse-tls
+        - name: clickhouse-users
+          secret:
+            secretName: tarinio-lab-clickhouse-users
 ---
 apiVersion: v1
 kind: Service
@@ -54,9 +73,6 @@ spec:
   selector:
     app: clickhouse
   ports:
-    - name: http
-      port: 8123
-      targetPort: 8123
-    - name: native
-      port: 9000
-      targetPort: 9000
+    - name: https
+      port: 8443
+      targetPort: 8443

@@ -28,5 +28,7 @@ func (h *SetupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
 		return
 	}
-	writeJSON(w, http.StatusOK, status)
+	// This endpoint is intentionally public so a first-time browser can select
+	// the bootstrap flow. Do not disclose user, site, or revision inventory.
+	writeJSON(w, http.StatusOK, map[string]bool{"needs_bootstrap": status.NeedsBootstrap})
 }

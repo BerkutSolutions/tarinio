@@ -74,6 +74,7 @@ type HealthHandler struct {
 	runtimeEvents  healthRuntimeSecurityProber
 	runtimeRequest healthRuntimeRequestsProber
 	runtimeCRS     healthRuntimeCRSStatuser
+	responseCache  *healthResponseCache
 }
 
 func NewHealthHandler(
@@ -101,10 +102,11 @@ func NewHealthHandler(
 		runtimeEvents:  runtimeEvents,
 		runtimeRequest: runtimeRequest,
 		runtimeCRS:     runtimeCRS,
+		responseCache:  newHealthResponseCache(3 * time.Second),
 	}
 }
 
-func (h *HealthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *HealthHandler) serveFresh(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return

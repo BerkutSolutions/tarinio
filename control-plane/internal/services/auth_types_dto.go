@@ -52,6 +52,11 @@ type TOTPEnableResult struct {
 	ExpiresAt     time.Time `json:"expires_at,omitempty"`
 }
 
+type StepUpTOTPResult struct {
+	OK                bool `json:"ok"`
+	RetryAfterSeconds int  `json:"retry_after_seconds,omitempty"`
+}
+
 type PasskeyListResult struct {
 	Items []PasskeyItem `json:"items"`
 }

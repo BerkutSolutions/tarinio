@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -48,6 +49,7 @@ type authService interface {
 	SetupTOTP(ctx context.Context, sessionID string) (services.TOTPSetupResult, error)
 	EnableTOTP(ctx context.Context, sessionID, challengeID, code string) (services.TOTPEnableResult, error)
 	DisableTOTP(ctx context.Context, sessionID, password, recoveryCode string) (services.AuthUser, error)
+	StepUpTOTP(ctx context.Context, sessionID, code string) (services.StepUpTOTPResult, error)
 	ChangePassword(ctx context.Context, sessionID, currentPassword, password string) error
 	ListPasskeys(sessionID string) (services.PasskeyListResult, error)
 	BeginPasskeyRegister(ctx context.Context, sessionID, name string, req *http.Request) (services.PasskeyBeginResult, error)
@@ -81,6 +83,10 @@ type totpEnableRequest struct {
 type totpDisableRequest struct {
 	Password     string `json:"password"`
 	RecoveryCode string `json:"recovery_code"`
+}
+
+type stepUpTOTPRequest struct {
+	Code string `json:"code"`
 }
 
 type changePasswordRequest struct {
@@ -146,6 +152,8 @@ func (h *AuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.twoFAEnable(w, r)
 	case r.URL.Path == "/api/auth/2fa/disable" && r.Method == http.MethodPost:
 		h.twoFADisable(w, r)
+	case r.URL.Path == "/api/auth/step-up/totp" && r.Method == http.MethodPost:
+		h.stepUpTOTP(w, r)
 	case r.URL.Path == "/api/auth/change-password" && r.Method == http.MethodPost:
 		h.changePassword(w, r)
 	case r.URL.Path == "/api/auth/passkeys" && r.Method == http.MethodGet:
@@ -417,6 +425,32 @@ func (h *AuthHandler) twoFADisable(w http.ResponseWriter, r *http.Request) {
 	}
 	SetSessionCookieForRequest(w, r, sessionID)
 	writeJSON(w, http.StatusOK, user)
+}
+
+func (h *AuthHandler) stepUpTOTP(w http.ResponseWriter, r *http.Request) {
+	sessionID, ok := readSessionID(r)
+	if !ok {
+		clearSessionCookie(w)
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "session required"})
+		return
+	}
+	var req stepUpTOTPRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
+		return
+	}
+	result, err := h.auth.StepUpTOTP(withActorIP(r), sessionID, req.Code)
+	if err != nil {
+		status := http.StatusUnauthorized
+		if result.RetryAfterSeconds > 0 {
+			w.Header().Set("Retry-After", strconv.Itoa(result.RetryAfterSeconds))
+			status = http.StatusTooManyRequests
+		}
+		writeJSON(w, status, map[string]any{"error": err.Error(), "retry_after_seconds": result.RetryAfterSeconds})
+		return
+	}
+	SetSessionCookieForRequest(w, r, sessionID)
+	writeJSON(w, http.StatusOK, result)
 }
 
 func (h *AuthHandler) changePassword(w http.ResponseWriter, r *http.Request) {

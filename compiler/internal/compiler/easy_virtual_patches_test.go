@@ -74,3 +74,17 @@ func TestVirtualPatch_HeaderTarget(t *testing.T) {
 		t.Errorf("expected REQUEST_HEADERS target, got:\n%s", rules)
 	}
 }
+
+func TestVirtualPatch_EscapesQuotedPatternAndRejectsNewline(t *testing.T) {
+	rules := buildVirtualPatchModSecurityRules([]VirtualPatchInput{
+		{ID: "vp-safe", Pattern: `a"b`, Target: "uri", Action: "block"},
+		{ID: "vp-newline", Pattern: "safe\nSecRuleEngine Off", Target: "uri", Action: "block"},
+	})
+	joined := strings.Join(rules, "\n")
+	if !strings.Contains(joined, `@rx a\"b`) {
+		t.Fatalf("expected quoted pattern to remain within SecRule string, got: %s", joined)
+	}
+	if strings.Contains(joined, "vp-newline") || strings.Contains(joined, "SecRuleEngine Off") {
+		t.Fatalf("expected newline injection to be rejected, got: %s", joined)
+	}
+}

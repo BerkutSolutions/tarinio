@@ -255,8 +255,8 @@ func TestE2EBehavioral(t *testing.T) {
 		verifyResp := doRuntimeGET(verifyReqPath, nil)
 		verifyBody, _ := io.ReadAll(verifyResp.Body)
 		_ = verifyResp.Body.Close()
-		if verifyResp.StatusCode != http.StatusFound && verifyResp.StatusCode != http.StatusSeeOther {
-			t.Fatalf("expected verify redirect, got status=%d body=%s", verifyResp.StatusCode, string(verifyBody))
+		if verifyResp.StatusCode != http.StatusNoContent {
+			t.Fatalf("expected verify to set the cookie without redirecting, got status=%d body=%s", verifyResp.StatusCode, string(verifyBody))
 		}
 		if len(verifyResp.Cookies()) == 0 {
 			t.Fatalf("expected verify to set cookie, got none")

@@ -26,6 +26,9 @@ const requestClickHouseMigrationStateFile = ".clickhouse-migration-state.json"
 const requestHotToColdMigrationStateFile = ".hot-to-cold-migration-state.json"
 
 const requestIngestBatchLines = 4000
+const maxRequestQueryItems = 1000
+const maxRequestQueryOffset = 100000
+const maxRequestHistoryDays = 31
 
 type requestStreamOption func(*requestStreamSource)
 
@@ -84,11 +87,17 @@ func parseRequestQueryOptions(values url.Values, maxItems int, defaultRetention 
 	if limit <= 0 {
 		limit = 500
 	}
+	if limit > maxRequestQueryItems {
+		limit = maxRequestQueryItems
+	}
 	offset := 0
 	if raw := strings.TrimSpace(values.Get("offset")); raw != "" {
 		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
 			offset = parsed
 		}
+	}
+	if offset > maxRequestQueryOffset {
+		offset = maxRequestQueryOffset
 	}
 	since := time.Time{}
 	if raw := strings.TrimSpace(values.Get("since")); raw != "" {

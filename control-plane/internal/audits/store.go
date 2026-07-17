@@ -75,8 +75,10 @@ type state struct {
 }
 
 type Store struct {
-	state *storage.JSONState
-	mu    sync.Mutex
+	state     *storage.JSONState
+	mu        sync.Mutex
+	atomic    storage.AtomicDocumentBackend
+	atomicKey string
 }
 
 func NewStore(root string) (*Store, error) {
@@ -93,12 +95,17 @@ func NewPostgresStore(root string, backend storage.Backend) (*Store, error) {
 	if strings.TrimSpace(root) == "" {
 		return nil, errors.New("audit store root is required")
 	}
-	return &Store{
-		state: storage.NewBackendJSONState(backend, "audits/audit_events.json", filepath.Join(root, "audit_events.json")),
-	}, nil
+	store := &Store{state: storage.NewBackendJSONState(backend, "audits/audit_events.json", filepath.Join(root, "audit_events.json")), atomicKey: "audits/audit_events.json"}
+	if atomic, ok := backend.(storage.AtomicDocumentBackend); ok {
+		store.atomic = atomic
+	}
+	return store, nil
 }
 
 func (s *Store) Append(event AuditEvent) error {
+	if s.atomic != nil {
+		return s.appendAtomic(event)
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -118,9 +125,37 @@ func (s *Store) Append(event AuditEvent) error {
 		return err
 	}
 	event.Hash = hash
-	current.Events = append(current.Events, event)
-	sortEvents(current.Events)
+	current.Events = append([]AuditEvent{event}, current.Events...)
 	return s.saveLocked(current)
+}
+
+func (s *Store) appendAtomic(event AuditEvent) error {
+	event = normalizeEvent(event)
+	if err := validateEvent(event); err != nil {
+		return err
+	}
+	return s.atomic.UpdateDocument(s.atomicKey, func(raw []byte) ([]byte, error) {
+		current := &state{}
+		if len(raw) > 0 && string(raw) != "{}" {
+			if err := json.Unmarshal(raw, current); err != nil {
+				return nil, fmt.Errorf("decode audit store: %w", err)
+			}
+		}
+		if len(current.Events) > 0 {
+			event.PrevHash = strings.TrimSpace(current.Events[0].Hash)
+		}
+		hash, err := ComputeEventHash(event)
+		if err != nil {
+			return nil, err
+		}
+		event.Hash = hash
+		current.Events = append([]AuditEvent{event}, current.Events...)
+		content, err := json.MarshalIndent(current, "", "  ")
+		if err != nil {
+			return nil, err
+		}
+		return append(content, '\n'), nil
+	})
 }
 
 func (s *Store) List(query Query) (ListResult, error) {
@@ -200,7 +235,14 @@ func (s *Store) loadLocked() (*state, error) {
 	if err := json.Unmarshal(content, &current); err != nil {
 		return nil, fmt.Errorf("decode audit store: %w", err)
 	}
-	sortEvents(current.Events)
+	return &current, nil
+}
+
+func (s *Store) loadFromContent(content []byte) (*state, error) {
+	var current state
+	if err := json.Unmarshal(content, &current); err != nil {
+		return nil, err
+	}
 	return &current, nil
 }
 

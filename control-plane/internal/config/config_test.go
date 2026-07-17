@@ -36,6 +36,9 @@ func TestLoadFromEnv_Overrides(t *testing.T) {
 	t.Setenv("WAF_RUNTIME_ROOT", "/tmp/runtime")
 	t.Setenv("CONTROL_PLANE_REDIS_ADDR", "127.0.0.1:6380")
 	t.Setenv("CONTROL_PLANE_REDIS_DB", "2")
+	t.Setenv("CONTROL_PLANE_REDIS_TLS_ENABLED", "true")
+	t.Setenv("CONTROL_PLANE_REDIS_TLS_CA_FILE", "/etc/redis-tls/ca.crt")
+	t.Setenv("CONTROL_PLANE_REDIS_TLS_SERVER_NAME", "redis.internal")
 	t.Setenv("CONTROL_PLANE_STARTUP_SELF_TEST_ENABLED", "false")
 	t.Setenv("CONTROL_PLANE_SECURITY_PEPPER", "test-pepper")
 	t.Setenv("CONTROL_PLANE_SENTINEL_BAN_SYNC_ENABLED", "true")
@@ -57,6 +60,9 @@ func TestLoadFromEnv_Overrides(t *testing.T) {
 	}
 	if cfg.Redis.Addr != "127.0.0.1:6380" || cfg.Redis.DB != 2 {
 		t.Fatalf("unexpected redis config: %+v", cfg.Redis)
+	}
+	if !cfg.Redis.TLS || cfg.Redis.TLSCAFile != "/etc/redis-tls/ca.crt" || cfg.Redis.TLSServerName != "redis.internal" {
+		t.Fatalf("unexpected redis TLS config: %+v", cfg.Redis)
 	}
 	if cfg.StartupSelfTest {
 		t.Fatal("expected startup self-test to be disabled by env override")

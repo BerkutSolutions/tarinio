@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"strings"
 
+	"waf/control-plane/internal/auth"
+	"waf/control-plane/internal/rbac"
 	"waf/internal/loggingconfig"
 )
 
@@ -26,6 +28,12 @@ func (h *SettingsRuntimeHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		}
 		body, ok := readJSONBody(w, r)
 		if !ok {
+			return
+		}
+		_, changesStorageRetention := body["storage"]
+		_, changesLogging := body["logging"]
+		if (changesStorageRetention || changesLogging) && !canWriteStorageRetention(r) {
+			writeJSON(w, http.StatusForbidden, map[string]any{"error": "settings.storage.write permission required for storage retention"})
 			return
 		}
 
@@ -182,4 +190,17 @@ func (h *SettingsRuntimeHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
+}
+
+func canWriteStorageRetention(r *http.Request) bool {
+	session, ok := auth.SessionFromContext(r.Context())
+	if !ok {
+		return false
+	}
+	for _, permission := range session.Permissions {
+		if rbac.Permission(permission) == rbac.PermissionSettingsStorageWrite {
+			return true
+		}
+	}
+	return false
 }

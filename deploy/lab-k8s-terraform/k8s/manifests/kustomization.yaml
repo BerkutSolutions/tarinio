@@ -4,6 +4,7 @@ namespace: tarinio-lab
 resources:
   - 00-namespace.yaml
   - 01-configmap.yaml
+  - 21-opensearch-security-config.yaml
   - 02-secrets.yaml
   - 10-postgres.yaml
   - 20-opensearch.yaml

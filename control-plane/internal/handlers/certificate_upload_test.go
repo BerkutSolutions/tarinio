@@ -110,6 +110,18 @@ func TestCertificateUploadHandler_ImportArchive(t *testing.T) {
 	}
 }
 
+func TestParseCertificateArchiveRejectsOversizedEntry(t *testing.T) {
+	archive := &bytes.Buffer{}
+	zipWriter := zip.NewWriter(archive)
+	writeZipFile(t, zipWriter, "cert-a/certificate.pem", string(bytes.Repeat([]byte("x"), maxCertificateArchiveEntryBytes+1)))
+	if err := zipWriter.Close(); err != nil {
+		t.Fatalf("close zip writer: %v", err)
+	}
+	if _, err := parseCertificateArchive(archive.Bytes()); err == nil {
+		t.Fatal("expected oversized archive entry to be rejected")
+	}
+}
+
 func writeMultipartFile(t *testing.T, writer *multipart.Writer, field string, name string, content string) {
 	t.Helper()
 

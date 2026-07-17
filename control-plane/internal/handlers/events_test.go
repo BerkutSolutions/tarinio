@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -100,5 +101,25 @@ func TestEventsHandler_UsesCachedEventsOnServiceFailure(t *testing.T) {
 	handler.ServeHTTP(secondResp, secondReq)
 	if secondResp.Code != http.StatusOK {
 		t.Fatalf("expected cached response 200, got %d", secondResp.Code)
+	}
+}
+
+func TestEventsHandlerClampsLargePage(t *testing.T) {
+	items := make([]events.Event, maxMonitoringEventsPageSize+20)
+	for i := range items {
+		items[i] = events.Event{ID: "evt", OccurredAt: time.Now().UTC().Format(time.RFC3339)}
+	}
+	handler := NewEventsHandler(&fakeEventService{items: items})
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, httptest.NewRequest(http.MethodGet, "/api/events?limit=999999", nil))
+	var payload struct {
+		Events []events.Event `json:"events"`
+		Total  int            `json:"total"`
+	}
+	if err := json.Unmarshal(resp.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(payload.Events) != maxMonitoringEventsPageSize || payload.Total != len(items) {
+		t.Fatalf("unexpected pagination: got=%d total=%d", len(payload.Events), payload.Total)
 	}
 }

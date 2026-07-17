@@ -13,6 +13,19 @@ spec:
               value: "true"
             - name: CONTROL_PLANE_REDIS_ADDR
               value: "redis:6379"
+            - name: CONTROL_PLANE_REDIS_USERNAME
+              value: waf-coordination
+            - name: CONTROL_PLANE_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tarinio-lab-secrets
+                  key: REDIS_PASSWORD
+            - name: CONTROL_PLANE_REDIS_TLS_ENABLED
+              value: "true"
+            - name: CONTROL_PLANE_REDIS_TLS_CA_FILE
+              value: /etc/redis-tls/ca.crt
+            - name: CONTROL_PLANE_REDIS_TLS_SERVER_NAME
+              value: redis
             - name: CONTROL_PLANE_HA_OPERATION_LOCK_TTL_SECONDS
               value: "120"
             - name: CONTROL_PLANE_HA_LEADER_LOCK_TTL_SECONDS
@@ -21,3 +34,11 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+          volumeMounts:
+            - name: redis-tls
+              mountPath: /etc/redis-tls
+              readOnly: true
+      volumes:
+        - name: redis-tls
+          secret:
+            secretName: tarinio-lab-redis-tls

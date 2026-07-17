@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strings"
 )
@@ -27,6 +28,9 @@ func ValidateRevisionBundle(bundle *RevisionBundle) error {
 		if strings.TrimSpace(file.Path) == "" {
 			return errors.New("bundle file path is required")
 		}
+		if !isSafeBundlePath(file.Path) {
+			return fmt.Errorf("bundle file path %q escapes the staging root", file.Path)
+		}
 		if _, exists := fileByPath[file.Path]; exists {
 			return fmt.Errorf("duplicate bundle file path %s", file.Path)
 		}
@@ -38,6 +42,9 @@ func ValidateRevisionBundle(bundle *RevisionBundle) error {
 	}
 	if !manifestFound {
 		return errors.New("manifest.json is required")
+	}
+	if !isSafeBundleIdentifier(bundle.Revision.ID) {
+		return errors.New("bundle revision id must be a safe identifier")
 	}
 
 	var manifest RevisionManifest
@@ -73,6 +80,9 @@ func ValidateRevisionBundle(bundle *RevisionBundle) error {
 		if strings.TrimSpace(entry.Path) == "" {
 			return errors.New("manifest content path is required")
 		}
+		if !isSafeBundlePath(entry.Path) {
+			return fmt.Errorf("manifest content path %q escapes the staging root", entry.Path)
+		}
 		if _, exists := seenContentPaths[entry.Path]; exists {
 			return fmt.Errorf("duplicate manifest content path %s", entry.Path)
 		}
@@ -103,6 +113,29 @@ func ValidateRevisionBundle(bundle *RevisionBundle) error {
 	}
 
 	return nil
+}
+
+func isSafeBundleIdentifier(value string) bool {
+	value = strings.TrimSpace(value)
+	if value == "" || value == "." || value == ".." {
+		return false
+	}
+	for _, r := range value {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '.' || r == '_' || r == '-' {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func isSafeBundlePath(value string) bool {
+	value = strings.TrimSpace(value)
+	if value == "" || filepath.IsAbs(value) || strings.ContainsRune(value, '\\') {
+		return false
+	}
+	clean := filepath.ToSlash(filepath.Clean(value))
+	return clean != "." && clean != ".." && !strings.HasPrefix(clean, "../")
 }
 
 func checksumBytes(content []byte) string {

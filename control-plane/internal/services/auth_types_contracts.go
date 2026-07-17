@@ -38,6 +38,12 @@ type AuthSessionStore interface {
 	ConsumeTOTPSetupChallenge(id string) (sessions.TOTPSetupChallenge, bool, error)
 }
 
+type AuthStepUpStore interface {
+	StepUpStatus(sessionID, userID string, now time.Time) (sessions.StepUpStatus, error)
+	RecordStepUpFailure(userID string, now time.Time) (sessions.StepUpStatus, error)
+	GrantStepUp(sessionID, userID string, ttl time.Duration, now time.Time) (sessions.StepUpStatus, error)
+}
+
 type AuthPasskeyStore interface {
 	ListByUser(userID string) ([]passkeys.Passkey, error)
 	FindByCredentialID(credentialID string) (passkeys.Passkey, bool, error)
@@ -56,6 +62,7 @@ type AuthService struct {
 	roles        AuthRoleStore
 	sessions     AuthSessionStore
 	passkeys     AuthPasskeyStore
+	stepUps      AuthStepUpStore
 	policy       *rbac.Policy
 	issuer       string
 	security     AuthSecurityConfig

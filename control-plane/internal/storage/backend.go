@@ -31,6 +31,13 @@ type Backend interface {
 	ListBlobKeys(prefix string) ([]string, error)
 }
 
+// AtomicDocumentBackend serializes one read-modify-write operation for a
+// shared document. Callers should use it for consume-once state transitions.
+type AtomicDocumentBackend interface {
+	Backend
+	UpdateDocument(key string, update func([]byte) ([]byte, error)) error
+}
+
 func IsNilBackend(backend Backend) bool {
 	if backend == nil {
 		return true
@@ -205,6 +212,38 @@ func (b *PostgresBackend) LoadDocument(key string) ([]byte, error) {
 
 func (b *PostgresBackend) SaveDocument(key string, content []byte) error {
 	return b.save("state_documents", key, content)
+}
+
+func (b *PostgresBackend) UpdateDocument(key string, update func([]byte) ([]byte, error)) error {
+	if b == nil || b.db == nil {
+		return errors.New("postgres backend is not initialized")
+	}
+	if update == nil {
+		return errors.New("document update function is required")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), postgresBackendOperationTimeout)
+	defer cancel()
+	tx, err := b.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	key = strings.TrimSpace(key)
+	if _, err := tx.ExecContext(ctx, `INSERT INTO state_documents (key, content, updated_at) VALUES ($1, '{}', NOW()) ON CONFLICT (key) DO NOTHING`, key); err != nil {
+		return err
+	}
+	var content []byte
+	if err := tx.QueryRowContext(ctx, `SELECT content FROM state_documents WHERE key = $1 FOR UPDATE`, key).Scan(&content); err != nil {
+		return err
+	}
+	next, err := update(content)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE state_documents SET content = $2, updated_at = NOW() WHERE key = $1`, key, next); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (b *PostgresBackend) DeleteDocument(key string) error {

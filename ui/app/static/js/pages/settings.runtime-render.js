@@ -49,6 +49,7 @@ export async function renderRuntimeData(params) {
     securityLoginRateWindow,
     securityLoginRateBlock,
     securityAllowInsecureVaultTLS,
+    securityRequireCertificateExportApproval,
     syncVaultTLSControls,
     loggingStatus,
     settingsRenderLoggingStatusText,
@@ -213,6 +214,9 @@ export async function renderRuntimeData(params) {
       }
       if (securityAllowInsecureVaultTLS) {
         securityAllowInsecureVaultTLS.checked = !!security?.allow_insecure_vault_tls;
+      }
+      if (securityRequireCertificateExportApproval) {
+        securityRequireCertificateExportApproval.checked = security?.require_certificate_export_approval !== false;
       }
       syncVaultTLSControls();
       if (loggingStatus) {

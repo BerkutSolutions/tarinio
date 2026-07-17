@@ -38,11 +38,12 @@ type StorageRetention struct {
 }
 
 type RuntimeSecuritySettings struct {
-	AllowInsecureVaultTLS      bool `json:"allow_insecure_vault_tls"`
-	LoginRateLimitEnabled      bool `json:"login_rate_limit_enabled"`
-	LoginRateLimitMaxAttempts  int  `json:"login_rate_limit_max_attempts"`
-	LoginRateLimitWindowSecond int  `json:"login_rate_limit_window_seconds"`
-	LoginRateLimitBlockSecond  int  `json:"login_rate_limit_block_seconds"`
+	AllowInsecureVaultTLS            bool `json:"allow_insecure_vault_tls"`
+	RequireCertificateExportApproval bool `json:"require_certificate_export_approval"`
+	LoginRateLimitEnabled            bool `json:"login_rate_limit_enabled"`
+	LoginRateLimitMaxAttempts        int  `json:"login_rate_limit_max_attempts"`
+	LoginRateLimitWindowSecond       int  `json:"login_rate_limit_window_seconds"`
+	LoginRateLimitBlockSecond        int  `json:"login_rate_limit_block_seconds"`
 }
 
 type persistedRuntimeSettings struct {
@@ -92,11 +93,12 @@ var runtimeSettingsState = struct {
 		ColdIndexDays: loggingconfig.DefaultColdDays,
 	},
 	security: RuntimeSecuritySettings{
-		AllowInsecureVaultTLS:      false,
-		LoginRateLimitEnabled:      true,
-		LoginRateLimitMaxAttempts:  10,
-		LoginRateLimitWindowSecond: 300,
-		LoginRateLimitBlockSecond:  600,
+		AllowInsecureVaultTLS:            false,
+		RequireCertificateExportApproval: true,
+		LoginRateLimitEnabled:            true,
+		LoginRateLimitMaxAttempts:        10,
+		LoginRateLimitWindowSecond:       300,
+		LoginRateLimitBlockSecond:        600,
 	},
 	loginAppearance:       "command-center",
 	healthcheckAppearance: "variant-1",
@@ -130,6 +132,12 @@ var runtimeSettingsState = struct {
 			PathPrefix: "tarinio",
 		},
 	}),
+}
+
+func CertificateExportApprovalRequired() bool {
+	runtimeSettingsState.mu.RLock()
+	defer runtimeSettingsState.mu.RUnlock()
+	return runtimeSettingsState.security.RequireCertificateExportApproval
 }
 
 var runtimeRequestIndexes = &runtimeIndexFetcher{

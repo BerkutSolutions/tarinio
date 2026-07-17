@@ -34,13 +34,21 @@ spec:
               value: single-node
             - name: DISABLE_INSTALL_DEMO_CONFIG
               value: "true"
-            - name: DISABLE_SECURITY_PLUGIN
-              value: "true"
             - name: OPENSEARCH_JAVA_OPTS
               value: -Xms512m -Xmx512m
           volumeMounts:
             - name: opensearch-data
               mountPath: /usr/share/opensearch/data
+            - name: opensearch-config
+              mountPath: /usr/share/opensearch/config/opensearch.yml
+              subPath: opensearch.yml
+              readOnly: true
+            - name: opensearch-tls
+              mountPath: /usr/share/opensearch/config/tls
+              readOnly: true
+            - name: opensearch-security-config
+              mountPath: /usr/share/opensearch/plugins/opensearch-security/securityconfig
+              readOnly: true
           readinessProbe:
             tcpSocket:
               port: 9200
@@ -50,6 +58,15 @@ spec:
         - name: opensearch-data
           persistentVolumeClaim:
             claimName: opensearch-data
+        - name: opensearch-config
+          configMap:
+            name: tarinio-lab-opensearch-config
+        - name: opensearch-tls
+          secret:
+            secretName: tarinio-lab-opensearch-tls
+        - name: opensearch-security-config
+          secret:
+            secretName: tarinio-lab-opensearch-security
 ---
 apiVersion: v1
 kind: Service

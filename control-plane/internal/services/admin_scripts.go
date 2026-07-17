@@ -189,13 +189,13 @@ func (s *AdminScriptService) Run(ctx context.Context, scriptID string, input map
 	if err != nil {
 		return AdminScriptRunResult{}, err
 	}
-	if err := os.MkdirAll(s.runsRoot, 0o755); err != nil {
+	if err := os.MkdirAll(s.runsRoot, 0o700); err != nil {
 		return AdminScriptRunResult{}, err
 	}
 
 	runID := fmt.Sprintf("%s-%d", definition.ID, time.Now().UTC().UnixNano())
 	runDir := filepath.Join(s.runsRoot, runID)
-	if err := os.MkdirAll(runDir, 0o755); err != nil {
+	if err := os.MkdirAll(runDir, 0o700); err != nil {
 		return AdminScriptRunResult{}, err
 	}
 
@@ -215,7 +215,7 @@ func (s *AdminScriptService) Run(ctx context.Context, scriptID string, input map
 	cmd.Env = env
 	cmd.Dir = filepath.Dir(scriptPath)
 	output, runErr := cmd.CombinedOutput()
-	if writeErr := os.WriteFile(consoleLogPath, output, 0o644); writeErr != nil {
+	if writeErr := os.WriteFile(consoleLogPath, output, 0o600); writeErr != nil {
 		return AdminScriptRunResult{}, writeErr
 	}
 
@@ -397,7 +397,7 @@ func (s *AdminScriptService) writeRunRecord(runDir string, record adminScriptRun
 		return err
 	}
 	content = append(content, '\n')
-	return os.WriteFile(filepath.Join(runDir, "run.json"), content, 0o644)
+	return os.WriteFile(filepath.Join(runDir, "run.json"), content, 0o600)
 }
 
 func (s *AdminScriptService) readRunRecord(runID string) (adminScriptRunRecord, error) {

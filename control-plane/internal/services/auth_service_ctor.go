@@ -9,7 +9,7 @@ import (
 
 func NewAuthService(users AuthUserStore, roles AuthRoleStore, sessions AuthSessionStore, passkeys AuthPasskeyStore, issuer string, security AuthSecurityConfig, audits *AuditService) *AuthService {
 	normalizedSecurity := normalizeAuthSecurityConfig(security)
-	return &AuthService{
+	service := &AuthService{
 		users:        users,
 		roles:        roles,
 		sessions:     sessions,
@@ -21,4 +21,8 @@ func NewAuthService(users AuthUserStore, roles AuthRoleStore, sessions AuthSessi
 		challengeTTL: 5 * time.Minute,
 		audits:       audits,
 	}
+	if stepUps, ok := sessions.(AuthStepUpStore); ok {
+		service.stepUps = stepUps
+	}
+	return service
 }

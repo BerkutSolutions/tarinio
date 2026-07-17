@@ -85,6 +85,16 @@ func TestRenderWAFArtifacts_RejectsInvalidMode(t *testing.T) {
 	}
 }
 
+func TestRenderWAFArtifacts_RejectsInjectedCustomRuleInclude(t *testing.T) {
+	_, err := RenderWAFArtifacts(
+		[]SiteInput{{ID: "site-a", Enabled: true}},
+		[]WAFPolicyInput{{ID: "waf-a", SiteID: "site-a", Enabled: true, Mode: WAFModePrevention, CustomRuleIncludes: []string{"rules/safe.conf\nSecRuleEngine Off"}}},
+	)
+	if err == nil || !strings.Contains(err.Error(), "custom_rule_includes") {
+		t.Fatalf("expected injected include rejection, got %v", err)
+	}
+}
+
 func TestRenderWAFArtifacts_FileBasedSiteConfig(t *testing.T) {
 	artifacts, err := RenderWAFArtifacts(
 		[]SiteInput{

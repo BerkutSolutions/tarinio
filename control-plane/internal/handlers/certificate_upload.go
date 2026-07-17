@@ -15,6 +15,9 @@ import (
 )
 
 const maxCertificateUploadMemory = 10 << 20
+const maxCertificateArchiveEntries = 200
+const maxCertificateArchiveEntryBytes = 2 << 20
+const maxCertificateArchiveUncompressedBytes = 16 << 20
 
 type certificateUploadService interface {
 	Upload(ctx context.Context, req services.CertificateUploadRequest, certificatePEM []byte, privateKeyPEM []byte) (services.CertificateUploadResult, error)
@@ -140,6 +143,10 @@ func parseCertificateArchive(content []byte) (map[string]archiveCertificatePair,
 	}
 
 	pairs := map[string]archiveCertificatePair{}
+	if len(reader.File) > maxCertificateArchiveEntries {
+		return nil, fmt.Errorf("zip archive has too many entries")
+	}
+	totalUncompressed := uint64(0)
 	for _, file := range reader.File {
 		if file.FileInfo().IsDir() {
 			continue
@@ -159,14 +166,24 @@ func parseCertificateArchive(content []byte) (map[string]archiveCertificatePair,
 		if name != "certificate.pem" && name != "private.key" {
 			continue
 		}
+		if file.UncompressedSize64 > maxCertificateArchiveEntryBytes {
+			return nil, fmt.Errorf("zip archive entry exceeds size limit")
+		}
+		totalUncompressed += file.UncompressedSize64
+		if totalUncompressed > maxCertificateArchiveUncompressedBytes {
+			return nil, fmt.Errorf("zip archive exceeds uncompressed size limit")
+		}
 		entryReader, openErr := file.Open()
 		if openErr != nil {
 			return nil, openErr
 		}
-		data, readErr := io.ReadAll(entryReader)
+		data, readErr := io.ReadAll(io.LimitReader(entryReader, maxCertificateArchiveEntryBytes+1))
 		_ = entryReader.Close()
 		if readErr != nil {
 			return nil, readErr
+		}
+		if len(data) > maxCertificateArchiveEntryBytes {
+			return nil, fmt.Errorf("zip archive entry exceeds size limit")
 		}
 		if len(data) == 0 {
 			continue
@@ -197,12 +214,15 @@ func readUploadedFile(r *http.Request, field string) ([]byte, error) {
 	}
 	defer file.Close()
 
-	content, err := io.ReadAll(file)
+	content, err := io.ReadAll(io.LimitReader(file, maxCertificateUploadMemory+1))
 	if err != nil {
 		return nil, err
 	}
 	if len(content) == 0 {
 		return nil, http.ErrMissingFile
+	}
+	if len(content) > maxCertificateUploadMemory {
+		return nil, fmt.Errorf("uploaded file exceeds size limit")
 	}
 	return content, nil
 }

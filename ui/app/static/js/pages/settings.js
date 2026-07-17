@@ -232,7 +232,12 @@ export async function renderSettings(container, ctx) {
               <div class="waf-list-head"><div class="waf-list-title">${escapeHtml(ctx.t("settings.security.directIp.title"))}</div></div>
               <div class="waf-note">${escapeHtml(ctx.t("settings.security.directIp.hint"))}</div>
               <label class="waf-checkbox" for="settings-security-block-direct-ip-access"><input type="checkbox" id="settings-security-block-direct-ip-access"><span>${escapeHtml(ctx.t("settings.security.directIp.enabled"))}</span></label>
-              <div class="waf-actions"><button id="settings-security-block-direct-ip-save" class="btn primary btn-sm" type="button">${escapeHtml(ctx.t("common.save"))}</button></div>
+            </section>
+
+            <section class="waf-list-item">
+              <div class="waf-list-head"><div class="waf-list-title">${escapeHtml(ctx.t("settings.security.certificateExport.title"))}</div></div>
+              <div class="waf-note">${escapeHtml(ctx.t("settings.security.certificateExport.hint"))}</div>
+              <label class="waf-checkbox" for="settings-security-require-certificate-export-approval"><input type="checkbox" id="settings-security-require-certificate-export-approval"><span>${escapeHtml(ctx.t("settings.security.certificateExport.enabled"))}</span></label>
             </section>
 
             <section class="waf-list-item">
@@ -484,9 +489,9 @@ export async function renderSettings(container, ctx) {
   const securityLoginRateWindow = container.querySelector("#settings-security-login-rate-window");
   const securityLoginRateBlock = container.querySelector("#settings-security-login-rate-block");
   const securityAllowInsecureVaultTLS = container.querySelector("#settings-security-allow-insecure-vault-tls");
+  const securityRequireCertificateExportApproval = container.querySelector("#settings-security-require-certificate-export-approval");
   const securitySave = container.querySelector("#settings-security-save");
   const blockDirectIPAccess = container.querySelector("#settings-security-block-direct-ip-access");
-  const blockDirectIPAccessSave = container.querySelector("#settings-security-block-direct-ip-save");
   const secretsSave = container.querySelector("#settings-secrets-save");
   const loggingHotBackend = container.querySelector("#settings-logging-hot-backend");
   const loggingColdBackend = container.querySelector("#settings-logging-cold-backend");
@@ -658,6 +663,7 @@ export async function renderSettings(container, ctx) {
       securityLoginRateWindow,
       securityLoginRateBlock,
       securityAllowInsecureVaultTLS,
+      securityRequireCertificateExportApproval,
       syncVaultTLSControls,
       loggingStatus,
       settingsRenderLoggingStatusText: renderLoggingStatusText,
@@ -736,6 +742,8 @@ export async function renderSettings(container, ctx) {
     storageHotIndexDays,
     storageColdIndexDays,
     securityAllowInsecureVaultTLS,
+    securityRequireCertificateExportApproval,
+    blockDirectIPAccess,
     securityLoginRateEnabled,
     securityLoginRateAttempts,
     securityLoginRateWindow,
@@ -775,16 +783,6 @@ export async function renderSettings(container, ctx) {
   healthcheckAppearancePreview?.addEventListener("click", () => {
     const theme = encodeURIComponent(String(healthcheckAppearanceSelect?.value || "variant-1"));
     window.open(`/healthcheck?appearance=${theme}`, "_blank", "noopener");
-  });
-
-  blockDirectIPAccessSave?.addEventListener("click", async () => {
-    setAlert("");
-    try {
-      await ctx.api.put("/api/settings/direct-ip-access", { block_direct_ip_access: !!blockDirectIPAccess?.checked });
-      setAlert(ctx.t("settings.saved"), true);
-    } catch (error) {
-      setAlert(error?.message || ctx.t("common.error"));
-    }
   });
 
   const selectedTab = currentTab.id;

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -21,11 +22,14 @@ const (
 
 // Config contains the minimal Redis wiring for coordination-only usage.
 type Config struct {
-	Addr        string
-	Username    string
-	Password    string
-	DB          int
-	DialTimeout time.Duration
+	Addr          string
+	Username      string
+	Password      string
+	DB            int
+	DialTimeout   time.Duration
+	TLS           bool
+	TLSCAFile     string
+	TLSServerName string
 }
 
 func DefaultConfig() Config {
@@ -41,8 +45,10 @@ type Dialer interface {
 }
 
 type Client struct {
-	cfg    Config
-	dialer Dialer
+	cfg       Config
+	dialer    Dialer
+	tlsConfig *tls.Config
+	tlsErr    error
 }
 
 var ErrLockNotAcquired = errors.New("redis lock not acquired")
@@ -55,7 +61,8 @@ func NewClient(cfg Config) *Client {
 	if cfg.DialTimeout == 0 {
 		cfg.DialTimeout = defaultDialTimeout
 	}
-	return &Client{cfg: cfg, dialer: dialer}
+	tlsConfig, tlsErr := newTLSConfig(cfg)
+	return &Client{cfg: cfg, dialer: dialer, tlsConfig: tlsConfig, tlsErr: tlsErr}
 }
 
 func (c *Client) Config() Config {
@@ -88,6 +95,18 @@ func (c *Client) connect(ctx context.Context) (net.Conn, error) {
 	conn, err := c.dialer.DialContext(ctx, "tcp", c.cfg.Addr)
 	if err != nil {
 		return nil, fmt.Errorf("dial redis: %w", err)
+	}
+	if c.cfg.TLS {
+		if c.tlsErr != nil {
+			_ = conn.Close()
+			return nil, c.tlsErr
+		}
+		secured := tls.Client(conn, c.tlsConfig)
+		if err := secured.HandshakeContext(ctx); err != nil {
+			_ = conn.Close()
+			return nil, fmt.Errorf("redis TLS handshake: %w", err)
+		}
+		conn = secured
 	}
 	reader := bufio.NewReader(conn)
 	if strings.TrimSpace(c.cfg.Password) != "" {

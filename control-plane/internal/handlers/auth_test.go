@@ -76,6 +76,9 @@ func (f *fakeAuthService) EnableTOTP(ctx context.Context, sessionID, challengeID
 func (f *fakeAuthService) DisableTOTP(ctx context.Context, sessionID, password, recoveryCode string) (services.AuthUser, error) {
 	return services.AuthUser{ID: "admin", Username: "admin", TOTPEnabled: false}, nil
 }
+func (f *fakeAuthService) StepUpTOTP(ctx context.Context, sessionID, code string) (services.StepUpTOTPResult, error) {
+	return services.StepUpTOTPResult{OK: true}, nil
+}
 func (f *fakeAuthService) ChangePassword(ctx context.Context, sessionID, currentPassword, password string) error {
 	return nil
 }

@@ -12,8 +12,30 @@ import (
 
 type fakeOWASPCRSService struct{}
 
+type failingOWASPCRSService struct{ fakeOWASPCRSService }
+
+func (f *failingOWASPCRSService) CheckUpdates(ctx context.Context, dryRun bool) (services.RuntimeCRSStatus, error) {
+	return services.RuntimeCRSStatus{}, &services.RuntimeCRSError{Code: "crs_release_digest_invalid", Message: "internal detail"}
+}
+
 func (f *fakeOWASPCRSService) Status(ctx context.Context) (services.RuntimeCRSStatus, error) {
 	return services.RuntimeCRSStatus{ActiveVersion: "4.0.0"}, nil
+}
+
+func TestOWASPCRSHandler_MapsRuntimeErrorCode(t *testing.T) {
+	handler := NewOWASPCRSHandler(&failingOWASPCRSService{})
+	req := httptest.NewRequest(http.MethodPost, "/api/owasp-crs/check-updates", strings.NewReader(`{"dry_run":true}`))
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, req)
+	if resp.Code != http.StatusBadGateway {
+		t.Fatalf("expected 502, got %d", resp.Code)
+	}
+	if !strings.Contains(resp.Body.String(), `"code":"crs_release_digest_invalid"`) {
+		t.Fatalf("expected stable code, got %s", resp.Body.String())
+	}
+	if strings.Contains(resp.Body.String(), "internal detail") {
+		t.Fatalf("internal runtime detail must not reach UI: %s", resp.Body.String())
+	}
 }
 
 func (f *fakeOWASPCRSService) CheckUpdates(ctx context.Context, dryRun bool) (services.RuntimeCRSStatus, error) {
@@ -51,4 +73,3 @@ func TestOWASPCRSHandler_StatusAndUpdate(t *testing.T) {
 		t.Fatalf("unexpected update response body: %s", updateResp.Body.String())
 	}
 }
-

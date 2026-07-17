@@ -55,7 +55,7 @@ run() {
   local name="$1"
   shift
   {
-    echo "# cmd: $*"
+    echo "# cmd: <redacted command>"
     "$@"
     rc=$?
     echo
@@ -67,7 +67,7 @@ run_sh() {
   local name="$1"
   local cmd="$2"
   {
-    echo "# cmd: $cmd"
+    echo "# cmd: <redacted command>"
     bash -lc "$cmd"
     rc=$?
     echo

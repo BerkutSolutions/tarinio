@@ -1,13 +1,16 @@
 package handlers
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	"waf/control-plane/internal/auth"
 	"waf/internal/loggingconfig"
 	"waf/internal/secretcrypto"
 )
@@ -272,6 +275,24 @@ func TestParseLoggingSettingsRequiresVaultAddressWhenEnabled(t *testing.T) {
 	}
 }
 
+func TestParseLoggingSettingsRequiresNewVaultTokenWhenAddressChanges(t *testing.T) {
+	current := loggingconfig.Normalize(loggingconfig.Settings{
+		Vault: loggingconfig.VaultSettings{
+			Address:  "https://vault.internal:8200",
+			TokenEnc: "stored-token",
+		},
+	})
+	_, err := parseLoggingSettings(map[string]any{
+		"vault": map[string]any{
+			"address": "https://attacker.invalid:8200",
+			"token":   loggingconfig.MaskedSecretValue,
+		},
+	}, current, "pepper-for-tests", true)
+	if err == nil || !strings.Contains(err.Error(), "vault token must be supplied") {
+		t.Fatalf("expected changed Vault destination with masked token to be rejected, got %v", err)
+	}
+}
+
 func TestParseLoggingSettingsStoresSecretsInVault(t *testing.T) {
 	var gotPath string
 	var gotPayload map[string]any
@@ -358,6 +379,31 @@ func TestParseStorageRetentionCapsHotAndColdIndexWindows(t *testing.T) {
 	}
 }
 
+func TestSettingsRuntimeHandler_StorageRetentionRequiresStorageWritePermission(t *testing.T) {
+	handler := NewSettingsRuntimeHandler(t.TempDir(), "", "pepper-for-tests")
+	body := []byte(`{"storage":{"logs_days":21}}`)
+
+	denied := httptest.NewRequest(http.MethodPut, "/api/settings/runtime", bytes.NewReader(body))
+	denied = denied.WithContext(auth.ContextWithSession(denied.Context(), auth.SessionView{
+		UserID: "general-writer", Permissions: []string{"settings.general.write"},
+	}))
+	deniedResponse := httptest.NewRecorder()
+	handler.ServeHTTP(deniedResponse, denied)
+	if deniedResponse.Code != http.StatusForbidden {
+		t.Fatalf("expected storage mutation to be forbidden, got %d: %s", deniedResponse.Code, deniedResponse.Body.String())
+	}
+
+	allowed := httptest.NewRequest(http.MethodPut, "/api/settings/runtime", bytes.NewReader(body))
+	allowed = allowed.WithContext(auth.ContextWithSession(allowed.Context(), auth.SessionView{
+		UserID: "storage-writer", Permissions: []string{"settings.general.write", "settings.storage.write"},
+	}))
+	allowedResponse := httptest.NewRecorder()
+	handler.ServeHTTP(allowedResponse, allowed)
+	if allowedResponse.Code != http.StatusOK {
+		t.Fatalf("expected storage mutation to succeed, got %d: %s", allowedResponse.Code, allowedResponse.Body.String())
+	}
+}
+
 func TestDefaultLoggingSettingsFromEnvReadsVaultTokenFile(t *testing.T) {
 	pepper := "pepper-for-tests"
 	tokenFile := filepath.Join(t.TempDir(), "vault-token")
@@ -405,5 +451,24 @@ func TestDefaultLoggingSettingsFromEnvUsesOpenSearchForHotAndColdByDefault(t *te
 	}
 	if next.Routing.WriteRequestsToHot != true || next.Routing.WriteRequestsToCold != false {
 		t.Fatalf("expected single-write opensearch routing, got %+v", next.Routing)
+	}
+}
+
+func TestDefaultLoggingSettingsFromEnvPreservesStorageTLSCAPaths(t *testing.T) {
+	t.Setenv("CLICKHOUSE_ENDPOINT", "https://clickhouse:8443")
+	t.Setenv("CLICKHOUSE_PASSWORD", "clickhouse-secret")
+	t.Setenv("CLICKHOUSE_TLS_CA_FILE", "/etc/waf/storage/clickhouse/ca.crt")
+	t.Setenv("OPENSEARCH_ENDPOINT", "https://opensearch:9200")
+	t.Setenv("OPENSEARCH_USERNAME", "waf-runtime")
+	t.Setenv("OPENSEARCH_PASSWORD", "opensearch-secret")
+	t.Setenv("OPENSEARCH_TLS_CA_FILE", "/etc/waf/storage/opensearch/ca.crt")
+	runtimeSettingsState.pepper = "pepper-for-tests"
+
+	next := defaultLoggingSettingsFromEnv(loggingconfig.Settings{}, RuntimeSecuritySettings{})
+	if next.ClickHouse.TLSCAFile != "/etc/waf/storage/clickhouse/ca.crt" {
+		t.Fatalf("unexpected ClickHouse CA path: %q", next.ClickHouse.TLSCAFile)
+	}
+	if next.OpenSearch.TLSCAFile != "/etc/waf/storage/opensearch/ca.crt" {
+		t.Fatalf("unexpected OpenSearch CA path: %q", next.OpenSearch.TLSCAFile)
 	}
 }

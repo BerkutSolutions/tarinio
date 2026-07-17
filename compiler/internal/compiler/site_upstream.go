@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -199,28 +198,37 @@ func normalizeInputs(sites []SiteInput, upstreams []UpstreamInput) ([]SiteInput,
 
 	upstreamByID := make(map[string]UpstreamInput, len(upstreams))
 	for _, upstream := range upstreams {
-		if upstream.ID == "" {
-			return nil, nil, errors.New("upstream id is required")
+		if err := validateNginxIdentifier(upstream.ID, "upstream id"); err != nil {
+			return nil, nil, err
 		}
-		if upstream.SiteID == "" {
-			return nil, nil, fmt.Errorf("upstream %s site id is required", upstream.ID)
+		if err := validateNginxIdentifier(upstream.SiteID, fmt.Sprintf("upstream %s site id", upstream.ID)); err != nil {
+			return nil, nil, err
 		}
 		if upstream.Scheme == "" || upstream.Host == "" || upstream.Port <= 0 {
 			return nil, nil, fmt.Errorf("upstream %s must define scheme, host, and port", upstream.ID)
+		}
+		if err := validateNginxHost(upstream.Host, fmt.Sprintf("upstream %s host", upstream.ID)); err != nil {
+			return nil, nil, err
 		}
 		upstreamByID[upstream.ID] = upstream
 	}
 
 	for i := range sortedSites {
 		site := &sortedSites[i]
-		if site.ID == "" {
-			return nil, nil, errors.New("site id is required")
+		if err := validateNginxIdentifier(site.ID, "site id"); err != nil {
+			return nil, nil, err
 		}
 		if !site.Enabled {
 			continue
 		}
 		if site.PrimaryHost == "" {
 			return nil, nil, fmt.Errorf("site %s primary host is required", site.ID)
+		}
+		if err := validateNginxHost(site.PrimaryHost, fmt.Sprintf("site %s primary host", site.ID)); err != nil {
+			return nil, nil, err
+		}
+		if err := ValidateMTLS(site.MTLS); err != nil {
+			return nil, nil, fmt.Errorf("site %s mTLS: %w", site.ID, err)
 		}
 		if !site.ListenHTTP && !site.ListenHTTPS {
 			return nil, nil, fmt.Errorf("site %s must enable at least one listener", site.ID)
@@ -237,6 +245,11 @@ func normalizeInputs(sites []SiteInput, upstreams []UpstreamInput) ([]SiteInput,
 		}
 
 		site.Aliases = sortedUnique(site.Aliases)
+		for _, alias := range site.Aliases {
+			if err := validateNginxHost(alias, fmt.Sprintf("site %s alias", site.ID)); err != nil {
+				return nil, nil, err
+			}
+		}
 	}
 
 	return sortedSites, upstreamByID, nil

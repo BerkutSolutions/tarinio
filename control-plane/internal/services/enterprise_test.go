@@ -15,7 +15,41 @@ import (
 	"waf/control-plane/internal/events"
 	"waf/control-plane/internal/jobs"
 	"waf/control-plane/internal/revisions"
+	"waf/control-plane/internal/users"
 )
+
+func TestEnterpriseServiceSCIMCannotReadOrDeactivateLocalUsers(t *testing.T) {
+	root := t.TempDir()
+	enterpriseStore, err := enterprise.NewStore(filepath.Join(root, "enterprise"))
+	if err != nil {
+		t.Fatalf("enterprise store: %v", err)
+	}
+	userStore, err := users.NewStore(filepath.Join(root, "users"), users.BootstrapUser{})
+	if err != nil {
+		t.Fatalf("user store: %v", err)
+	}
+	if _, err := userStore.Create(users.User{ID: "local-admin", Username: "local-admin", AuthSource: "local", IsActive: true}); err != nil {
+		t.Fatalf("create local user: %v", err)
+	}
+	if _, err := userStore.Create(users.User{ID: "scim-user", Username: "scim-user", AuthSource: "scim", ExternalID: "subject-1", IsActive: true}); err != nil {
+		t.Fatalf("create scim user: %v", err)
+	}
+	service := NewEnterpriseService(enterpriseStore, userStore, nil, nil, nil, nil, nil, nil, nil)
+
+	if _, ok, err := service.GetSCIMUser("local-admin"); err != nil || ok {
+		t.Fatalf("local user must not be readable through SCIM: ok=%v err=%v", ok, err)
+	}
+	if _, err := service.DeactivateSCIMUser("local-admin"); err == nil {
+		t.Fatal("expected local user deactivation through SCIM to fail")
+	}
+	item, ok, err := service.GetSCIMUser("scim-user")
+	if err != nil || !ok || item.ID != "scim-user" {
+		t.Fatalf("expected SCIM user to remain readable: item=%+v ok=%v err=%v", item, ok, err)
+	}
+	if _, err := service.DeactivateSCIMUser("scim-user"); err != nil {
+		t.Fatalf("expected SCIM user deactivation to work: %v", err)
+	}
+}
 
 func TestEnterpriseServiceBuildSupportBundle(t *testing.T) {
 	root := t.TempDir()

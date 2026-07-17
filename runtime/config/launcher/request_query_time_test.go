@@ -44,6 +44,26 @@ func TestRequestDayArchiveKeysLimitsSinceToRelevantDays(t *testing.T) {
 	}
 }
 
+func TestRequestQueryOptionsClampRemotePagination(t *testing.T) {
+	options := parseRequestQueryOptions(url.Values{"limit": {"999999"}, "offset": {"999999999"}}, 100, 14)
+	if options.Limit != maxRequestQueryItems || options.Offset != maxRequestQueryOffset {
+		t.Fatalf("unexpected clamps: limit=%d offset=%d", options.Limit, options.Offset)
+	}
+}
+
+func TestRequestDayArchiveKeysClampHistoricSince(t *testing.T) {
+	keys := requestDayArchiveKeys(requestQueryOptions{Since: time.Now().UTC().AddDate(0, 0, -365)})
+	if len(keys) > maxRequestHistoryDays+1 {
+		t.Fatalf("historic probe enumerated too many archive days: %d", len(keys))
+	}
+}
+
+func TestNormalizeRuntimeRouteUsesFiniteUnknownLabel(t *testing.T) {
+	if got := normalizeRuntimeRoute("/untrusted/unique/path"); got != "unknown" {
+		t.Fatalf("expected finite unknown label, got %q", got)
+	}
+}
+
 func TestRequestArchiveLatestRespectsLocalDayTimezoneOffset(t *testing.T) {
 	root := t.TempDir()
 	logPath := filepath.Join(root, "access.log")

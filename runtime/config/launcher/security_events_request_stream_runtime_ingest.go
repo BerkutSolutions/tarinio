@@ -16,21 +16,24 @@ import (
 
 func (s *requestStreamSource) latest(query url.Values) ([]map[string]any, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 
 	options := parseRequestQueryOptions(query, s.maxItems, s.defaultRetention)
 
 	if err := s.ensureArchiveRootLocked(); err != nil {
+		s.mu.Unlock()
 		return nil, err
 	}
 
 	if err := s.ingestArchiveLocked(options.RetentionDays); err != nil {
+		s.mu.Unlock()
 		return nil, err
 	}
 	if options.Probe {
+		s.mu.Unlock()
 		return []map[string]any{}, nil
 	}
 	items, err := s.loadArchiveRowsLocked(options)
+	s.mu.Unlock()
 	if err != nil {
 		return nil, err
 	}

@@ -90,12 +90,17 @@ func (s *requestStreamSource) latestFromBackendsLocked(options requestQueryOptio
 }
 
 func (s *requestStreamSource) ensureArchiveRootLocked() error {
-	if err := os.MkdirAll(s.archiveRoot, 0o755); err == nil {
-		return nil
+	if err := os.MkdirAll(s.archiveRoot, 0o700); err == nil {
+		if err := os.Chmod(s.archiveRoot, 0o700); err == nil {
+			return nil
+		}
 	}
-	fallback := filepath.Join(os.TempDir(), "waf-requests-archive")
-	if mkErr := os.MkdirAll(fallback, 0o755); mkErr != nil {
+	fallback, mkErr := os.MkdirTemp("", "waf-requests-archive-")
+	if mkErr != nil {
 		return mkErr
+	}
+	if err := os.Chmod(fallback, 0o700); err != nil {
+		return err
 	}
 	s.archiveRoot = fallback
 	return nil

@@ -218,7 +218,10 @@ func waitForHTTP(client *http.Client, target string, hostOverride string, timeou
 	deadline := time.Now().Add(timeout)
 	lastErr := ""
 	for time.Now().Before(deadline) {
-		resp, err := doE2ERequest(client, http.MethodGet, target, hostOverride, "text/html,application/json", nil, true)
+		// Readiness only needs to prove that the locally addressed listener is
+		// accepting requests. Do not follow a challenge redirect: its absolute
+		// public host is intentionally not resolvable from the host-side E2E client.
+		resp, err := doE2ERequest(client, http.MethodGet, target, hostOverride, "text/html,application/json", nil, false)
 		if err == nil {
 			_ = resp.Body.Close()
 			if resp.StatusCode >= 200 && resp.StatusCode < 500 {

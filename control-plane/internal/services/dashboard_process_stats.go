@@ -9,6 +9,8 @@ import (
 	"strings"
 )
 
+const maxDashboardProcessSamples = 1024
+
 // collectTopProcessStats reads the current process snapshot from /proc and
 // computes CPU percentages relative to the previous call. On the very first
 // call there is no previous snapshot, so all cpu_percent values are 0; from
@@ -108,7 +110,8 @@ func readProcessSamples() (map[int]processSample, uint64, bool) {
 		return nil, 0, false
 	}
 
-	samples := make(map[int]processSample, len(entries))
+	samples := make(map[int]processSample, minInt(len(entries), maxDashboardProcessSamples))
+	visited := 0
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
@@ -117,6 +120,10 @@ func readProcessSamples() (map[int]processSample, uint64, bool) {
 		if err != nil || pid <= 0 {
 			continue
 		}
+		if visited >= maxDashboardProcessSamples {
+			break
+		}
+		visited++
 		sample, ok := readSingleProcessSample(pid)
 		if !ok {
 			continue
@@ -125,6 +132,13 @@ func readProcessSamples() (map[int]processSample, uint64, bool) {
 	}
 
 	return samples, totalSample.total, true
+}
+
+func minInt(left, right int) int {
+	if left < right {
+		return left
+	}
+	return right
 }
 
 func readSingleProcessSample(pid int) (processSample, bool) {
@@ -138,12 +152,8 @@ func readSingleProcessSample(pid int) (processSample, bool) {
 		return processSample{}, false
 	}
 
-	if cmdlineContent, err := os.ReadFile(filepath.Join(procRoot, "cmdline")); err == nil {
-		command := strings.TrimSpace(strings.ReplaceAll(string(cmdlineContent), "\x00", " "))
-		if command != "" {
-			sample.command = command
-		}
-	}
+	// Do not expose raw /proc/<pid>/cmdline through dashboard.read: command
+	// lines commonly contain passwords, tokens, and connection strings.
 	if sample.command == "" {
 		sample.command = sample.name
 	}

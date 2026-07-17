@@ -9,7 +9,7 @@ const nextStorageKey = "waf_login_next";
 
 async function nextLocation() {
   const setup = await api.get("/api/setup/status");
-  return setup.needs_bootstrap || !setup.has_active_revision
+  return setup.needs_bootstrap
     ? onboardingUrl("/onboarding/user-creation")
     : secureAppUrl("/healthcheck");
 }

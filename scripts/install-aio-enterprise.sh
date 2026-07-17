@@ -243,9 +243,11 @@ ensure_secure_env_defaults() {
 }
 
 safe_snapshot() {
-  mkdir -p "$BACKUP_DIR"
+  umask 077
+  mkdir -p -m 700 "$BACKUP_DIR"
   if [ -f "$INSTALL_DIR/deploy/compose/$PROFILE/.env" ]; then
     cp "$INSTALL_DIR/deploy/compose/$PROFILE/.env" "$BACKUP_DIR/.env"
+    chmod 600 "$BACKUP_DIR/.env"
   fi
   if [ -f "$INSTALL_DIR/deploy/compose/$PROFILE/docker-compose.yml" ]; then
     cp "$INSTALL_DIR/deploy/compose/$PROFILE/docker-compose.yml" "$BACKUP_DIR/docker-compose.yml"

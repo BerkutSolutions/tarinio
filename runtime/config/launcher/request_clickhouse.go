@@ -45,6 +45,7 @@ type requestLogRecord struct {
 type requestClickHouseConfig struct {
 	Enabled          bool
 	Endpoint         string
+	TLSCAFile        string
 	Database         string
 	Username         string
 	Password         string
@@ -96,6 +97,10 @@ func (s *requestClickHouseStore) currentConfig() (requestClickHouseConfig, error
 	if !loggingconfig.EnabledClickHouse(logging) {
 		return requestClickHouseConfig{}, nil
 	}
+	endpoint, err := loggingconfig.ValidateClickHouseEndpoint(logging.ClickHouse.Endpoint, loggingconfig.AllowedClickHouseEndpointsFromEnv())
+	if err != nil {
+		return requestClickHouseConfig{}, err
+	}
 	password := ""
 	if loggingconfig.EnabledVault(logging) {
 		client := vaultkv.Client{
@@ -117,7 +122,8 @@ func (s *requestClickHouseStore) currentConfig() (requestClickHouseConfig, error
 	}
 	return requestClickHouseConfig{
 		Enabled:          true,
-		Endpoint:         logging.ClickHouse.Endpoint,
+		Endpoint:         endpoint,
+		TLSCAFile:        logging.ClickHouse.TLSCAFile,
 		Database:         logging.ClickHouse.Database,
 		Username:         logging.ClickHouse.Username,
 		Password:         password,
@@ -393,14 +399,18 @@ func (s *requestClickHouseStore) query(cfg requestClickHouseConfig, query string
 	if client == nil {
 		client = &http.Client{Timeout: 10 * time.Second}
 	}
+	client = clickHouseClientWithoutRedirects(client)
+	client, err = storageHTTPClient(client, cfg.TLSCAFile)
+	if err != nil {
+		return nil, err
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		defer resp.Body.Close()
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
-		return nil, fmt.Errorf("clickhouse query failed: status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(body)))
+		return nil, fmt.Errorf("clickhouse query failed: status=%d", resp.StatusCode)
 	}
 	return resp.Body, nil
 }
@@ -414,14 +424,18 @@ func (s *requestClickHouseStore) doQuery(cfg requestClickHouseConfig, query stri
 	if client == nil {
 		client = &http.Client{Timeout: 10 * time.Second}
 	}
+	client = clickHouseClientWithoutRedirects(client)
+	client, err = storageHTTPClient(client, cfg.TLSCAFile)
+	if err != nil {
+		return err
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		content, _ := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
-		return fmt.Errorf("clickhouse query failed: status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(content)))
+		return fmt.Errorf("clickhouse query failed: status=%d", resp.StatusCode)
 	}
 	return nil
 }
@@ -443,6 +457,14 @@ func (s *requestClickHouseStore) newRequest(cfg requestClickHouseConfig, query s
 		req.SetBasicAuth(cfg.Username, cfg.Password)
 	}
 	return req, nil
+}
+
+func clickHouseClientWithoutRedirects(client *http.Client) *http.Client {
+	copy := *client
+	copy.CheckRedirect = func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	return &copy
 }
 
 func newRequestLogRecord(item parsedAccess) requestLogRecord {

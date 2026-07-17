@@ -1,0 +1,16 @@
+cluster.name: tarinio-enterprise
+network.host: 0.0.0.0
+discovery.type: single-node
+plugins.security.ssl.transport.pemcert_filepath: tls/node.crt
+plugins.security.ssl.transport.pemkey_filepath: tls/tls.key
+plugins.security.ssl.transport.pemtrustedcas_filepath: tls/ca.crt
+plugins.security.ssl.http.enabled: true
+plugins.security.ssl.http.pemcert_filepath: tls/node.crt
+plugins.security.ssl.http.pemkey_filepath: tls/tls.key
+plugins.security.ssl.http.pemtrustedcas_filepath: tls/ca.crt
+plugins.security.authcz.admin_dn:
+  - "CN=tarinio-opensearch-admin"
+plugins.security.nodes_dn:
+  - "CN=tarinio-opensearch"
+plugins.security.allow_default_init_securityindex: true
+plugins.security.allow_unsafe_democertificates: false

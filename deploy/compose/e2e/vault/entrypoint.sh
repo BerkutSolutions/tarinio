@@ -7,6 +7,7 @@ BOOTSTRAP_DIR="${VAULT_BOOTSTRAP_DIR:-/vault/bootstrap}"
 INIT_FILE="${BOOTSTRAP_DIR}/init.txt"
 UNSEAL_FILE="${BOOTSTRAP_DIR}/unseal-key"
 ROOT_TOKEN_FILE="${BOOTSTRAP_DIR}/root-token"
+APP_TOKEN_FILE="${VAULT_APP_TOKEN_FILE:-/vault/app-token/token}"
 MOUNT_NAME="$(printf "%s" "${VAULT_MOUNT:-secret}" | tr -d '\r' | sed 's#^/*##; s#/*$##')"
 
 mkdir -p /vault/file "$BOOTSTRAP_DIR"
@@ -92,9 +93,31 @@ ensure_mount() {
   vault secrets enable -address="$LOCAL_ADDR" -path="$MOUNT_NAME" -version=2 kv >/dev/null
 }
 
+ensure_app_token() {
+  [ -s "$ROOT_TOKEN_FILE" ] || return 0
+  mkdir -p "$(dirname "$APP_TOKEN_FILE")"
+  chmod 700 "$(dirname "$APP_TOKEN_FILE")"
+  if [ -s "$APP_TOKEN_FILE" ]; then
+    chmod 600 "$APP_TOKEN_FILE"
+    return 0
+  fi
+  export VAULT_TOKEN="$(cat "$ROOT_TOKEN_FILE")"
+  vault policy write -address="$LOCAL_ADDR" tarinio-app - <<EOF
+path "${MOUNT_NAME}/data/tarinio/*" {
+  capabilities = ["create", "read", "update", "delete", "list"]
+}
+path "${MOUNT_NAME}/metadata/tarinio/*" {
+  capabilities = ["list", "read", "delete"]
+}
+EOF
+  vault token create -address="$LOCAL_ADDR" -orphan -policy=tarinio-app -field=token >"$APP_TOKEN_FILE"
+  chmod 600 "$APP_TOKEN_FILE"
+}
+
 wait_for_api
 ensure_initialized
 ensure_unsealed
 ensure_mount
+ensure_app_token
 
 wait "$VAULT_PID"

@@ -56,11 +56,17 @@ func Normalize(p VirtualPatch) VirtualPatch {
 
 // Validate checks that the patch fields are well-formed.
 func Validate(p VirtualPatch) error {
+	if !safePatchIdentifier(p.ID) {
+		return errors.New("virtual patch id must be a safe identifier")
+	}
 	if strings.TrimSpace(p.SiteID) == "" {
 		return errors.New("virtual patch site_id is required")
 	}
 	if strings.TrimSpace(p.Pattern) == "" {
 		return errors.New("virtual patch pattern is required")
+	}
+	if containsControlCharacter(p.Pattern) {
+		return errors.New("virtual patch pattern must not contain control characters")
 	}
 	if _, err := regexp.Compile(p.Pattern); err != nil {
 		return errors.New("virtual patch pattern is not a valid regex: " + err.Error())
@@ -81,4 +87,22 @@ func Validate(p VirtualPatch) error {
 		}
 	}
 	return nil
+}
+
+func safePatchIdentifier(value string) bool {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return false
+	}
+	for _, r := range value {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '.' || r == '_' || r == '-' {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func containsControlCharacter(value string) bool {
+	return strings.IndexFunc(value, func(r rune) bool { return r < 0x20 || r == 0x7f }) >= 0
 }

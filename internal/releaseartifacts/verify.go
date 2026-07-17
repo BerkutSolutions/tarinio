@@ -21,10 +21,17 @@ type signaturePayload struct {
 	Signature      string `json:"signature"`
 }
 
-func Verify(outputDir string) error {
+// Verify validates an artifact directory against a public key kept outside it.
+// The trust root must be supplied by the deployment/release process, never by
+// a file that arrived together with the artifacts being verified.
+func Verify(outputDir, trustedPublicKeyPath string) error {
 	dir := strings.TrimSpace(outputDir)
 	if dir == "" {
 		return errors.New("output directory is required")
+	}
+	trustedPublicKeyPath = strings.TrimSpace(trustedPublicKeyPath)
+	if trustedPublicKeyPath == "" {
+		return errors.New("trusted public key path is required")
 	}
 	requiredFiles := []string{
 		"release-manifest.json",
@@ -43,7 +50,11 @@ func Verify(outputDir string) error {
 	if err := verifyChecksums(dir); err != nil {
 		return err
 	}
-	return verifySignature(dir)
+	trustedPublicKeyRaw, err := os.ReadFile(trustedPublicKeyPath)
+	if err != nil {
+		return fmt.Errorf("read trusted public key: %w", err)
+	}
+	return verifySignature(dir, trustedPublicKeyRaw)
 }
 
 func verifyChecksums(outputDir string) error {
@@ -79,7 +90,7 @@ func verifyChecksums(outputDir string) error {
 	return nil
 }
 
-func verifySignature(outputDir string) error {
+func verifySignature(outputDir string, trustedPublicKeyRaw []byte) error {
 	manifestRaw, err := os.ReadFile(filepath.Join(outputDir, "release-manifest.json"))
 	if err != nil {
 		return fmt.Errorf("read release-manifest.json: %w", err)
@@ -88,11 +99,6 @@ func verifySignature(outputDir string) error {
 	if err != nil {
 		return fmt.Errorf("read signature.json: %w", err)
 	}
-	publicKeyRaw, err := os.ReadFile(filepath.Join(outputDir, "release-public-key.pem"))
-	if err != nil {
-		return fmt.Errorf("read release-public-key.pem: %w", err)
-	}
-
 	var signature signaturePayload
 	if err := json.Unmarshal(signatureRaw, &signature); err != nil {
 		return fmt.Errorf("decode signature.json: %w", err)
@@ -109,7 +115,7 @@ func verifySignature(outputDir string) error {
 		return errors.New("manifest hash mismatch in signature.json")
 	}
 
-	block, _ := pem.Decode(publicKeyRaw)
+	block, _ := pem.Decode(trustedPublicKeyRaw)
 	if block == nil || len(block.Bytes) != ed25519.PublicKeySize {
 		return errors.New("invalid public key format")
 	}

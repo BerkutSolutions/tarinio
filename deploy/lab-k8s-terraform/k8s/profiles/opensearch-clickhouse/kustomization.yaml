@@ -3,3 +3,6 @@ kind: Kustomization
 resources:
   - ../../manifests
   - 60-clickhouse.yaml
+  - 61-clickhouse-security-config.yaml
+patches:
+  - path: 62-storage-client-security-patch.yaml

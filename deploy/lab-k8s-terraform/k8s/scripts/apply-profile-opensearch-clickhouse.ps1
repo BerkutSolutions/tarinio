@@ -7,6 +7,10 @@ $ErrorActionPreference = "Stop"
 
 $profileManifest = "deploy/lab-k8s-terraform/k8s/profiles/opensearch-clickhouse"
 
+foreach ($secretName in @("tarinio-lab-opensearch-tls", "tarinio-lab-opensearch-security", "tarinio-lab-clickhouse-tls", "tarinio-lab-clickhouse-users")) {
+  kubectl -n $Namespace get secret $secretName | Out-Null
+}
+
 Write-Host "Applying OpenSearch+ClickHouse k8s profile..." -ForegroundColor Cyan
 kubectl apply -k $profileManifest
 
@@ -20,4 +24,3 @@ if (-not $SkipRuntimeProfileConfig) {
 }
 
 Write-Host "OpenSearch+ClickHouse profile apply completed." -ForegroundColor Green
-

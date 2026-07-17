@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -13,6 +14,8 @@ import (
 )
 
 const runtimeSecurityEventsAttemptTimeout = 1200 * time.Millisecond
+const runtimeSecurityEventsMaxResponseBytes = 2 << 20
+const runtimeSecurityEventsMaxItems = 1000
 
 type RuntimeSecurityEventCollector interface {
 	Collect() ([]events.Event, error)
@@ -81,8 +84,11 @@ func (c *HTTPRuntimeSecurityEventCollector) Collect() ([]events.Event, error) {
 					Details         map[string]any `json:"details"`
 				} `json:"events"`
 			}
-			if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+			if err := json.NewDecoder(io.LimitReader(resp.Body, runtimeSecurityEventsMaxResponseBytes+1)).Decode(&payload); err != nil {
 				return nil, err
+			}
+			if len(payload.Events) > runtimeSecurityEventsMaxItems {
+				return nil, fmt.Errorf("runtime security events response exceeds item limit")
 			}
 
 			out := make([]events.Event, 0, len(payload.Events))

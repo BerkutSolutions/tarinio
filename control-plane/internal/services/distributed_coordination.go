@@ -172,40 +172,51 @@ func (c *RedisDistributedCoordinator) acquireWithRetry(ctx context.Context, key 
 }
 
 func runWithRefreshedLock(ctx context.Context, lock rediscoord.HeldLock, ttl time.Duration, fn func(context.Context) error) error {
-	refreshCtx, cancel := context.WithCancel(ctx)
+	operationCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	errCh := make(chan error, 1)
+	refreshErrCh := make(chan error, 1)
 	go func() {
 		ticker := time.NewTicker(ttl / 3)
 		defer ticker.Stop()
 		for {
 			select {
-			case <-refreshCtx.Done():
-				errCh <- nil
+			case <-operationCtx.Done():
+				refreshErrCh <- nil
 				return
 			case <-ticker.C:
 				if err := lock.Refresh(context.Background(), ttl); err != nil {
-					errCh <- err
+					cancel()
+					refreshErrCh <- err
 					return
 				}
 			}
 		}
 	}()
 
-	runErr := fn(ctx)
-	cancel()
-	refreshErr := <-errCh
-	releaseErr := lock.Release(context.Background())
-
-	if runErr != nil {
+	runErrCh := make(chan error, 1)
+	go func() { runErrCh <- fn(operationCtx) }()
+	select {
+	case refreshErr := <-refreshErrCh:
+		if refreshErr != nil {
+			_ = lock.Release(context.Background())
+			return fmt.Errorf("distributed lock lease lost: %w", refreshErr)
+		}
+		runErr := <-runErrCh
+		if releaseErr := lock.Release(context.Background()); releaseErr != nil && !errors.Is(releaseErr, rediscoord.ErrLockNotAcquired) && runErr == nil {
+			return releaseErr
+		}
+		return runErr
+	case runErr := <-runErrCh:
+		cancel()
+		refreshErr := <-refreshErrCh
+		if refreshErr != nil {
+			_ = lock.Release(context.Background())
+			return fmt.Errorf("distributed lock lease lost: %w", refreshErr)
+		}
+		if releaseErr := lock.Release(context.Background()); releaseErr != nil && !errors.Is(releaseErr, rediscoord.ErrLockNotAcquired) && runErr == nil {
+			return releaseErr
+		}
 		return runErr
 	}
-	if refreshErr != nil {
-		return refreshErr
-	}
-	if releaseErr != nil && !errors.Is(releaseErr, rediscoord.ErrLockNotAcquired) {
-		return releaseErr
-	}
-	return nil
 }

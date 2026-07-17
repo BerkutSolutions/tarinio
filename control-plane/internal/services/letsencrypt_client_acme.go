@@ -29,10 +29,11 @@ import (
 )
 
 type ACMEClientConfig struct {
-	Email        string
-	DirectoryURL string
-	StateDir     string
-	ChallengeDir string
+	Email               string
+	DirectoryURL        string
+	CustomDirectoryURLs []string
+	StateDir            string
+	ChallengeDir        string
 }
 
 type ACMELetsEncryptClient struct {
@@ -51,6 +52,7 @@ var envVarKeyRegexp = regexp.MustCompile(`^[A-Z_][A-Z0-9_]*$`)
 func NewACMELetsEncryptClient(cfg ACMEClientConfig) (*ACMELetsEncryptClient, error) {
 	cfg.Email = strings.TrimSpace(cfg.Email)
 	cfg.DirectoryURL = strings.TrimSpace(cfg.DirectoryURL)
+	cfg.CustomDirectoryURLs = normalizeACMEDirectoryURLs(cfg.CustomDirectoryURLs)
 	cfg.StateDir = strings.TrimSpace(cfg.StateDir)
 	cfg.ChallengeDir = strings.TrimSpace(cfg.ChallengeDir)
 	if cfg.Email == "" {
@@ -107,6 +109,10 @@ func (c *ACMELetsEncryptClient) obtain(commonName string, sanList []string, opti
 
 	legoCfg := lego.NewConfig(user)
 	legoCfg.CADirURL = resolvedOptions.DirectoryURL
+	legoCfg.HTTPClient, err = newACMEHTTPClient(resolvedOptions.DirectoryURL)
+	if err != nil {
+		return IssuedMaterial{}, err
+	}
 	legoCfg.Certificate.KeyType = certcrypto.EC256
 	client, err := lego.NewClient(legoCfg)
 	if err != nil {
@@ -221,6 +227,9 @@ func (c *ACMELetsEncryptClient) resolveIssueOptions(options *ACMEIssueOptions) (
 		resolved.ZeroSSLEABHMACKey = value
 	}
 	if value := strings.TrimSpace(options.CustomDirectoryURL); value != "" {
+		if !c.customDirectoryAllowed(value) {
+			return resolvedACMEIssueOptions{}, errors.New("custom acme directory is not approved by deployment configuration")
+		}
 		resolved.DirectoryURL = value
 	}
 	if len(options.DNSProviderEnv) > 0 {

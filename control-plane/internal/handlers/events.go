@@ -24,6 +24,8 @@ type EventsHandler struct {
 	}
 }
 
+const maxMonitoringEventsPageSize = 500
+
 func NewEventsHandler(events eventService) *EventsHandler {
 	return &EventsHandler{events: events}
 }
@@ -47,8 +49,22 @@ func (h *EventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	items, err := h.events.List()
 	if err != nil {
 		if cached, ok := h.cachedEvents(); ok {
+			offset, limit := monitoringEventsPage(r)
+			total := len(cached)
+			if offset >= total {
+				cached = []events.Event{}
+			} else {
+				end := offset + limit
+				if end > total {
+					end = total
+				}
+				cached = cached[offset:end]
+			}
 			writeJSON(w, http.StatusOK, map[string]any{
 				"events": cached,
+				"total":  total,
+				"limit":  limit,
+				"offset": offset,
 			})
 			return
 		}
@@ -72,9 +88,32 @@ func (h *EventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		items = filtered
 	}
 	h.storeEvents(items)
+	offset, limit := monitoringEventsPage(r)
+	total := len(items)
+	if offset >= total {
+		items = []events.Event{}
+	} else {
+		end := offset + limit
+		if end > total {
+			end = total
+		}
+		items = items[offset:end]
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"events": items,
+		"events":  items,
+		"total":   total,
+		"limit":   limit,
+		"offset":  offset,
 	})
+}
+
+func monitoringEventsPage(r *http.Request) (int, int) {
+	offset := parsePositiveInt(r.URL.Query().Get("offset"), 0)
+	limit := parsePositiveInt(r.URL.Query().Get("limit"), maxMonitoringEventsPageSize)
+	if limit <= 0 || limit > maxMonitoringEventsPageSize {
+		limit = maxMonitoringEventsPageSize
+	}
+	return offset, limit
 }
 
 func (h *EventsHandler) cachedEvents() ([]events.Event, bool) {

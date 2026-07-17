@@ -52,26 +52,31 @@ services:
       CONTROL_PLANE_SENTINEL_BAN_SYNC_MIN_SCORE: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_MIN_SCORE:-10}
       CONTROL_PLANE_SENTINEL_BAN_SYNC_MAX_PROMOTIONS_PER_TICK: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_MAX_PROMOTIONS_PER_TICK:-5}
       POSTGRES_DSN: postgres://${POSTGRES_USER:-waf}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-waf}?sslmode=disable
-      CLICKHOUSE_ENDPOINT: ${CLICKHOUSE_ENDPOINT:-http://clickhouse:8123}
+      CLICKHOUSE_ENDPOINT: ${CLICKHOUSE_ENDPOINT:-https://clickhouse:8443}
       CLICKHOUSE_DB: ${CLICKHOUSE_DB:-waf_logs}
-      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-waf}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-change-me-clickhouse-password}
-      OPENSEARCH_ENDPOINT: ${OPENSEARCH_ENDPOINT:-http://opensearch:9200}
-      OPENSEARCH_USERNAME: ${OPENSEARCH_USERNAME:-admin}
-      OPENSEARCH_PASSWORD: ${OPENSEARCH_PASSWORD:-change-me-opensearch-password}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-waf-runtime}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?set CLICKHOUSE_PASSWORD in .env}
+      CLICKHOUSE_TLS_CA_FILE: /etc/waf/storage/clickhouse/ca.crt
+      WAF_CLICKHOUSE_ALLOWED_ENDPOINTS: https://clickhouse:8443
+      OPENSEARCH_ENDPOINT: ${OPENSEARCH_ENDPOINT:-https://opensearch:9200}
+      OPENSEARCH_USERNAME: ${OPENSEARCH_USERNAME:-waf-runtime}
+      OPENSEARCH_PASSWORD: ${OPENSEARCH_PASSWORD:?set OPENSEARCH_PASSWORD in .env}
+      OPENSEARCH_TLS_CA_FILE: /etc/waf/storage/opensearch/ca.crt
       OPENSEARCH_INDEX_PREFIX: ${OPENSEARCH_INDEX_PREFIX:-waf-hot}
       VAULT_ENABLED: ${VAULT_ENABLED:-true}
       VAULT_ADDR: ${VAULT_ADDR:-http://vault:8200}
       VAULT_MOUNT: ${VAULT_MOUNT:-secret}
       VAULT_PATH_PREFIX: ${VAULT_PATH_PREFIX:-tarinio}
       VAULT_TOKEN: ${VAULT_TOKEN:-}
-      VAULT_TOKEN_FILE: /var/run/waf-secrets/root-token
+      VAULT_TOKEN_FILE: /var/run/waf-app-token/token
     volumes:
       - waf-ha-runtime-data:/var/lib/waf
       - waf-ha-control-plane-data:/var/lib/waf/control-plane
       - waf-ha-certificates-data:/var/lib/waf/control-plane/certificate-materials
       - waf-ha-l4-adaptive:/etc/waf/l4guard-adaptive:ro
-      - waf-ha-vault-bootstrap-data:/var/run/waf-secrets:ro
+      - waf-ha-vault-app-token-data:/var/run/waf-app-token:ro
+      - ${CLICKHOUSE_TLS_DIR:-./storage/clickhouse/tls}:/etc/waf/storage/clickhouse:ro
+      - ${OPENSEARCH_TLS_DIR:-./storage/opensearch/tls}:/etc/waf/storage/opensearch:ro
       - /var/run/docker.sock:/var/run/docker.sock
     expose:
       - "8080"
@@ -124,26 +129,31 @@ services:
       CONTROL_PLANE_SENTINEL_BAN_SYNC_MIN_SCORE: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_MIN_SCORE:-10}
       CONTROL_PLANE_SENTINEL_BAN_SYNC_MAX_PROMOTIONS_PER_TICK: ${CONTROL_PLANE_SENTINEL_BAN_SYNC_MAX_PROMOTIONS_PER_TICK:-5}
       POSTGRES_DSN: postgres://${POSTGRES_USER:-waf}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-waf}?sslmode=disable
-      CLICKHOUSE_ENDPOINT: ${CLICKHOUSE_ENDPOINT:-http://clickhouse:8123}
+      CLICKHOUSE_ENDPOINT: ${CLICKHOUSE_ENDPOINT:-https://clickhouse:8443}
       CLICKHOUSE_DB: ${CLICKHOUSE_DB:-waf_logs}
-      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-waf}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-change-me-clickhouse-password}
-      OPENSEARCH_ENDPOINT: ${OPENSEARCH_ENDPOINT:-http://opensearch:9200}
-      OPENSEARCH_USERNAME: ${OPENSEARCH_USERNAME:-admin}
-      OPENSEARCH_PASSWORD: ${OPENSEARCH_PASSWORD:-change-me-opensearch-password}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-waf-runtime}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?set CLICKHOUSE_PASSWORD in .env}
+      CLICKHOUSE_TLS_CA_FILE: /etc/waf/storage/clickhouse/ca.crt
+      WAF_CLICKHOUSE_ALLOWED_ENDPOINTS: https://clickhouse:8443
+      OPENSEARCH_ENDPOINT: ${OPENSEARCH_ENDPOINT:-https://opensearch:9200}
+      OPENSEARCH_USERNAME: ${OPENSEARCH_USERNAME:-waf-runtime}
+      OPENSEARCH_PASSWORD: ${OPENSEARCH_PASSWORD:?set OPENSEARCH_PASSWORD in .env}
+      OPENSEARCH_TLS_CA_FILE: /etc/waf/storage/opensearch/ca.crt
       OPENSEARCH_INDEX_PREFIX: ${OPENSEARCH_INDEX_PREFIX:-waf-hot}
       VAULT_ENABLED: ${VAULT_ENABLED:-true}
       VAULT_ADDR: ${VAULT_ADDR:-http://vault:8200}
       VAULT_MOUNT: ${VAULT_MOUNT:-secret}
       VAULT_PATH_PREFIX: ${VAULT_PATH_PREFIX:-tarinio}
       VAULT_TOKEN: ${VAULT_TOKEN:-}
-      VAULT_TOKEN_FILE: /var/run/waf-secrets/root-token
+      VAULT_TOKEN_FILE: /var/run/waf-app-token/token
     volumes:
       - waf-ha-runtime-data:/var/lib/waf
       - waf-ha-control-plane-data:/var/lib/waf/control-plane
       - waf-ha-certificates-data:/var/lib/waf/control-plane/certificate-materials
       - waf-ha-l4-adaptive:/etc/waf/l4guard-adaptive:ro
-      - waf-ha-vault-bootstrap-data:/var/run/waf-secrets:ro
+      - waf-ha-vault-app-token-data:/var/run/waf-app-token:ro
+      - ${CLICKHOUSE_TLS_DIR:-./storage/clickhouse/tls}:/etc/waf/storage/clickhouse:ro
+      - ${OPENSEARCH_TLS_DIR:-./storage/opensearch/tls}:/etc/waf/storage/opensearch:ro
       - /var/run/docker.sock:/var/run/docker.sock
     expose:
       - "8080"
@@ -184,20 +194,23 @@ services:
       WAF_RUNTIME_API_TOKEN: ${WAF_RUNTIME_API_TOKEN:?set WAF_RUNTIME_API_TOKEN in .env}
       WAF_RUNTIME_METRICS_TOKEN: ${WAF_RUNTIME_METRICS_TOKEN:-ha-lab-runtime-metrics}
       CONTROL_PLANE_SECURITY_PEPPER: ${CONTROL_PLANE_SECURITY_PEPPER:?set CONTROL_PLANE_SECURITY_PEPPER in .env}
-      CLICKHOUSE_ENDPOINT: ${CLICKHOUSE_ENDPOINT:-http://clickhouse:8123}
+      CLICKHOUSE_ENDPOINT: ${CLICKHOUSE_ENDPOINT:-https://clickhouse:8443}
       CLICKHOUSE_DB: ${CLICKHOUSE_DB:-waf_logs}
-      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-waf}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-change-me-clickhouse-password}
-      OPENSEARCH_ENDPOINT: ${OPENSEARCH_ENDPOINT:-http://opensearch:9200}
-      OPENSEARCH_USERNAME: ${OPENSEARCH_USERNAME:-admin}
-      OPENSEARCH_PASSWORD: ${OPENSEARCH_PASSWORD:-change-me-opensearch-password}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-waf-runtime}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?set CLICKHOUSE_PASSWORD in .env}
+      CLICKHOUSE_TLS_CA_FILE: /etc/waf/storage/clickhouse/ca.crt
+      WAF_CLICKHOUSE_ALLOWED_ENDPOINTS: https://clickhouse:8443
+      OPENSEARCH_ENDPOINT: ${OPENSEARCH_ENDPOINT:-https://opensearch:9200}
+      OPENSEARCH_USERNAME: ${OPENSEARCH_USERNAME:-waf-runtime}
+      OPENSEARCH_PASSWORD: ${OPENSEARCH_PASSWORD:?set OPENSEARCH_PASSWORD in .env}
+      OPENSEARCH_TLS_CA_FILE: /etc/waf/storage/opensearch/ca.crt
       OPENSEARCH_INDEX_PREFIX: ${OPENSEARCH_INDEX_PREFIX:-waf-hot}
       VAULT_ENABLED: ${VAULT_ENABLED:-true}
       VAULT_ADDR: ${VAULT_ADDR:-http://vault:8200}
       VAULT_MOUNT: ${VAULT_MOUNT:-secret}
       VAULT_PATH_PREFIX: ${VAULT_PATH_PREFIX:-tarinio}
       VAULT_TOKEN: ${VAULT_TOKEN:-}
-      VAULT_TOKEN_FILE: /var/run/waf-secrets/root-token
+      VAULT_TOKEN_FILE: /var/run/waf-app-token/token
       WAF_L4_GUARD_ADAPTIVE_PATH: /etc/waf/l4guard-adaptive/adaptive.json
       WAF_L4_GUARD_REAPPLY_INTERVAL_SECONDS: ${WAF_L4_GUARD_REAPPLY_INTERVAL_SECONDS:-5}
     cap_add:
@@ -211,7 +224,9 @@ services:
       - waf-ha-control-plane-data:/var/lib/waf/control-plane:ro
       - waf-ha-nginx-logs:/var/log/nginx
       - waf-ha-l4-adaptive:/etc/waf/l4guard-adaptive:ro
-      - waf-ha-vault-bootstrap-data:/var/run/waf-secrets:ro
+      - waf-ha-vault-app-token-data:/var/run/waf-app-token:ro
+      - ${CLICKHOUSE_TLS_DIR:-./storage/clickhouse/tls}:/etc/waf/storage/clickhouse:ro
+      - ${OPENSEARCH_TLS_DIR:-./storage/opensearch/tls}:/etc/waf/storage/opensearch:ro
     ports:
       - "${HA_WAF_HTTP_PORT:-18085}:80"
       - "${HA_WAF_HTTPS_PORT:-18443}:443"
@@ -269,12 +284,15 @@ services:
     restart: unless-stopped
     environment:
       CLICKHOUSE_DB: ${CLICKHOUSE_DB:-waf_logs}
-      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-waf}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-change-me-clickhouse-password}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-waf-runtime}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?set CLICKHOUSE_PASSWORD in .env}
     volumes:
       - waf-ha-clickhouse-data:/var/lib/clickhouse
+      - ./storage/clickhouse/10-tls-only.xml:/etc/clickhouse-server/config.d/10-tls-only.xml:ro
+      - ${CLICKHOUSE_TLS_DIR:-./storage/clickhouse/tls}:/etc/clickhouse-server/tls:ro
+      - ${CLICKHOUSE_USERS_DIR:-./storage/clickhouse/users}:/etc/clickhouse-server/users.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8123/ping | grep -q Ok"]
+      test: ["CMD-SHELL", "wget --no-check-certificate -qO- --user=$$CLICKHOUSE_USER --password=$$CLICKHOUSE_PASSWORD https://127.0.0.1:8443/ping | grep -q Ok"]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -290,12 +308,16 @@ services:
     environment:
       discovery.type: single-node
       DISABLE_INSTALL_DEMO_CONFIG: "true"
-      DISABLE_SECURITY_PLUGIN: "true"
+      WAF_STORAGE_HEALTH_USER: ${OPENSEARCH_USERNAME:-waf-runtime}
+      WAF_STORAGE_HEALTH_PASSWORD: ${OPENSEARCH_PASSWORD:?set OPENSEARCH_PASSWORD in .env}
       OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
     volumes:
       - waf-ha-opensearch-data:/usr/share/opensearch/data
+      - ./storage/opensearch/opensearch.yml:/usr/share/opensearch/config/opensearch.yml:ro
+      - ${OPENSEARCH_TLS_DIR:-./storage/opensearch/tls}:/usr/share/opensearch/config/tls:ro
+      - ${OPENSEARCH_SECURITY_DIR:-./storage/opensearch/security}:/usr/share/opensearch/config/opensearch-security:ro
     healthcheck:
-      test: ["CMD-SHELL", "bash -lc 'exec 3<>/dev/tcp/127.0.0.1/9200'"]
+      test: ["CMD-SHELL", "curl --fail --silent --show-error --cacert /usr/share/opensearch/config/tls/ca.crt --user $$WAF_STORAGE_HEALTH_USER:$$WAF_STORAGE_HEALTH_PASSWORD https://127.0.0.1:9200/_cluster/health >/dev/null"]
       interval: 15s
       timeout: 5s
       retries: 20
@@ -329,6 +351,7 @@ services:
     volumes:
       - waf-ha-vault-data:/vault/file
       - waf-ha-vault-bootstrap-data:/vault/bootstrap
+      - waf-ha-vault-app-token-data:/vault/app-token
       - ./vault/entrypoint.sh:/usr/local/bin/tarinio-vault-entrypoint:ro
     healthcheck:
       test: ["CMD-SHELL", "vault status -address=http://127.0.0.1:8200 >/dev/null 2>&1; code=$$?; [ \"$$code\" = \"0\" ]"]
@@ -466,7 +489,7 @@ services:
       - --storage.tsdb.path=/prometheus
       - --storage.tsdb.retention.time=7d
     ports:
-      - "${HA_PROMETHEUS_PORT:-19090}:9090"
+      - "127.0.0.1:${HA_PROMETHEUS_PORT:-19090}:9090"
     networks:
       - waf-ha-net
     mem_limit: 512m
@@ -482,15 +505,23 @@ services:
       prometheus:
         condition: service_started
     environment:
-      GF_SECURITY_ADMIN_USER: ${HA_GRAFANA_ADMIN_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${HA_GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_SECURITY_ADMIN_USER: ${HA_GRAFANA_ADMIN_USER:-}
+      GF_SECURITY_ADMIN_PASSWORD: ${HA_GRAFANA_ADMIN_PASSWORD:-}
       GF_USERS_ALLOW_SIGN_UP: "false"
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        case "$${GF_SECURITY_ADMIN_USER}:$${GF_SECURITY_ADMIN_PASSWORD}" in
+          :*|admin:admin|*CHANGE_ME*) echo "set unique HA_GRAFANA_ADMIN_USER and HA_GRAFANA_ADMIN_PASSWORD" >&2; exit 64 ;;
+        esac
+        exec /run.sh
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
       - waf-ha-grafana-data:/var/lib/grafana
     ports:
-      - "${HA_GRAFANA_PORT:-13000}:3000"
+      - "127.0.0.1:${HA_GRAFANA_PORT:-13000}:3000"
     networks:
       - waf-ha-net
     mem_limit: 384m
@@ -564,6 +595,8 @@ volumes:
     name: waf-ha-vault-data
   waf-ha-vault-bootstrap-data:
     name: waf-ha-vault-bootstrap-data
+  waf-ha-vault-app-token-data:
+    name: waf-ha-vault-app-token-data
   waf-ha-prometheus-data:
     name: waf-ha-prometheus-data
   waf-ha-grafana-data:

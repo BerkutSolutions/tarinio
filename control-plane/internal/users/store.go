@@ -65,8 +65,10 @@ type state struct {
 }
 
 type Store struct {
-	state *storage.JSONState
-	mu    sync.Mutex
+	state     *storage.JSONState
+	mu        sync.Mutex
+	atomic    storage.AtomicDocumentBackend
+	atomicKey string
 }
 
 func NewStore(root string, bootstrap BootstrapUser) (*Store, error) {
@@ -87,8 +89,9 @@ func NewPostgresStore(root string, backend storage.Backend, bootstrap BootstrapU
 	if strings.TrimSpace(root) == "" {
 		return nil, errors.New("users store root is required")
 	}
-	store := &Store{
-		state: storage.NewBackendJSONState(backend, "users/users.json", filepath.Join(root, "users.json")),
+	store := &Store{state: storage.NewBackendJSONState(backend, "users/users.json", filepath.Join(root, "users.json")), atomicKey: "users/users.json"}
+	if atomic, ok := backend.(storage.AtomicDocumentBackend); ok {
+		store.atomic = atomic
 	}
 	if err := store.seedBootstrap(bootstrap); err != nil {
 		return nil, err
@@ -268,6 +271,9 @@ func (s *Store) MarkLogin(userID string, when time.Time) error {
 }
 
 func (s *Store) seedBootstrap(bootstrap BootstrapUser) error {
+	if s.atomic != nil {
+		return s.seedBootstrapAtomic(bootstrap)
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -298,6 +304,33 @@ func (s *Store) seedBootstrap(bootstrap BootstrapUser) error {
 		UpdatedAt:    now,
 	}))
 	return s.saveLocked(current)
+}
+
+func (s *Store) seedBootstrapAtomic(bootstrap BootstrapUser) error {
+	if !bootstrap.Enabled {
+		return nil
+	}
+	passwordHash, err := HashPassword(bootstrap.Password)
+	if err != nil {
+		return err
+	}
+	return s.atomic.UpdateDocument(s.atomicKey, func(raw []byte) ([]byte, error) {
+		current := &state{}
+		if len(raw) > 0 && string(raw) != "{}" {
+			if err := json.Unmarshal(raw, current); err != nil {
+				return nil, fmt.Errorf("decode users store: %w", err)
+			}
+		}
+		if len(current.Users) == 0 {
+			now := time.Now().UTC().Format(time.RFC3339)
+			current.Users = append(current.Users, normalizeUser(User{ID: bootstrap.ID, Username: bootstrap.Username, Email: bootstrap.Email, PasswordHash: passwordHash, IsActive: true, RoleIDs: append([]string(nil), bootstrap.RoleIDs...), CreatedAt: now, UpdatedAt: now}))
+		}
+		content, err := json.MarshalIndent(current, "", "  ")
+		if err != nil {
+			return nil, err
+		}
+		return append(content, '\n'), nil
+	})
 }
 
 func (s *Store) loadLocked() (*state, error) {

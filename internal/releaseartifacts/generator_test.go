@@ -1,7 +1,12 @@
 package releaseartifacts
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
+	"encoding/pem"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -72,7 +77,15 @@ func TestGenerateReleaseArtifacts(t *testing.T) {
 	if got := sbom["bomFormat"]; got != "CycloneDX" {
 		t.Fatalf("sbom bomFormat = %v", got)
 	}
-	if err := Verify(outputDir); err != nil {
+	trustedKeyPath := filepath.Join(t.TempDir(), "release-public-key.pem")
+	trustedKey, err := os.ReadFile(result.PublicKeyPath)
+	if err != nil {
+		t.Fatalf("read generated public key: %v", err)
+	}
+	if err := os.WriteFile(trustedKeyPath, trustedKey, 0o600); err != nil {
+		t.Fatalf("write trusted public key: %v", err)
+	}
+	if err := Verify(outputDir, trustedKeyPath); err != nil {
 		t.Fatalf("Verify() error = %v", err)
 	}
 }
@@ -95,8 +108,58 @@ func TestVerifyReleaseArtifactsFailsOnTamper(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(outputDir, "provenance.json"), []byte(`{"tampered":true}`), 0o644); err != nil {
 		t.Fatalf("tamper provenance: %v", err)
 	}
-	if err := Verify(outputDir); err == nil {
+	trustedKeyPath := filepath.Join(t.TempDir(), "release-public-key.pem")
+	trustedKey, err := os.ReadFile(filepath.Join(outputDir, "release-public-key.pem"))
+	if err != nil {
+		t.Fatalf("read generated public key: %v", err)
+	}
+	if err := os.WriteFile(trustedKeyPath, trustedKey, 0o600); err != nil {
+		t.Fatalf("write trusted public key: %v", err)
+	}
+	if err := Verify(outputDir, trustedKeyPath); err == nil {
 		t.Fatal("expected Verify() to fail after artifact tampering")
+	}
+}
+
+func TestVerifyReleaseArtifactsRejectsArtifactProvidedReplacementKey(t *testing.T) {
+	repoRoot := filepath.Clean(filepath.Join("..", ".."))
+	trustedRelease := filepath.Join(t.TempDir(), "trusted")
+	if _, err := Generate(Options{RepoRoot: repoRoot, Version: "3.0.0", CommitSHA: "trusted", Tag: "v3.0.0", OutputDir: trustedRelease}); err != nil {
+		t.Fatalf("generate trusted release: %v", err)
+	}
+	trustedKeyPath := filepath.Join(t.TempDir(), "trust.pem")
+	trustedKey, err := os.ReadFile(filepath.Join(trustedRelease, "release-public-key.pem"))
+	if err != nil {
+		t.Fatalf("read trusted key: %v", err)
+	}
+	if err := os.WriteFile(trustedKeyPath, trustedKey, 0o600); err != nil {
+		t.Fatalf("write trusted key: %v", err)
+	}
+	replacement := filepath.Join(t.TempDir(), "replacement")
+	if err := os.MkdirAll(replacement, 0o755); err != nil {
+		t.Fatalf("create replacement directory: %v", err)
+	}
+	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("generate replacement key: %v", err)
+	}
+	manifest := []byte(`{"format":"tarinio-release-artifacts/v1","signing_key_id":"replacement"}`)
+	signature := ed25519.Sign(privateKey, manifest)
+	files := map[string][]byte{
+		"release-manifest.json": manifest,
+		"checksums.txt":          nil,
+		"sbom.cdx.json":          []byte(`{}`),
+		"provenance.json":        []byte(`{}`),
+		"release-public-key.pem": pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: publicKey}),
+		"signature.json":         []byte(fmt.Sprintf(`{"algorithm":"ed25519","key_id":"replacement","signed_object":"release-manifest.json","manifest_sha256":"%s","signature":"%s"}`, sha256Hex(manifest), hex.EncodeToString(signature))),
+	}
+	for name, content := range files {
+		if err := os.WriteFile(filepath.Join(replacement, name), content, 0o644); err != nil {
+			t.Fatalf("write replacement artifact %s: %v", name, err)
+		}
+	}
+	if err := Verify(replacement, trustedKeyPath); err == nil {
+		t.Fatal("expected replacement artifact directory key to be rejected")
 	}
 }
 

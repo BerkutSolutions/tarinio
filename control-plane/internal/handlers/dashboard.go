@@ -6,13 +6,17 @@ import (
 	"net/url"
 	"strings"
 
+	"waf/control-plane/internal/auth"
+	"waf/control-plane/internal/rbac"
 	"waf/control-plane/internal/services"
 )
 
 type dashboardService interface {
 	Stats() (services.DashboardStats, error)
+	StatsForActor(actorID string) (services.DashboardStats, error)
+	StatsForActorWithProcessDetails(actorID string, includeProcessDetails bool) (services.DashboardStats, error)
 	Probe(kind string, query url.Values) error
-	DismissServiceErrors(errorIDs []string)
+	DismissServiceErrors(actorID string, errorIDs []string)
 }
 
 type DashboardHandler struct {
@@ -43,7 +47,7 @@ func (h *DashboardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 		return
 	}
-	stats, err := h.service.Stats()
+	stats, err := h.service.StatsForActorWithProcessDetails(dashboardActorID(r), dashboardCanReadProcessDetails(r))
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
 		return
@@ -54,6 +58,11 @@ func (h *DashboardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // handleDismissServiceErrors обрабатывает DELETE /api/dashboard/services/{name}/errors
 // Тело запроса: {"error_ids": ["id1", "id2"]} или пустое (скрыть все ошибки сервиса).
 func (h *DashboardHandler) handleDismissServiceErrors(w http.ResponseWriter, r *http.Request) {
+	actorID := dashboardActorID(r)
+	if actorID == "" {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "authenticated session is required"})
+		return
+	}
 	// Извлекаем имя сервиса из пути.
 	trimmed := strings.TrimPrefix(r.URL.Path, "/api/dashboard/services/")
 	trimmed = strings.TrimSuffix(trimmed, "/errors")
@@ -75,7 +84,7 @@ func (h *DashboardHandler) handleDismissServiceErrors(w http.ResponseWriter, r *
 
 	// Если error_ids не переданы — нужно получить все ошибки сервиса из stats и скрыть их.
 	if len(body.ErrorIDs) == 0 {
-		stats, err := h.service.Stats()
+		stats, err := h.service.StatsForActor(actorID)
 		if err == nil {
 			for _, svc := range stats.Services {
 				if svc.Name != serviceName {
@@ -89,7 +98,27 @@ func (h *DashboardHandler) handleDismissServiceErrors(w http.ResponseWriter, r *
 		}
 	}
 
-	h.service.DismissServiceErrors(body.ErrorIDs)
+	h.service.DismissServiceErrors(actorID, body.ErrorIDs)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "dismissed": len(body.ErrorIDs)})
 }
 
+func dashboardActorID(r *http.Request) string {
+	session, ok := auth.SessionFromContext(r.Context())
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(session.UserID)
+}
+
+func dashboardCanReadProcessDetails(r *http.Request) bool {
+	session, ok := auth.SessionFromContext(r.Context())
+	if !ok {
+		return false
+	}
+	for _, permission := range session.Permissions {
+		if rbac.Permission(permission) == rbac.PermissionAdministrationRead {
+			return true
+		}
+	}
+	return false
+}

@@ -92,6 +92,34 @@ func TestRenderAccessRateLimitArtifacts_RejectsInvalidRatePolicy(t *testing.T) {
 	}
 }
 
+func TestRenderAccessRateLimitArtifacts_RejectsTrustedProxyDirectiveInjection(t *testing.T) {
+	_, err := RenderAccessRateLimitArtifacts(
+		[]SiteInput{{ID: "site-a", Enabled: true, PrimaryHost: "a.example.com", ListenHTTP: true, DefaultUpstreamID: "up-a"}},
+		[]AccessPolicyInput{{ID: "access-a", SiteID: "site-a", TrustedProxyCIDRs: []string{"10.0.0.0/8; deny all"}}},
+		nil,
+	)
+	if err == nil {
+		t.Fatal("expected unsafe trusted proxy value to be rejected")
+	}
+}
+
+func TestRenderAccessRateLimitArtifacts_RendersValidTrustedProxyCIDR(t *testing.T) {
+	artifacts, err := RenderAccessRateLimitArtifacts(
+		[]SiteInput{{ID: "site-a", Enabled: true, PrimaryHost: "a.example.com", ListenHTTP: true, DefaultUpstreamID: "up-a"}},
+		[]AccessPolicyInput{{ID: "access-a", SiteID: "site-a", TrustedProxyCIDRs: []string{"10.0.0.0/8"}}},
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("render failed: %v", err)
+	}
+	for _, artifact := range artifacts {
+		if artifact.Path == "nginx/conf.d/real_ip.conf" && strings.Contains(string(artifact.Content), "set_real_ip_from 10.0.0.0/8;") {
+			return
+		}
+	}
+	t.Fatal("expected valid trusted proxy CIDR in real_ip.conf")
+}
+
 func TestRenderAccessRateLimitArtifacts_AllowlistKeepsRateLimitKeying(t *testing.T) {
 	artifacts, err := RenderAccessRateLimitArtifacts(
 		[]SiteInput{

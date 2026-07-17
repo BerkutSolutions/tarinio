@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"waf/control-plane/apiroutes"
 )
@@ -63,12 +64,22 @@ func TestE2EAdminPanelModSecurityBypassesEveryAdministrativeRoute(t *testing.T) 
 	// sets the anti-bot cookie, the original page and its module must load without
 	// another challenge or a substituted HTML response.
 	anonymousClient, anonymousBaseURL, _ := newE2EClientAndBase(t, activeRuntimeURL)
-	loginResp, err := doE2ERequest(anonymousClient, http.MethodGet, anonymousBaseURL+"/login", host, "text/html", nil, false)
-	if err != nil {
-		t.Fatalf("open unauthenticated management login: %v", err)
-	}
-	if loginResp.StatusCode != http.StatusFound && loginResp.StatusCode != http.StatusSeeOther {
-		t.Fatalf("unauthenticated management login must redirect to challenge: status=%d body=%s", loginResp.StatusCode, mustReadBody(t, loginResp.Body))
+	var loginResp *http.Response
+	deadline := time.Now().Add(30 * time.Second)
+	for {
+		response, err := doE2ERequest(anonymousClient, http.MethodGet, anonymousBaseURL+"/login", host, "text/html", nil, false)
+		if err != nil {
+			t.Fatalf("open unauthenticated management login: %v", err)
+		}
+		if response.StatusCode == http.StatusFound || response.StatusCode == http.StatusSeeOther {
+			loginResp = response
+			break
+		}
+		body := mustReadBody(t, response.Body)
+		if time.Now().After(deadline) {
+			t.Fatalf("unauthenticated management login must redirect to challenge after revision apply: status=%d body=%s", response.StatusCode, body)
+		}
+		time.Sleep(500 * time.Millisecond)
 	}
 	challengeLocation := strings.TrimSpace(loginResp.Header.Get("Location"))
 	if !strings.Contains(challengeLocation, "/challenge") {
@@ -121,8 +132,10 @@ func TestE2EAdminPanelModSecurityBypassesEveryAdministrativeRoute(t *testing.T) 
 		t.Fatalf("verified management login module must be JavaScript, got status=%d content-type=%q body=%s", assetResp.StatusCode, assetContentType, assetBody)
 	}
 	if activeRuntimeURL != runtimeURL {
-		client, baseURL, _ = newE2EClientAndBase(t, activeRuntimeURL)
-		loginE2EUser(t, client, baseURL, host)
+		var requestHostOverride string
+		client, baseURL, requestHostOverride = newE2EClientAndBase(t, activeRuntimeURL)
+		requestHostOverride = host
+		loginE2EUser(t, client, baseURL, requestHostOverride)
 	}
 	for _, path := range apiroutes.AdministrativePaths {
 		t.Run(strings.Trim(strings.ReplaceAll(path, "/", "_"), "_"), func(t *testing.T) {

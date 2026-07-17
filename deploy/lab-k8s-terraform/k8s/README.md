@@ -90,9 +90,9 @@ powershell -ExecutionPolicy Bypass -File deploy/lab-k8s-terraform/k8s/scripts/ap
 
 Что делает профиль:
 
-1. добавляет `clickhouse` deployment/service/PVC;
+1. добавляет TLS-only `clickhouse` deployment/service/PVC с отдельным
+   `waf-runtime` пользователем и без plaintext/default-user fallback;
 2. применяет runtime logging profile через API:
    - hot backend: `opensearch`
    - cold backend: `clickhouse`
 3. проверяет, что профиль реально активирован в `settings/runtime`.
-

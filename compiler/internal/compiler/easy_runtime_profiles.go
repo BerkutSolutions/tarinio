@@ -13,6 +13,15 @@ func buildEasyProfileBySite(profiles []EasyProfileInput) (map[string]EasyProfile
 		if siteID == "" {
 			return nil, fmt.Errorf("easy profile site id is required")
 		}
+		if err := ValidateMTLS(profile.MTLS); err != nil {
+			return nil, fmt.Errorf("easy profile %s mTLS: %w", siteID, err)
+		}
+		if err := ValidateUpstreamMTLS(profile.UpstreamMTLS); err != nil {
+			return nil, fmt.Errorf("easy profile %s upstream mTLS: %w", siteID, err)
+		}
+		if err := validateEasyDirectiveInputs(profile); err != nil {
+			return nil, fmt.Errorf("easy profile %s: %w", siteID, err)
+		}
 		profile.AllowedMethods = sortedUnique(profile.AllowedMethods)
 		if len(profile.AllowedMethods) == 0 {
 			profile.AllowedMethods = []string{"GET", "POST", "HEAD", "OPTIONS", "PUT", "PATCH", "DELETE"}
