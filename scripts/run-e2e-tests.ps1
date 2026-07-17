@@ -6,6 +6,11 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+# PowerShell 7 can promote stderr written by a successful native process to an
+# error record even when ErrorActionPreference is temporarily Continue. Docker
+# BuildKit uses stderr for ordinary progress, so keep native output nonfatal and
+# validate docker/go commands exclusively through their exit codes below.
+$PSNativeCommandUseErrorActionPreference = $false
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $composeFile = Join-Path $repoRoot "deploy/compose/e2e/docker-compose.yml"
 $logDir = Join-Path $repoRoot ".work/logs"
@@ -23,15 +28,18 @@ New-Item -ItemType Directory -Path $logDir -Force | Out-Null
 function Invoke-Compose {
     param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
 
-    $previousErrorActionPreference = $ErrorActionPreference
+    $outputFile = Join-Path $logDir ("docker-compose-{0}.out" -f [guid]::NewGuid().ToString("N"))
+    $errorFile = Join-Path $logDir ("docker-compose-{0}.err" -f [guid]::NewGuid().ToString("N"))
     try {
-        # Docker Compose writes normal progress messages to stderr on Windows.
-        # Do not turn those messages into terminating PowerShell errors; use its exit code.
-        $ErrorActionPreference = "Continue"
-        & docker compose -f $composeFile @Arguments 2>&1 | Tee-Object -FilePath $logFile -Append
-        $composeExitCode = $LASTEXITCODE
+        # Docker Compose writes ordinary BuildKit progress to stderr. Capture
+        # both streams outside PowerShell's native-error pipeline and decide
+        # success solely from the process exit code.
+        $composeArguments = @("compose", "-f", $composeFile) + $Arguments
+        $process = Start-Process -FilePath "docker" -ArgumentList $composeArguments -NoNewWindow -Wait -PassThru -RedirectStandardOutput $outputFile -RedirectStandardError $errorFile
+        Get-Content -LiteralPath $outputFile, $errorFile -ErrorAction SilentlyContinue | Tee-Object -FilePath $logFile -Append
+        $composeExitCode = $process.ExitCode
     } finally {
-        $ErrorActionPreference = $previousErrorActionPreference
+        Remove-Item -LiteralPath $outputFile, $errorFile -Force -ErrorAction SilentlyContinue
     }
     if ($composeExitCode -ne 0) {
         throw "docker compose $($Arguments -join ' ') failed; see $logFile"

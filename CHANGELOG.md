@@ -1,5 +1,9 @@
 ## [1.5.5] - 17.07.2026
 
+### E2E runner
+
+- Windows PowerShell E2E runner now captures Docker BuildKit stdout/stderr safely and determines success from the Docker exit code, so normal build progress no longer aborts the test run.
+
 ### Management hosts and request security telemetry
 
 - Initial onboarding persists its panel domain in management hosts before the first revision is compiled; CRS therefore cannot lock the control-plane API after initial setup.
