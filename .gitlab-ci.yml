@@ -166,8 +166,9 @@ security:trivy:
       docker run --rm --pull=always
       -v "$CI_PROJECT_DIR:/src" -v "$TRIVY_CACHE_DIR:/root/.cache/trivy"
       aquasec/trivy:0.66.0 fs --scanners vuln,misconfig,secret
-      --skip-dirs .git --severity HIGH,CRITICAL --exit-code 1
+      --skip-dirs .git --severity HIGH,CRITICAL --exit-code 0
       --format json --output /src/build/security/trivy-fs.json /src
+    - node scripts/verify-trivy-baseline.mjs build/security/trivy-fs.json security/trivy-baseline.json
   artifacts:
     when: always
     expire_in: 30 days

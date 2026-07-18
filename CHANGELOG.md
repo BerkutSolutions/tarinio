@@ -5,6 +5,7 @@
 - GitLab CI now gates the private source repository with repository validation, full Go tests, a separate documentation build, standard and clean-onboarding Docker E2E suites, Gitleaks, Trivy, govulncheck, and npm audit. No release or GitHub publication job is enabled.
 - The GitLab runner keeps npm packages and required E2E base images outside the disposable checkout; documentation and dependency-audit jobs reuse the package cache, while E2E starts only after PostgreSQL, Vault, and echo-server images are present.
 - Gitleaks uses reviewed occurrence-level history exceptions without suppressing future matches, and govulncheck is pinned to the Go 1.26-compatible v1.6.0 release.
+- Trivy keeps its full vulnerability, secret, and configuration scan. Existing reviewed infrastructure exceptions are tracked per file and rule; new or expanded high/critical findings fail CI.
 
 ### Dependency security
 
