@@ -80,6 +80,7 @@ func TestSiteSettings_FieldContract(t *testing.T) {
 		"security_auth_basic.users.enabled",
 		"security_auth_basic.users.last_login_at",
 		"security_auth_basic.users.password",
+		"security_auth_basic.users.password_length",
 		"security_auth_basic.users.username",
 		"security_behavior_and_limits.access_trusted_proxy_cidrs",
 		"security_behavior_and_limits.bad_behavior_ban_time_seconds",

@@ -153,8 +153,8 @@ export function getDraftFromForm(container, state, deps) {
       const index = String(input.dataset.authUserUsername || "");
       const passwordInput = container.querySelector(`[data-auth-user-password="${index}"]`);
       const enabledInput = container.querySelector(`[data-auth-user-enabled="${index}"]`);
-      const lastLogin = normalizeAuthBasicUsers(state.draft.auth_basic_users)[Number.parseInt(index, 10)]?.last_login_at || "";
-      return { username: String(input.value || "").trim(), password: String(passwordInput?.value || "").trim(), enabled: Boolean(enabledInput?.checked), last_login_at: String(lastLogin || "") };
+      const currentUser = normalizeAuthBasicUsers(state.draft.auth_basic_users)[Number.parseInt(index, 10)] || {};
+      return { username: String(input.value || "").trim(), password: String(passwordInput?.value || "").trim() || (passwordInput?.dataset.authUserPasswordStored === "true" ? "********" : ""), password_length: Number(currentUser.password_length || 0), enabled: Boolean(enabledInput?.checked), last_login_at: String(currentUser.last_login_at || "") };
     }),
     auth_basic_session_inactivity_minutes: normalizeAuthSessionTTLMinutes(container.querySelector("#service-auth-basic-session-ttl")?.value),
     blacklist_country: normalizeStringArray(state.draft.blacklist_country),

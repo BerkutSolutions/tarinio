@@ -6,6 +6,7 @@
 
 ### Dashboard telemetry
 
+- Fixed the Basic Auth password eye button in the service editor: it now retrieves the saved password through an authorized, audited reveal request. Stored passwords remain masked by their actual character count and are preserved when unrelated settings are saved.
 - Requests now provide a localized block-reason selector. Authentication and anti-bot failures are recorded as exact `auth` and `antibot` security reasons, while successful authentication remains a normal request.
 - Removed the customer-facing quick security summary, legacy-compatibility labels, and `legacy_row_type_support` response field from Requests. Compatibility inference remains server-side only.
 - The 24-hour requests/attacks chart now labels its middle Y-axis tick as half of the peak value rather than the sparse-window arithmetic mean; a peak of 54 therefore shows a middle tick of 27.

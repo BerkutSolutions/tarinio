@@ -13,6 +13,7 @@ import (
 type easySiteProfileService interface {
 	List() ([]easysiteprofiles.EasySiteProfile, error)
 	Get(siteID string) (easysiteprofiles.EasySiteProfile, error)
+	RevealAuthBasicPassword(ctx context.Context, siteID, username string) (string, error)
 	Upsert(ctx context.Context, profile easysiteprofiles.EasySiteProfile) (easysiteprofiles.EasySiteProfile, error)
 	Delete(ctx context.Context, siteID string) error
 }
@@ -29,6 +30,8 @@ func (h *EasySiteProfilesHandler) ServeHTTP(w http.ResponseWriter, r *http.Reque
 	switch {
 	case r.URL.Path == "/api/easy-site-profiles" && r.Method == http.MethodGet:
 		h.list(w, r)
+	case strings.HasPrefix(r.URL.Path, "/api/easy-site-profiles/") && strings.HasSuffix(r.URL.Path, "/auth-password/reveal") && r.Method == http.MethodPost:
+		h.revealAuthPassword(w, r)
 	case strings.HasPrefix(r.URL.Path, "/api/easy-site-profiles/") && r.Method == http.MethodGet:
 		h.get(w, r)
 	case strings.HasPrefix(r.URL.Path, "/api/easy-site-profiles/") && r.Method == http.MethodPut:
@@ -40,6 +43,26 @@ func (h *EasySiteProfilesHandler) ServeHTTP(w http.ResponseWriter, r *http.Reque
 	default:
 		w.WriteHeader(http.StatusNotFound)
 	}
+}
+
+func (h *EasySiteProfilesHandler) revealAuthPassword(w http.ResponseWriter, r *http.Request) {
+	const suffix = "/auth-password/reveal"
+	siteID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/api/easy-site-profiles/"), suffix)
+	username := strings.TrimSpace(r.URL.Query().Get("username"))
+	if siteID == "" || username == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "site id and username are required"})
+		return
+	}
+	password, err := h.profiles.RevealAuthBasicPassword(withActorIP(r), siteID, username)
+	if err != nil {
+		status := http.StatusBadRequest
+		if strings.Contains(err.Error(), "not found") {
+			status = http.StatusNotFound
+		}
+		writeJSON(w, status, map[string]any{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"password": password})
 }
 
 func (h *EasySiteProfilesHandler) list(w http.ResponseWriter, _ *http.Request) {

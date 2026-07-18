@@ -200,10 +200,11 @@ type SecurityAuthBasicSettings struct {
 }
 
 type SecurityAuthUser struct {
-	Username    string `json:"username"`
-	Password    string `json:"password"`
-	Enabled     bool   `json:"enabled"`
-	LastLoginAt string `json:"last_login_at,omitempty"`
+	Username       string `json:"username"`
+	Password       string `json:"password"`
+	PasswordLength int    `json:"password_length,omitempty"`
+	Enabled        bool   `json:"enabled"`
+	LastLoginAt    string `json:"last_login_at,omitempty"`
 }
 
 type SecurityAuthExclusionRule struct {

@@ -163,12 +163,13 @@ export function buildDetailDraftFromForm(container, state, deps = {}) {
         const index = String(input.dataset.authUserUsername || "");
         const passwordInput = container.querySelector(`[data-auth-user-password="${index}"]`);
         const enabledInput = container.querySelector(`[data-auth-user-enabled="${index}"]`);
-        const lastLogin = normalizeAuthBasicUsers(state.draft.auth_basic_users)[Number.parseInt(index, 10)]?.last_login_at || "";
+        const currentUser = normalizeAuthBasicUsers(state.draft.auth_basic_users)[Number.parseInt(index, 10)] || {};
         return {
           username: String(input.value || "").trim(),
-          password: String(passwordInput?.value || "").trim(),
+          password: String(passwordInput?.value || "").trim() || (passwordInput?.dataset.authUserPasswordStored === "true" ? "********" : ""),
+          password_length: Number(currentUser.password_length || 0),
           enabled: Boolean(enabledInput?.checked),
-          last_login_at: String(lastLogin || "")
+          last_login_at: String(currentUser.last_login_at || "")
         };
       }),
     auth_exclusion_rules: Array.from(container.querySelectorAll("[data-auth-exclusion-path]")).map((input) => {

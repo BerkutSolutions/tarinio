@@ -295,18 +295,6 @@ export function bindDetailListEditors(container, state, deps) {
       render();
     });
   });
-  container.querySelectorAll("[data-auth-user-toggle]").forEach((button) => {
-    syncAuthPasswordToggle(button, false, ctx);
-    button.addEventListener("click", () => {
-      const index = String(button.dataset.authUserToggle || "");
-      const input = container.querySelector(`[data-auth-user-password="${index}"]`);
-      if (!input) return;
-      const nextVisible = input.type !== "text";
-      input.type = nextVisible ? "text" : "password";
-      syncAuthPasswordToggle(button, nextVisible, ctx);
-    });
-  });
-
   const syncModSecurityExclusionDraftRows = () => {
     syncStateDraftFromForm();
     state.draft.modsecurity_exclusion_rules = readModSecurityExclusionDraftRows(container, { normalizeArray });

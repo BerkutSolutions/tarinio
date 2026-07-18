@@ -359,12 +359,12 @@ func (s *EasySiteProfileService) syncEasyToLegacy(profile easysiteprofiles.EasyS
 			}
 		}
 		target := accesspolicies.AccessPolicy{
-			ID:                  accessID,
-			SiteID:              profile.SiteID,
-			Enabled:             profile.SecurityBehaviorAndLimits.UseBlacklist || profile.SecurityBehaviorAndLimits.UseExceptions,
-			AllowList:           nil,
-			DenyList:            append([]string(nil), profile.SecurityBehaviorAndLimits.BlacklistIP...),
-			TrustedProxyCIDRs:   append([]string(nil), profile.SecurityBehaviorAndLimits.AccessTrustedProxyCIDRs...),
+			ID:                accessID,
+			SiteID:            profile.SiteID,
+			Enabled:           profile.SecurityBehaviorAndLimits.UseBlacklist || profile.SecurityBehaviorAndLimits.UseExceptions,
+			AllowList:         nil,
+			DenyList:          append([]string(nil), profile.SecurityBehaviorAndLimits.BlacklistIP...),
+			TrustedProxyCIDRs: append([]string(nil), profile.SecurityBehaviorAndLimits.AccessTrustedProxyCIDRs...),
 		}
 		if profile.SecurityBehaviorAndLimits.UseExceptions {
 			target.AllowList = append([]string(nil), profile.SecurityBehaviorAndLimits.ExceptionsIP...)
@@ -445,6 +445,7 @@ func maskEasySiteProfileSecrets(profile easysiteprofiles.EasySiteProfile) easysi
 	profile.SecurityAntibot.AntibotTurnstileSecret = maskSecret(profile.SecurityAntibot.AntibotTurnstileSecret)
 	profile.SecurityAuthBasic.AuthBasicPassword = maskSecret(profile.SecurityAuthBasic.AuthBasicPassword)
 	for i := range profile.SecurityAuthBasic.Users {
+		profile.SecurityAuthBasic.Users[i].PasswordLength = authPasswordLength(profile.SecurityAuthBasic.Users[i].Password)
 		profile.SecurityAuthBasic.Users[i].Password = maskSecret(profile.SecurityAuthBasic.Users[i].Password)
 	}
 	return profile

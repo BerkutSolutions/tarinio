@@ -16,11 +16,27 @@ export function bindDetailRuleEvents(params) {
 
   container.querySelectorAll("[data-auth-user-toggle]").forEach((button) => {
     syncAuthPasswordToggle(button, false, ctx);
-    button.addEventListener("click", () => {
+    button.addEventListener("click", async () => {
       const index = String(button.dataset.authUserToggle || "");
       const input = container.querySelector(`[data-auth-user-password="${index}"]`);
       if (!input) {
         return;
+      }
+      if (input.dataset.authUserPasswordStored === "true") {
+        const username = container.querySelector(`[data-auth-user-username="${index}"]`)?.value || "";
+        button.disabled = true;
+        try {
+          const siteID = String(state.draft.id || "").trim();
+          const payload = await ctx.api.post(`/api/easy-site-profiles/${encodeURIComponent(siteID)}/auth-password/reveal?username=${encodeURIComponent(username)}`, {});
+          input.value = String(payload?.password || "");
+          input.placeholder = "";
+          delete input.dataset.authUserPasswordStored;
+        } catch (error) {
+          setError(feedback, error?.message || String(error));
+          return;
+        } finally {
+          button.disabled = false;
+        }
       }
       const nextVisible = input.type !== "text";
       input.type = nextVisible ? "text" : "password";

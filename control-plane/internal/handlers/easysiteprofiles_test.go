@@ -3,8 +3,10 @@ package handlers
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"waf/control-plane/internal/easysiteprofiles"
@@ -34,6 +36,18 @@ func (f *fakeEasySiteProfileService) Get(siteID string) (easysiteprofiles.EasySi
 		f.item = easysiteprofiles.DefaultProfile(siteID)
 	}
 	return f.item, nil
+}
+
+func (f *fakeEasySiteProfileService) RevealAuthBasicPassword(_ context.Context, _ string, username string) (string, error) {
+	if f.err != nil {
+		return "", f.err
+	}
+	for _, user := range f.item.SecurityAuthBasic.Users {
+		if user.Username == username {
+			return user.Password, nil
+		}
+	}
+	return "", fmt.Errorf("basic auth user %s not found", username)
 }
 
 func TestEasySiteProfilesHandler_List(t *testing.T) {
@@ -69,6 +83,17 @@ func TestEasySiteProfilesHandler_Get(t *testing.T) {
 	handler.ServeHTTP(resp, req)
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+}
+
+func TestEasySiteProfilesHandler_RevealAuthPassword(t *testing.T) {
+	service := &fakeEasySiteProfileService{item: easysiteprofiles.EasySiteProfile{SecurityAuthBasic: easysiteprofiles.SecurityAuthBasicSettings{Users: []easysiteprofiles.SecurityAuthUser{{Username: "admin", Password: "saved-secret"}}}}}
+	handler := NewEasySiteProfilesHandler(service)
+	req := httptest.NewRequest(http.MethodPost, "/api/easy-site-profiles/site-a/auth-password/reveal?username=admin", nil)
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK || !strings.Contains(resp.Body.String(), `"password":"saved-secret"`) {
+		t.Fatalf("expected revealed password payload, got status=%d body=%s", resp.Code, resp.Body.String())
 	}
 }
 

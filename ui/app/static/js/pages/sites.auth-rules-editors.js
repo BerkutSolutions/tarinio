@@ -58,6 +58,7 @@ export function normalizeAuthBasicUsers(value, deps = {}) {
     .map((item) => ({
       username: String(item?.username || "").trim(),
       password: String(item?.password || "").trim(),
+      password_length: Number.parseInt(String(item?.password_length || "0"), 10) || 0,
       enabled: Boolean(item?.enabled ?? true),
       last_login_at: String(item?.last_login_at || "").trim()
     }))
@@ -133,6 +134,11 @@ export function syncAuthPasswordToggle(button, visible, ctx) {
   button.querySelector(".waf-password-icon-eye")?.classList.toggle("waf-hidden", visible);
   button.querySelector(".waf-password-icon-off")?.classList.toggle("waf-hidden", !visible);
 }
+function renderAuthPasswordInput(user, index, escapeHtml) {
+  const stored = user.password === "********";
+  const placeholder = stored ? "•".repeat(Math.max(1, user.password_length)) : "";
+  return `<input data-auth-user-password="${index}" type="password" value="${stored ? "" : escapeHtml(user.password)}"${stored ? ` data-auth-user-password-stored="true" placeholder="${placeholder}"` : ""}>`;
+}
 export function renderAuthUsersEditor(users, ctx, deps = {}) {
   const escapeHtml = deps.escapeHtml;
   const safeUsers = normalizeAuthBasicUsers(users, deps);
@@ -158,7 +164,7 @@ export function renderAuthUsersEditor(users, ctx, deps = {}) {
                 </td>
                 <td>
                   <div class="waf-auth-password-cell">
-                    <input data-auth-user-password="${index}" type="password" value="${escapeHtml(user.password)}">
+                    ${renderAuthPasswordInput(user, index, escapeHtml)}
                     ${renderAuthPasswordToggleButton(index, ctx, deps)}
                   </div>
                 </td>

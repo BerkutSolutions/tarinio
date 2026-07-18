@@ -453,6 +453,7 @@ func TestEasySiteProfileService_GetMasksSecrets(t *testing.T) {
 	item.SecurityAntibot.AntibotHcaptchaSecret = "hcaptcha-secret"
 	item.SecurityAntibot.AntibotTurnstileSecret = "turnstile-secret"
 	item.SecurityAuthBasic.AuthBasicPassword = "basic-password"
+	item.SecurityAuthBasic.Users = []easysiteprofiles.SecurityAuthUser{{Username: "admin", Password: "пароль42", Enabled: true}}
 	store.items["site-a"] = item
 
 	service := NewEasySiteProfileService(
@@ -481,6 +482,9 @@ func TestEasySiteProfileService_GetMasksSecrets(t *testing.T) {
 	}
 	if got.SecurityAuthBasic.AuthBasicPassword != "********" {
 		t.Fatalf("expected masked basic auth password, got %q", got.SecurityAuthBasic.AuthBasicPassword)
+	}
+	if user := got.SecurityAuthBasic.Users[0]; user.Password != "********" || user.PasswordLength != 8 {
+		t.Fatalf("expected masked user password with rune length 8, got %+v", user)
 	}
 }
 

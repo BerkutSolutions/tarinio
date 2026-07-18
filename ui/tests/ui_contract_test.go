@@ -180,6 +180,25 @@ func TestUIContract_OnboardingAndSidebarMarkers(t *testing.T) {
 			},
 		},
 		{
+			name:  "basic auth password visibility binding",
+			files: []string{filepath.Join("..", "app", "static", "js", "pages", "sites.detail-events-rules.js")},
+			markers: []string{
+				`container.querySelectorAll("[data-auth-user-toggle]").forEach`,
+				`/auth-password/reveal?username=`,
+				`input.type = nextVisible ? "text" : "password"`,
+				`syncAuthPasswordToggle(button, nextVisible, ctx)`,
+			},
+		},
+		{
+			name:  "basic auth password mask preserves character count",
+			files: []string{filepath.Join("..", "app", "static", "js", "pages", "sites.auth-rules-editors.js")},
+			markers: []string{
+				`password_length`,
+				`"•".repeat(Math.max(1, user.password_length))`,
+				`data-auth-user-password-stored="true"`,
+			},
+		},
+		{
 			name: "requests",
 			files: []string{
 				filepath.Join("..", "app", "static", "js", "pages", "requests.js"),
