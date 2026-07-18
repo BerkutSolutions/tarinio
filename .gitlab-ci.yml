@@ -26,6 +26,7 @@ variables:
   GOTOOLCHAIN: auto
   GOCACHE: /home/gitlab-runner/.cache/tarinio/go-build
   GOMODCACHE: /home/gitlab-runner/.cache/tarinio/go-mod
+  NPM_CACHE_DIR: /home/gitlab-runner/.cache/tarinio/npm
   TRIVY_CACHE_DIR: /home/gitlab-runner/.cache/tarinio/trivy
 
 validate:repository:
@@ -39,17 +40,33 @@ validate:repository:
     - test -f package-lock.json
     - grep -q '^RUN GOTOOLCHAIN=auto go test ./ui/tests$' ui/Dockerfile
 
+warm:e2e-images:
+  stage: validate
+  timeout: 20m
+  script:
+    - |
+      set -eu
+      for image in postgres:15 hashicorp/vault:1.18 ealen/echo-server:latest; do
+        if docker image inspect "$image" >/dev/null 2>&1; then
+          echo "[ci] E2E base image is cached: $image"
+        else
+          echo "[ci] Pulling required E2E base image: $image"
+          docker pull "$image"
+        fi
+      done
+
 unit:go:
   stage: unit
   timeout: 35m
   script:
-    - mkdir -p .ci-bin .ci-home
+    - mkdir -p .ci-bin .ci-home "$NPM_CACHE_DIR"
     - |
       cat > .ci-bin/npm <<'EOF'
       #!/bin/sh
       set -eu
       exec docker run --rm --pull=always --user "$(id -u):$(id -g)" \
-        -e HOME=/workspace/.ci-home \
+        -e HOME=/workspace/.ci-home -e NPM_CONFIG_CACHE=/npm-cache \
+        -v "$NPM_CACHE_DIR:/npm-cache" \
         -v "$PWD:/workspace" -w /workspace node:24-bookworm npm "$@"
       EOF
     - chmod 700 .ci-bin/npm
@@ -63,10 +80,11 @@ docs:build:
   stage: unit
   timeout: 30m
   script:
-    - mkdir -p .ci-npm-cache .ci-home
+    - mkdir -p "$NPM_CACHE_DIR" .ci-home
     - >-
       docker run --rm --pull=always --user "$(id -u):$(id -g)"
-      -e HOME=/workspace/.ci-home -e NPM_CONFIG_CACHE=/workspace/.ci-npm-cache
+      -e HOME=/workspace/.ci-home -e NPM_CONFIG_CACHE=/npm-cache
+      -v "$NPM_CACHE_DIR:/npm-cache"
       -v "$CI_PROJECT_DIR:/workspace" -w /workspace node:24-bookworm
       bash -lc 'npm ci --prefer-online --no-audit --fund=false && npm run docs:build'
   artifacts:
@@ -79,6 +97,7 @@ e2e:full:
   stage: e2e
   timeout: 45m
   resource_group: waf-e2e-stack
+  dependencies: []
   retry:
     max: 1
     when:
@@ -98,6 +117,7 @@ e2e:fresh-onboarding:
   stage: e2e
   timeout: 30m
   resource_group: waf-e2e-stack
+  dependencies: []
   retry:
     max: 1
     when:
@@ -121,6 +141,7 @@ e2e:fresh-onboarding:
 security:gitleaks:
   stage: security
   timeout: 20m
+  dependencies: []
   script:
     - mkdir -p build/security
     - >-
@@ -138,6 +159,7 @@ security:gitleaks:
 security:trivy:
   stage: security
   timeout: 35m
+  dependencies: []
   script:
     - mkdir -p build/security "$TRIVY_CACHE_DIR"
     - >-
@@ -155,6 +177,7 @@ security:trivy:
 security:govulncheck:
   stage: security
   timeout: 30m
+  dependencies: []
   script:
     - mkdir -p .bin
     - GOBIN="$CI_PROJECT_DIR/.bin" go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
@@ -163,10 +186,12 @@ security:govulncheck:
 security:npm-audit:
   stage: security
   timeout: 25m
+  dependencies: []
   script:
-    - mkdir -p .ci-npm-cache .ci-home
+    - mkdir -p "$NPM_CACHE_DIR" .ci-home
     - >-
       docker run --rm --pull=always --user "$(id -u):$(id -g)"
-      -e HOME=/workspace/.ci-home -e NPM_CONFIG_CACHE=/workspace/.ci-npm-cache
+      -e HOME=/workspace/.ci-home -e NPM_CONFIG_CACHE=/npm-cache
+      -v "$NPM_CACHE_DIR:/npm-cache"
       -v "$CI_PROJECT_DIR:/workspace" -w /workspace node:24-bookworm
       bash -lc 'npm ci --prefer-online --no-audit --fund=false && npm audit --omit=dev --audit-level=moderate'

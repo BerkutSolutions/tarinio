@@ -3,6 +3,7 @@
 ### DevSecOps CI
 
 - GitLab CI now gates the private source repository with repository validation, full Go tests, a separate documentation build, standard and clean-onboarding Docker E2E suites, Gitleaks, Trivy, govulncheck, and npm audit. No release or GitHub publication job is enabled.
+- The GitLab runner keeps npm packages and required E2E base images outside the disposable checkout; documentation and dependency-audit jobs reuse the package cache, while E2E starts only after PostgreSQL, Vault, and echo-server images are present.
 
 ### Dependency security
 
