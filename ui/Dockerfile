@@ -13,6 +13,8 @@ COPY control-plane/apiroutes ./control-plane/apiroutes
 COPY docs ./docs
 COPY ui/app ./ui/app
 COPY ui/nginx.conf ./ui/nginx.conf
+COPY ui/nginx.testpage.conf ./ui/nginx.testpage.conf
+COPY ui/Dockerfile ./ui/Dockerfile
 COPY ui/tests ./ui/tests
 
 RUN GOTOOLCHAIN=auto go test ./ui/tests

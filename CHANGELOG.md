@@ -1,5 +1,9 @@
 ## [1.5.5] - 17.07.2026
 
+### Installer
+
+- Fixed the UI image build: its container-side contract tests now receive every nginx configuration and the UI Dockerfile they inspect.
+
 ### DevSecOps CI
 
 - GitLab CI now gates the private source repository with repository validation, full Go tests, a separate documentation build, standard and clean-onboarding Docker E2E suites, Gitleaks, Trivy, govulncheck, and npm audit. No release or GitHub publication job is enabled.
