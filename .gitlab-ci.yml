@@ -181,7 +181,7 @@ security:govulncheck:
   dependencies: []
   script:
     - mkdir -p .bin
-    - GOBIN="$CI_PROJECT_DIR/.bin" go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
+    - GOTOOLCHAIN=go1.26.5 GOBIN="$CI_PROJECT_DIR/.bin" go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
     - .bin/govulncheck ./...
 
 security:npm-audit:
