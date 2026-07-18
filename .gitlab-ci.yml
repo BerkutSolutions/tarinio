@@ -43,6 +43,17 @@ unit:go:
   stage: unit
   timeout: 35m
   script:
+    - mkdir -p .ci-bin
+    - |
+      cat > .ci-bin/npm <<'EOF'
+      #!/bin/sh
+      set -eu
+      exec docker run --rm --pull=always --user "$(id -u):$(id -g)" \
+        --tmpfs /tmp:rw,noexec,nosuid,size=512m -e HOME=/tmp \
+        -v "$PWD:/workspace" -w /workspace node:24-bookworm npm "$@"
+      EOF
+    - chmod 700 .ci-bin/npm
+    - export PATH="$CI_PROJECT_DIR/.ci-bin:$PATH"
     - go version
     - go vet ./...
     - go test ./... -count=1
