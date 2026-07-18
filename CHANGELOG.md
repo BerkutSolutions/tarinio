@@ -1,5 +1,9 @@
 ## [1.5.5] - 17.07.2026
 
+### Release automation
+
+- A successful GitLab pipeline on `main` now mirrors source code to GitHub. A successful version-tag pipeline (`vX.Y.Z`) additionally publishes signed release metadata, a GitHub Release, and version/latest images to GHCR.
+
 ### Dashboard telemetry
 
 - Requests now provide a localized block-reason selector. Authentication and anti-bot failures are recorded as exact `auth` and `antibot` security reasons, while successful authentication remains a normal request.

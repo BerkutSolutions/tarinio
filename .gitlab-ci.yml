@@ -3,11 +3,13 @@ stages:
   - unit
   - e2e
   - security
+  - publish
 
 workflow:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH'
+    - if: '$CI_COMMIT_TAG'
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
     - when: never
 
@@ -196,3 +198,78 @@ security:npm-audit:
       -v "$NPM_CACHE_DIR:/npm-cache"
       -v "$CI_PROJECT_DIR:/workspace" -w /workspace node:24-bookworm
       bash -lc 'npm ci --prefer-offline --no-audit --fund=false && npm audit --omit=dev --audit-level=moderate'
+
+publish:github-mirror:
+  stage: publish
+  timeout: 15m
+  dependencies: []
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  script:
+    - |
+      set -eu
+      test -n "${GITHUB_TOKEN:-}" || { echo "GITHUB_TOKEN is required for GitHub mirroring" >&2; exit 1; }
+      askpass="$CI_PROJECT_DIR/.git-askpass"
+      trap 'rm -f "$askpass"' EXIT
+      cat > "$askpass" <<'EOF'
+      #!/bin/sh
+      case "$1" in
+        *Username*) printf '%s\n' x-access-token ;;
+        *) printf '%s\n' "$GITHUB_TOKEN" ;;
+      esac
+      EOF
+      chmod 700 "$askpass"
+      GIT_ASKPASS="$askpass" GIT_TERMINAL_PROMPT=0 \
+        git push "https://github.com/BerkutSolutions/tarinio.git" HEAD:main
+
+publish:github-release:
+  stage: publish
+  timeout: 45m
+  dependencies: []
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+/'
+  script:
+    - |
+      set -eu
+      test -n "${GITHUB_TOKEN:-}" || { echo "GITHUB_TOKEN is required for GitHub publishing" >&2; exit 1; }
+      test -n "${RELEASE_SIGNING_PRIVATE_KEY_B64:-}" || { echo "RELEASE_SIGNING_PRIVATE_KEY_B64 is required for signed release artifacts" >&2; exit 1; }
+      version="${CI_COMMIT_TAG#v}"
+      app_version="$(sed -n 's/^var AppVersion = "\(.*\)"/\1/p' control-plane/internal/appmeta/meta.go | head -n1)"
+      test "$version" = "$app_version" || { echo "tag $CI_COMMIT_TAG does not match AppVersion $app_version" >&2; exit 1; }
+      mkdir -p .work/release-signing build/release/"$version"
+      printf '%s' "$RELEASE_SIGNING_PRIVATE_KEY_B64" | base64 -d > .work/release-signing/release-ed25519-private.pem
+      chmod 600 .work/release-signing/release-ed25519-private.pem
+      go run ./cmd/release-artifacts \
+        -version "$version" \
+        -commit "$CI_COMMIT_SHA" \
+        -tag "$CI_COMMIT_TAG" \
+        -output "build/release/$version" \
+        -docker-tags "ghcr.io/berkutsolutions/tarinio:$version,ghcr.io/berkutsolutions/tarinio:latest"
+      askpass="$CI_PROJECT_DIR/.git-askpass"
+      export DOCKER_CONFIG="$CI_PROJECT_DIR/.docker-publish"
+      trap 'rm -rf "$askpass" "$DOCKER_CONFIG" .work/release-signing/release-ed25519-private.pem' EXIT
+      cat > "$askpass" <<'EOF'
+      #!/bin/sh
+      case "$1" in
+        *Username*) printf '%s\n' x-access-token ;;
+        *) printf '%s\n' "$GITHUB_TOKEN" ;;
+      esac
+      EOF
+      chmod 700 "$askpass"
+      GIT_ASKPASS="$askpass" GIT_TERMINAL_PROMPT=0 \
+        git push "https://github.com/BerkutSolutions/tarinio.git" "refs/tags/$CI_COMMIT_TAG"
+      awk -v header="## [$version]" '$0 == header { found=1 } found && NR > 1 && /^## / && $0 != header { exit } found { print }' CHANGELOG.md > "build/release/$version/github-release-notes.md"
+      test -s "build/release/$version/github-release-notes.md"
+      printf '%s' "$GITHUB_TOKEN" | docker login ghcr.io -u BerkutSolutions --password-stdin
+      docker build -t "ghcr.io/berkutsolutions/tarinio:$version" -f control-plane/Dockerfile .
+      docker tag "ghcr.io/berkutsolutions/tarinio:$version" "ghcr.io/berkutsolutions/tarinio:latest"
+      docker push "ghcr.io/berkutsolutions/tarinio:$version"
+      docker push "ghcr.io/berkutsolutions/tarinio:latest"
+      docker run --rm -e GH_TOKEN="$GITHUB_TOKEN" -v "$CI_PROJECT_DIR:/workspace" -w /workspace ghcr.io/cli/cli:2.90.0 \
+        release create "$CI_COMMIT_TAG" --repo BerkutSolutions/tarinio --title "TARINIO $version" --notes-file "build/release/$version/github-release-notes.md" || \
+        docker run --rm -e GH_TOKEN="$GITHUB_TOKEN" -v "$CI_PROJECT_DIR:/workspace" -w /workspace ghcr.io/cli/cli:2.90.0 \
+          release edit "$CI_COMMIT_TAG" --repo BerkutSolutions/tarinio --title "TARINIO $version" --notes-file "build/release/$version/github-release-notes.md"
+  artifacts:
+    expire_in: 30 days
+    paths:
+      - build/release/
