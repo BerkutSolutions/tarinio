@@ -86,7 +86,7 @@ docs:build:
       -e HOME=/workspace/.ci-home -e NPM_CONFIG_CACHE=/npm-cache
       -v "$NPM_CACHE_DIR:/npm-cache"
       -v "$CI_PROJECT_DIR:/workspace" -w /workspace node:24-bookworm
-      bash -lc 'npm ci --prefer-online --no-audit --fund=false && npm run docs:build'
+      bash -lc 'npm ci --prefer-offline --no-audit --fund=false && npm run docs:build'
   artifacts:
     when: always
     expire_in: 7 days
@@ -194,4 +194,4 @@ security:npm-audit:
       -e HOME=/workspace/.ci-home -e NPM_CONFIG_CACHE=/npm-cache
       -v "$NPM_CACHE_DIR:/npm-cache"
       -v "$CI_PROJECT_DIR:/workspace" -w /workspace node:24-bookworm
-      bash -lc 'npm ci --prefer-online --no-audit --fund=false && npm audit --omit=dev --audit-level=moderate'
+      bash -lc 'npm ci --prefer-offline --no-audit --fund=false && npm audit --omit=dev --audit-level=moderate'
