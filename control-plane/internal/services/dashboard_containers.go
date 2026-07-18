@@ -694,6 +694,11 @@ func classifyContainerLogIssue(message string) (string, bool) {
 		return "", false
 	}
 	lower := strings.ToLower(trimmed)
+	// A ModSecurity denial is a successful WAF enforcement decision. It is
+	// represented in request and security-event telemetry, not a runtime fault.
+	if strings.Contains(lower, "modsecurity: access denied with code") {
+		return "", false
+	}
 	benignPatterns := []string{
 		"warning: no config file specified, using the default config. in order to specify a config file use redis-server /path/to/redis.conf",
 		"warning: a restricted method in java.lang.foreign.linker has been called",

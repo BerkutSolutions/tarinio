@@ -2,6 +2,7 @@ param(
   [string]$ComposeFile = "deploy/compose/default/docker-compose.yml",
   [string]$RuntimeService = "runtime",
   [string]$SiteID = "localhost",
+  [string]$SecondarySiteID = "dashboard-demo-secondary",
   [int]$Hours = 24,
   [int]$RequestsPerHour = 8,
   [int]$BlockedPerHour = 3
@@ -35,7 +36,8 @@ function New-AccessEvent {
     [string]$City,
     [int]$Status,
     [string]$URI,
-    [string]$RequestID
+    [string]$RequestID,
+    [string]$EventSiteID
   )
   [ordered]@{
     timestamp = $Timestamp.ToUniversalTime().ToString("o")
@@ -43,14 +45,14 @@ function New-AccessEvent {
     client_ip = $IP
     country = $Country
     city = $City
-    host = "dashboard-demo.local"
+    host = if ($EventSiteID -eq $SiteID) { "dashboard-demo.local" } else { "dashboard-demo-secondary.local" }
     method = "GET"
     uri = $URI
     status = $Status
     bytes_sent = 0
     referer = ""
     user_agent = "WAF dashboard telemetry demo"
-    site = $SiteID
+    site = $EventSiteID
     security_reason = if ($Status -ge 400) { "dashboard_demo" } else { "" }
     upstream_addr = ""
     request_time = 0.001
@@ -70,22 +72,20 @@ $start = [DateTime]::UtcNow.AddHours(-($Hours - 1)).Date.AddHours([DateTime]::Ut
 
 for ($hour = 0; $hour -lt $Hours; $hour++) {
   $bucket = $start.AddHours($hour)
-  $requestCount = $RequestsPerHour + (Get-Random -Minimum 0 -Maximum 22)
-  $blockedCount = $BlockedPerHour + (Get-Random -Minimum 0 -Maximum 10)
-  if ($hour % 5 -eq 0) {
-    $requestCount += Get-Random -Minimum 14 -Maximum 36
-    $blockedCount += Get-Random -Minimum 6 -Maximum 17
-  }
+  $requestCount = $RequestsPerHour
+  $blockedCount = $BlockedPerHour
   for ($i = 0; $i -lt $requestCount; $i++) {
     $location = $locations[($hour + $i) % $locations.Count]
     $minute = [math]::Floor(($i * 58) / [math]::Max($requestCount, 1))
-    $lines.Add((New-AccessEvent $bucket.AddMinutes($minute) $location.IP $location.Country $location.City 200 "/catalog/demo-$hour-$i" "demo-request-$hour-$i"))
+    $eventSiteID = if ($i % 2 -eq 0) { $SiteID } else { $SecondarySiteID }
+    $lines.Add((New-AccessEvent $bucket.AddMinutes($minute) $location.IP $location.Country $location.City 200 "/catalog/demo-$hour-$i" "dashboard-e2e-request-$hour-$i" $eventSiteID))
   }
   for ($i = 0; $i -lt $blockedCount; $i++) {
     $location = $locations[($hour + $i + 1) % $locations.Count]
     $status = @(403, 429, 444)[$i % 3]
     $minute = 30 + [math]::Floor(($i * 28) / [math]::Max($blockedCount, 1))
-    $lines.Add((New-AccessEvent $bucket.AddMinutes($minute) $location.IP $location.Country $location.City $status $attackPaths[$i % $attackPaths.Count] "demo-attack-$hour-$i"))
+    $eventSiteID = if ($i % 2 -eq 0) { $SecondarySiteID } else { $SiteID }
+    $lines.Add((New-AccessEvent $bucket.AddMinutes($minute) $location.IP $location.Country $location.City $status $attackPaths[$i % $attackPaths.Count] "dashboard-e2e-attack-$hour-$i" $eventSiteID))
   }
 }
 
@@ -97,4 +97,7 @@ $encoded | & docker compose -f $ComposeFile exec -T $RuntimeService sh -lc "tr -
 if ($LASTEXITCODE -ne 0) {
   throw "docker compose failed to append demo telemetry."
 }
+$expectedRequests = $Hours * ($RequestsPerHour + $BlockedPerHour)
+$expectedBlocked = $Hours * $BlockedPerHour
 Write-Host "Done. Wait up to 10 seconds, refresh Dashboard, and inspect traffic, attacks, blocked attacks, countries, and the 24-hour chart."
+Write-Host "Deterministic seed: $expectedRequests requests, $expectedBlocked blocked, two sites, five IPs/countries."

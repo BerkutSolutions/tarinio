@@ -1,5 +1,15 @@
 ## [1.5.5] - 17.07.2026
 
+### Dashboard telemetry
+
+- Requests now provide a localized block-reason selector. Authentication and anti-bot failures are recorded as exact `auth` and `antibot` security reasons, while successful authentication remains a normal request.
+- Removed the customer-facing quick security summary, legacy-compatibility labels, and `legacy_row_type_support` response field from Requests. Compatibility inference remains server-side only.
+- The 24-hour requests/attacks chart now labels its middle Y-axis tick as half of the peak value rather than the sparse-window arithmetic mean; a peak of 54 therefore shows a middle tick of 27.
+- Dashboard request widgets now use the authenticated runtime aggregate for the same complete 24-hour observation window. Totals, hourly series, top sites/URLs, unique IPs, error statuses, and request-derived security metrics no longer depend on the paginated request-list limit.
+- Runtime exposes the protected `GET /requests/dashboard-summary` endpoint for this aggregate. It applies the same panel-traffic exclusion as the dashboard while preserving protected-service security events.
+- Successful ModSecurity access denials are no longer classified as container-health errors; they remain available as blocked security telemetry.
+- Top attacker IPs now include their observed country, so dashboard IP rows and click-through details remain informative even when the paginated request feed does not contain that historical row.
+
 ### Installer
 
 - Fixed the UI image build: its container-side contract tests now receive every nginx configuration and the UI Dockerfile they inspect.
@@ -77,3 +87,21 @@
 - Обновление не перезаписывает существующие ключи, сертификаты, тома, хэши пользователей и сохранённые настройки.
 - Добавлены регрессии для TOTP, экспорта сертификатов, CRS, ACME HTTP-01, прямого IP, виртуальных патчей и порядка антибот-проверки/ограничения частоты; ручные проверки перечислены в `.work/UI_CHECKLIST.md`.
 - Сквозная проверка панели управления с ModSecurity ждёт фактического применения ревизии runtime, поэтому не даёт ложный сбой из-за обращения к предыдущей конфигурации.
+### UI previews (2026-07-18)
+
+- Added ten standalone, responsive Basic Auth page concepts under `.work/sidebar-previews`; they are asset-free and intended for visual selection before product integration.
+### UI previews (2026-07-18)
+
+- Added five Basic Auth concepts informed by the current login layouts and five informed by the current anti-bot verification layouts under `.work/sidebar-previews`.
+### Basic Auth appearances (2026-07-18)
+
+- Added nine selectable, branded Basic Auth page appearances with authenticated previews and runtime artifact generation.
+- Added persistence, server validation, compiler coverage, and E2E coverage for changing and using the selected Basic Auth page.
+### Basic Auth appearance refinements (2026-07-18)
+
+- Localized the runtime Basic Auth pages for `en`, `ru`, `de`, `sr`, and `zh`; the footer now links to Tarinio on GitHub.
+- Refined logo use, contrast, alignment, and preview-button positioning across the selected Basic Auth and anti-bot appearance controls.
+### Basic Auth preview polish (2026-07-18)
+
+- Centered anti-bot and Basic Auth preview controls against their template selectors and renamed Basic Auth choices to neutral numbered variants.
+- Refined the light-blue `v4`, restored `v6` copy, and adjusted `v7`–`v9` branding and layout details.

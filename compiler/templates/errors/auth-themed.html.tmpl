@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Authentication Required</title>
+  <style>
+    :root{color-scheme:dark;--bg:#09131d;--panel:#101d2a;--line:#3d5d78;--text:#e9f0f8;--muted:#9eb2c4;--accent:#62a2d2;--ok:#74dfae}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:var(--bg);color:var(--text);font:15px Inter,"Segoe UI",sans-serif}.shell{width:min(900px,100%);overflow:hidden;border:1px solid var(--line);border-radius:18px;background:var(--panel);box-shadow:0 30px 90px #0009}.brand{display:flex;align-items:center;padding:24px 30px;border-bottom:1px solid var(--line);background:#101d2ae6}.brand-wide{width:min(210px,48vw);height:auto}.brand-mark{width:52px;height:52px;object-fit:contain;margin-left:16px}.runtime-state{margin-left:auto;color:var(--muted);font-size:12px}.runtime-state:before{content:"●";color:var(--ok);margin-right:7px}.body{display:grid;grid-template-columns:1fr .9fr;gap:18px;padding:30px}.intro{padding:18px;border:1px solid var(--line);border-radius:14px;background:#091521}.eyebrow{color:#91c4e8;font-size:11px;letter-spacing:.13em;text-transform:uppercase}.intro h1{margin:14px 0 8px;font-size:31px;line-height:1.1}.intro p{margin:0;color:var(--muted);line-height:1.55}.form-card{padding:22px;border:1px solid var(--line);border-radius:14px;background:#0c1621}label{display:block;margin:15px 0 7px;color:#c3d1dc;font-size:13px}input,button{width:100%;height:45px;border-radius:8px;font:inherit}input{padding:0 12px;border:1px solid #38546e;background:#08121b;color:#fff;outline-color:var(--accent)}button{margin-top:22px;border:1px solid var(--accent);background:#357aad;color:#fff;font-weight:700;cursor:pointer}.error{display:none;margin-top:12px;padding:10px;border:1px solid #ff858580;border-radius:8px;background:#ff858522;color:#ffcaca;font-size:13px}.error.show{display:block}.meta{display:flex;justify-content:space-between;margin-top:18px;padding-top:15px;border-top:1px solid var(--line);color:#778fa2;font-size:11px}.secured{position:fixed;bottom:18px;left:0;right:0;text-align:center;color:#93a7bd;font-size:12px}.secured a{color:#cfe1ff;text-decoration:none;border-bottom:1px solid #cfe1ff66}.secured a:hover{border-bottom-color:#cfe1ff}
+    /* v1 Aurora */body.v1{--bg:#070d1d;--panel:#101a35;--line:#6678aa;--accent:#57d7cf;background:radial-gradient(circle at 12% 15%,#254ddb,transparent 35%),radial-gradient(circle at 88% 85%,#19cba4,transparent 31%),#070d1d}.v1 .shell{width:min(450px,100%)}.v1 .brand{justify-content:center;background:transparent;border:0;padding-bottom:0}.v1 .brand-mark,.v1 .runtime-state{display:none}.v1 .body{grid-template-columns:1fr;padding-top:12px}.v1 .intro{border:0;background:transparent;padding:0}.v1 .form-card{background:#071127}
+    /* v2 Cobalt */body.v2{--bg:#123fd1;--panel:#fff;--line:#d7dcf0;--text:#13205b;--muted:#68719a;--accent:#214de0;background:#123fd1}.v2 .shell{border:0;border-radius:0;width:min(920px,100%)}.v2 .brand{background:#0d2aa0;color:#fff;border:0}.v2 .brand-mark{display:none}.v2 .body{grid-template-columns:.9fr 1.1fr}.v2 .intro{background:#0d2aa0;color:#fff;border:0;border-radius:0}.v2 .form-card{background:#fff;border:0;border-radius:0}.v2 input{background:#fff;color:#13205b}.v2 button{background:#ffcf29;border-color:#ffcf29;color:#17276b}
+    /* v3 Nordic */body.v3{--bg:#d6e4df;--panel:#f4f9f7;--line:#aec8c0;--text:#153237;--muted:#587176;--accent:#205f5a;background:#d6e4df}.v3 .shell{border-color:#b5cec6}.v3 .brand{background:#b7d8ce;border-color:#a4c6bc}.v3 .brand-mark{display:none}.v3 .intro{background:#b7d8ce;border-color:#a4c6bc}.v3 .form-card{background:#f4f9f7}.v3 input{background:#edf5f2;color:#153237}.v3 button{background:#205f5a;border-color:#205f5a}
+    /* v4 Light Login */body.v4{--bg:#e6effc;--panel:#f8fbff;--line:#b9cce8;--text:#19365c;--muted:#637b9b;--accent:#356fbb;background:#e6effc}.v4 .shell{width:min(480px,100%);border-top:8px solid #356fbb;border-radius:4px}.v4 .brand{background:#f8fbff;border:0}.v4 .brand-mark,.v4 .runtime-state{display:none}.v4 .body{grid-template-columns:1fr}.v4 .intro{padding:0;border:0;background:#f8fbff}.v4 .form-card{border:0;padding:0;background:#f8fbff}.v4 input{background:#f8fbff;color:#19365c}.v4 button{background:#356fbb;border-color:#356fbb}
+    /* v5 Minimal Ops */body.v5{--bg:#0a121a;--panel:#101c27;--line:#2b455d;--text:#e6eef6;--muted:#95aabd;--accent:#62a2d2;background:#0a121a}.v5 .shell{width:min(510px,100%);border-radius:0}.v5 .brand{height:64px;padding:18px}.v5 .brand-wide{width:150px}.v5 .brand-mark{display:none}.v5 .body{grid-template-columns:1fr}.v5 .intro{border:0;background:transparent;padding:0}.v5 .form-card{border:0;background:transparent;padding:0}.v5 button{background:transparent;color:#bdddf5}
+    /* v6 Command Center */body.v6{background:#09131d radial-gradient(circle at 12% 15%,#294f6d,transparent 35%)}.v6 .shell{min-height:560px;display:grid;grid-template-columns:38% 1fr}.v6 .brand{display:block;padding:36px;background:linear-gradient(145deg,#1d3449,#0d1721);border:0}.v6 .brand-wide{width:100%}.v6 .brand-mark,.v6 .runtime-state{display:none}.v6 .body{display:grid;grid-template-columns:1fr;align-content:center;justify-items:center;padding:44px}.v6 .intro{display:block;width:min(300px,100%);border:0;background:transparent;padding:0}.v6 .form-card{width:min(300px,100%)}
+    /* v7 Security Card */body.v7{background:radial-gradient(circle at 50% 0,#234462,transparent 40%),#071019}.v7 .shell{width:min(480px,100%);border-radius:18px;background:linear-gradient(160deg,#162636,#09111b)}.v7 .brand{justify-content:center;border:0;background:transparent}.v7 .brand-wide{display:none}.v7 .brand-mark{width:86px;height:86px;padding:0;border:0;border-radius:0;background:transparent;margin:0}.v7 .runtime-state{display:none}.v7 .body{grid-template-columns:1fr}.v7 .intro{text-align:center;border:0;background:transparent;padding:0}.v7 .form-card{border:0;background:transparent;padding:0}
+    /* v8 Incident Console */body.v8{background-color:#081018;background-image:linear-gradient(#27405733 1px,transparent 1px),linear-gradient(90deg,#27405733 1px,transparent 1px);background-size:42px 42px}.v8 .shell{width:min(470px,100%);border-radius:14px}.v8 .brand{padding:15px 20px}.v8 .brand-wide{width:175px}.v8 .brand-mark{display:none}.v8 .runtime-state{margin-left:auto;padding-left:28px}.v8 .body{grid-template-columns:1fr}.v8 .intro{border:0;background:transparent;padding:0}.v8 .form-card{border:0;background:transparent;padding:0}
+    /* v9 Classic Split */body.v9{padding:0}.v9 .shell{width:100%;min-height:100vh;border:0;border-radius:0;display:grid;grid-template-columns:40% 1fr}.v9 .brand{padding:48px;display:block;background:radial-gradient(circle at 15% 15%,#224667,transparent 40%),linear-gradient(145deg,#172638,#0b141f);border-right:1px solid #30475f}.v9 .brand-wide{width:min(245px,100%)}.v9 .brand-mark,.v9 .runtime-state{display:none}.v9 .body{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center}.v9 .intro{border:0;background:transparent;padding:0;text-align:center}.v9 .form-card{width:min(330px,100%);border:0;background:transparent;padding:0}.v9 label{text-align:center}.v9 .secured{left:40%;right:0}
+    @media(max-width:720px){.body{grid-template-columns:1fr}.runtime-state{display:none}.v6 .shell,.v9 .shell{display:block;min-height:0}.v6 .brand,.v9 .brand{display:none}.v6 .body,.v9 .body{padding:36px 24px}.v9 .secured{left:0}}
+  </style>
+</head>
+<body class="{{ .TemplateName }}">
+  <main class="shell">
+    <header class="brand">
+      <img class="brand-wide" src="/static/logo800x300_no-text.png" alt="WAF">
+      <img class="brand-mark" src="/static/logo512.png" alt="WAF">
+      <span class="runtime-state" id="runtime-state">Runtime healthy · secure connection</span>
+    </header>
+    <section class="body">
+      <article class="intro">
+        <div class="eyebrow" id="eyebrow">Protected resource</div>
+        <h1 id="title">Authentication required</h1>
+        <p id="subtitle">Enter your Basic Auth credentials to continue to the protected service.</p>
+      </article>
+      <article class="form-card">
+        <form id="auth-basic-form" novalidate>
+          <label for="username" id="username-label">Username</label>
+          <input id="username" autocomplete="username">
+          <label for="password" id="password-label">Password</label>
+          <input id="password" type="password" autocomplete="current-password">
+          <button id="submit-basic" type="submit">Sign in</button>
+        </form>
+        <div id="error" class="error" role="alert"></div>
+        <div class="meta"><span id="audit">Audit enabled</span><span id="tls">TLS protected</span></div>
+      </article>
+    </section>
+  </main>
+  <div class="secured"><span id="secured-by">Secured by</span> <a href="https://github.com/BerkutSolutions/tarinio" target="_blank" rel="noopener noreferrer">Tarinio</a></div>
+  <script>
+    (function () {
+      var messages = {
+        en:{pageTitle:"Authentication Required",eyebrow:"Protected resource",title:"Authentication required",subtitle:"Enter your Basic Auth credentials to continue to the protected service.",username:"Username",password:"Password",submit:"Sign in",audit:"Audit enabled",tls:"TLS protected",runtime:"Runtime healthy · secure connection",connection:"secure connection",secured:"Secured by",missing:"Enter username and password.",invalid:"Invalid username or password.",failed:"Authentication failed."},
+        ru:{pageTitle:"Требуется аутентификация",eyebrow:"Защищённый ресурс",title:"Требуется аутентификация",subtitle:"Введите данные Basic Auth, чтобы продолжить работу с защищённым сервисом.",username:"Имя пользователя",password:"Пароль",submit:"Войти",audit:"Аудит включён",tls:"Защищено TLS",runtime:"Runtime исправен · защищённое соединение",connection:"защищённое соединение",secured:"Защищено",missing:"Введите имя пользователя и пароль.",invalid:"Неверное имя пользователя или пароль.",failed:"Ошибка аутентификации."},
+        de:{pageTitle:"Authentifizierung erforderlich",eyebrow:"Geschützte Ressource",title:"Authentifizierung erforderlich",subtitle:"Geben Sie Ihre Basic-Auth-Zugangsdaten ein, um fortzufahren.",username:"Benutzername",password:"Passwort",submit:"Anmelden",audit:"Audit aktiviert",tls:"TLS geschützt",runtime:"Runtime fehlerfrei · geschützte Verbindung",connection:"geschützte Verbindung",secured:"Geschützt durch",missing:"Benutzername und Passwort eingeben.",invalid:"Ungültiger Benutzername oder Passwort.",failed:"Authentifizierung fehlgeschlagen."},
+        sr:{pageTitle:"Потребна је аутентификација",eyebrow:"Заштићени ресурс",title:"Потребна је аутентификација",subtitle:"Унесите Basic Auth акредитиве да бисте наставили.",username:"Корисничко име",password:"Лозинка",submit:"Пријави се",audit:"Ревизија је укључена",tls:"TLS заштићено",runtime:"Runtime је исправан · заштићена веза",connection:"заштићена веза",secured:"Заштићено од",missing:"Унесите корисничко име и лозинку.",invalid:"Неисправно корисничко име или лозинка.",failed:"Аутентификација није успела."},
+        zh:{pageTitle:"需要身份验证",eyebrow:"受保护资源",title:"需要身份验证",subtitle:"请输入 Basic Auth 凭据以继续访问受保护的服务。",username:"用户名",password:"密码",submit:"登录",audit:"审计已启用",tls:"TLS 保护",runtime:"运行正常 · 连接受保护",connection:"连接受保护",secured:"由",missing:"请输入用户名和密码。",invalid:"用户名或密码无效。",failed:"身份验证失败。"}
+      };
+      var lang = "en";
+      try {
+        var candidates = [];
+        if (Array.isArray(navigator.languages)) candidates = candidates.concat(navigator.languages);
+        if (navigator.language) candidates.push(navigator.language);
+        for (var i = 0; i < candidates.length; i += 1) {
+          var token = String(candidates[i] || "").toLowerCase().split(/[-_]/)[0];
+          if (messages[token]) { lang = token; break; }
+        }
+      } catch (_langError) {}
+      var dict = messages[lang] || messages.en;
+      if (document.body.classList.contains("v8")) dict.runtime = dict.connection;
+      document.documentElement.lang = lang;
+      document.title = dict.pageTitle;
+      [["eyebrow",dict.eyebrow],["title",dict.title],["subtitle",dict.subtitle],["username-label",dict.username],["password-label",dict.password],["submit-basic",dict.submit],["audit",dict.audit],["tls",dict.tls],["runtime-state",dict.runtime],["secured-by",dict.secured]].forEach(function (item) {
+        var node = document.getElementById(item[0]); if (node) node.textContent = item[1];
+      });
+      function target() {
+        var params = new URLSearchParams(location.search);
+        var uri = String(params.get("return_uri") || "/").trim();
+        var args = String(params.get("return_args") || "").trim();
+        return !uri || uri.charAt(0) !== "/" || uri.indexOf("%") !== -1 ? "/" : args ? uri + "?" + args : uri;
+      }
+      function showError(value) {
+        var box = document.getElementById("error"); box.textContent = value; box.classList.add("show");
+      }
+      document.getElementById("auth-basic-form").addEventListener("submit", function (event) {
+        event.preventDefault();
+        var username = String(document.getElementById("username").value || "").trim();
+        var password = String(document.getElementById("password").value || "");
+        if (!username || !password) { showError(dict.missing); return; }
+        var button = document.getElementById("submit-basic"); button.disabled = true;
+        fetch("{{ .BasicVerifyURI }}", {method:"POST",credentials:"include",headers:{Authorization:"Basic " + btoa(username + ":" + password),"Cache-Control":"no-store"}})
+          .then(function (response) {
+            if (response.ok) { location.assign(target()); return; }
+            showError(response.status === 401 || response.status === 403 ? dict.invalid : dict.failed);
+          })
+          .catch(function () { showError(dict.failed); })
+          .finally(function () { button.disabled = false; });
+      });
+    })();
+  </script>
+</body>
+</html>

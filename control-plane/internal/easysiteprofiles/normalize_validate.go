@@ -106,6 +106,10 @@ func normalizeProfile(profile EasySiteProfile) EasySiteProfile {
 	profile.SecurityAuthBasic.AuthBasicUser = strings.TrimSpace(profile.SecurityAuthBasic.AuthBasicUser)
 	profile.SecurityAuthBasic.AuthBasicPassword = strings.TrimSpace(profile.SecurityAuthBasic.AuthBasicPassword)
 	profile.SecurityAuthBasic.AuthBasicText = strings.TrimSpace(profile.SecurityAuthBasic.AuthBasicText)
+	profile.SecurityAuthBasic.AuthBasicTemplate = strings.ToLower(strings.TrimSpace(profile.SecurityAuthBasic.AuthBasicTemplate))
+	if profile.SecurityAuthBasic.AuthBasicTemplate == "" {
+		profile.SecurityAuthBasic.AuthBasicTemplate = "v1"
+	}
 	profile.SecurityAuthBasic.Users = normalizeAuthUsers(profile.SecurityAuthBasic.Users)
 	profile.SecurityAuthBasic.ExclusionRules = normalizeAuthExclusionRules(profile.SecurityAuthBasic.ExclusionRules)
 	profile.SecurityAuthBasic.ServiceTokens = normalizeAuthServiceTokens(profile.SecurityAuthBasic.ServiceTokens)
@@ -393,6 +397,9 @@ func validateProfile(profile EasySiteProfile) error {
 	}
 	if profile.SecurityAuthBasic.AuthBasicText == "" {
 		return errors.New("easy site profile security_auth_basic.auth_basic_text is required")
+	}
+	if !slices.Contains([]string{"v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9"}, profile.SecurityAuthBasic.AuthBasicTemplate) {
+		return errors.New("easy site profile security_auth_basic.auth_basic_template has unsupported value")
 	}
 	if profile.SecurityAuthBasic.SessionInactivityMinutes < -1 || profile.SecurityAuthBasic.SessionInactivityMinutes > 24*60 {
 		return errors.New("easy site profile security_auth_basic.session_inactivity_minutes must be between -1 and 1440")

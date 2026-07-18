@@ -142,7 +142,7 @@ func TestRenderEasyArtifacts_GeneratesSiteAndAuthBasicFiles(t *testing.T) {
 	if !strings.Contains(challengePage, `var verifyURI = "/challenge/verify";`) {
 		t.Fatalf("expected antibot interstitial artifact with verify uri, got: %s", challengePage)
 	}
-	if !strings.Contains(authPage, `request("/auth/verify/basic"`) {
+	if !strings.Contains(authPage, `fetch("/auth/verify/basic"`) {
 		t.Fatalf("expected auth gate page with verify endpoint, got: %s", authPage)
 	}
 }

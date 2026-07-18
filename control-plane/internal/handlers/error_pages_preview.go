@@ -107,6 +107,14 @@ func (h *ErrorPagePreviewHandler) ServeHTTP(w http.ResponseWriter, r *http.Reque
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	if templateName, ok := strings.CutPrefix(slug, "auth-v"); ok {
+		if data, found := compiler.AuthPagePreview("v" + templateName); found {
+			writeErrorPagePreview(w, data)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
 	if data, ok := compiler.GeneratedErrorPage(slug); ok {
 		writeErrorPagePreview(w, data)
 		return

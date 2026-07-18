@@ -127,6 +127,7 @@ export function applyEasyProfileToDraft(draft, profile) {
     auth_basic_user: authBasic.auth_basic_user || draft.auth_basic_user,
     auth_basic_password: authBasic.auth_basic_password || draft.auth_basic_password,
     auth_basic_text: authBasic.auth_basic_text || draft.auth_basic_text,
+    auth_basic_template: authBasic.auth_basic_template || draft.auth_basic_template || "v1",
     auth_basic_users: normalizeAuthBasicUsers(authBasic.users),
     auth_basic_session_inactivity_minutes: normalizeAuthSessionTTLMinutes(authBasic.session_inactivity_minutes ?? draft.auth_basic_session_inactivity_minutes),
     blacklist_country: normalizeStringArray(country.blacklist_country),

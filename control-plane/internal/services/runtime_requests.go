@@ -20,6 +20,22 @@ type RuntimeRequestCollector interface {
 	Collect() ([]map[string]any, error)
 }
 
+type RuntimeRequestDashboardSummary struct {
+	RequestsDay       int                  `json:"requests_day"`
+	UniqueIPsDay      int                  `json:"unique_ips_day"`
+	TopSites          []DashboardKeyCount  `json:"top_sites"`
+	TopURLs           []DashboardKeyCount  `json:"top_urls"`
+	RequestsSeries    []DashboardTimeCount `json:"requests_series"`
+	BlockedDay        int                  `json:"blocked_day"`
+	BlockedSeries     []DashboardTimeCount `json:"blocked_series"`
+	PopularErrors     []DashboardKeyCount  `json:"popular_errors"`
+	AttacksDay        int                  `json:"attacks_day"`
+	UniqueAttackerIPs int                  `json:"unique_attacker_ips_day"`
+	TopAttackerIPs    []DashboardKeyCount  `json:"top_attacker_ips"`
+	TopCountries      []DashboardKeyCount  `json:"top_attacker_countries"`
+	MostAttackedURLs  []DashboardKeyCount  `json:"most_attacked_urls"`
+}
+
 type RuntimeRequestProber interface {
 	Probe(query url.Values) error
 }
@@ -104,6 +120,48 @@ func (c *HTTPRuntimeRequestCollector) CollectCount(query url.Values) (int, error
 		lastErr = err
 	}
 	return 0, lastErr
+}
+
+func (c *HTTPRuntimeRequestCollector) CollectDashboardSummary(query url.Values) (RuntimeRequestDashboardSummary, error) {
+	var summary RuntimeRequestDashboardSummary
+	if c == nil || strings.TrimSpace(c.URL) == "" {
+		return summary, nil
+	}
+	var lastErr error
+	for _, baseURL := range runtimeEndpointCandidates(deriveRuntimeRequestsDashboardSummaryURL(c.URL), "http://127.0.0.1:8081/requests/dashboard-summary") {
+		targetURL := withRuntimeRequestQuery(baseURL, query, []string{"since", "day", "retention_days", "tz_offset_minutes"})
+		reqCtx, cancel := context.WithTimeout(context.Background(), runtimeRequestsCollectAttemptTimeout)
+		req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, targetURL, nil)
+		if err != nil {
+			cancel()
+			lastErr = err
+			continue
+		}
+		setRuntimeAuthHeader(req, c.Token)
+		client := c.Client
+		if client == nil {
+			client = &http.Client{Timeout: runtimeRequestsHTTPTimeout}
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			cancel()
+			lastErr = err
+			continue
+		}
+		err = func() error {
+			defer cancel()
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				return fmt.Errorf("runtime requests/dashboard-summary endpoint returned %d", resp.StatusCode)
+			}
+			return json.NewDecoder(io.LimitReader(resp.Body, runtimeRequestsMaxResponseBytes)).Decode(&summary)
+		}()
+		if err == nil {
+			return summary, nil
+		}
+		lastErr = err
+	}
+	return summary, lastErr
 }
 
 func (c *HTTPRuntimeRequestCollector) CollectWithOptions(query url.Values) ([]map[string]any, error) {
@@ -270,5 +328,34 @@ func deriveRuntimeRequestsCountURL(targetURL string) string {
 	parsed.Path = "/requests/count"
 	parsed.RawQuery = ""
 	parsed.Fragment = ""
+	return parsed.String()
+}
+
+func deriveRuntimeRequestsDashboardSummaryURL(targetURL string) string {
+	parsed, err := url.Parse(strings.TrimSpace(targetURL))
+	if err != nil {
+		return strings.TrimSpace(targetURL)
+	}
+	parsed.Path = "/requests/dashboard-summary"
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	return parsed.String()
+}
+
+func withRuntimeRequestQuery(targetURL string, query url.Values, keys []string) string {
+	if len(query) == 0 {
+		return targetURL
+	}
+	parsed, err := url.Parse(targetURL)
+	if err != nil {
+		return targetURL
+	}
+	values := parsed.Query()
+	for _, key := range keys {
+		if value := strings.TrimSpace(query.Get(key)); value != "" {
+			values.Set(key, value)
+		}
+	}
+	parsed.RawQuery = values.Encode()
 	return parsed.String()
 }

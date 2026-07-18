@@ -67,6 +67,9 @@ func TestRenderEasyArtifacts_AntibotTwoLayerAndRules(t *testing.T) {
 	if !strings.Contains(siteConf, `if ($uri ~* "^/api/auth/")`) || !strings.Contains(siteConf, `set $waf_antibot_effective_redirect "/challenge/verify";`) {
 		t.Fatalf("expected prefix cookie challenge override, got: %s", siteConf)
 	}
+	if !strings.Contains(siteConf, `set $waf_antibot_security_reason "antibot";`) {
+		t.Fatalf("expected blocked antibot request to emit its telemetry reason, got: %s", siteConf)
+	}
 
 	locationsConf := byPath["nginx/easy-locations/site-a.conf"]
 	if !strings.Contains(locationsConf, "location = /challenge/stage1 {") || !strings.Contains(locationsConf, "location = /challenge/stage1/verify {") {

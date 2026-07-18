@@ -494,7 +494,10 @@ func newRequestLogRecord(item parsedAccess) requestLogRecord {
 }
 
 func requestRowTypeForAccess(item parsedAccess) string {
-	if item.status == 403 || item.status == 444 {
+	if item.status == 403 || item.status == 429 || item.status == 444 {
+		return "security"
+	}
+	if item.status >= 400 && classifyAccessSecurityEventType(item) != "access_blocked" {
 		return "security"
 	}
 	return "request"
@@ -504,8 +507,8 @@ func requestSecurityReasonForAccess(item parsedAccess) string {
 	if reason := strings.TrimSpace(item.securityReason); reason != "" {
 		return reason
 	}
-	if item.status == 403 || item.status == 444 {
-		return "access_blocked"
+	if item.status >= 400 {
+		return classifyAccessSecurityEventType(item)
 	}
 	return ""
 }

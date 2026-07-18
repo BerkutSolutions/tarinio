@@ -175,6 +175,7 @@ export function draftToEasyProfilePart2(draft, deps) {
       auth_basic_user: firstUser.username,
       auth_basic_password: firstUser.password,
       auth_basic_text: authBasicText,
+      auth_basic_template: draft.auth_basic_template || "v1",
       users: authUsers,
       exclusion_rules: authExclusionRules,
       service_tokens: authServiceTokens,

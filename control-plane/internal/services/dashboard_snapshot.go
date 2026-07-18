@@ -140,16 +140,17 @@ func (s *DashboardService) buildSnapshot() (DashboardStats, error) {
 	}
 
 	var (
-		requestRows []map[string]any
-		eventItems  []events.Event
-		requestErr  error
-		eventErr    error
+		requestRows    []map[string]any
+		requestSummary RuntimeRequestDashboardSummary
+		eventItems     []events.Event
+		requestErr     error
+		eventErr       error
 	)
 	var fetchWG sync.WaitGroup
 	fetchWG.Add(2)
 	go func() {
 		defer fetchWG.Done()
-		requestRows, requestErr = s.collectRequests()
+		requestRows, requestSummary, requestErr = s.collectDashboardRequests()
 	}()
 	go func() {
 		defer fetchWG.Done()
@@ -172,17 +173,21 @@ func (s *DashboardService) buildSnapshot() (DashboardStats, error) {
 	// len(requestRows) the windows are aligned and the summarised count is
 	// already accurate, so we keep it (avoids overwriting filtered counts in
 	// tests and low-traffic scenarios).
-	if exactDay, ok := s.collectRequestsDay(); ok && exactDay > len(requestRows) {
-		out.RequestsDay = exactDay
-	} else {
-		out.RequestsDay = requestsDay
-	}
+	// All request widgets use this same filtered observation set. A raw storage
+	// count may include management and static traffic removed from request rows.
+	out.RequestsDay = requestsDay
 	out.RequestUniqueIPsDay = requestUniqueIPsDay
 	out.RequestTopSites = requestTopSites
 	out.RequestTopURLs = requestTopURLs
 	out.RequestsSeries = requestsSeries
 	out.BlockedSeries = blockedFromRequestsSeries
 	out.PopularErrors = popularErrors
+	if requestSummary.RequestsSeries != nil {
+		out.RequestsDay, out.RequestUniqueIPsDay = requestSummary.RequestsDay, requestSummary.UniqueIPsDay
+		out.RequestTopSites, out.RequestTopURLs = requestSummary.TopSites, requestSummary.TopURLs
+		out.RequestsSeries, out.BlockedSeries = requestSummary.RequestsSeries, requestSummary.BlockedSeries
+		out.PopularErrors, blockedFromRequestsDay = requestSummary.PopularErrors, requestSummary.BlockedDay
+	}
 
 	attacksDay, blockedAttacksDay, uniqueIPsDay, topIPs, topCountries, topURLs, attacksFromEventsSeries, blockedFromEventsSeries, eventErrors := summarizeAttackEvents(eventItems, cutoff, now)
 	out.AttacksDay = attacksDay
@@ -195,6 +200,10 @@ func (s *DashboardService) buildSnapshot() (DashboardStats, error) {
 
 	requestAttackFallback := summarizeRequestAttacks(requestRows, cutoff)
 	requestAttackSeries := summarizeRequestAttackSeries(requestRows, cutoff, now)
+	if requestSummary.RequestsSeries != nil {
+		requestAttackFallback = requestAttackSummary{AttacksDay: requestSummary.AttacksDay, BlockedAttacksDay: requestSummary.BlockedDay, UniqueIPsDay: requestSummary.UniqueAttackerIPs, TopIPs: requestSummary.TopAttackerIPs, TopCountries: requestSummary.TopCountries, TopURLs: requestSummary.MostAttackedURLs}
+		requestAttackSeries = requestSummary.BlockedSeries
+	}
 	eventAttackBreakdownPartial := (out.AttacksDay > 0 || out.BlockedAttacksDay > 0 || out.UniqueAttackerIPsDay > 0) &&
 		(len(out.TopAttackerCountries) == 0 || len(out.MostAttackedURLs) == 0)
 	if requestAttackFallback.AttacksDay > out.AttacksDay {
@@ -238,6 +247,21 @@ func (s *DashboardService) buildSnapshot() (DashboardStats, error) {
 		out.AttacksSeries = requestAttackSeries
 	}
 	out.PopularErrors = mergeKeyCountsSum(out.PopularErrors, eventErrors, 7)
+	if requestSummary.RequestsSeries != nil {
+		// The runtime summary is calculated from the complete filtered request
+		// archive. Do not mix it with the independently retained event feed:
+		// a single block may be represented in both streams and would otherwise
+		// inflate totals, time buckets, countries and IP rankings differently.
+		out.AttacksDay = requestSummary.AttacksDay
+		out.BlockedAttacksDay = requestSummary.BlockedDay
+		out.UniqueAttackerIPsDay = requestSummary.UniqueAttackerIPs
+		out.TopAttackerIPs = requestSummary.TopAttackerIPs
+		out.TopAttackerCountries = requestSummary.TopCountries
+		out.MostAttackedURLs = requestSummary.MostAttackedURLs
+		out.AttacksSeries = requestSummary.BlockedSeries
+		out.BlockedSeries = requestSummary.BlockedSeries
+		out.PopularErrors = requestSummary.PopularErrors
+	}
 	out.System = collectSystemStats()
 	out.UpstreamHealth = summarizeUpstreamHealth(requestRows, now)
 	return out, nil

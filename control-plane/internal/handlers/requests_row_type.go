@@ -22,12 +22,14 @@ func normalizeRequestRow(item map[string]any) map[string]any {
 	if item == nil {
 		return map[string]any{"row_type": requestRowTypeRequest}
 	}
-	copyRow := make(map[string]any, len(item)+3)
+	copyRow := make(map[string]any, len(item)+2)
 	for key, value := range item {
 		copyRow[key] = value
 	}
+	// Compatibility metadata belongs to the normalizer, never to the public
+	// Requests API or its raw-detail view.
+	delete(copyRow, "legacy_row_type_support")
 	copyRow["row_type"] = inferLegacyRequestRowType(copyRow)
-	copyRow["legacy_row_type_support"] = true
 	normalizeRequestSecurityFields(copyRow)
 	return copyRow
 }
@@ -92,7 +94,10 @@ func normalizeRequestSecurityFields(row map[string]any) {
 	if eventType != "" {
 		row["event_type"] = eventType
 	}
-	securityReason := firstNonEmptyRequestString(eventType, asStringValue(row["summary"]), asStringValue(row["type"]), asStringValue(details["intel_label"]), asStringValue(details["feed"]), asStringValue(details["path"]))
+	securityReason := firstNonEmptyRequestString(asStringValue(row["security_reason"]), eventType, asStringValue(row["summary"]), asStringValue(row["type"]), asStringValue(details["intel_label"]), asStringValue(details["feed"]), asStringValue(details["path"]))
+	if normalizeRequestToken(securityReason) == "dashboard_demo" {
+		securityReason = "access_blocked"
+	}
 	if securityReason != "" {
 		row["security_reason"] = securityReason
 	}

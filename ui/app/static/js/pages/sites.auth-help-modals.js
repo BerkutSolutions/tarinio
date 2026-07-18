@@ -8,6 +8,7 @@ export function renderAuthHelpModal(ctx, deps = {}) {
     { labelKey: "sites.easy.auth.order", helpKey: "sites.easy.auth.help.order" },
     { labelKey: "sites.easy.antibot.authBasicLocation", helpKey: "sites.easy.auth.help.location" },
     { labelKey: "sites.easy.antibot.authText", helpKey: "sites.easy.auth.help.text" },
+    { labelKey: "sites.easy.auth.template", helpKey: "sites.easy.auth.help.template" },
     { labelKey: "sites.easy.antibot.authSessionTtl", helpKey: "sites.easy.auth.help.sessionTtl" },
     { labelKey: "sites.easy.auth.exclusionRules", helpKey: "sites.easy.auth.help.exclusions" },
     { labelKey: "sites.easy.antibot.authUsers", helpKey: "sites.easy.auth.help.users" },

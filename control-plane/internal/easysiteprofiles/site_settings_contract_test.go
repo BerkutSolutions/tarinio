@@ -66,6 +66,7 @@ func TestSiteSettings_FieldContract(t *testing.T) {
 		"security_auth_basic.auth_mode",
 		"security_auth_basic.auth_order",
 		"security_auth_basic.auth_basic_password",
+		"security_auth_basic.auth_basic_template",
 		"security_auth_basic.auth_basic_text",
 		"security_auth_basic.auth_basic_user",
 		"security_auth_basic.exclusion_rules.methods",

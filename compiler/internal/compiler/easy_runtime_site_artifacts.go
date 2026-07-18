@@ -112,6 +112,7 @@ func renderEasySiteArtifacts(site SiteInput, profile EasyProfileInput) ([]Artifa
 		AuthGateCookieKey:            authGateCookieName(site.ID),
 		AuthGateCookieVal:            authGateCookieValue(site.ID, profile),
 		AuthGateCookieTTL:            authGateCookieTTLSeconds(profile),
+		AuthBasicTemplate:            normalizeAuthBasicTemplate(profile.AuthBasicTemplate),
 		AuthExclusionRules:           buildEasyAuthExclusionRuleData(authExclusionRules),
 		AuthTokenRules:               buildEasyAuthTokenRuleData(authTokens),
 		AntibotEnabled:               antibotEnabled,
@@ -206,11 +207,16 @@ func renderEasySiteArtifacts(site SiteInput, profile EasyProfileInput) ([]Artifa
 		))
 	}
 	if data.AuthEnabled {
-		authPage, err := renderTemplate("templates/errors/auth.html.tmpl", authGatePageData{
+		templatePath := "templates/errors/auth.html.tmpl"
+		if data.AuthBasicEnabled && !data.AuthTokenEnabled {
+			templatePath = "templates/errors/auth-themed.html.tmpl"
+		}
+		authPage, err := renderTemplate(templatePath, authGatePageData{
 			BasicVerifyURI:  data.AuthGateVerifyBasicURI,
 			TokenVerifyURI:  data.AuthGateVerifyTokenURI,
 			UseBasic:        data.AuthBasicEnabled,
 			UseServiceToken: data.AuthTokenEnabled,
+			TemplateName:    data.AuthBasicTemplate,
 		})
 		if err != nil {
 			return nil, false, 0, 0, fmt.Errorf("render auth gate page for %s: %w", site.ID, err)

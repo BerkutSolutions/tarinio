@@ -155,8 +155,8 @@ func TestRequestsHandler_AddsRequestRowType(t *testing.T) {
 	if got := rows[1]["row_type"]; got != requestRowTypeSecurity {
 		t.Fatalf("expected second row_type=%q, got %#v", requestRowTypeSecurity, got)
 	}
-	if got := rows[0]["legacy_row_type_support"]; got != true {
-		t.Fatalf("expected legacy_row_type_support=true, got %#v", got)
+	if _, exists := rows[0]["legacy_row_type_support"]; exists {
+		t.Fatalf("legacy implementation field must not be exposed: %#v", rows[0])
 	}
 }
 
@@ -191,6 +191,21 @@ func TestRequestsHandler_KeepsExplicitLegacyRowTypeCompatibility(t *testing.T) {
 	}
 }
 
+func TestRequestsHandler_RemovesLegacyImplementationMetadata(t *testing.T) {
+	handler := NewRequestsHandler(&fakeRequestCollector{items: []map[string]any{{
+		"row_type": "security", "legacy_row_type_support": true,
+	}}})
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, httptest.NewRequest(http.MethodGet, "/api/requests", nil))
+	var rows []map[string]any
+	if err := json.Unmarshal(resp.Body.Bytes(), &rows); err != nil || len(rows) != 1 {
+		t.Fatalf("decode rows: err=%v rows=%#v", err, rows)
+	}
+	if _, exists := rows[0]["legacy_row_type_support"]; exists {
+		t.Fatalf("implementation metadata leaked through API: %#v", rows[0])
+	}
+}
+
 func TestRequestsHandler_InfersLegacySecurityRowsWithoutRowType(t *testing.T) {
 	collector := &fakeRequestCollector{
 		items: []map[string]any{
@@ -222,7 +237,7 @@ func TestRequestsHandler_ExposesNormalizedSecurityCategoryFields(t *testing.T) {
 	collector := &fakeRequestCollector{
 		items: []map[string]any{
 			{
-				"stream": "security_access",
+				"stream":  "security_access",
 				"summary": "legacy summary should not win",
 				"details": map[string]any{
 					"event_type": "auth",
@@ -262,5 +277,20 @@ func TestRequestsHandler_ExposesNormalizedSecurityCategoryFields(t *testing.T) {
 	}
 	if got := rows[1]["security_reason"]; got != "modsecurity_sql_injection" {
 		t.Fatalf("expected second security_reason from legacy fallback, got %#v", got)
+	}
+}
+
+func TestRequestsHandler_HidesDashboardDemoReason(t *testing.T) {
+	handler := NewRequestsHandler(&fakeRequestCollector{items: []map[string]any{{
+		"stream": "security_access", "security_reason": "dashboard_demo",
+	}}})
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, httptest.NewRequest(http.MethodGet, "/api/requests", nil))
+	var rows []map[string]any
+	if err := json.Unmarshal(resp.Body.Bytes(), &rows); err != nil || len(rows) != 1 {
+		t.Fatalf("decode rows: err=%v rows=%#v", err, rows)
+	}
+	if got := rows[0]["security_reason"]; got != "access_blocked" {
+		t.Fatalf("dashboard seed reason must not reach UI: got %#v", got)
 	}
 }

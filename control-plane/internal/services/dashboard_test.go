@@ -102,6 +102,43 @@ type fakeDashboardRuntimeProbe struct{ err error }
 
 func (f *fakeDashboardRuntimeProbe) Probe() error { return f.err }
 
+type fakeDashboardSummaryCollector struct {
+	fakeDashboardRequestCollector
+	summary RuntimeRequestDashboardSummary
+}
+
+func (f *fakeDashboardSummaryCollector) CollectDashboardSummary(_ url.Values) (RuntimeRequestDashboardSummary, error) {
+	return f.summary, f.err
+}
+
+func TestDashboardService_RuntimeSummaryIsAuthoritativeForAttackWidgets(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Hour)
+	collector := &fakeDashboardSummaryCollector{summary: RuntimeRequestDashboardSummary{
+		RequestsDay: 7, BlockedDay: 2, AttacksDay: 2, UniqueAttackerIPs: 1,
+		RequestsSeries:   []DashboardTimeCount{{Timestamp: now.Format(time.RFC3339), Count: 7}},
+		BlockedSeries:    []DashboardTimeCount{{Timestamp: now.Format(time.RFC3339), Count: 2}},
+		TopAttackerIPs:   []DashboardKeyCount{{Key: "203.0.113.20", Count: 2, Country: "DE"}},
+		TopCountries:     []DashboardKeyCount{{Key: "DE", Count: 2}},
+		MostAttackedURLs: []DashboardKeyCount{{Key: "/blocked", Count: 2}},
+		PopularErrors:    []DashboardKeyCount{{Key: "403", Count: 1}, {Key: "429", Count: 1}},
+	}}
+	eventsReader := &fakeDashboardEventReader{items: []events.Event{{
+		Type: events.TypeSecurityWAF, OccurredAt: now.Format(time.RFC3339),
+		Details: map[string]any{"client_ip": "198.51.100.99", "country": "RU", "path": "/other", "status": 403},
+	}}}
+	service := NewDashboardService(eventsReader, collector, nil)
+	stats, err := service.Stats()
+	if err != nil {
+		t.Fatalf("stats: %v", err)
+	}
+	if stats.AttacksDay != 2 || stats.BlockedAttacksDay != 2 || stats.UniqueAttackerIPsDay != 1 {
+		t.Fatalf("summary totals were mixed with events: %+v", stats)
+	}
+	if len(stats.TopAttackerIPs) != 1 || stats.TopAttackerIPs[0].Country != "DE" {
+		t.Fatalf("summary IP metadata was not preserved: %#v", stats.TopAttackerIPs)
+	}
+}
+
 func TestDashboardService_StatsExposeCurrentWidgetData(t *testing.T) {
 	now := time.Now().UTC()
 	requests := &fakeDashboardRequestCollector{
@@ -201,7 +238,7 @@ func TestDashboardService_StatsExposeCurrentWidgetData(t *testing.T) {
 	}
 }
 
-func TestDashboardService_PrefersExactRequestsDayCount(t *testing.T) {
+func TestDashboardService_UsesFilteredRowsForEveryRequestWidget(t *testing.T) {
 	now := time.Now().UTC()
 	requests := &fakeDashboardRequestCollector{
 		items: []map[string]any{
@@ -225,8 +262,8 @@ func TestDashboardService_PrefersExactRequestsDayCount(t *testing.T) {
 		t.Fatalf("stats failed: %v", err)
 	}
 
-	if stats.RequestsDay != 48780 {
-		t.Fatalf("expected exact requests_day count, got %d", stats.RequestsDay)
+	if stats.RequestsDay != 1 {
+		t.Fatalf("expected requests_day to match the filtered request rows, got %d", stats.RequestsDay)
 	}
 	if len(stats.RequestTopSites) != 1 || stats.RequestTopSites[0].Count != 1 {
 		t.Fatalf("expected sampled top-site breakdown to stay available, got %#v", stats.RequestTopSites)

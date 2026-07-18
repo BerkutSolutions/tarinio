@@ -35,6 +35,7 @@ func TestClassifyContainerLogIssue_IgnoresBenignOpenSearchStartupNoise(t *testin
 		`2026/06/24 18:09:04 [error] event service runtime security collector failed: Get "http://localhost:8081/security-events": dial tcp [::1]:8081: connect: connection refused`,
 		`2026/06/27 01:53:12 [error] 69#69: *1395 directory index of "/var/lib/waf/control-plane/acme-challenges/" is forbidden, client: 195.178.110.199, server: automation.example.test, request: "GET /.well-known/acme-challenge/ HTTP/1.1", host: "automation.example.test"`,
 		`2026/06/27 01:55:18 [error] 69#69: *1407 open() "/var/lib/waf/control-plane/acme-challenges/random-probe" failed (2: No such file or directory), client: 203.0.113.40, server: automation.example.test, request: "GET /.well-known/acme-challenge/random-probe HTTP/1.1", host: "automation.example.test"`,
+		"2026/07/18 09:40:16 [error] 1361#1361: *548 [client 159.89.174.87] ModSecurity: Access denied with code 403 (phase 2). Matched score threshold [uri \"/.git/config\"]",
 	}
 
 	for _, message := range cases {

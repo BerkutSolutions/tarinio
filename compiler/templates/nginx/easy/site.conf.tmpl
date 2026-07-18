@@ -213,7 +213,10 @@ if ($waf_country_guard ~ "{{ .BlacklistCountryGuardPattern }}") { return 403; }
 
 {{- if .AntibotScannerAutoBan }}
 set $waf_antibot_scanner_guard "$waf_easy_exception_guard:$request_uri:$http_user_agent";
-if ($waf_antibot_scanner_guard ~* "^0:.*(?:{{ .AntibotScannerPattern }})") { return 403; }
+if ($waf_antibot_scanner_guard ~* "^0:.*(?:{{ .AntibotScannerPattern }})") {
+    set $waf_antibot_security_reason "antibot";
+    return 403;
+}
 {{- end }}
 
 {{- if .AntibotEnabled }}
@@ -261,7 +264,10 @@ if ($waf_antibot_stage_guard = "0:0:1:1") { return 302 $waf_antibot_effective_re
 {{- else }}
 if ($waf_antibot_guard = "0:0:1") { return 302 $waf_antibot_effective_redirect?return_uri=$uri&return_args=$args; }
 {{- end }}
-if ($waf_antibot_guard ~ "^0:0:") { return 403; }
+if ($waf_antibot_guard ~ "^0:0:") {
+    set $waf_antibot_security_reason "antibot";
+    return 403;
+}
 {{- end }}
 
 if ($waf_rate_limited_escalated = 1) {

@@ -148,6 +148,7 @@ export function getDraftFromForm(container, state, deps) {
     auth_basic_user: "",
     auth_basic_password: "",
     auth_basic_text: container.querySelector("#service-auth-basic-text").value.trim(),
+    auth_basic_template: container.querySelector("#service-auth-basic-template")?.value || "v1",
     auth_basic_users: Array.from(container.querySelectorAll("[data-auth-user-username]")).map((input) => {
       const index = String(input.dataset.authUserUsername || "");
       const passwordInput = container.querySelector(`[data-auth-user-password="${index}"]`);

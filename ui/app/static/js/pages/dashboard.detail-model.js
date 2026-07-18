@@ -167,6 +167,24 @@ export function buildDetailModel(stats, requestRows, eventRows) {
     }
   });
 
+  // The dashboard snapshot is aggregated from the complete runtime archive,
+  // while the interactive request feed is intentionally paginated. Hydrate
+  // its top attackers here so a valid click always opens an IP detail even
+  // when that IP is outside the current feed page.
+  (Array.isArray(stats?.top_attacker_ips) ? stats.top_attacker_ips : []).forEach((item) => {
+    const ip = String(item?.key || "").trim();
+    if (!ip) return;
+    const detail = ensureIPDetail(ipDetails, ip);
+    if (!detail) return;
+    const count = Number(item?.count || 0);
+    detail.attacks = Math.max(detail.attacks, count);
+    detail.blocked = Math.max(detail.blocked, count);
+    const country = normalizeCountryCode(item?.country);
+    if (country !== "UNK") {
+      addToMap(detail.countryCounts, country, Math.max(1, count));
+    }
+  });
+
   const fallbackAttackCount = sumMapValues(fallbackAttacksBySite);
   const fallbackBlockedCount = sumMapValues(fallbackBlockedBySite);
   const eventBlockedCount = sumMapValues(blockedBySite);

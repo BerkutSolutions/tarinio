@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestRequestsSecurityCompatibilityMarkers(t *testing.T) {
+func TestRequestsSecurityReasonFilterAndCleanDetailsContract(t *testing.T) {
 	files := []string{
 		filepath.Join("..", "app", "static", "js", "pages", "requests.js"),
 		filepath.Join("..", "app", "static", "js", "pages", "requests.security.js"),
@@ -18,20 +18,15 @@ func TestRequestsSecurityCompatibilityMarkers(t *testing.T) {
 		filepath.Join("..", "app", "static", "i18n", "zh.json"),
 	}
 	markers := []string{
-		`inferLegacyRequestRowType`,
 		`normalizeSecurityReason`,
 		`buildRequestDetailsMeta(row, ctx)`,
-		`legacy_row_type_support`,
+		`selectedSecurityReason`,
+		`requests-filter-security-reason`,
+		`requests.filter.securityReason`,
 		`requests.detail.securityReason`,
-		`requests.detail.securitySummary`,
-		`requests.detail.legacyCompatibility`,
-		`requests.detail.legacyCompatibilityBadge`,
-		`requests.detail.legacyCompatibilityEnabled`,
 		`buildSecurityDetailSummary(row, ctx)`,
 		`normalizedSecurityEventType(row)`,
 		`row?.event_type`,
-		`legacyCompatibilityText`,
-		`reasonRaw`,
 		`requests.securityReason.accessBlocked`,
 		`row?.security_reason`,
 		`requests.securityReason.modsecurity`,
@@ -61,6 +56,13 @@ func TestRequestsSecurityCompatibilityMarkers(t *testing.T) {
 		}
 		if !found {
 			t.Fatalf("missing requests compatibility marker %s in %v", marker, files)
+		}
+	}
+	for _, forbidden := range []string{"legacy_row_type_support", "legacyCompatibility", "requests.detail.securitySummary"} {
+		for _, content := range contents {
+			if strings.Contains(content, forbidden) {
+				t.Fatalf("requests UI must not expose %s", forbidden)
+			}
 		}
 	}
 }

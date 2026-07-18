@@ -224,4 +224,9 @@ export function bindDetailCore(container, state, ctx, deps) {
     // javascript mode
     window.open(`/api/error-pages/preview/antibot-${tmpl}`, "_blank", "noopener,noreferrer");
   });
+
+  container.querySelector("#auth-basic-template-preview-btn")?.addEventListener("click", () => {
+    const tmpl = container.querySelector("#service-auth-basic-template")?.value || "v1";
+    window.open(`/api/error-pages/preview/auth-${tmpl}`, "_blank", "noopener,noreferrer");
+  });
 }

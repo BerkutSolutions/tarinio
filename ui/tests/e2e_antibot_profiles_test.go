@@ -37,8 +37,11 @@ func TestE2EAntiBot_ProfileCutoffAndCookiePersistence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolve antibot endpoint: %v", err)
 	}
+	var telemetryClient *http.Client
+	var telemetryBaseURL, telemetryHostOverride string
 	if runtimeURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_RUNTIME_URL")), "/"); runtimeURL != "" {
 		adminClient, adminBaseURL, adminHostOverride := newE2EClientAndBase(t, os.Getenv("WAF_E2E_BASE_URL"))
+		telemetryClient, telemetryBaseURL, telemetryHostOverride = adminClient, adminBaseURL, adminHostOverride
 		loginE2EUser(t, adminClient, adminBaseURL, adminHostOverride)
 		for _, path := range []string{"/api/tls-configs/e2e-antibot-site?auto_apply=false", "/api/sites/e2e-antibot-site?auto_apply=false", "/api/upstreams/e2e-antibot-upstream?auto_apply=false"} {
 			resp := requestE2EJSON(t, adminClient, http.MethodDelete, adminBaseURL+path, adminHostOverride, nil)
@@ -212,6 +215,15 @@ func TestE2EAntiBot_ProfileCutoffAndCookiePersistence(t *testing.T) {
 				}
 			}
 		})
+	}
+	if telemetryClient != nil {
+		blocked := antibotDoRequest(t, probeClient, endpoint, http.MethodPost, endpoint.requestBaseURL+normalPath, "curl/8.7.1", false)
+		if blocked.StatusCode != http.StatusForbidden {
+			_ = blocked.Body.Close()
+			t.Fatalf("unverified unsafe antibot request must be blocked with 403, got status=%d", blocked.StatusCode)
+		}
+		_ = blocked.Body.Close()
+		e2eWaitForRequestTelemetry(t, telemetryClient, telemetryBaseURL, telemetryHostOverride, normalPath, http.StatusForbidden, "antibot", "security")
 	}
 }
 

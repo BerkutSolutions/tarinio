@@ -26,6 +26,10 @@ type runtimeRequestCounter interface {
 	CollectCount(query url.Values) (int, error)
 }
 
+type runtimeRequestDashboardSummaryCollector interface {
+	CollectDashboardSummary(query url.Values) (RuntimeRequestDashboardSummary, error)
+}
+
 // dashboardContainerIssueReader — интерфейс для получения ошибок из логов контейнеров.
 type dashboardContainerIssueReader interface {
 	Issues() (DashboardContainerIssuesSummary, error)
@@ -79,8 +83,9 @@ type DashboardTimeCount struct {
 }
 
 type DashboardKeyCount struct {
-	Key   string `json:"key"`
-	Count int    `json:"count"`
+	Key     string `json:"key"`
+	Count   int    `json:"count"`
+	Country string `json:"country,omitempty"`
 }
 
 type DashboardProcessStats struct {
@@ -503,6 +508,19 @@ func (s *DashboardService) collectRequests() ([]map[string]any, error) {
 	s.requestsCache.rows = append([]map[string]any(nil), items...)
 	s.requestsCache.mu.Unlock()
 	return items, nil
+}
+
+func (s *DashboardService) collectDashboardRequests() ([]map[string]any, RuntimeRequestDashboardSummary, error) {
+	if collector, ok := s.requests.(runtimeRequestDashboardSummaryCollector); ok {
+		query := make(url.Values)
+		query.Set("since", time.Now().UTC().Add(-24*time.Hour).Format(time.RFC3339))
+		summary, err := collector.CollectDashboardSummary(query)
+		if err == nil {
+			return nil, summary, nil
+		}
+	}
+	rows, err := s.collectRequests()
+	return rows, RuntimeRequestDashboardSummary{}, err
 }
 
 func (s *DashboardService) collectEvents() ([]events.Event, error) {

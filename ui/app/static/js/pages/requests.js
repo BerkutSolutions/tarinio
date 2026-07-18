@@ -3,7 +3,7 @@ import {
   buildSecurityDetailSummary,
   buildRequestEntry,
   buildSecurityBadge,
-  inferLegacyRequestRowType,
+  inferRequestRowType,
   normalizeSecurityReason,
   requestRowTypeLabelKey,
   requestRowTypeSortValue,
@@ -164,6 +164,7 @@ export async function renderRequests(container, ctx) {
     selectedService: "",
     selectedMethod: "",
     selectedStatus: "",
+    selectedSecurityReason: "",
     selectedTimePreset: "date",
     selectedDate: todayDateKeyLocal(),
     selectedDateTime: "",
@@ -172,7 +173,8 @@ export async function renderRequests(container, ctx) {
     typeOptions: [],
     serviceOptions: [],
     methodOptions: [],
-    statusOptions: []
+    statusOptions: [],
+    securityReasonOptions: []
   };
 
   const columns = [
@@ -236,11 +238,13 @@ export async function renderRequests(container, ctx) {
     const services = new Set();
     const methods = new Set();
     const statuses = new Set();
+    const securityReasons = new Set();
     for (const row of state.rows) {
       const rowType = String(row?.rowType || "request").trim();
       const service = String(row?.serviceDisplay || "").trim();
       const method = String(row?.entry?.method || "").trim().toUpperCase();
       const status = String(row?.entry?.status ?? "").trim();
+      const securityReason = String(row?.securityReason || "").trim();
       if (rowType) {
         types.add(rowType);
       }
@@ -253,11 +257,15 @@ export async function renderRequests(container, ctx) {
       if (status) {
         statuses.add(status);
       }
+      if (securityReason) {
+        securityReasons.add(securityReason);
+      }
     }
     state.typeOptions = Array.from(types).sort((left, right) => left.localeCompare(right, undefined, { sensitivity: "base" }));
     state.serviceOptions = Array.from(services).sort((left, right) => left.localeCompare(right, undefined, { sensitivity: "base" }));
     state.methodOptions = Array.from(methods).sort((left, right) => left.localeCompare(right, undefined, { sensitivity: "base" }));
     state.statusOptions = Array.from(statuses).sort((left, right) => Number(left) - Number(right));
+    state.securityReasonOptions = Array.from(securityReasons).sort((left, right) => left.localeCompare(right, undefined, { sensitivity: "base" }));
     if (state.selectedType && !state.typeOptions.includes(state.selectedType)) {
       state.selectedType = "";
     }
@@ -269,6 +277,9 @@ export async function renderRequests(container, ctx) {
     }
     if (state.selectedStatus && !state.statusOptions.includes(state.selectedStatus)) {
       state.selectedStatus = "";
+    }
+    if (state.selectedSecurityReason && !state.securityReasonOptions.includes(state.selectedSecurityReason)) {
+      state.selectedSecurityReason = "";
     }
   };
 
@@ -332,6 +343,9 @@ export async function renderRequests(container, ctx) {
       if (state.selectedStatus && status !== state.selectedStatus) {
         return false;
       }
+      if (state.selectedSecurityReason && String(row?.securityReason || "") !== state.selectedSecurityReason) {
+        return false;
+      }
       if (!matchTimeFilter(rowDate)) {
         return false;
       }
@@ -368,7 +382,6 @@ export async function renderRequests(container, ctx) {
 
     const renderRequestDetail = (row) => {
       const entry = row?.entry && typeof row.entry === "object" ? row.entry : {};
-      const securitySummary = buildSecurityDetailSummary(row, ctx);
       const detailsMeta = buildRequestDetailsMeta(row, ctx);
       const fields = [
         ["requests.detail.type", ctx.t(requestRowTypeLabelKey(row?.rowType))],
@@ -386,9 +399,6 @@ export async function renderRequests(container, ctx) {
       ];
       const allFields = fields.concat(detailsMeta);
       return `
-        ${securitySummary
-          ? `<div class="waf-note"><div class="waf-inline"><strong>${escapeHtml(ctx.t("requests.detail.securitySummary"))}:</strong><span class="waf-badge waf-badge-warning">${escapeHtml(securitySummary.typeLabel || ctx.t("requests.type.security"))}</span><span class="waf-badge waf-badge-warning">${escapeHtml(securitySummary.reasonLabel || ctx.t("requests.securityBadge"))}</span>${securitySummary.legacyCompatibility ? `<span class="waf-badge">${escapeHtml(ctx.t("requests.detail.legacyCompatibilityBadge"))}</span>` : ""}</div></div>`
-          : ""}
         <div class="waf-table-wrap">
           <table class="waf-table waf-detail-table">
             <tbody>
@@ -445,6 +455,13 @@ export async function renderRequests(container, ctx) {
                 <select id="requests-filter-status">
                   <option value="">${escapeHtml(ctx.t("requests.filter.all"))}</option>
                   ${state.statusOptions.map((item) => `<option value="${escapeHtml(item)}"${state.selectedStatus === item ? " selected" : ""}>${escapeHtml(item)}</option>`).join("")}
+                </select>
+              </div>
+              <div class="waf-field">
+                <label for="requests-filter-security-reason">${escapeHtml(ctx.t("requests.filter.securityReason"))}</label>
+                <select id="requests-filter-security-reason">
+                  <option value="">${escapeHtml(ctx.t("requests.filter.all"))}</option>
+                  ${state.securityReasonOptions.map((item) => `<option value="${escapeHtml(item)}"${state.selectedSecurityReason === item ? " selected" : ""}>${escapeHtml(buildSecurityDetailSummary({ rowType: "security", security_reason: item }, ctx)?.reasonLabel || item)}</option>`).join("")}
                 </select>
               </div>
               <div class="waf-field">
@@ -571,6 +588,11 @@ export async function renderRequests(container, ctx) {
     });
     container.querySelector("#requests-filter-status")?.addEventListener("change", (event) => {
       state.selectedStatus = String(event.target?.value || "");
+      state.page = 1;
+      render();
+    });
+    container.querySelector("#requests-filter-security-reason")?.addEventListener("change", (event) => {
+      state.selectedSecurityReason = String(event.target?.value || "");
       state.page = 1;
       render();
     });
@@ -765,7 +787,7 @@ export async function renderRequests(container, ctx) {
         const entry = buildRequestEntry(row);
         const serviceDisplay = resolveServiceDisplay(entry.site, entry.host, siteHostMap);
         const timestampDate = parseTimestamp(entry.timestamp || row?.ingested_at);
-        const rowType = inferLegacyRequestRowType(row);
+        const rowType = inferRequestRowType(row);
         const securityReason = normalizeSecurityReason(row);
         return { ...row, entry, serviceDisplay, timestampDate, rowType, securityReason };
       }).filter((row) => !isInternalGlobalService(row?.entry?.site || row?.serviceDisplay));

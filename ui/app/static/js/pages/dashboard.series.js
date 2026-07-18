@@ -55,7 +55,10 @@ function renderRequestsSeries(rows, ctx, chartWidthPx) {
     return `<div class="dashboard-widget-content waf-empty">${escapeHtml(ctx.t("dashboard.series.empty"))}</div>`;
   }
   const maxRequests = Math.max(1, ...rows.map((row) => row.requests));
-  const averageRequests = rows.reduce((sum, row) => sum + row.requests, 0) / rows.length;
+  // This is the middle tick of the Y axis, not the arithmetic mean of the
+  // observation window. A mean is misleading for sparse traffic and makes
+  // the scale read "2.25" below a peak of 54; the midpoint must be 27.
+  const midpointRequests = maxRequests / 2;
   const maxY = Math.max(maxRequests, ...rows.map((row) => row.attacks));
   const width = Math.max(320, Math.floor(chartWidthPx || 1100));
   const height = 230;
@@ -92,7 +95,7 @@ function renderRequestsSeries(rows, ctx, chartWidthPx) {
             return `<line x1="${pad.left}" y1="${y}" x2="${width - pad.right}" y2="${y}" stroke="rgba(148, 163, 184, 0.16)" stroke-width="1" stroke-dasharray="3 7"></line>`;
           }).join("")}
           <text x="${pad.left - 8}" y="${pad.top + 4}" text-anchor="end" font-size="11" fill="rgba(203, 213, 225, 0.68)">${escapeHtml(formatNumber(maxRequests))}</text>
-          <text x="${pad.left - 8}" y="${pad.top + chartHeight / 2 + 4}" text-anchor="end" font-size="11" fill="rgba(203, 213, 225, 0.68)">${escapeHtml(formatNumber(averageRequests))}</text>
+          <text x="${pad.left - 8}" y="${pad.top + chartHeight / 2 + 4}" text-anchor="end" font-size="11" fill="rgba(203, 213, 225, 0.68)">${escapeHtml(formatNumber(midpointRequests))}</text>
           <path d="${requestPath}" fill="none" stroke="#2895ff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
           <path d="${attackPath}" fill="none" stroke="#f17322" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
           ${rows.map((row, index) => {

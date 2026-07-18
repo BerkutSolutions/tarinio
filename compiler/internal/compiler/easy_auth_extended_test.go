@@ -106,3 +106,36 @@ func TestRenderEasyArtifacts_ManagementSiteAuthBypassesWriteAPI(t *testing.T) {
 		t.Fatalf("expected management modsecurity self-bypass safeguard rule, got: %s", siteConf)
 	}
 }
+
+func TestRenderEasyArtifacts_BasicAuthTemplateVariants(t *testing.T) {
+	for _, variant := range []string{"v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9"} {
+		t.Run(variant, func(t *testing.T) {
+			artifacts, err := RenderEasyArtifacts(
+				[]SiteInput{{ID: "site-a", Enabled: true, PrimaryHost: "a.example.com", ListenHTTP: true}},
+				[]EasyProfileInput{{
+					SiteID: "site-a", AllowedMethods: []string{"GET"}, UseAuthBasic: true,
+					AuthMode: "basic", AuthBasicText: "Restricted area", AuthBasicTemplate: variant,
+					AuthUsers: []ServiceAuthUserInput{{Username: "admin", Password: "secret", Enabled: true}},
+				}},
+			)
+			if err != nil {
+				t.Fatalf("render easy artifacts: %v", err)
+			}
+			page := mapArtifactsByPath(artifacts)["errors/site-a/auth.html"]
+			if !strings.Contains(page, `body class="`+variant+`"`) || !strings.Contains(page, `fetch("/auth/verify/basic"`) {
+				t.Fatalf("expected themed, working Basic Auth page for %s", variant)
+			}
+			if !strings.Contains(page, "logo800x300_no-text.png") || !strings.Contains(page, "logo512.png") {
+				t.Fatalf("expected local logos in %s", variant)
+			}
+			if !strings.Contains(page, "https://github.com/BerkutSolutions/tarinio") || !strings.Contains(page, "Secured by") {
+				t.Fatalf("expected Tarinio footer link in %s", variant)
+			}
+			for _, language := range []string{"en:", "ru:", "de:", "sr:", "zh:"} {
+				if !strings.Contains(page, language) {
+					t.Fatalf("expected %s localization in %s", language, variant)
+				}
+			}
+		})
+	}
+}

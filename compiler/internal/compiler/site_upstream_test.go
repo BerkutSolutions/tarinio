@@ -299,7 +299,7 @@ func TestRenderSiteUpstreamArtifacts_BlockDirectIPAccessUses444AndSecurityReason
 			t.Fatalf("%s must contain %q, got: %s", path, fragment, contents[path])
 		}
 	}
-	if !strings.Contains(contents["nginx/conf.d/base.conf"], `"security_reason":"$waf_security_reason"`) {
+	if !strings.Contains(contents["nginx/conf.d/base.conf"], `"security_reason":"$waf_request_security_reason"`) {
 		t.Fatalf("access log must include normalized security_reason: %s", contents["nginx/conf.d/base.conf"])
 	}
 	if !strings.Contains(contents["nginx/conf.d/base.conf"], `~^[0-9][0-9]?[0-9]?\.[0-9][0-9]?[0-9]?\.[0-9][0-9]?[0-9]?\.[0-9][0-9]?[0-9]?$ 1;`) {

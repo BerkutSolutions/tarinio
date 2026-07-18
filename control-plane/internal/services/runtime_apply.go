@@ -1059,6 +1059,7 @@ func mapEasyInputs(items []easysiteprofiles.EasySiteProfile, virtualPatches []vi
 			AuthBasicUser:              item.SecurityAuthBasic.AuthBasicUser,
 			AuthBasicPassword:          item.SecurityAuthBasic.AuthBasicPassword,
 			AuthBasicText:              item.SecurityAuthBasic.AuthBasicText,
+			AuthBasicTemplate:          item.SecurityAuthBasic.AuthBasicTemplate,
 			AuthUsers:                  mapAuthUsers(item.SecurityAuthBasic.Users),
 			AuthServiceTokens:          mapAuthServiceTokens(item.SecurityAuthBasic.ServiceTokens),
 			AuthExclusionRules:         mapAuthExclusionRules(item.SecurityAuthBasic.ExclusionRules),

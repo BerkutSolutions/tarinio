@@ -1,6 +1,5 @@
 export const REQUEST_ROW_TYPE_REQUEST = "request";
 export const REQUEST_ROW_TYPE_SECURITY = "security";
-export const LEGACY_REQUESTS_ROW_TYPE_SUPPORT_FIELD = "legacy_row_type_support";
 
 const SECURITY_REASON_LABELS = {
   modsecurity: "requests.securityReason.modsecurity",
@@ -55,7 +54,7 @@ export function coerceObject(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
 
-export function inferLegacyRequestRowType(row) {
+export function inferRequestRowType(row) {
   const explicit = normalizeSecurityToken(row?.row_type || row?.rowType);
   if (explicit === REQUEST_ROW_TYPE_SECURITY) {
     return REQUEST_ROW_TYPE_SECURITY;
@@ -145,8 +144,6 @@ export function buildSecurityDetailSummary(row, ctx = null) {
     reasonLabel: reasonLabel || reason,
     reasonRaw: topLevelReason || reason,
     normalizedEventType: normalizedSecurityEventType(row),
-    legacyCompatibility: Boolean(row?.[LEGACY_REQUESTS_ROW_TYPE_SUPPORT_FIELD]),
-    legacyCompatibilityText: ctx?.t ? String(ctx.t("requests.detail.legacyCompatibilityEnabled") || "") : "legacy row_type compatibility enabled",
   };
 }
 
@@ -161,7 +158,6 @@ export function buildRequestDetailsMeta(row, ctx = null) {
   };
   const securitySummary = buildSecurityDetailSummary(row, ctx);
 
-  push("requests.detail.summary", row?.summary);
   if (securitySummary?.reasonLabel) {
     push("requests.detail.securityReason", securitySummary.reasonLabel);
   }
@@ -184,9 +180,6 @@ export function buildRequestDetailsMeta(row, ctx = null) {
   push("requests.detail.feed", details.feed);
   push("requests.detail.intelLabel", details.intel_label);
   push("requests.detail.intelScore", details.intel_score);
-  if (securitySummary?.legacyCompatibility) {
-    push("requests.detail.legacyCompatibility", securitySummary.legacyCompatibilityText);
-  }
   return meta;
 }
 

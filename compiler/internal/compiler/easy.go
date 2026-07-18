@@ -48,6 +48,7 @@ type easySiteData struct {
 	AuthGateCookieKey      string
 	AuthGateCookieVal      string
 	AuthGateCookieTTL      int
+	AuthBasicTemplate      string
 	AuthExclusionRules     []easyAuthExclusionRuleData
 	AuthTokenRules         []easyAuthTokenRuleData
 
@@ -130,6 +131,7 @@ type authGatePageData struct {
 	TokenVerifyURI  string
 	UseBasic        bool
 	UseServiceToken bool
+	TemplateName    string
 }
 
 type easyAntibotRuleData struct {

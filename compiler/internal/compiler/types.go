@@ -192,6 +192,7 @@ type EasyProfileInput struct {
 	AuthBasicUser      string
 	AuthBasicPassword  string
 	AuthBasicText      string
+	AuthBasicTemplate  string
 	AuthUsers          []ServiceAuthUserInput
 	AuthServiceTokens  []ServiceAuthTokenInput
 	AuthExclusionRules []AuthExclusionRuleInput

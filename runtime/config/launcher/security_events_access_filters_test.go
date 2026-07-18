@@ -39,3 +39,20 @@ func TestBlockedManagementRequestIsMarkedAsSecurityRecord(t *testing.T) {
 		t.Fatalf("blocked management record must retain its security classification, got %+v", record)
 	}
 }
+
+func TestRequestRecordUsesExactAuthAndAntibotReasons(t *testing.T) {
+	for _, item := range []struct {
+		path   string
+		status int
+		want   string
+	}{
+		{path: "/auth/verify/basic", status: 401, want: "auth"},
+		{path: "/challenge/verify", status: 400, want: "antibot"},
+		{path: "/checkout", status: 403, want: "access_blocked"},
+	} {
+		record := newRequestLogRecord(parsedAccess{path: item.path, status: item.status})
+		if record.RowType != "security" || record.SecurityReason != item.want {
+			t.Fatalf("%s status=%d: got %+v", item.path, item.status, record)
+		}
+	}
+}

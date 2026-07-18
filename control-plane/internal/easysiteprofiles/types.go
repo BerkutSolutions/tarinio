@@ -190,6 +190,7 @@ type SecurityAuthBasicSettings struct {
 	AuthBasicUser     string                      `json:"auth_basic_user"`
 	AuthBasicPassword string                      `json:"auth_basic_password"`
 	AuthBasicText     string                      `json:"auth_basic_text"`
+	AuthBasicTemplate string                      `json:"auth_basic_template,omitempty"`
 	Users             []SecurityAuthUser          `json:"users"`
 	ExclusionRules    []SecurityAuthExclusionRule `json:"exclusion_rules"`
 	ServiceTokens     []SecurityAuthServiceToken  `json:"service_tokens"`
@@ -494,6 +495,7 @@ func DefaultProfile(siteID string) EasySiteProfile {
 			AuthBasicUser:     "changeme",
 			AuthBasicPassword: "",
 			AuthBasicText:     "Restricted area",
+			AuthBasicTemplate: "v1",
 			Users: []SecurityAuthUser{
 				{
 					Username: "changeme",
