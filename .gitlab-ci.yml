@@ -79,6 +79,10 @@ e2e:full:
   stage: e2e
   timeout: 45m
   resource_group: waf-e2e-stack
+  retry:
+    max: 1
+    when:
+      - script_failure
   script:
     - mkdir -p build/e2e/full
     - E2E_TIMEOUT=240 E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/full" sh scripts/run-e2e-tests.sh
@@ -94,6 +98,10 @@ e2e:fresh-onboarding:
   stage: e2e
   timeout: 30m
   resource_group: waf-e2e-stack
+  retry:
+    max: 1
+    when:
+      - script_failure
   script:
     - mkdir -p build/e2e/fresh-onboarding
     - >-
