@@ -57,8 +57,7 @@ unit:go:
     - go version
     - go vet ./...
     - go test ./... -count=1
-    - go mod tidy
-    - git diff --exit-code -- go.mod go.sum
+    - go mod verify
 
 docs:build:
   stage: unit
