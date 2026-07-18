@@ -1,0 +1,13 @@
+# Reviewed historical false positives. Each entry identifies exactly one immutable
+# Git occurrence; new secret-like content remains subject to the default rules.
+250139175ab8146ccfb6208cb526d04ab86e7979:deploy/compose/enterprise/docker-compose.yml:curl-auth-user:320
+7f62eaa342ec68d588c20aa4272393a86fb7d8e3:CHANGELOG.md:generic-api-key:25
+cb4ee6c719aa28d91e50320d41fea1fff744dcfd:ui/app/static/js/pages/bans.js:generic-api-key:8
+cb4ee6c719aa28d91e50320d41fea1fff744dcfd:ui/app/static/js/pages/bans.js:generic-api-key:9
+cb4ee6c719aa28d91e50320d41fea1fff744dcfd:ui/app/static/js/pages/bans.js:generic-api-key:10
+cb4ee6c719aa28d91e50320d41fea1fff744dcfd:ui/app/static/js/pages/bans.js:generic-api-key:11
+cb4ee6c719aa28d91e50320d41fea1fff744dcfd:ui/app/static/js/pages/bans.js:generic-api-key:12
+cb4ee6c719aa28d91e50320d41fea1fff744dcfd:ui/app/static/js/pages/bans.js:generic-api-key:13
+cb4ee6c719aa28d91e50320d41fea1fff744dcfd:ui/app/static/js/pages/bans.js:generic-api-key:14
+7e7d7b2acbecd01204f42215d91267e51f243a57:control-plane/internal/services/letsencrypt_client_acme.go:generic-api-key:87
+75642bf2a86381ece33e181fb2af7442cea416fb:control-plane/internal/easysiteprofiles/site_settings_contract_test.go:generic-api-key:142

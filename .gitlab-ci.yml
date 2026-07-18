@@ -148,7 +148,7 @@ security:gitleaks:
       docker run --rm --pull=always
       -v "$CI_PROJECT_DIR:/repo" -w /repo
       zricethezav/gitleaks:v8.30.0
-      detect --source /repo
+      detect --config /repo/.gitleaks.toml --source /repo
       --redact --report-format json --report-path /repo/build/security/gitleaks.json
   artifacts:
     when: always
@@ -180,7 +180,7 @@ security:govulncheck:
   dependencies: []
   script:
     - mkdir -p .bin
-    - GOBIN="$CI_PROJECT_DIR/.bin" go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+    - GOBIN="$CI_PROJECT_DIR/.bin" go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
     - .bin/govulncheck ./...
 
 security:npm-audit:
