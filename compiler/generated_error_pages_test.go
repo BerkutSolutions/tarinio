@@ -150,10 +150,18 @@ func TestExtendedErrorPagesUseConsistentTerminalRouteLabels(t *testing.T) {
 }
 
 func TestNormalizeErrorPageRouteLabelsUpdatesLegacyPagesOnly(t *testing.T) {
-	legacy := []byte(`<span id="n-host">Host</span></body>`)
+	legacy := []byte(`<span id="n-host">Host</span><span id="m-ip">n/a</span><span id="m-time">n/a</span><span id="m-rid">n/a</span></body>`)
 	updated := string(NormalizeErrorPageRouteLabels(legacy))
-	if !strings.Contains(updated, `l==="ru"?"\u0421\u0435\u0440\u0432\u0435\u0440":"Origin"`) {
-		t.Fatalf("legacy route label script was not added: %s", updated)
+	for _, marker := range []string{
+		`l==="ru"?"\u0421\u0435\u0440\u0432\u0435\u0440":"Origin"`,
+		`performance.getEntriesByType("navigation")[0]`,
+		`set("m-rid",rid)`,
+		`set("m-ip",ip)`,
+		`set("m-time",isNaN(d.getTime())?ts:d.toLocaleString(l))`,
+	} {
+		if !strings.Contains(updated, marker) {
+			t.Fatalf("metadata recovery script lacks %q: %s", marker, updated)
+		}
 	}
 	plain := []byte(`<main>no route</main></body>`)
 	if string(NormalizeErrorPageRouteLabels(plain)) != string(plain) {

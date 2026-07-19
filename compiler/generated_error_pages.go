@@ -47,13 +47,16 @@ func GeneratedErrorPage(code string) ([]byte, bool) {
 }
 
 // NormalizeErrorPageRouteLabels keeps legacy static pages aligned with the
-// extended-page terminology without rewriting every embedded preview file.
+// extended-page terminology and restores request metadata after nginx makes an
+// internal error_page redirect. The browser URL remains the original request,
+// so query parameters on the internal target are intentionally unavailable.
 func NormalizeErrorPageRouteLabels(content []byte) []byte {
-	if !strings.Contains(string(content), `id="n-host"`) {
+	page := string(content)
+	if !strings.Contains(page, `id="n-host"`) {
 		return content
 	}
-	const script = `<script>(function(){var l=(document.documentElement.lang||navigator.language||"en").toLowerCase().split(/[-_]/)[0],e=document.getElementById("n-host");if(e)e.textContent=l==="ru"?"\u0421\u0435\u0440\u0432\u0435\u0440":"Origin"})()</script>`
-	return []byte(strings.Replace(string(content), "</body>", script+"</body>", 1))
+	const script = `<script>(function(){var l=(document.documentElement.lang||navigator.language||"en").toLowerCase().split(/[-_]/)[0],e=document.getElementById("n-host");if(e)e.textContent=l==="ru"?"\u0421\u0435\u0440\u0432\u0435\u0440":"Origin";var n=(performance.getEntriesByType&&performance.getEntriesByType("navigation")[0]),s=n&&n.serverTiming||[];function v(k){for(var i=0;i<s.length;i++)if(s[i].name===k)return String(s[i].description||"").trim()}function set(k,x){var q=document.getElementById(k);if(q&&x)q.textContent=x}var rid=v("rid"),ip=v("ip"),ts=v("ts");set("m-rid",rid);set("m-ip",ip);if(ts){var d=new Date(Number(ts)*1000);set("m-time",isNaN(d.getTime())?ts:d.toLocaleString(l))}})()</script>`
+	return []byte(strings.Replace(page, "</body>", script+"</body>", 1))
 }
 
 type errorCopy struct{ Title, Subtitle, State string }

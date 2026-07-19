@@ -2,6 +2,7 @@ package tests
 
 import (
 	"encoding/json"
+	"net/http"
 	"os"
 	"strings"
 	"testing"
@@ -14,6 +15,7 @@ func TestE2ERecoveryFlow_BadConfigThenRepair(t *testing.T) {
 	}
 	client, requestBaseURL, requestHostOverride := newE2EClientAndBase(t, baseURL)
 	loginE2EUser(t, client, requestBaseURL, requestHostOverride)
+	before := e2eGetAntiDDoSSettings(t, client, requestBaseURL, requestHostOverride)
 
 	t.Run("RejectInvalidAntiDDoSConfig", func(t *testing.T) {
 		invalidResp := requestDeepJSON(t, client, "PUT", requestBaseURL+"/api/anti-ddos/settings", requestHostOverride, map[string]any{
@@ -29,6 +31,13 @@ func TestE2ERecoveryFlow_BadConfigThenRepair(t *testing.T) {
 			t.Fatalf("expected 400 for invalid anti-ddos config, got=%d body=%s", invalidResp.StatusCode, mustReadBody(t, invalidResp.Body))
 		}
 		_ = invalidResp.Body.Close()
+
+		after := e2eGetAntiDDoSSettings(t, client, requestBaseURL, requestHostOverride)
+		for _, field := range []string{"use_l4_guard", "conn_limit", "rate_per_second", "rate_burst", "target"} {
+			if before[field] != after[field] {
+				t.Fatalf("rejected config changed active %s: before=%v after=%v", field, before[field], after[field])
+			}
+		}
 	})
 
 	t.Run("ApplyValidAntiDDoSConfig", func(t *testing.T) {
@@ -73,4 +82,18 @@ func TestE2ERecoveryFlow_BadConfigThenRepair(t *testing.T) {
 		}
 		_ = applyResp.Body.Close()
 	})
+}
+
+func e2eGetAntiDDoSSettings(t *testing.T, client *http.Client, baseURL, hostOverride string) map[string]any {
+	t.Helper()
+	resp := getWithAuth(t, client, baseURL+"/api/anti-ddos/settings", hostOverride)
+	if resp.StatusCode != 200 {
+		t.Fatalf("get anti-ddos settings: status=%d body=%s", resp.StatusCode, mustReadBody(t, resp.Body))
+	}
+	defer resp.Body.Close()
+	var settings map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&settings); err != nil {
+		t.Fatalf("decode anti-ddos settings: %v", err)
+	}
+	return settings
 }

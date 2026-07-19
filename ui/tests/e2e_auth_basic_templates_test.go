@@ -130,6 +130,7 @@ func e2eWaitForRequestTelemetry(t *testing.T, client *http.Client, baseURL, host
 			for _, row := range rows {
 				entry, _ := row["entry"].(map[string]any)
 				if entry["uri"] == uri && e2eDashboardAsInt(t, entry["status"]) == status && row["security_reason"] == reason && row["row_type"] == rowType {
+					e2eWaitForTelemetryDashboard(t, client, baseURL, hostOverride, rowType == "security")
 					return
 				}
 			}
@@ -137,4 +138,25 @@ func e2eWaitForRequestTelemetry(t *testing.T, client *http.Client, baseURL, host
 		time.Sleep(500 * time.Millisecond)
 	}
 	t.Fatalf("request telemetry missing uri=%s status=%d reason=%q type=%q", uri, status, reason, rowType)
+}
+
+func e2eWaitForTelemetryDashboard(t *testing.T, client *http.Client, baseURL, hostOverride string, blocked bool) {
+	t.Helper()
+	deadline := time.Now().Add(30 * time.Second)
+	for time.Now().Before(deadline) {
+		resp := getWithAuth(t, client, baseURL+"/api/dashboard/stats", hostOverride)
+		var stats map[string]any
+		decodeErr := json.NewDecoder(resp.Body).Decode(&stats)
+		_ = resp.Body.Close()
+		if resp.StatusCode == http.StatusOK && decodeErr == nil {
+			requests := e2eDashboardAsInt(t, stats["requests_day"])
+			attacks := e2eDashboardAsInt(t, stats["attacks_day"])
+			series := stats["blocked_series"]
+			if requests > 0 && (!blocked || (attacks > 0 && e2eDashboardSeriesTotal(t, e2eDashboardAsSlice(t, series, "blocked_series")) > 0)) {
+				return
+			}
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	t.Fatalf("dashboard did not aggregate the %s request telemetry", map[bool]string{true: "blocked", false: "normal"}[blocked])
 }

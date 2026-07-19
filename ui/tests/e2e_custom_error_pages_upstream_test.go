@@ -194,6 +194,7 @@ func TestE2EBehavioral_CustomErrorPages_UpstreamDrivenBranches(t *testing.T) {
 			return
 		}
 		assertLooksLikeBrandedPage(t, "custom "+codeStr, respBranded.StatusCode, bodyBranded)
+		assertRuntimeErrorPageMetadata(t, respBranded.Header.Get("Server-Timing"))
 
 		pDisabled := baseBlockProfile()
 		pDisabled["use_custom_error_pages"] = true
@@ -214,6 +215,15 @@ func TestE2EBehavioral_CustomErrorPages_UpstreamDrivenBranches(t *testing.T) {
 	checkUpstreamDrivenCustomPage(t, http.StatusNotFound, "/__upstream_status/404")
 	checkUpstreamDrivenCustomPage(t, http.StatusBadGateway, "/__upstream_status/502")
 	checkUpstreamDrivenCustomPage(t, http.StatusServiceUnavailable, "/__upstream_status/503")
+}
+
+func assertRuntimeErrorPageMetadata(t *testing.T, serverTiming string) {
+	t.Helper()
+	for _, marker := range []string{"rid;desc=\"", "ip;desc=\"", "ts;desc=\""} {
+		if !strings.Contains(serverTiming, marker) {
+			t.Fatalf("custom error page response must expose %q through Server-Timing, got %q", marker, serverTiming)
+		}
+	}
 }
 
 func TestE2EBehavioral_CustomErrorPages_GeoAndDirectRuntimeBranches(t *testing.T) {
@@ -474,6 +484,38 @@ func TestE2EBehavioral_CustomErrorPages_GeoAndDirectRuntimeBranches(t *testing.T
 		_ = respDisabled.Body.Close()
 		if respDisabled.StatusCode == http.StatusUnavailableForLegalReasons {
 			assertDisabledPageGetsShorter(t, "451-whitelist", body, bodyDisabled)
+		}
+	})
+
+	t.Run("TrustedProxyIdentityRejectsSpoofedForwardedFor", func(t *testing.T) {
+		trusted := baseBlockProfile()
+		security := mapGetOrCreate(trusted, "security_behavior_and_limits")
+		security["use_blacklist"] = true
+		security["blacklist_ip"] = []string{blockedIP}
+		security["access_trusted_proxy_cidrs"] = []string{"127.0.0.1/32", "172.16.0.0/12"}
+		saveProfile(t, trusted)
+		compileApply(t)
+
+		blocked := doRuntimeGET("/", map[string]string{"X-Forwarded-For": blockedIP})
+		blockedBody, _ := io.ReadAll(blocked.Body)
+		_ = blocked.Body.Close()
+		if blocked.StatusCode != http.StatusForbidden {
+			t.Fatalf("trusted proxy must apply client IP from X-Forwarded-For: status=%d body=%.200s", blocked.StatusCode, string(blockedBody))
+		}
+
+		untrusted := baseBlockProfile()
+		security = mapGetOrCreate(untrusted, "security_behavior_and_limits")
+		security["use_blacklist"] = true
+		security["blacklist_ip"] = []string{blockedIP}
+		security["access_trusted_proxy_cidrs"] = []string{}
+		saveProfile(t, untrusted)
+		compileApply(t)
+
+		spoofed := doRuntimeGET("/", map[string]string{"X-Forwarded-For": blockedIP})
+		spoofedBody, _ := io.ReadAll(spoofed.Body)
+		_ = spoofed.Body.Close()
+		if spoofed.StatusCode == http.StatusForbidden {
+			t.Fatalf("untrusted X-Forwarded-For must not control the client identity: body=%.200s", string(spoofedBody))
 		}
 	})
 
