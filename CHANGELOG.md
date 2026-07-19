@@ -8,6 +8,7 @@
 
 ### Публикация и CI/CD
 
+- Добавлен изолированный DAST-контур OWASP ZAP после security-гейтов: baseline проверяет `main` и теги, а активный full scan запускается по расписанию и для release-тегов. Отчёты ZAP и двуязычный DAST evidence прикладываются к GitHub Release; High/Critical блокируют pipeline.
 - GitLab CI разделён на быстрый E2E smoke-набор, полный E2E-набор и отдельный набор security-инвариантов: Basic Auth, межсайтовая изоляция, compile/apply, антибот, ModSecurity, rollback и security-телеметрия.
 - E2E подтверждает, что события неудачной Basic Auth-аутентификации сохраняются с причиной `auth`, но пароль и значение заголовка Authorization не попадают в телеметрию запросов.
 - Каждый E2E job формирует двуязычный отчёт-доказательство (`e2e-evidence.md` и `e2e-evidence.json`) без секретов; при публикации релиза эти отчёты прикладываются к GitHub Release.
