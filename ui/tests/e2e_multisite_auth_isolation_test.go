@@ -129,14 +129,15 @@ func e2eWaitForMultisiteHost(t *testing.T, runtimeURL, host string) {
 		req.Host = host
 		resp, err := client.Do(req)
 		if err == nil {
+			location := resp.Header.Get("Location")
 			_ = resp.Body.Close()
-			if resp.StatusCode != http.StatusMisdirectedRequest {
+			if resp.StatusCode == http.StatusFound && strings.HasPrefix(location, "/auth") {
 				return
 			}
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
-	t.Fatalf("runtime did not activate host %s after profile apply", host)
+	t.Fatalf("runtime did not activate authenticated host %s after profile apply", host)
 }
 
 func e2eMultisiteBasicVerify(t *testing.T, runtimeURL, host, username, password string) *http.Response {
