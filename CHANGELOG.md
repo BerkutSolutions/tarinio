@@ -4,6 +4,7 @@
 
 - Basic Auth verification now completes after Nginx runs `auth_basic`, so invalid, disabled, and cross-site credentials are rejected.
 - Disabled users can no longer be reactivated by legacy profile fields; generated credential files remain site-scoped.
+- E2E waits for the runtime revision's refreshed session cookie before asserting session revocation after credential rotation.
 
 ### Публикация и CI/CD
 

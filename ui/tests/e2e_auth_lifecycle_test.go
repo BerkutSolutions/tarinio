@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestE2EBasicAuthLifecycle(t *testing.T) {
@@ -110,12 +111,10 @@ func TestE2EBasicAuthLifecycle(t *testing.T) {
 	} else {
 		_ = resp.Body.Close()
 	}
-	if resp := e2eBasicVerify(t, runtimeURL, runtimeHost, activeUser, rotatedPassword); resp.StatusCode != http.StatusNoContent {
-		body := readAndClose(t, resp.Body)
-		t.Fatalf("rotated Basic Auth password must be accepted: status=%d body=%s", resp.StatusCode, body)
-	} else {
-		_ = resp.Body.Close()
-	}
+	// auth_basic reads its credential file per request, while the session cookie
+	// guard becomes active after nginx reloads the new revision. Wait for the
+	// freshly issued cookie so the revocation assertion observes one revision.
+	e2eWaitForRotatedBasicSession(t, runtimeURL, runtimeHost, activeUser, rotatedPassword, cookie)
 
 	stale := e2eRequestWithCookie(t, runtimeURL+"/", runtimeHost, cookie)
 	if stale.StatusCode != http.StatusFound {
@@ -123,6 +122,22 @@ func TestE2EBasicAuthLifecycle(t *testing.T) {
 		t.Fatalf("old Basic Auth session must be revoked after profile apply: status=%d body=%s", stale.StatusCode, body)
 	}
 	_ = stale.Body.Close()
+}
+
+func e2eWaitForRotatedBasicSession(t *testing.T, runtimeURL, host, username, password, staleCookie string) {
+	t.Helper()
+	stalePair := strings.SplitN(staleCookie, ";", 2)[0]
+	deadline := time.Now().Add(30 * time.Second)
+	for time.Now().Before(deadline) {
+		resp := e2eBasicVerify(t, runtimeURL, host, username, password)
+		setCookie := resp.Header.Get("Set-Cookie")
+		_ = readAndClose(t, resp.Body)
+		if resp.StatusCode == http.StatusNoContent && setCookie != "" && strings.SplitN(setCookie, ";", 2)[0] != stalePair {
+			return
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+	t.Fatal("rotated Basic Auth revision did not issue a fresh session cookie")
 }
 
 func e2eSaveAndApplyAuthProfile(t *testing.T, client *http.Client, baseURL, hostOverride, siteID string, profile map[string]any) {
