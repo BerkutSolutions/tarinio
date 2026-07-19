@@ -294,6 +294,21 @@ publish:github-mirror:
   stage: publish
   timeout: 15m
   dependencies: []
+  needs:
+    - validate:repository
+    - warm:e2e-images
+    - unit:go
+    - docs:build
+    - e2e:smoke
+    - validate:generated-nginx-config
+    - e2e:security-invariants
+    - e2e:full
+    - e2e:fresh-onboarding
+    - security:gitleaks
+    - security:trivy
+    - security:govulncheck
+    - security:npm-audit
+    - dast:baseline
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
       when: manual
@@ -323,6 +338,22 @@ publish:github-release:
     - e2e:smoke
     - e2e:security-invariants
     - e2e:full
+    - dast:baseline
+    - dast:full
+  needs:
+    - validate:repository
+    - warm:e2e-images
+    - unit:go
+    - docs:build
+    - e2e:smoke
+    - validate:generated-nginx-config
+    - e2e:security-invariants
+    - e2e:full
+    - e2e:fresh-onboarding
+    - security:gitleaks
+    - security:trivy
+    - security:govulncheck
+    - security:npm-audit
     - dast:baseline
     - dast:full
   rules:
