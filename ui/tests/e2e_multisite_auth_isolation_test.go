@@ -131,7 +131,7 @@ func e2eWaitForMultisiteHost(t *testing.T, runtimeURL, host string) {
 		if err == nil {
 			location := resp.Header.Get("Location")
 			_ = resp.Body.Close()
-			if resp.StatusCode == http.StatusFound && strings.HasPrefix(location, "/auth") {
+			if resp.StatusCode == http.StatusFound && strings.Contains(location, "/auth") {
 				return
 			}
 		}
