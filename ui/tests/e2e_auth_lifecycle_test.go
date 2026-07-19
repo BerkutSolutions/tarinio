@@ -88,6 +88,11 @@ func TestE2EBasicAuthLifecycle(t *testing.T) {
 	} else {
 		_ = resp.Body.Close()
 	}
+	e2eWaitForRequestTelemetry(t, adminClient, requestBaseURL, hostOverride, "/auth/verify/basic", http.StatusUnauthorized, "auth", "security")
+	e2eAssertRequestTelemetryRedacted(t, adminClient, requestBaseURL, hostOverride,
+		disabledPassword,
+		base64.StdEncoding.EncodeToString([]byte(disabledUser+":"+disabledPassword)),
+	)
 	verified := e2eBasicVerify(t, runtimeURL, runtimeHost, activeUser, initialPassword)
 	if verified.StatusCode != http.StatusNoContent {
 		body := readAndClose(t, verified.Body)
@@ -122,6 +127,20 @@ func TestE2EBasicAuthLifecycle(t *testing.T) {
 		t.Fatalf("old Basic Auth session must be revoked after profile apply: status=%d body=%s", stale.StatusCode, body)
 	}
 	_ = stale.Body.Close()
+}
+
+func e2eAssertRequestTelemetryRedacted(t *testing.T, client *http.Client, baseURL, hostOverride string, forbiddenValues ...string) {
+	t.Helper()
+	resp := getWithAuth(t, client, baseURL+"/api/requests?limit=1000&retention_days=1", hostOverride)
+	body := readAndClose(t, resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("get request telemetry for redaction check: status=%d body=%s", resp.StatusCode, body)
+	}
+	for _, forbidden := range forbiddenValues {
+		if forbidden != "" && strings.Contains(body, forbidden) {
+			t.Fatalf("request telemetry must redact credential material %q", forbidden)
+		}
+	}
 }
 
 func e2eWaitForRotatedBasicSession(t *testing.T, runtimeURL, host, username, password, staleCookie string) {

@@ -36,6 +36,7 @@ GO_CMD="${GO_CMD:-go}"
 E2E_LOG_DIR="${E2E_LOG_DIR:-$REPO_ROOT/.work/logs}"
 mkdir -p "$E2E_LOG_DIR"
 E2E_LOG_FILE="$E2E_LOG_DIR/e2e-$(date +%Y%m%d_%H%M%S).log"
+E2E_EVIDENCE_DIR="${E2E_EVIDENCE_DIR:-$E2E_LOG_DIR}"
 
 if [ "$E2E_FRESH_ONBOARDING" = "1" ]; then
   export E2E_BOOTSTRAP_ADMIN_ENABLED=false
@@ -473,11 +474,13 @@ TEST_SUMMARY="$(cat "$TEST_SUMMARY_FILE" 2>/dev/null || true)"
 rm -f "$TEST_SUMMARY_FILE"
 
 if [ "$TEST_EXIT" -ne 0 ]; then
+  python3 "$REPO_ROOT/scripts/write-e2e-evidence-report.py" --log "$TEST_LOG" --output-dir "$E2E_EVIDENCE_DIR" --suite "$E2E_FILTER" || true
   fail_msg "Tests failed (exit $TEST_EXIT). Expected/actual details from Go output:"
   show_log_tail "$TEST_LOG" 160
   rm -f "$TEST_LOG"
   exit "$TEST_EXIT"
 fi
+python3 "$REPO_ROOT/scripts/write-e2e-evidence-report.py" --log "$TEST_LOG" --output-dir "$E2E_EVIDENCE_DIR" --suite "$E2E_FILTER"
 rm -f "$TEST_LOG"
 ok "Tests passed: ${TEST_SUMMARY:-$E2E_FILTER}"
 ok "All e2e checks passed"
