@@ -18,23 +18,45 @@ func TestE2EBasicAuthLifecycle(t *testing.T) {
 	t.Logf("Basic Auth lifecycle runtime URL: %s", runtimeURL)
 	adminClient, requestBaseURL, hostOverride := newE2EClientAndBase(t, panelURL)
 	loginE2EUser(t, adminClient, requestBaseURL, hostOverride)
-	siteID := e2eGetFirstSiteID(t, adminClient, requestBaseURL, hostOverride)
-	if siteID == "" {
-		t.Skip("no site is configured for the Basic Auth lifecycle test")
-	}
-	original := e2eGetEasyProfile(t, adminClient, requestBaseURL, hostOverride, siteID)
-	if original == nil {
-		t.Skip("no easy profile is configured for the Basic Auth lifecycle test")
+	siteID := "e2e-auth-lifecycle"
+	runtimeHost = siteID + ".test"
+	upstreamID := siteID + "-upstream"
+	for _, endpoint := range []string{
+		"/api/sites/" + siteID + "?auto_apply=false",
+		"/api/upstreams/" + upstreamID + "?auto_apply=false",
+	} {
+		resp := requestE2EJSON(t, adminClient, http.MethodDelete, requestBaseURL+endpoint, hostOverride, nil)
+		_ = resp.Body.Close()
 	}
 	t.Cleanup(func() {
-		resp := postJSON(t, adminClient, requestBaseURL+"/api/easy-site-profiles/"+siteID, hostOverride, original)
-		_ = resp.Body.Close()
+		for _, endpoint := range []string{
+			"/api/sites/" + siteID + "?auto_apply=false",
+			"/api/upstreams/" + upstreamID + "?auto_apply=false",
+		} {
+			resp := requestE2EJSON(t, adminClient, http.MethodDelete, requestBaseURL+endpoint, hostOverride, nil)
+			_ = resp.Body.Close()
+		}
 		e2eCompileAndApply(t, adminClient, requestBaseURL, hostOverride)
 	})
+	resp := postJSON(t, adminClient, requestBaseURL+"/api/sites?auto_apply=false", hostOverride, map[string]any{
+		"id": siteID, "primary_host": runtimeHost, "enabled": true, "listen_http": true, "listen_https": false, "use_easy_config": true, "default_upstream_id": upstreamID,
+	})
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+		t.Fatalf("create lifecycle site: status=%d body=%s", resp.StatusCode, mustReadBody(t, resp.Body))
+	}
+	_ = resp.Body.Close()
+	resp = postJSON(t, adminClient, requestBaseURL+"/api/upstreams?auto_apply=false", hostOverride, map[string]any{
+		"id": upstreamID, "site_id": siteID, "name": upstreamID, "scheme": "http", "host": "upstream-echo", "port": 8888, "base_path": "/",
+	})
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+		t.Fatalf("create lifecycle upstream: status=%d body=%s", resp.StatusCode, mustReadBody(t, resp.Body))
+	}
+	_ = resp.Body.Close()
 
 	const disabledUser, disabledPassword = "e2e-disabled", "disabled-password"
 	const activeUser, initialPassword, rotatedPassword = "e2e-active", "initial-password", "rotated-password"
 	profile := e2eGetEasyProfile(t, adminClient, requestBaseURL, hostOverride, siteID)
+	profile["allowed_methods"] = []string{"GET", "POST", "HEAD", "OPTIONS"}
 	auth, _ := profile["security_auth_basic"].(map[string]any)
 	if auth == nil {
 		auth = map[string]any{}
@@ -52,6 +74,7 @@ func TestE2EBasicAuthLifecycle(t *testing.T) {
 		{"username": activeUser, "password": initialPassword, "enabled": true},
 	}
 	e2eSaveAndApplyAuthProfile(t, adminClient, requestBaseURL, hostOverride, siteID, profile)
+	e2eWaitForMultisiteHost(t, runtimeURL, runtimeHost)
 
 	if resp := e2eBasicVerify(t, runtimeURL, runtimeHost, disabledUser, disabledPassword); resp.StatusCode != http.StatusUnauthorized {
 		body := readAndClose(t, resp.Body)
