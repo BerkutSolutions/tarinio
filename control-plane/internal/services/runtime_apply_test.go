@@ -353,7 +353,7 @@ func TestApplyService_CompilesEasyProfileArtifacts(t *testing.T) {
 	if !strings.Contains(easyConf, "client_max_body_size 64m;") {
 		t.Fatalf("expected max body size directive in easy conf, got: %s", easyConf)
 	}
-	if !strings.Contains(easyConf, "if ($request_method !~ ^(DELETE|GET|POST)$)") {
+	if !strings.Contains(easyConf, "if ($request_method ~ ^(DELETE|GET|POST)$)") || !strings.Contains(easyConf, "if ($waf_easy_method_allowed = 0)") {
 		t.Fatalf("expected allowed methods guard in easy conf, got: %s", easyConf)
 	}
 	if !strings.Contains(easyConf, "add_header Referrer-Policy \"same-origin\" always;") {
