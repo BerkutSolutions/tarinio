@@ -1,5 +1,10 @@
 ## [1.5.5] - 17.07.2026
 
+### Basic Auth security
+
+- Basic Auth verification now completes after Nginx runs `auth_basic`, so invalid, disabled, and cross-site credentials are rejected.
+- Disabled users can no longer be reactivated by legacy profile fields; generated credential files remain site-scoped.
+
 ### Публикация и CI/CD
 
 - После успешного GitLab pipeline для ветки `main` доступна ручная job зеркалирования в GitHub.

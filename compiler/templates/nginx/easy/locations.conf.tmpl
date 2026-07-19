@@ -84,7 +84,9 @@ location = {{ .AuthGateVerifyBasicURI }} {
 {{- else }}
     add_header Set-Cookie "{{ .AuthGateCookieKey }}={{ .AuthGateCookieVal }}; Path=/; SameSite=Lax; Secure; HttpOnly" always;
 {{- end }}
-    return 204;
+    # auth_basic is evaluated in the access phase. A rewrite-phase return would
+    # bypass it, so finish the request only after access controls have run.
+    try_files /__waf_auth_verified__ =204;
 }
 {{- end }}
 {{- if .AuthTokenEnabled }}

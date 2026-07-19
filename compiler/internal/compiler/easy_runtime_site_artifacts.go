@@ -58,7 +58,7 @@ func renderEasySiteArtifacts(site SiteInput, profile EasyProfileInput) ([]Artifa
 		defaultChallenge = profile.ChallengeEscalationMode
 	}
 	authUsers := enabledAuthUsers(profile.AuthUsers)
-	if len(authUsers) == 0 && strings.TrimSpace(profile.AuthBasicUser) != "" && strings.TrimSpace(profile.AuthBasicPassword) != "" {
+	if len(profile.AuthUsers) == 0 && strings.TrimSpace(profile.AuthBasicUser) != "" && strings.TrimSpace(profile.AuthBasicPassword) != "" {
 		authUsers = []ServiceAuthUserInput{{
 			Username: strings.TrimSpace(profile.AuthBasicUser),
 			Password: strings.TrimSpace(profile.AuthBasicPassword),

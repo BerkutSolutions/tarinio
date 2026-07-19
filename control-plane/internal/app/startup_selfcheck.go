@@ -582,6 +582,7 @@ func startupSelfTestCreateProfile(siteID, host string) easysiteprofiles.EasySite
 	profile.SecurityAuthBasic.AuthBasicUser = "admin"
 	profile.SecurityAuthBasic.AuthBasicPassword = "password-a"
 	profile.SecurityAuthBasic.AuthBasicText = "Restricted area"
+	profile.SecurityAuthBasic.Users = []easysiteprofiles.SecurityAuthUser{{Username: "admin", Password: "password-a", Enabled: true}}
 
 	// 8) Country policy.
 	profile.SecurityCountryPolicy.BlacklistCountry = []string{"RU", "CN"}
@@ -769,6 +770,7 @@ func startupSelfTestUpdateProfile(siteID, host string) easysiteprofiles.EasySite
 	profile.SecurityAntibot.AntibotTurnstileSitekey = "turnstile-sitekey-b"
 	profile.SecurityAntibot.AntibotTurnstileSecret = "turnstile-secret-b"
 	profile.SecurityAuthBasic.AuthBasicPassword = "password-b"
+	profile.SecurityAuthBasic.Users = []easysiteprofiles.SecurityAuthUser{{Username: "admin", Password: "password-b", Enabled: true}}
 
 	// 8) Country policy.
 	profile.SecurityCountryPolicy.BlacklistCountry = []string{"IR"}

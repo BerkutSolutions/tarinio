@@ -122,7 +122,8 @@ func normalizeProfile(profile EasySiteProfile) EasySiteProfile {
 			},
 		}
 	}
-	if profile.SecurityAuthBasic.UseAuthBasic &&
+	if len(profile.SecurityAuthBasic.Users) == 0 &&
+		profile.SecurityAuthBasic.UseAuthBasic &&
 		profile.SecurityAuthBasic.AuthBasicUser != "" &&
 		profile.SecurityAuthBasic.AuthBasicPassword != "" &&
 		!hasEnabledUserWithPassword(profile.SecurityAuthBasic.Users) {
