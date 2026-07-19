@@ -68,10 +68,11 @@ unit:go:
       cat > .ci-bin/npm <<'EOF'
       #!/bin/sh
       set -eu
+      repo_dir="$(pwd -P)"
       exec docker run --rm --pull=always --user "$(id -u):$(id -g)" \
         -e HOME=/workspace/.ci-home -e NPM_CONFIG_CACHE=/npm-cache \
         -v "$NPM_CACHE_DIR:/npm-cache" \
-        -v "$PWD:/workspace" -w /workspace node:24-bookworm npm "$@"
+        -v "$repo_dir:/workspace" -w /workspace node:24-bookworm npm "$@"
       EOF
     - chmod 700 .ci-bin/npm
     - export PATH="$CI_PROJECT_DIR/.ci-bin:$PATH"
