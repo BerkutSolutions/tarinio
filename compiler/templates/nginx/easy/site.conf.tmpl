@@ -49,7 +49,17 @@ if ($waf_easy_admin_guard = 1) {
     set $waf_rate_limited_active 0;
     set $waf_rate_limited_escalated 0;
 }
-if ($request_method !~ {{ .AllowedMethodsPattern }}) {
+set $waf_easy_method_allowed 0;
+if ($request_method ~ {{ .AllowedMethodsPattern }}) {
+    set $waf_easy_method_allowed 1;
+}
+if ($uri = {{ .AuthGateVerifyBasicURI }}) {
+    set $waf_easy_method_allowed 1;
+}
+if ($uri = {{ .AuthGateVerifyTokenURI }}) {
+    set $waf_easy_method_allowed 1;
+}
+if ($waf_easy_method_allowed = 0) {
     return 405;
 }
 

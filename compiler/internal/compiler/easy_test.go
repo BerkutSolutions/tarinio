@@ -286,7 +286,7 @@ func TestRenderEasyArtifacts_UsesSafeTemplateWhenProfileMissing(t *testing.T) {
 	if !strings.Contains(siteConf, "client_max_body_size 100m;") {
 		t.Fatalf("expected default max client size in template, got: %s", siteConf)
 	}
-	if !strings.Contains(siteConf, "if ($request_method !~ ^(GET|POST|HEAD|OPTIONS|PUT|PATCH|DELETE)$)") {
+	if !strings.Contains(siteConf, "if ($request_method ~ ^(GET|POST|HEAD|OPTIONS|PUT|PATCH|DELETE)$)") || !strings.Contains(siteConf, "if ($waf_easy_method_allowed = 0)") {
 		t.Fatalf("expected default allowed methods guard in template, got: %s", siteConf)
 	}
 	if !strings.Contains(siteConf, "proxy_ssl_server_name off;") {

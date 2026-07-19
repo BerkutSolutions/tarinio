@@ -56,7 +56,12 @@ func TestE2EBasicAuthLifecycle(t *testing.T) {
 	const disabledUser, disabledPassword = "e2e-disabled", "disabled-password"
 	const activeUser, initialPassword, rotatedPassword = "e2e-active", "initial-password", "rotated-password"
 	profile := e2eGetEasyProfile(t, adminClient, requestBaseURL, hostOverride, siteID)
-	profile["allowed_methods"] = []string{"GET", "POST", "HEAD", "OPTIONS"}
+	httpBehavior, _ := profile["http_behavior"].(map[string]any)
+	if httpBehavior == nil {
+		httpBehavior = map[string]any{}
+		profile["http_behavior"] = httpBehavior
+	}
+	httpBehavior["allowed_methods"] = []string{"GET", "POST", "HEAD", "OPTIONS"}
 	auth, _ := profile["security_auth_basic"].(map[string]any)
 	if auth == nil {
 		auth = map[string]any{}

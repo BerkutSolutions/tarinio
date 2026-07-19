@@ -61,7 +61,6 @@ func TestE2EMultisiteBasicAuthIsolation(t *testing.T) {
 			profile["http_behavior"] = httpBehavior
 		}
 		httpBehavior["allowed_methods"] = []string{"GET", "POST", "HEAD", "OPTIONS"}
-		profile["allowed_methods"] = []string{"GET", "POST", "HEAD", "OPTIONS"}
 		auth, _ := profile["security_auth_basic"].(map[string]any)
 		if auth == nil {
 			auth = map[string]any{}

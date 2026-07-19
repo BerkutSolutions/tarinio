@@ -60,6 +60,9 @@ func TestRenderEasyArtifacts_AuthTokenOrderAndExclusions(t *testing.T) {
 	if !strings.Contains(siteConf, `set $waf_auth_service_guard "$http_x_waf_service_name|$http_x_waf_service_token";`) {
 		t.Fatalf("expected service token request guard, got: %s", siteConf)
 	}
+	if !strings.Contains(siteConf, `if ($uri = /auth/verify/basic) {`) || !strings.Contains(siteConf, `if ($uri = /auth/verify/token) {`) {
+		t.Fatalf("expected auth verification endpoints to bypass site method filtering, got: %s", siteConf)
+	}
 	if !strings.Contains(siteConf, `if ($waf_auth_exclusion_match ~* "^(?:GET|OPTIONS):`) {
 		t.Fatalf("expected auth exclusion rule in site conf, got: %s", siteConf)
 	}
