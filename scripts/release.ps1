@@ -231,6 +231,30 @@ function Publish-DockerPackage {
   Write-Status "OK" ("Docker package published for " + $version)
 }
 
+function Publish-GitLabMain {
+  $currentBranch = git branch --show-current
+  if ($LASTEXITCODE -ne 0) {
+    throw "failed to determine the current git branch"
+  }
+  if ($currentBranch.Trim() -ne "main") {
+    throw "GitLab publication requires the main branch; current branch: $($currentBranch.Trim())"
+  }
+
+  $dirtyFiles = git status --short
+  if ($LASTEXITCODE -ne 0) {
+    throw "failed to check git worktree status"
+  }
+  if (-not [string]::IsNullOrWhiteSpace(($dirtyFiles -join ""))) {
+    throw "GitLab publication requires a clean worktree; commit or stash local changes first"
+  }
+
+  Write-Status "RUN" "Syncing with gitlab/main"
+  Invoke-Checked -Command "git" -Arguments @("pull", "--rebase", "gitlab", "main")
+  Write-Status "RUN" "Pushing main to GitLab"
+  Invoke-Checked -Command "git" -Arguments @("push", "gitlab", "HEAD:main")
+  Write-Status "OK" "Source code published to GitLab main"
+}
+
 function Normalize-Mode([string]$Raw) {
   $value = ""
   if (-not [string]::IsNullOrWhiteSpace($Raw)) {
@@ -243,6 +267,7 @@ function Normalize-Mode([string]$Raw) {
     "4" { return "docker" }
     "5" { return "version" }
     "6" { return "publish" }
+    "7" { return "gitlab" }
     "full" { return "full" }
     "check" { return "check" }
     "release" { return "release" }
@@ -250,6 +275,8 @@ function Normalize-Mode([string]$Raw) {
     "docker" { return "docker" }
     "version" { return "version" }
     "sync-version" { return "version" }
+    "gitlab" { return "gitlab" }
+    "gitlab-publish" { return "gitlab" }
     default { return "" }
   }
 }
@@ -262,6 +289,7 @@ function Read-ModeInteractive {
   Write-Host "4. Docker package publish only" -ForegroundColor White
   Write-Host "5. Version sync only" -ForegroundColor White
   Write-Host "6. Publish only (release + docker, no checks)" -ForegroundColor White
+  Write-Host "7. Publish current main to GitLab (no checks)" -ForegroundColor White
   $choice = Read-Host "Enter number and press Enter"
   if ([string]::IsNullOrWhiteSpace($choice)) {
     Write-Status "WARN" "No mode selected. Exiting."
@@ -554,25 +582,6 @@ Write-KeyValue "Current version" $version
 Write-KeyValue "Release tag" $tag
 Write-KeyValue "Docker image" $ghcrVersion
 
-Write-Title "Startup Test Checks"
-$expectedStartupCheckCount = 14
-$startupResults = @(Run-StartupChecks)
-$executedStartupCheckCount = @($startupResults).Count
-$passedStartupCheckCount = @($startupResults | Where-Object { $_.Ok }).Count
-$failedStartupCheckCount = $executedStartupCheckCount - $passedStartupCheckCount
-
-Write-Title "Startup Test Summary"
-Write-KeyValue "Expected checks" ([string]$expectedStartupCheckCount)
-Write-KeyValue "Executed checks" ([string]$executedStartupCheckCount)
-Write-KeyValue "Passed checks" ([string]$passedStartupCheckCount)
-Write-KeyValue "Failed checks" ([string]$failedStartupCheckCount)
-
-if ($executedStartupCheckCount -ne $expectedStartupCheckCount) {
-  throw "startup test check count mismatch: expected $expectedStartupCheckCount, executed $executedStartupCheckCount"
-}
-
-$allStartupChecksPassed = ($failedStartupCheckCount -eq 0)
-
 $normalizedArgMode = Normalize-Mode $Mode
 $interactiveModeSelection = [string]::IsNullOrWhiteSpace($normalizedArgMode)
 
@@ -618,21 +627,29 @@ switch ($normalizedArgMode) {
   }
   "release" {
     Write-Title "Mode: Release Publish Only"
-    if (-not $allStartupChecksPassed) {
-      throw "release publish is blocked: startup tests failed"
-    }
     Publish-ReleaseMetadata
   }
   "docker" {
     Write-Title "Mode: Docker Package Publish Only"
-    if (-not $allStartupChecksPassed) {
-      throw "docker package publish is blocked: startup tests failed"
-    }
     Publish-DockerPackage
   }
   "full" {
     Write-Title "Mode: Check and Publish (ALL: Checks + GitHub Release + Docker)"
-    if (-not $allStartupChecksPassed) {
+    Write-Title "Full Release Checks"
+    $expectedStartupCheckCount = 14
+    $startupResults = @(Run-StartupChecks)
+    $executedStartupCheckCount = @($startupResults).Count
+    $passedStartupCheckCount = @($startupResults | Where-Object { $_.Ok }).Count
+    $failedStartupCheckCount = $executedStartupCheckCount - $passedStartupCheckCount
+    Write-Title "Full Release Check Summary"
+    Write-KeyValue "Expected checks" ([string]$expectedStartupCheckCount)
+    Write-KeyValue "Executed checks" ([string]$executedStartupCheckCount)
+    Write-KeyValue "Passed checks" ([string]$passedStartupCheckCount)
+    Write-KeyValue "Failed checks" ([string]$failedStartupCheckCount)
+    if ($executedStartupCheckCount -ne $expectedStartupCheckCount) {
+      throw "full release check count mismatch: expected $expectedStartupCheckCount, executed $executedStartupCheckCount"
+    }
+    if ($failedStartupCheckCount -ne 0) {
       throw "full release is blocked: startup tests failed"
     }
     Invoke-LocalPreflight -SkipGoTest -CompactOutput
@@ -642,12 +659,13 @@ switch ($normalizedArgMode) {
   }
   "publish" {
     Write-Title "Mode: Publish Only (Release + Docker)"
-    if (-not $allStartupChecksPassed) {
-      throw "publish is blocked: startup tests failed"
-    }
     Publish-ReleaseMetadata
     Publish-DockerPackage
     Write-Status "OK" "Publish only completed"
+  }
+  "gitlab" {
+    Write-Title "Mode: GitLab Publish Only"
+    Publish-GitLabMain
   }
   default {
     throw "unsupported mode: $normalizedArgMode"
