@@ -4,6 +4,8 @@
   Framework plan: он записывал временный summary-файл в недоступный для
   runner-пользователя `/tmp`; штатные JSON/HTML/XML/Markdown отчёты по-прежнему
   сохраняются в артефактах job.
+  Конфигурация ZAP и Java preferences сохраняются в writable томе артефактов,
+  поэтому daemon корректно стартует с UID GitLab runner.
 
 - ci: multisite Basic Auth E2E сохраняет обе связанные настройки без
   промежуточных auto-apply и проверяет их одной явной compile/apply revision;
