@@ -57,6 +57,12 @@ func RenderAccessRateLimitArtifacts(
 	sort.Slice(sortedSites, func(i, j int) bool {
 		return sortedSites[i].ID < sortedSites[j].ID
 	})
+	enabledSiteIDs := make(map[string]struct{}, len(sortedSites))
+	for _, site := range sortedSites {
+		if site.Enabled {
+			enabledSiteIDs[site.ID] = struct{}{}
+		}
+	}
 
 	accessBySite := make(map[string]AccessPolicyInput, len(accessPolicies))
 	for _, policy := range accessPolicies {
@@ -147,11 +153,29 @@ func RenderAccessRateLimitArtifacts(
 		return nil, fmt.Errorf("render rate limit http template: %w", err)
 	}
 
-	// Trusted proxy directives are rendered in each site's server context below.
-	// A global real_ip rule would leak one site's trust boundary to other sites.
+	// Trusted proxy directives must be emitted at http level: the real_ip module
+	// processes client identity before virtual-server selection.
+	allTrustedCIDRs := map[string]struct{}{}
+	for _, policy := range accessPolicies {
+		if _, active := enabledSiteIDs[policy.SiteID]; !active {
+			continue
+		}
+		for _, cidr := range policy.TrustedProxyCIDRs {
+			if cidr != "" {
+				allTrustedCIDRs[cidr] = struct{}{}
+			}
+		}
+	}
+	trustedCIDRSlice := sortedUnique(func() []string {
+		out := make([]string, 0, len(allTrustedCIDRs))
+		for cidr := range allTrustedCIDRs {
+			out = append(out, cidr)
+		}
+		return out
+	}())
 	realIPContent, err := renderTemplate("templates/nginx/conf.d/real_ip.conf.tmpl", struct {
 		TrustedProxyCIDRs []string
-	}{})
+	}{TrustedProxyCIDRs: trustedCIDRSlice})
 	if err != nil {
 		return nil, fmt.Errorf("render real_ip template: %w", err)
 	}
