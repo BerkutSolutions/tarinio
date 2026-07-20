@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestResolveCandidatePath(t *testing.T) {
@@ -26,6 +27,21 @@ func TestResolveCandidatePath(t *testing.T) {
 	}
 	if relative != filepath.Join("C:\\runtime", "candidates", "rev-002") {
 		t.Fatalf("unexpected relative resolution: %s", relative)
+	}
+}
+
+func TestWaitForHTTPProxyRevisionRequiresActiveRevision(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("X-WAF-Runtime-Revision", "rev-current")
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+
+	if err := waitForHTTPProxyRevisionAt(server.URL, "rev-current", time.Second); err != nil {
+		t.Fatalf("matching revision must be ready regardless of response status: %v", err)
+	}
+	if err := waitForHTTPProxyRevisionAt(server.URL, "rev-next", 100*time.Millisecond); err == nil {
+		t.Fatal("stale revision must not satisfy readiness")
 	}
 }
 

@@ -152,8 +152,51 @@ func (p *runtimeProcess) reloadCurrent() error {
 		runtimeProm.recordReload("failed")
 		return err
 	}
+	if err := waitForHTTPProxyRevision(pointer.RevisionID, 10*time.Second); err != nil {
+		runtimeProm.recordReload("failed")
+		return err
+	}
 	runtimeProm.recordReload("succeeded")
 	return nil
+}
+
+// waitForHTTPProxyRevision makes reload transactional from the caller's point of
+// view.  Nginx accepts SIGHUP before its new workers are ready; reporting a
+// successful reload at that point lets the next request race a worker restart.
+// The marker must belong to the just-activated revision; a response from an
+// old worker is not sufficient. Its status is deliberately not prescribed by
+// a site policy.
+func waitForHTTPProxyRevision(revisionID string, timeout time.Duration) error {
+	return waitForHTTPProxyRevisionAt("http://127.0.0.1/", revisionID, timeout)
+}
+
+func waitForHTTPProxyRevisionAt(endpoint, revisionID string, timeout time.Duration) error {
+	revisionID = strings.TrimSpace(revisionID)
+	if revisionID == "" {
+		return errors.New("runtime revision id is required for reload readiness")
+	}
+	deadline := time.Now().Add(timeout)
+	client := &http.Client{Timeout: 500 * time.Millisecond}
+	var lastErr error
+	for time.Now().Before(deadline) {
+		request, err := http.NewRequest(http.MethodGet, endpoint, nil)
+		if err != nil {
+			return err
+		}
+		request.Host = "runtime-readiness.local"
+		response, err := client.Do(request)
+		if err == nil {
+			_ = response.Body.Close()
+			if response.Header.Get("X-WAF-Runtime-Revision") == revisionID {
+				return nil
+			}
+			lastErr = fmt.Errorf("runtime proxy served revision %q, want %q", response.Header.Get("X-WAF-Runtime-Revision"), revisionID)
+		} else {
+			lastErr = err
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	return fmt.Errorf("nginx proxy did not serve the active revision after reload: %w", lastErr)
 }
 
 func (p *runtimeProcess) setCRSPath(path string) {

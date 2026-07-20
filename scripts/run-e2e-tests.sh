@@ -472,7 +472,16 @@ redact_e2e_artifacts() {
   python3 "$REPO_ROOT/scripts/redact-e2e-artifact.py" "$E2E_LOG_FILE" || true
 }
 
+capture_e2e_runtime_diagnostics() {
+  {
+    printf '\n[e2e] Runtime diagnostics captured before teardown\n'
+    $COMPOSE_CMD -f "$COMPOSE_FILE" ps
+    $COMPOSE_CMD -f "$COMPOSE_FILE" logs --no-color --timestamps --tail=400 runtime control-plane tarinio-sentinel
+  } >>"$E2E_LOG_FILE" 2>&1 || true
+}
+
 if [ "$TEST_EXIT" -ne 0 ]; then
+  capture_e2e_runtime_diagnostics
   redact_e2e_artifacts
   python3 "$REPO_ROOT/scripts/write-e2e-evidence-report.py" --log "$TEST_LOG" --runtime-log "$E2E_LOG_FILE" --output-dir "$E2E_EVIDENCE_DIR" --suite "$E2E_FILTER" || true
   fail_msg "Tests failed (exit $TEST_EXIT). Expected/actual details from Go output:"

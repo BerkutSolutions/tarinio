@@ -307,6 +307,26 @@ func TestRenderSiteUpstreamArtifacts_BlockDirectIPAccessUses444AndSecurityReason
 	}
 }
 
+func TestRenderSiteUpstreamArtifacts_EmitsRuntimeRevisionMarker(t *testing.T) {
+	artifacts, err := RenderSiteUpstreamArtifactsWithOptions(
+		[]SiteInput{{ID: "site-a", Enabled: true, PrimaryHost: "a.example.com", ListenHTTP: true, DefaultUpstreamID: "up-a"}},
+		[]UpstreamInput{{ID: "up-a", SiteID: "site-a", Scheme: "http", Host: "app-a", Port: 8080, BasePath: "/"}},
+		DefaultServerOptions{RuntimeRevisionID: "rev-000123"},
+	)
+	if err != nil {
+		t.Fatalf("render failed: %v", err)
+	}
+	for _, artifact := range artifacts {
+		if artifact.Path == "nginx/conf.d/base.conf" {
+			if !strings.Contains(string(artifact.Content), `add_header X-WAF-Runtime-Revision "rev-000123" always;`) {
+				t.Fatalf("base config must expose the active revision marker: %s", artifact.Content)
+			}
+			return
+		}
+	}
+	t.Fatal("nginx base config artifact was not rendered")
+}
+
 func TestRenderSiteUpstreamArtifacts_DisabledServiceLeavesNoRuntimeArtifacts(t *testing.T) {
 	artifacts, err := RenderSiteUpstreamArtifacts(
 		[]SiteInput{

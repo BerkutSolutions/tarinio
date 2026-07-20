@@ -73,7 +73,11 @@ func TestE2EMultisiteBasicAuthIsolation(t *testing.T) {
 		auth["auth_basic_user"] = item.username
 		auth["auth_basic_password"] = item.password
 		auth["users"] = []map[string]any{{"username": item.username, "password": item.password, "enabled": true}}
-		resp := postJSON(t, adminClient, requestBaseURL+"/api/easy-site-profiles/"+item.siteID, hostOverride, profile)
+		// Both profiles form one atomic policy change. Persist without implicit
+		// reloads and prove their combined runtime effect with the explicit
+		// compile/apply below. This avoids testing an intermediate one-site
+		// configuration that is not part of the scenario's contract.
+		resp := postJSON(t, adminClient, requestBaseURL+"/api/easy-site-profiles/"+item.siteID+"?auto_apply=false", hostOverride, profile)
 		if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
 			t.Fatalf("save auth profile %s: status=%d body=%s", item.siteID, resp.StatusCode, mustReadBody(t, resp.Body))
 		}

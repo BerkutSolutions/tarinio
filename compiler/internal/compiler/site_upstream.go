@@ -25,6 +25,7 @@ type nginxMainData struct {
 
 type DefaultServerOptions struct {
 	BlockDirectIPAccess bool
+	RuntimeRevisionID   string
 }
 
 type nginxSiteData struct {
@@ -119,6 +120,7 @@ func RenderSiteUpstreamArtifactsWithOptions(sites []SiteInput, upstreams []Upstr
 		ManagementAPIProxyTarget: managementAPIProxyTarget(),
 		UIProxyTarget:            uiProxyTarget(),
 		BlockDirectIPAccess:      options.BlockDirectIPAccess,
+		RuntimeRevisionID:        options.RuntimeRevisionID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("render nginx base template: %w", err)
@@ -460,6 +462,7 @@ type nginxBaseData struct {
 	TrustedProxyCIDRs        []string
 	UIProxyTarget            string
 	BlockDirectIPAccess      bool
+	RuntimeRevisionID        string
 }
 
 func managementSiteID(sites []SiteInput) string {

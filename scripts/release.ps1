@@ -231,6 +231,30 @@ function Publish-DockerPackage {
   Write-Status "OK" ("Docker package published for " + $version)
 }
 
+function Invoke-WithGitLabSSHKey {
+  param(
+    [Parameter(Mandatory = $true)]
+    [scriptblock]$Action
+  )
+
+  $keyPath = Join-Path $root ".work/.ssh/id_ed25519"
+  if (-not (Test-Path -LiteralPath $keyPath -PathType Leaf)) {
+    throw "GitLab SSH key not found: $keyPath"
+  }
+
+  $previousGitSSHCommand = $env:GIT_SSH_COMMAND
+  try {
+    $env:GIT_SSH_COMMAND = 'ssh -i "' + $keyPath + '" -o IdentitiesOnly=yes -o BatchMode=yes'
+    & $Action
+  } finally {
+    if ($null -eq $previousGitSSHCommand) {
+      Remove-Item Env:GIT_SSH_COMMAND -ErrorAction SilentlyContinue
+    } else {
+      $env:GIT_SSH_COMMAND = $previousGitSSHCommand
+    }
+  }
+}
+
 function Publish-GitLabMain {
   $currentBranch = git branch --show-current
   if ($LASTEXITCODE -ne 0) {
@@ -249,9 +273,11 @@ function Publish-GitLabMain {
   }
 
   Write-Status "RUN" "Syncing with gitlab/main"
-  Invoke-Checked -Command "git" -Arguments @("pull", "--rebase", "gitlab", "main")
-  Write-Status "RUN" "Pushing main to GitLab"
-  Invoke-Checked -Command "git" -Arguments @("push", "gitlab", "HEAD:main")
+  Invoke-WithGitLabSSHKey {
+    Invoke-Checked -Command "git" -Arguments @("pull", "--rebase", "gitlab", "main")
+    Write-Status "RUN" "Pushing main to GitLab"
+    Invoke-Checked -Command "git" -Arguments @("push", "gitlab", "HEAD:main")
+  }
   Write-Status "OK" "Source code published to GitLab main"
 }
 

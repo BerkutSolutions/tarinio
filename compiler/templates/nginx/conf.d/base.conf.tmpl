@@ -141,6 +141,7 @@ limit_req_zone $binary_remote_addr zone=waf_management_login_req:10m rate=5r/s;
 server {
     listen 80 default_server;
     server_name _;
+    add_header X-WAF-Runtime-Revision "{{ .RuntimeRevisionID }}" always;
     add_header Server-Timing "rid;desc=$request_id,ip;desc=$remote_addr,ts;desc=$msec" always;
     proxy_intercept_errors on;
 {{- range .ErrorStatusCodes }}

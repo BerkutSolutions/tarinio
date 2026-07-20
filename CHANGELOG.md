@@ -1,5 +1,20 @@
 ## [1.5.6] - 20.07.2026
 
+- ci: multisite Basic Auth E2E сохраняет обе связанные настройки без
+  промежуточных auto-apply и проверяет их одной явной compile/apply revision;
+  failure diagnostics используют абсолютный путь compose-файла.
+
+- ci: при падении E2E артефакт теперь включает состояние compose и последние
+  логи runtime, control-plane и sentinel до teardown, с редактированием
+  чувствительных данных.
+
+- runtime: apply теперь ждёт фактической готовности HTTP-proxy именно на
+  активной revision после Nginx reload; это исключает передачу следующего
+  запроса в переходное окно между старыми и новыми worker-процессами.
+
+- release: пункт публикации в GitLab использует проектный SSH-ключ в
+  `.work/.ssh` без парольного запроса и восстанавливает окружение после push.
+
 - runtime: launcher keeps its authenticated health and reload API alive when
   supervised Nginx exits, allowing apply rollback to restore the last
   known-good revision instead of losing the runtime control endpoint.
