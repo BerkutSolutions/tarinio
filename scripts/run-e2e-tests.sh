@@ -22,6 +22,7 @@ set -eu
 
 REPO_ROOT="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
 E2E_COMPOSE_DIR="$REPO_ROOT/deploy/compose/e2e"
+COMPOSE_FILE="$E2E_COMPOSE_DIR/docker-compose.yml"
 E2E_PORT="${E2E_PORT:-18080}"
 E2E_RT_PORT="${E2E_RT_PORT:-10080}"
 E2E_RT_HTTPS_PORT="${E2E_RT_HTTPS_PORT:-10443}"
