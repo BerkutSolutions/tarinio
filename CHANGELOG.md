@@ -4,6 +4,7 @@
 
 ### Дашборд и E2E
 
+- ci: E2E-runner больше не запускает слепой initial compile/apply поверх dev-fast-start revision: это исключает гонку, при которой runtime reload listener останавливался до первого проверяемого изменения политики.
 - ci: E2E-проверка исключения management host из L7 rate-limit вынесена в отдельный чистый job, чтобы изменение runtime в других security-сценариях не искажало её результат.
 - ci: добавлены nightly E2E-проверки восстановления runtime после restart и краткой недоступности control-plane, Vault и Postgres; активная revision продолжает блокировать атаки.
 - security: добавлены отрицательные DAST-пробы SQLi, XSS и path traversal, контроль анонимного administrative API и проверка отсутствия ложной блокировки легитимного запроса.

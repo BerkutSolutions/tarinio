@@ -433,27 +433,12 @@ if [ "$E2E_FRESH_ONBOARDING" != "1" ]; then
   done
   ok "Runtime healthy after ${elapsed}s"
 
-  step "Compiling and applying initial revision"
-  CP_COOKIE_JAR="$(mktemp)"
-  curl -sS -c "$CP_COOKIE_JAR" -X POST "$E2E_BASE_URL/api/auth/login" \
-    -H "Content-Type: application/json" \
-    -d "{\"username\":\"${E2E_USER}\",\"password\":\"${E2E_PASS}\"}" >/dev/null
-  COMPILE_OUT="$(curl -sS -b "$CP_COOKIE_JAR" -X POST "$E2E_BASE_URL/api/revisions/compile" \
-    -H "Content-Type: application/json" -d '{}')"
-  printf '%s\n' "[compile] $COMPILE_OUT" >>"$E2E_LOG_FILE"
-  REV_ID="$(printf '%s' "$COMPILE_OUT" | grep -o '"revision_id":"[^"]*"' | cut -d'"' -f4)"
-  if [ -z "$REV_ID" ]; then
-    REV_ID="$(printf '%s' "$COMPILE_OUT" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)"
-  fi
-  if [ -n "$REV_ID" ]; then
-    sleep 3
-    APPLY_OUT="$(curl -sS -b "$CP_COOKIE_JAR" -X POST "$E2E_BASE_URL/api/revisions/$REV_ID/apply" \
-      -H "Content-Type: application/json" -d '{}' 2>&1 || true)"
-    printf '%s\n' "[apply] $APPLY_OUT" >>"$E2E_LOG_FILE"
-    sleep 5
-  fi
-  rm -f "$CP_COOKIE_JAR"
-  ok "Initial revision ready (id=$REV_ID)"
+  # The compose stack's dev-fast-start revision already owns the active runtime
+  # configuration. Do not race it with a second blind apply: every E2E that
+  # changes policy performs and verifies its own compile/apply transaction.
+  # A previous unconditional apply intermittently stopped the runtime reload
+  # listener before the first test could submit its verified revision.
+  ok "Bootstrap runtime revision is ready"
 fi
 
 # Run tests.
