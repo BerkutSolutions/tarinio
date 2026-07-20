@@ -103,13 +103,9 @@ e2e:smoke:
   timeout: 30m
   resource_group: waf-e2e-stack
   dependencies: []
-  retry:
-    max: 1
-    when:
-      - script_failure
   script:
     - mkdir -p build/e2e/smoke
-    - E2E_FILTER='TestE2ESmoke_LoginHealthcheckDashboard|TestE2EAPISchemaContracts' E2E_TIMEOUT=240 E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/smoke" E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/e2e/smoke" sh scripts/run-e2e-tests.sh
+    - E2E_FILTER='TestE2ESmoke_LoginHealthcheckDashboard|TestE2EAntibotChallengePrecedesActiveRateLimitFallback|TestE2EBasicAuthLifecycle|TestE2EModSecurity_EnableDisableReenableWithScopedExclusion|TestE2EDashboardAttackPopulationConsistency' E2E_TIMEOUT=240 E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/smoke" E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/e2e/smoke" sh scripts/run-e2e-tests.sh
   after_script:
     - docker compose -f deploy/compose/e2e/docker-compose.yml down --volumes --remove-orphans || true
   artifacts:
@@ -123,10 +119,6 @@ e2e:security-invariants:
   timeout: 35m
   resource_group: waf-e2e-stack
   dependencies: []
-  retry:
-    max: 1
-    when:
-      - script_failure
   script:
     - mkdir -p build/e2e/security-invariants
     - >-
@@ -146,13 +138,11 @@ e2e:full:
   timeout: 45m
   resource_group: waf-e2e-stack
   dependencies: []
-  retry:
-    max: 1
-    when:
-      - script_failure
+  needs:
+    - e2e:smoke
   script:
     - mkdir -p build/e2e/full
-    - E2E_TIMEOUT=240 E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/full" E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/e2e/full" sh scripts/run-e2e-tests.sh
+    - E2E_FILTER='TestE2EAntibotTemplates|TestE2EBasicAuthTemplates|TestE2EErrorPages|TestE2EL4L7AdaptiveProtection|TestE2ESecurityAndTLSMatrix|TestE2ERecoveryFlow_BadConfigThenRepair|TestE2EMultisiteBasicAuthIsolation' E2E_TIMEOUT=240 E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/full" E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/e2e/full" sh scripts/run-e2e-tests.sh
   after_script:
     - docker compose -f deploy/compose/e2e/docker-compose.yml down --volumes --remove-orphans || true
   artifacts:
