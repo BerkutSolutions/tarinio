@@ -36,9 +36,15 @@ function Invoke-Compose {
         # both streams outside PowerShell's native-error pipeline and decide
         # success solely from the process exit code.
         $composeArguments = @("compose", "-f", $composeFile) + $Arguments
-        $process = Start-Process -FilePath "docker" -ArgumentList $composeArguments -NoNewWindow -Wait -PassThru -RedirectStandardOutput $outputFile -RedirectStandardError $errorFile
+        $previousErrorActionPreference = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = "Continue"
+            & docker @composeArguments 1> $outputFile 2> $errorFile
+            $composeExitCode = $LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $previousErrorActionPreference
+        }
         Get-Content -LiteralPath $outputFile, $errorFile -ErrorAction SilentlyContinue | Tee-Object -FilePath $logFile -Append
-        $composeExitCode = $process.ExitCode
     } finally {
         Remove-Item -LiteralPath $outputFile, $errorFile -Force -ErrorAction SilentlyContinue
     }
@@ -117,7 +123,14 @@ try {
     $env:WAF_E2E_RUNTIME_HTTPS_URL = "https://127.0.0.1:10443"
     $env:WAF_E2E_RUNTIME_HEALTH_URL = $runtimeHealthUrl
     $env:WAF_E2E_RUNTIME_API_TOKEN = "e2e-test-runtime-token"
+    $env:WAF_E2E_COMPOSE_FILE = $composeFile
     $env:WAF_E2E_MANAGEMENT_HOST = "e2e-management.test"
+    $env:WAF_E2E_AUTH_BASE_URL = $runtimeUrl
+    # The antibot scenario provisions a TLS binding; exercising it over HTTPS
+    # proves the same virtual host that production clients use.
+    $env:WAF_E2E_ANTIBOT_BASE_URL = $env:WAF_E2E_RUNTIME_HTTPS_URL
+    $env:WAF_E2E_AUTOSTART_SMART = "1"
+    $env:WAF_E2E_L4_L7_PROTECTION = "1"
     $env:WAF_E2E_ANTIBOT_HOST = "e2e-antibot.test"
     $env:WAF_E2E_FRESH_ONBOARDING = if ($FreshOnboarding) { "1" } else { "" }
 
@@ -126,6 +139,9 @@ try {
         & go test ./ui/tests -run $Filter -count=1 -v 2>&1 | Tee-Object -FilePath $logFile -Append
         if ($LASTEXITCODE -ne 0) {
             throw "e2e tests failed; see $logFile"
+        }
+        if (Select-String -LiteralPath $logFile -Pattern '^--- SKIP:' -Quiet) {
+            throw "e2e tests skipped one or more scenarios; skipped tests are not accepted as proof; see $logFile"
         }
     } finally {
         Pop-Location

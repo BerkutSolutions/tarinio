@@ -30,13 +30,31 @@ func TestE2EBasicAuthTemplates(t *testing.T) {
 		}
 	}
 
-	siteID := e2eGetFirstSiteID(t, client, requestBaseURL, requestHostOverride)
-	if siteID == "" {
-		t.Skip("no sites configured; skipping Basic Auth template switch")
+	const (
+		siteID     = "e2e-basic-auth-template-site"
+		upstreamID = "e2e-basic-auth-template-upstream"
+		runtimeHost = "e2e-basic-auth-template.test"
+	)
+	for _, path := range []string{
+		"/api/sites/" + siteID + "?auto_apply=false",
+		"/api/upstreams/" + upstreamID + "?auto_apply=false",
+	} {
+		resp := requestE2EJSON(t, client, http.MethodDelete, requestBaseURL+path, requestHostOverride, nil)
+		_ = resp.Body.Close()
 	}
+	createE2EModSecuritySite(t, client, requestBaseURL, requestHostOverride, siteID, upstreamID, runtimeHost)
+	t.Cleanup(func() {
+		for _, path := range []string{
+			"/api/sites/" + siteID + "?auto_apply=false",
+			"/api/upstreams/" + upstreamID + "?auto_apply=false",
+		} {
+			resp := requestE2EJSON(t, client, http.MethodDelete, requestBaseURL+path, requestHostOverride, nil)
+			_ = resp.Body.Close()
+		}
+	})
 	original := e2eGetEasyProfile(t, client, requestBaseURL, requestHostOverride, siteID)
 	if original == nil {
-		t.Skip("no easy profile for site; skipping Basic Auth template switch")
+		t.Fatal("new Basic Auth E2E site has no easy profile")
 	}
 	defer func() {
 		response := postJSON(t, client, requestBaseURL+"/api/easy-site-profiles/"+siteID, requestHostOverride, original)
@@ -76,21 +94,28 @@ func TestE2EBasicAuthTemplates(t *testing.T) {
 	if runtimeURL == "" {
 		t.Skip("WAF_E2E_AUTH_BASE_URL not set; saved and compiled template but skipping runtime login flow")
 	}
+	e2eWaitForMultisiteHost(t, runtimeURL, runtimeHost)
 	runtimeClient := newE2EHTTPClient(runtimeURL, true)
-	page, err := runtimeClient.Get(runtimeURL + "/auth/login?return_uri=/")
+	pageRequest, err := http.NewRequest(http.MethodGet, runtimeURL+"/auth?return_uri=/", nil)
+	if err != nil {
+		t.Fatalf("create Basic Auth page request: %v", err)
+	}
+	pageRequest.Host = runtimeHost
+	page, err := runtimeClient.Do(pageRequest)
 	if err != nil {
 		t.Fatalf("get Basic Auth page: %v", err)
 	}
 	pageBody, _ := io.ReadAll(page.Body)
 	_ = page.Body.Close()
 	if page.StatusCode != http.StatusOK || !strings.Contains(string(pageBody), `body class="v6"`) || !strings.Contains(string(pageBody), "logo800x300_no-text.png") {
-		t.Fatalf("selected runtime page did not render v6 with logo: status=%d", page.StatusCode)
+		t.Fatalf("selected runtime page did not render v6 with logo: status=%d body=%.500s", page.StatusCode, pageBody)
 	}
 	req, err := http.NewRequest(http.MethodPost, runtimeURL+"/auth/verify/basic", nil)
 	if err != nil {
 		t.Fatalf("create Basic Auth request: %v", err)
 	}
 	req.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(username+":wrong-password")))
+	req.Host = runtimeHost
 	failed, err := runtimeClient.Do(req)
 	if err != nil {
 		t.Fatalf("submit invalid Basic Auth credentials: %v", err)
@@ -105,6 +130,7 @@ func TestE2EBasicAuthTemplates(t *testing.T) {
 		t.Fatalf("create valid Basic Auth request: %v", err)
 	}
 	req.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(username+":"+password)))
+	req.Host = runtimeHost
 	response, err := runtimeClient.Do(req)
 	if err != nil {
 		t.Fatalf("submit Basic Auth credentials: %v", err)

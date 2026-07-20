@@ -48,6 +48,15 @@ func TestRequestDashboardSummaryUsesAllFilteredArchiveRows(t *testing.T) {
 	}
 }
 
+func TestShouldSkipDashboardRequestKeepsProtectedRootPath(t *testing.T) {
+	if shouldSkipDashboardRequest(requestLogRecord{Site: "shop", Host: "shop.example.test", URI: "/", Status: 403}) {
+		t.Fatal("protected site root request must remain in dashboard telemetry")
+	}
+	if !shouldSkipDashboardRequest(requestLogRecord{Site: "ui", Host: "localhost", URI: "/", Status: 200}) {
+		t.Fatal("management root request must stay excluded from dashboard telemetry")
+	}
+}
+
 func requestDashboardFixture(at time.Time, requestID, status, site, host, uri, ip, country string) string {
 	return fmt.Sprintf(`{"ingested_at":"%s","entry":{"timestamp":"%s","request_id":"%s","client_ip":"%s","country":"%s","uri":"%s","status":%s,"site":"%s","host":"%s"}}`, at.Format(time.RFC3339), at.Format(time.RFC3339), requestID, ip, country, uri, status, site, host)
 }

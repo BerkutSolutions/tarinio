@@ -229,7 +229,7 @@ export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
                         <input id="service-antibot-enabled" type="checkbox"${draft.antibot_challenge !== "no" ? " checked" : ""}>
                         <span>${escapeHtml(ctx.t("sites.easy.antibot.enabled"))}</span>
                       </label>
-                      <div class="waf-field full${draft.antibot_challenge === "no" ? " waf-disabled" : ""}" id="antibot-template-row" style="display:flex;align-items:flex-end;gap:8px;margin-bottom:20px;">
+                      <div class="waf-field full${draft.antibot_challenge === "no" ? " waf-disabled" : ""}" id="antibot-template-row" style="display:flex;align-items:center;gap:8px;margin-bottom:20px;">
                         <div style="flex:1;min-width:0;">
                           <label for="service-antibot-challenge-template">${escapeHtml(ctx.t("sites.easy.antibot.challengeTemplate"))}</label>
                           <select id="service-antibot-challenge-template"${draft.antibot_challenge === "no" ? " disabled" : ""}>
@@ -242,7 +242,7 @@ export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
                             ].map((t) => `<option value="${t.val}"${(draft.antibot_challenge_template || "v1") === t.val ? " selected" : ""}>${escapeHtml(ctx.t(t.key))}</option>`).join("")}
                           </select>
                         </div>
-                        <button type="button" class="btn ghost btn-sm" id="antibot-template-preview-btn" style="align-self:flex-end;margin-bottom:3px;white-space:nowrap;flex-shrink:0;"${draft.antibot_challenge === "no" ? " disabled" : ""}>${escapeHtml(ctx.t("sites.easy.antibot.previewTemplate"))}</button>
+                        <button type="button" class="btn ghost btn-sm waf-template-preview-button" id="antibot-template-preview-btn"${draft.antibot_challenge === "no" ? " disabled" : ""}>${escapeHtml(ctx.t("sites.easy.antibot.previewTemplate"))}</button>
                       </div>
                       <div id="antibot-body-wrap"${draft.antibot_challenge === "no" ? ' class="waf-disabled"' : ""}>
                         <div class="waf-form-grid">
@@ -340,14 +340,14 @@ export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
                           <label for="service-auth-basic-text">${escapeHtml(ctx.t("sites.easy.antibot.authText"))}</label>
                           <input id="service-auth-basic-text" value="${escapeHtml(draft.auth_basic_text)}">
                         </div>
-                        <div class="waf-field full" style="display:flex;align-items:flex-end;gap:8px;">
+                        <div class="waf-field full" style="display:flex;align-items:center;gap:8px;">
                           <div style="flex:1;min-width:0;">
                             <label for="service-auth-basic-template">${escapeHtml(ctx.t("sites.easy.auth.template"))}</label>
                             <select id="service-auth-basic-template">
                               ${[1,2,3,4,5,6,7,8,9].map((number) => `<option value="v${number}"${(draft.auth_basic_template || "v1") === `v${number}` ? " selected" : ""}>${escapeHtml(ctx.t(`sites.easy.auth.template.v${number}`))}</option>`).join("")}
                             </select>
                           </div>
-                          <button type="button" class="btn ghost btn-sm" id="auth-basic-template-preview-btn" style="align-self:flex-end;margin-bottom:3px;white-space:nowrap;flex-shrink:0;">${escapeHtml(ctx.t("sites.easy.auth.previewTemplate"))}</button>
+                          <button type="button" class="btn ghost btn-sm waf-template-preview-button" id="auth-basic-template-preview-btn">${escapeHtml(ctx.t("sites.easy.auth.previewTemplate"))}</button>
                         </div>
                         <div class="waf-field">
                           <label for="service-auth-basic-session-ttl">${escapeHtml(ctx.t("sites.easy.antibot.authSessionTtl"))}</label>

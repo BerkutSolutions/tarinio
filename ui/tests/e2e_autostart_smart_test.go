@@ -25,28 +25,54 @@ func TestE2EAutoStartSmartRuntime(t *testing.T) {
 	repoRoot = filepath.Clean(filepath.Join(repoRoot, ".."))
 	composeDir := filepath.Join(repoRoot, "deploy", "compose", "auto-start")
 	composeFile := filepath.Join(composeDir, "docker-compose.yml")
-	defaultComposeFile := filepath.Join(repoRoot, "deploy", "compose", "default", "docker-compose.yml")
 	if _, err := os.Stat(composeFile); err != nil {
 		t.Fatalf("auto-start compose not found: %v", err)
 	}
 
-	runCmdSoft(composeDir, "docker", "compose", "-f", defaultComposeFile, "down", "--remove-orphans")
-	runCmdSoft(composeDir, "docker", "compose", "-f", composeFile, "down", "--remove-orphans")
-	runCmd(t, composeDir, "docker", "compose", "-f", composeFile, "up", "-d", "--build")
+	// This scenario is part of the full E2E suite, whose primary stack already
+	// owns 18080/80/443. Run the auto-start deployment on its own host ports
+	// instead of tearing down the stack being tested by the other scenarios.
+	autoStartEnv := []string{
+		"WAF_UI_HTTP_PORT=18083",
+		"WAF_RUNTIME_HTTP_PORT=10081",
+		"WAF_RUNTIME_HTTPS_PORT=10444",
+	}
+	runCmdSoft(composeDir, autoStartEnv, "docker", "compose", "-f", composeFile, "down", "--volumes", "--remove-orphans")
+	t.Log("starting clean auto-start compose stack")
+	runCmd(t, composeDir, autoStartEnv, "docker", "compose", "-f", composeFile, "up", "-d", "--build")
 	t.Cleanup(func() {
-		_ = exec.Command("docker", "compose", "-f", composeFile, "down", "--remove-orphans").Run()
+		runCmdSoft(composeDir, autoStartEnv, "docker", "compose", "-f", composeFile, "down", "--volumes", "--remove-orphans")
 	})
 
-	baseURL := firstNonEmptyAutoStart("http://127.0.0.1:18080", strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL")))
+	baseURL := firstNonEmptyAutoStart(strings.TrimSpace(os.Getenv("WAF_E2E_AUTOSTART_BASE_URL")), "http://127.0.0.1:18083")
 	client, requestBaseURL, requestHostOverride := newE2EClientAndBase(t, baseURL)
+	previousUsername, usernameSet := os.LookupEnv("WAF_E2E_USERNAME")
+	previousPassword, passwordSet := os.LookupEnv("WAF_E2E_PASSWORD")
+	_ = os.Setenv("WAF_E2E_USERNAME", "admin")
+	_ = os.Setenv("WAF_E2E_PASSWORD", "admin")
+	t.Cleanup(func() {
+		if usernameSet {
+			_ = os.Setenv("WAF_E2E_USERNAME", previousUsername)
+		} else {
+			_ = os.Unsetenv("WAF_E2E_USERNAME")
+		}
+		if passwordSet {
+			_ = os.Setenv("WAF_E2E_PASSWORD", previousPassword)
+		} else {
+			_ = os.Unsetenv("WAF_E2E_PASSWORD")
+		}
+	})
+	t.Log("waiting for auto-start management login")
 	loginE2EUserWithRetry(t, client, requestBaseURL, requestHostOverride)
-	edgeClient, _, _ := newE2EClientAndBase(t, "https://localhost")
+	t.Log("auto-start management login succeeded")
+	edgeClient, _, _ := newE2EClientAndBase(t, "https://127.0.0.1:10444")
 
 	siteID := "autotest-site"
 	siteHost := "autotest.localhost"
 	upstreamID := "autotest-upstream"
 
 	t.Run("AntiDDoSAndErrors", func(t *testing.T) {
+		t.Log("checking Anti-DDoS API and runtime edge")
 		getSettings := getWithAuth(t, client, requestBaseURL+"/api/anti-ddos/settings", requestHostOverride)
 		assertStatusOK(t, getSettings, "get anti-ddos settings")
 
@@ -67,7 +93,7 @@ func TestE2EAutoStartSmartRuntime(t *testing.T) {
 		})
 		assertStatusOK(t, updateSettings, "update anti-ddos settings")
 
-		edgeURL := "https://localhost/"
+		edgeURL := "https://127.0.0.1:10444/"
 		var gotRate bool
 		for i := 0; i < 8; i++ {
 			resp := getWithHost(t, edgeClient, edgeURL, siteHost)
@@ -87,6 +113,7 @@ func TestE2EAutoStartSmartRuntime(t *testing.T) {
 	})
 
 	t.Run("ServiceCRUD", func(t *testing.T) {
+		t.Log("checking site and upstream CRUD")
 		createSiteResp := postJSON(t, client, requestBaseURL+"/api/sites?auto_apply=false", requestHostOverride, map[string]any{
 			"id":           siteID,
 			"primary_host": siteHost,
@@ -113,6 +140,7 @@ func TestE2EAutoStartSmartRuntime(t *testing.T) {
 	})
 
 	t.Run("UIAndModules", func(t *testing.T) {
+		t.Log("checking UI routes and JavaScript modules")
 		uiPages := []string{"/dashboard", "/sites", "/requests", "/events", "/bans", "/settings", "/administration", "/healthcheck"}
 		for _, page := range uiPages {
 			resp := getWithAuth(t, client, requestBaseURL+page, requestHostOverride)
@@ -155,19 +183,21 @@ func firstNonEmptyAutoStart(values ...string) string {
 	return ""
 }
 
-func runCmd(t *testing.T, dir string, name string, args ...string) {
+func runCmd(t *testing.T, dir string, extraEnv []string, name string, args ...string) {
 	t.Helper()
 	cmd := exec.Command(name, args...)
 	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), extraEnv...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("%s %v failed: %v\n%s", name, args, err, string(out))
 	}
 }
 
-func runCmdSoft(dir string, name string, args ...string) {
+func runCmdSoft(dir string, extraEnv []string, name string, args ...string) {
 	cmd := exec.Command(name, args...)
 	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), extraEnv...)
 	_, _ = cmd.CombinedOutput()
 }
 
@@ -259,10 +289,29 @@ func loginE2EUserWithRetry(t *testing.T, client *http.Client, requestBaseURL, re
 
 	deadline := time.Now().Add(90 * time.Second)
 	for {
-		resp := postJSON(t, client, requestBaseURL+"/api/auth/login", requestHostOverride, map[string]any{
+		payload, err := json.Marshal(map[string]any{
 			"username": username,
 			"password": password,
 		})
+		if err != nil {
+			t.Fatalf("marshal auto-start login: %v", err)
+		}
+		req, err := http.NewRequest(http.MethodPost, requestBaseURL+"/api/auth/login", bytes.NewReader(payload))
+		if err != nil {
+			t.Fatalf("create auto-start login request: %v", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		if requestHostOverride != "" {
+			req.Host = requestHostOverride
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			if time.Now().After(deadline) {
+				t.Fatalf("auto-start login did not become available: %v", err)
+			}
+			time.Sleep(2 * time.Second)
+			continue
+		}
 		if resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusTooManyRequests {
 			_ = resp.Body.Close()
 			ensureManagementLoginAccess(t, client, requestBaseURL, requestHostOverride, challengeURI)

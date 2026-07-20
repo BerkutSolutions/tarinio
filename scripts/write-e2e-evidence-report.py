@@ -60,9 +60,9 @@ def main():
     tests = "\n".join(f"- `{item['name']}` — **{item['status']}**" for item in report["tests"]) or "- No matching E2E test events / Нет подходящих событий E2E."
     markdown = f"""# E2E evidence report / Отчёт-доказательство E2E
 
-**Suite / Набор:** `{args.suite}`  
-**Status / Статус:** **{report['status']}**  
-**Commit / Коммит:** `{report['commit']}`  
+**Suite / Набор:** `{args.suite}`<br>
+**Status / Статус:** **{report['status']}**<br>
+**Commit / Коммит:** `{report['commit']}`<br>
 **Passed / Пройдено:** {counts['pass']} · **Failed / Ошибки:** {counts['fail']} · **Skipped / Пропущено:** {counts['skip']}
 
 ## Security invariants / Инварианты безопасности
@@ -73,7 +73,7 @@ def main():
 
 {tests}
 
-The JSON companion is machine-readable and contains no credentials or request bodies.  
+The JSON companion is machine-readable and contains no credentials or request bodies.<br>
 JSON-файл машиночитаем и не содержит учётных данных или тел запросов.
 """
     (out / "e2e-evidence.md").write_text(markdown, encoding="utf-8")

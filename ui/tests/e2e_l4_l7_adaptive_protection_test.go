@@ -16,6 +16,8 @@ import (
 const (
 	protectionAttackerService = "e2e-attacker"
 	protectionAttackerIP      = "172.30.0.30"
+	l4AttackerService         = "e2e-l4-attacker"
+	l4AttackerIP              = "172.30.0.31"
 )
 
 // TestE2EL4L7AdaptiveProtection proves the complete public-service path:
@@ -42,16 +44,20 @@ func TestE2EL4L7AdaptiveProtection(t *testing.T) {
 	deleteProtectionResource(t, client, requestBaseURL+"/api/upstreams/"+upstreamID+"?auto_apply=false", requestHostOverride)
 
 	previousAntiDDoS := getProtectionJSON(t, client, requestBaseURL+"/api/anti-ddos/settings", requestHostOverride)
+	t.Cleanup(func() {
+		putProtectionJSON(t, client, requestBaseURL+"/api/anti-ddos/settings", requestHostOverride, previousAntiDDoS)
+	})
 
-	putProtectionJSON(t, client, requestBaseURL+"/api/anti-ddos/settings", requestHostOverride, map[string]any{
+	protectionSettings := map[string]any{
 		"use_l4_guard": true, "chain_mode": "input", "conn_limit": 10000, "rate_per_second": 10000,
-		"rate_burst": 10000, "ports": []int{80, 443}, "target": "DROP", "enforce_l7_rate_limit": false,
+		"rate_burst": 10000, "ports": []int{80, 443}, "target": "DROP", "enforce_l7_rate_limit": true,
+		"l7_requests_per_second": 1, "l7_burst": 1, "l7_status_code": 429,
 		"model_enabled": true, "model_poll_interval_seconds": 1, "model_decay_lambda": 0.01,
 		"model_throttle_threshold": 1.0, "model_drop_threshold": 2.0, "model_hold_seconds": 60,
 		"model_throttle_rate_per_second": 1, "model_throttle_burst": 1, "model_throttle_target": "DROP",
 		"model_weight_429": 1.0, "model_weight_403": 1.8, "model_weight_444": 2.2,
 		"model_emergency_rps": 10000, "model_emergency_unique_ips": 10000, "model_emergency_per_ip_rps": 2,
-	})
+	}
 
 	postProtectionJSON(t, client, requestBaseURL+"/api/sites?auto_apply=false", requestHostOverride, map[string]any{
 		"id": siteID, "primary_host": host, "enabled": true, "listen_http": true,
@@ -59,7 +65,7 @@ func TestE2EL4L7AdaptiveProtection(t *testing.T) {
 	})
 	postProtectionJSON(t, client, requestBaseURL+"/api/upstreams?auto_apply=false", requestHostOverride, map[string]any{
 		"id": upstreamID, "site_id": siteID, "name": upstreamID, "scheme": "http",
-		"host": "test-login-app", "port": 80, "base_path": "/", "pass_host_header": false,
+		"host": "upstream-echo", "port": 8888, "base_path": "/", "pass_host_header": false,
 	})
 	profile := e2eGetEasyProfile(t, client, requestBaseURL, requestHostOverride, siteID)
 	if profile == nil {
@@ -83,12 +89,15 @@ func TestE2EL4L7AdaptiveProtection(t *testing.T) {
 	limits["use_bad_behavior"] = false
 	profile["security_behavior_and_limits"] = limits
 	postProtectionJSON(t, client, requestBaseURL+"/api/easy-site-profiles/"+siteID, requestHostOverride, profile)
+	// Apply global protection last: earlier E2E cleanups can enqueue auto-apply
+	// jobs, and the L4/L7 revision must be the active one before traffic starts.
+	putProtectionJSON(t, client, requestBaseURL+"/api/anti-ddos/settings", requestHostOverride, protectionSettings)
 	e2eCompileAndApply(t, client, requestBaseURL, requestHostOverride)
 	waitForProtectionHTTP(t, runtimeURL, host)
 
 	var floodOutput string
 	t.Run("L7 returns 429 during a real flood", func(t *testing.T) {
-		floodOutput = runProtectionAttacker(t, composeFile, "for i in $(seq 1 40); do wget -S -O /dev/null --header='Host: "+host+"' http://runtime-test/ 2>&1 || true; done")
+		floodOutput = runProtectionCompose(t, composeFile, l4AttackerService, "for i in $(seq 1 40); do wget -S -O /dev/null --header='Host: "+host+"' http://runtime/ 2>&1 || true; done")
 		if !strings.Contains(floodOutput, "429") {
 			t.Fatalf("L7 rate limit did not return a real 429; attacker output=%s", floodOutput)
 		}
@@ -99,30 +108,26 @@ func TestE2EL4L7AdaptiveProtection(t *testing.T) {
 		deadline := time.Now().Add(35 * time.Second)
 		for time.Now().Before(deadline) {
 			adaptive = runProtectionRuntime(t, composeFile, "cat /etc/waf/l4guard-adaptive/adaptive.json 2>/dev/null || true")
-			if adaptiveHasDropEntry(adaptive, protectionAttackerIP) {
+			if adaptiveHasDropEntry(adaptive, l4AttackerIP) {
 				return
 			}
 			time.Sleep(time.Second)
 		}
-		t.Fatalf("adaptive model did not emit a drop entry for attacker %s: %s", protectionAttackerIP, adaptive)
+		t.Fatalf("adaptive model did not emit a drop entry for attacker %s: %s", l4AttackerIP, adaptive)
 	})
-	// Restore global settings before the temporary L4 rule can block the test
-	// runner's bridge address. The isolated test site is removed on the next
-	// test start, before traffic is generated.
-	putProtectionJSON(t, client, requestBaseURL+"/api/anti-ddos/settings", requestHostOverride, previousAntiDDoS)
 	t.Run("L4 guard drops new connections from the adaptive IP", func(t *testing.T) {
 		deadline := time.Now().Add(12 * time.Second)
 		for time.Now().Before(deadline) {
 			chain = runProtectionRuntime(t, composeFile, "iptables -w -S WAF-RUNTIME-L4 2>/dev/null || true")
-			if strings.Contains(chain, "-s "+protectionAttackerIP+"/32 -p tcp -j DROP") {
+			if strings.Contains(chain, "-s "+l4AttackerIP+"/32 -p tcp -j DROP") {
 				break
 			}
 			time.Sleep(500 * time.Millisecond)
 		}
-		if !strings.Contains(chain, "-s "+protectionAttackerIP+"/32 -p tcp -j DROP") {
+		if !strings.Contains(chain, "-s "+l4AttackerIP+"/32 -p tcp -j DROP") {
 			t.Fatalf("L4 guard did not install attacker drop rule: %s", chain)
 		}
-		blockedOutput := runProtectionAttacker(t, composeFile, "wget --tries=1 -T 3 -S -O /dev/null --header='Host: "+host+"' http://runtime-test/ 2>&1 || true")
+		blockedOutput := runProtectionCompose(t, composeFile, l4AttackerService, "wget --tries=1 -T 3 -S -O /dev/null --header='Host: "+host+"' http://runtime/ 2>&1 || true")
 		if strings.Contains(blockedOutput, "HTTP/1.1 200") || strings.Contains(blockedOutput, "HTTP/1.1 429") {
 			t.Fatalf("L4 drop did not block a new attacker connection: %s", blockedOutput)
 		}
@@ -197,7 +202,7 @@ func runProtectionAttacker(t *testing.T, composeFile, command string) string {
 
 func runProtectionRuntime(t *testing.T, composeFile, command string) string {
 	t.Helper()
-	return runProtectionCompose(t, composeFile, "runtime-test", command)
+	return runProtectionCompose(t, composeFile, "runtime", command)
 }
 
 func runProtectionCompose(t *testing.T, composeFile, service, command string) string {

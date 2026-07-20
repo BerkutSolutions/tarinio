@@ -181,7 +181,7 @@ e2e:fresh-onboarding:
     - mkdir -p build/e2e/fresh-onboarding
     - >-
       E2E_FRESH_ONBOARDING=1
-      E2E_FILTER=TestE2EFreshOnboardingSelfSignedTLS
+      E2E_FILTER=TestFreshOnboardingSelfSignedTLS
       E2E_TIMEOUT=240
       E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/fresh-onboarding"
       sh scripts/run-e2e-tests.sh
@@ -312,7 +312,7 @@ publish:github-mirror:
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
       when: manual
-      allow_failure: true
+      allow_failure: false
     - when: never
   script:
     - |

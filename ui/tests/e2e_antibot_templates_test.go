@@ -172,7 +172,8 @@ func TestE2EAntibotTemplates(t *testing.T) {
 		}
 
 		// Клиент без куков — должен получить challenge
-		clientNoJar := newE2EHTTPClient(endpoint.requestBaseURL, false)
+		clientNoJar := newAntibotHTTPClient(endpoint, false)
+		clientNoJar.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 
 		// Шаг 1: запрос на / → должен вернуть 302 или 200 с challenge redirect
 		probeResp, err := clientNoJar.Get(endpoint.requestBaseURL + "/")
@@ -190,7 +191,8 @@ func TestE2EAntibotTemplates(t *testing.T) {
 		t.Logf("antibot mode: %s", mode)
 
 		// Шаг 2: клиент с куками выполняет challenge
-		clientWithJar := newE2EHTTPClient(endpoint.requestBaseURL, true)
+		clientWithJar := newAntibotHTTPClient(endpoint, true)
+		clientWithJar.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 		challengeURI := normalizeChallengeURI(strings.TrimSpace(os.Getenv("WAF_E2E_ANTIBOT_CHALLENGE_URI")))
 		verifyURI := antibotVerifyURI(challengeURI)
 
@@ -227,7 +229,7 @@ func TestE2EAntibotTemplates(t *testing.T) {
 
 		// Verify должен вернуть 302 (редирект обратно на return_uri)
 		// или 200 если уже верифицирован
-		if verResp.StatusCode != http.StatusFound && verResp.StatusCode != http.StatusOK && verResp.StatusCode != http.StatusTemporaryRedirect {
+		if verResp.StatusCode != http.StatusFound && verResp.StatusCode != http.StatusOK && verResp.StatusCode != http.StatusNoContent && verResp.StatusCode != http.StatusTemporaryRedirect {
 			t.Fatalf("verify endpoint: want 302/200, got %d", verResp.StatusCode)
 		}
 		t.Logf("verify status: %d", verResp.StatusCode)

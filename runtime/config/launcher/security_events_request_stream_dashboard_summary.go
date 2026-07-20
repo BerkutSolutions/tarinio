@@ -121,13 +121,16 @@ func requestRecordMatchesDashboardOptions(record requestLogRecord, options reque
 }
 
 func shouldSkipDashboardRequest(record requestLogRecord) bool {
-	if shouldSkipInternalSite(record.Site) || isTarinioAdminAppPath(record.URI) {
+	if shouldSkipInternalSite(record.Site) {
+		return true
+	}
+	host := strings.ToLower(strings.TrimSpace(record.Host))
+	if isTarinioAdminAppPath(record.URI) && (host == "" || isInternalManagementHost(host) || strings.TrimSpace(record.Site) == "") {
 		return true
 	}
 	if !isInternalManagementPath(record.URI) {
 		return false
 	}
-	host := strings.ToLower(strings.TrimSpace(record.Host))
 	return host == "" || isInternalManagementHost(host) || strings.TrimSpace(record.Site) == ""
 }
 

@@ -176,6 +176,13 @@ body {
   grid-column: 1 / -1;
 }
 
+.waf-template-preview-button {
+  align-self: flex-end;
+  flex-shrink: 0;
+  margin-bottom: 7px;
+  white-space: nowrap;
+}
+
 .waf-checkbox.full {
   grid-column: 1 / -1;
 }

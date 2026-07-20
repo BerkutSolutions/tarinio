@@ -6,8 +6,10 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestE2EErrorPages проверяет:
@@ -117,7 +119,7 @@ func TestE2EErrorPages(t *testing.T) {
 		// Читаем текущий профиль
 		profileResp := getWithAuth(t, client, requestBaseURL+"/api/easy-site-profiles/"+siteID, requestHostOverride)
 		if profileResp.StatusCode != http.StatusOK {
-			t.Skipf("GET easy-site-profiles/%s: status=%d", siteID, profileResp.StatusCode)
+			t.Fatalf("GET easy-site-profiles/%s: status=%d", siteID, profileResp.StatusCode)
 		}
 		var profile map[string]any
 		if err := json.NewDecoder(profileResp.Body).Decode(&profile); err != nil {
@@ -134,16 +136,32 @@ func TestE2EErrorPages(t *testing.T) {
 		// Compile + apply
 		revID := e2eCompileAndApply(t, client, requestBaseURL, requestHostOverride)
 		if revID == "" {
-			t.Skip("compile/apply failed or no rev returned; skipping config check")
+			t.Fatal("compile/apply returned no revision ID")
 		}
 
 		// Читаем скомпилированный конфиг через API
 		confResp := getWithAuth(t, client, fmt.Sprintf("%s/api/revisions/%s/artifacts/nginx/easy/%s.conf", requestBaseURL, revID, siteID), requestHostOverride)
-		if confResp.StatusCode != http.StatusOK {
-			t.Skipf("GET compiled config artifact: status=%d (artifact may not exist via API)", confResp.StatusCode)
-		}
 		body, _ := io.ReadAll(confResp.Body)
 		_ = confResp.Body.Close()
+		if confResp.StatusCode != http.StatusOK {
+			runtimeContainer := strings.TrimSpace(os.Getenv("WAF_E2E_RUNTIME_CONTAINER"))
+			if runtimeContainer == "" {
+				runtimeContainer = "waf-e2e-runtime"
+			}
+			deadline := time.Now().Add(30 * time.Second)
+			for time.Now().Before(deadline) {
+				active, err := exec.Command("docker", "exec", runtimeContainer, "cat", "/var/lib/waf/active/current.json").CombinedOutput()
+				if err == nil && strings.Contains(string(active), revID) {
+					break
+				}
+				time.Sleep(250 * time.Millisecond)
+			}
+			runtimeBody, runtimeErr := exec.Command("docker", "exec", runtimeContainer, "cat", "/etc/waf/current/nginx/easy/"+siteID+".conf").CombinedOutput()
+			if runtimeErr != nil {
+				t.Fatalf("get active compiled config: api status=%d; runtime error=%v output=%s", confResp.StatusCode, runtimeErr, string(runtimeBody))
+			}
+			body = runtimeBody
+		}
 		confStr := string(body)
 
 		// error_page 403 не должен быть в конфиге

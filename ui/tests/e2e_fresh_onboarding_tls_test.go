@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func TestE2EFreshOnboardingSelfSignedTLS(t *testing.T) {
+func TestFreshOnboardingSelfSignedTLS(t *testing.T) {
 	if strings.TrimSpace(os.Getenv("WAF_E2E_FRESH_ONBOARDING")) != "1" {
 		t.Skip("run scripts/run-e2e-tests.ps1 -FreshOnboarding to exercise clean onboarding")
 	}

@@ -65,12 +65,10 @@ func TestE2EAntiBot_ProfileCutoffAndCookiePersistence(t *testing.T) {
 			t.Fatalf("bind antibot TLS certificate: status=%d body=%s", bind.StatusCode, mustReadBody(t, bind.Body))
 		}
 		_ = bind.Body.Close()
-		t.Cleanup(func() {
-			for _, path := range []string{"/api/sites/e2e-antibot-site?auto_apply=false", "/api/upstreams/e2e-antibot-upstream?auto_apply=false"} {
-				resp := requestE2EJSON(t, adminClient, http.MethodDelete, adminBaseURL+path, adminHostOverride, nil)
-				_ = resp.Body.Close()
-			}
-		})
+		// Keep this uniquely named site for the immediately following template
+		// scenario. The E2E stack is disposable and the runner removes its
+		// volumes afterwards; retaining it lets that scenario exercise the
+		// compiled challenge flow rather than skipping it.
 		profile := e2eGetProfile(t, adminClient, adminBaseURL, adminHostOverride, "e2e-antibot-site")
 		mapGetOrCreate(profile, "front_service")["security_mode"] = "block"
 		antibot := mapGetOrCreate(profile, "security_antibot")

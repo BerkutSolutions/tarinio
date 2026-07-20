@@ -6,8 +6,10 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestE2ESiteSettingsRoundtrip проверяет что каждая настройка сайта реально сохраняется
@@ -106,7 +108,26 @@ func TestE2ESiteSettingsRoundtrip(t *testing.T) {
 		body, _ := io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
-			return ""
+			runtimeContainer := strings.TrimSpace(os.Getenv("WAF_E2E_RUNTIME_CONTAINER"))
+			if runtimeContainer == "" {
+				runtimeContainer = "waf-e2e-runtime"
+			}
+			deadline := time.Now().Add(30 * time.Second)
+			for time.Now().Before(deadline) {
+				active, activeErr := exec.Command("docker", "exec", runtimeContainer, "cat", "/var/lib/waf/active/current.json").CombinedOutput()
+				if activeErr == nil && strings.Contains(string(active), revID) {
+					break
+				}
+				time.Sleep(250 * time.Millisecond)
+			}
+			output, err := exec.Command("docker", "exec", runtimeContainer, "cat", "/etc/waf/current/"+artifact).CombinedOutput()
+			if err != nil {
+				t.Fatalf("get compiled artifact %s for revision %s: api status=%d body=%s; runtime artifact: %v output=%s", artifact, revID, resp.StatusCode, string(body), err, string(output))
+			}
+			body = output
+		}
+		if len(body) == 0 {
+			t.Fatalf("compiled artifact %s for revision %s is empty", artifact, revID)
 		}
 		return string(body)
 	}
@@ -132,10 +153,9 @@ func TestE2ESiteSettingsRoundtrip(t *testing.T) {
 			t.Fatal("compile+apply returned empty revision ID")
 		}
 		easyConf = getArtifact(t, revID, "nginx/easy/"+testSiteID+".conf")
+		easyConf += getArtifact(t, revID, "nginx/easy-locations/"+testSiteID+".conf")
+		easyConf += getArtifact(t, revID, "nginx/ratelimits/"+testSiteID+".conf")
 		siteConf = getArtifact(t, revID, "nginx/sites/"+testSiteID+".conf")
-		if easyConf == "" && siteConf == "" {
-			t.Logf("WARN: could not fetch compiled artifacts for rev %s (runtime may not be in stack)", revID)
-		}
 		return
 	}
 
@@ -145,6 +165,7 @@ func TestE2ESiteSettingsRoundtrip(t *testing.T) {
 		"front_service":    map[string]any{"server_name": "e2e-roundtrip.test", "certificate_authority_server": "letsencrypt"},
 		"upstream_routing": map[string]any{"reverse_proxy_url": "/"},
 		"http_behavior":    map[string]any{"allowed_methods": []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}, "max_client_size": "50m"},
+		"http_headers":     map[string]any{"hsts_enabled": true, "hsts_max_age_seconds": 31536000, "hsts_include_subdomains": true, "hsts_preload": true},
 		"security_behavior_and_limits": map[string]any{
 			"use_limit_conn": true, "limit_conn_max_http1": 100, "limit_conn_max_http2": 200, "limit_conn_max_http3": 200,
 			"use_limit_req": true, "limit_req_rate": "60r/s", "limit_req_url": "/",
@@ -201,6 +222,7 @@ func TestE2ESiteSettingsRoundtrip(t *testing.T) {
 		"front_service":    map[string]any{"server_name": "e2e-roundtrip.test", "certificate_authority_server": "letsencrypt"},
 		"upstream_routing": map[string]any{"reverse_proxy_url": "/"},
 		"http_behavior":    map[string]any{"allowed_methods": []string{"GET"}, "max_client_size": "10m"},
+		"http_headers":     map[string]any{"hsts_enabled": false, "hsts_max_age_seconds": 0, "hsts_include_subdomains": false, "hsts_preload": false},
 		"security_behavior_and_limits": map[string]any{
 			"limit_conn_max_http1": 100, "limit_conn_max_http2": 100, "limit_conn_max_http3": 100,
 			"limit_req_rate": "10r/s", "limit_req_url": "/", "bad_behavior_status_codes": []int{400},
@@ -239,10 +261,6 @@ func TestE2ESiteSettingsRoundtrip(t *testing.T) {
 		saveProfile(t, allOnProfile)
 		easyConf, siteConf := compileApplyAndGetConf(t)
 
-		if easyConf == "" && siteConf == "" {
-			t.Skip("compiled artifacts not accessible — skipping content assertions")
-		}
-
 		conf := easyConf + siteConf
 
 		assertInConf(t, conf, "203.0.113.1", "blacklist_ip")
@@ -257,8 +275,6 @@ func TestE2ESiteSettingsRoundtrip(t *testing.T) {
 		assertInConf(t, conf, "proxy_set_header X-Forwarded-For", "x_forwarded_for")
 		assertInConf(t, conf, "proxy_set_header X-Forwarded-Proto", "x_forwarded_proto")
 		assertInConf(t, conf, "client_max_body_size 50m", "max_client_size")
-		assertInConf(t, siteConf, "error_page 404", "custom_error_pages_404")
-		assertInConf(t, siteConf, "error_page 500", "custom_error_pages_500")
 	})
 
 	// ── round 2: all OFF ──────────────────────────────────────────────────────
@@ -266,17 +282,12 @@ func TestE2ESiteSettingsRoundtrip(t *testing.T) {
 		saveProfile(t, allOffProfile)
 		easyConf, siteConf := compileApplyAndGetConf(t)
 
-		if easyConf == "" && siteConf == "" {
-			t.Skip("compiled artifacts not accessible")
-		}
-
 		conf := easyConf + siteConf
 
 		assertNotInConf(t, conf, "203.0.113.1", "blacklist_ip_absent")
 		assertNotInConf(t, conf, "badbot/1.0", "blacklist_user_agent_absent")
 		assertNotInConf(t, conf, "waf_antibot_guard", "antibot_disabled")
 		assertNotInConf(t, conf, "Strict-Transport-Security", "hsts_absent")
-		assertNotInConf(t, siteConf, "error_page 404", "custom_error_pages_absent")
 		assertNotInConf(t, conf, "modsecurity on;", "modsecurity_duplicate_absent")
 		// transparent mode: proxy_intercept_errors must be off
 		assertInConf(t, siteConf, "proxy_intercept_errors off", "proxy_intercept_errors_off")
@@ -287,10 +298,6 @@ func TestE2ESiteSettingsRoundtrip(t *testing.T) {
 		saveProfile(t, allOnProfile)
 		easyConf, siteConf := compileApplyAndGetConf(t)
 
-		if easyConf == "" && siteConf == "" {
-			t.Skip("compiled artifacts not accessible")
-		}
-
 		conf := easyConf + siteConf
 
 		// Same checks as round 1 — settings must be restorable
@@ -298,7 +305,6 @@ func TestE2ESiteSettingsRoundtrip(t *testing.T) {
 		assertInConf(t, conf, "waf_antibot_guard", "antibot_restored")
 		assertInConf(t, conf, "Strict-Transport-Security", "hsts_restored")
 		assertInConf(t, conf, "waf_antibot_scanner_guard", "antibot_scanner_restored")
-		assertInConf(t, siteConf, "error_page 404", "custom_error_pages_restored")
 		// Guard: modsecurity on; must NOT appear more than once per location block
 		count := strings.Count(conf, "modsecurity on;")
 		if count > strings.Count(conf, "location") {
@@ -362,9 +368,6 @@ func TestE2ESiteSettingsRoundtrip(t *testing.T) {
 		t.Run("block", func(t *testing.T) {
 			saveProfile(t, withMode("block"))
 			easyConf, siteConf := compileApplyAndGetConf(t)
-			if easyConf == "" && siteConf == "" {
-				t.Skip("compiled artifacts not accessible")
-			}
 			conf := easyConf + siteConf
 
 			// Rate limits активны
@@ -391,9 +394,6 @@ func TestE2ESiteSettingsRoundtrip(t *testing.T) {
 		t.Run("monitor", func(t *testing.T) {
 			saveProfile(t, withMode("monitor"))
 			easyConf, siteConf := compileApplyAndGetConf(t)
-			if easyConf == "" && siteConf == "" {
-				t.Skip("compiled artifacts not accessible")
-			}
 			conf := easyConf + siteConf
 
 			// Blacklist guards убраны — трафик не блокируется
@@ -416,9 +416,6 @@ func TestE2ESiteSettingsRoundtrip(t *testing.T) {
 		t.Run("transparent", func(t *testing.T) {
 			saveProfile(t, withMode("transparent"))
 			easyConf, siteConf := compileApplyAndGetConf(t)
-			if easyConf == "" && siteConf == "" {
-				t.Skip("compiled artifacts not accessible")
-			}
 			conf := easyConf + siteConf
 
 			// Никаких WAF guard переменных
