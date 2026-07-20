@@ -634,7 +634,16 @@ func run() error {
 		}
 	}
 
-	return <-process.exitCh
+	// Nginx is a supervised child, not the runtime control-plane itself. A
+	// child exit must make readiness fail, but must not terminate the launcher:
+	// the control-plane needs /reload to roll back to the last known-good
+	// revision.
+	for {
+		err := <-process.exitCh
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "waf-runtime-launcher nginx exited: %v\n", err)
+		}
+	}
 }
 
 func requestArchiveRoot(runtimeRoot string) string {

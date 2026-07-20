@@ -1,5 +1,9 @@
 ## [1.5.6] - 20.07.2026
 
+- runtime: launcher keeps its authenticated health and reload API alive when
+  supervised Nginx exits, allowing apply rollback to restore the last
+  known-good revision instead of losing the runtime control endpoint.
+
 - ci: DAST ограничивает время работы ZAP и при любом завершении удаляет только свой одноразовый контейнер. Зависший сканер больше не удерживает E2E resource group и не блокирует следующие pipeline.
 - ci: full E2E включает контракт Basic Auth: API-профиль → revision artifact control-plane → активный runtime artifact → фактические ответы `401` и `204`.
 - ci: security-invariants теперь проверяет trusted proxy и TOTP step-up, full — гео и ветки error pages, nightly — burst stability вместе с resilience-сценариями.
