@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import re
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -30,13 +31,31 @@ def outcomes(path):
     return final
 
 
+def extract_runtime_evidence(path):
+    raw = path.read_text(encoding="utf-8", errors="replace") if path.exists() else ""
+    return {
+        "revision_ids": sorted(set(re.findall(r"\brev-[0-9]+\b", raw))),
+        "http_statuses": sorted(set(re.findall(r"\bstatus[=: ]+(\d{3})\b", raw, re.I))),
+        "blocking_reasons": sorted(set(re.findall(r"\bsecurity_reason[=: ]+[\"']?([a-z0-9_.-]+)", raw, re.I))),
+    }
+
+
+def runtime_config_checksum():
+    try:
+        out = subprocess.check_output(["docker", "exec", "waf-e2e-runtime", "sh", "-lc", "find /etc/waf/nginx -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum"], text=True, stderr=subprocess.DEVNULL)
+        return out.split()[0]
+    except Exception:
+        return "unavailable"
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--log", required=True)
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--suite", required=True)
     args = parser.parse_args()
-    result = outcomes(Path(args.log))
+    log_path = Path(args.log)
+    result = outcomes(log_path)
     counts = {key: sum(value == key for value in result.values()) for key in ("pass", "fail", "skip")}
     report = {
         "schema_version": 1,
@@ -47,6 +66,7 @@ def main():
         "status": "passed" if counts["fail"] == 0 else "failed",
         "summary": counts,
         "tests": [{"name": name, "status": status} for name, status in sorted(result.items())],
+        "runtime_evidence": {**extract_runtime_evidence(log_path), "runtime_config_checksum": runtime_config_checksum()},
         "security_invariants": [
             "Authentication rejects disabled users and rotated credentials / Аутентификация отклоняет отключённых пользователей и сменённые учётные данные.",
             "Authentication sessions and credentials are isolated between sites / Сессии и учётные данные изолированы между сайтами.",
