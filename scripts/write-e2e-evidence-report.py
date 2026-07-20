@@ -5,6 +5,8 @@ import json
 import os
 import re
 import subprocess
+import urllib.request
+from http.cookiejar import CookieJar
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -86,6 +88,36 @@ def runtime_adaptive_evidence():
     return result
 
 
+def request_security_evidence():
+    base_url = os.getenv("WAF_E2E_BASE_URL", "").rstrip("/")
+    username = os.getenv("WAF_E2E_USERNAME", "")
+    password = os.getenv("WAF_E2E_PASSWORD", "")
+    if not base_url or not username or not password:
+        return []
+    try:
+        jar = CookieJar()
+        opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
+        login = urllib.request.Request(
+            base_url + "/api/auth/login",
+            data=json.dumps({"username": username, "password": password}).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with opener.open(login, timeout=5):
+            pass
+        with opener.open(base_url + "/api/requests?limit=100", timeout=5) as response:
+            payload = json.load(response)
+    except Exception:
+        return []
+    rows = payload.get("requests", []) if isinstance(payload, dict) else payload if isinstance(payload, list) else []
+    result = []
+    for row in rows:
+        if not isinstance(row, dict) or not row.get("security_reason"):
+            continue
+        result.append({key: row.get(key) for key in ("id", "site_id", "uri", "method", "status", "security_reason", "timestamp")})
+    return result[:100]
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--log", required=True)
@@ -97,6 +129,7 @@ def main():
     runtime_log_path = Path(args.runtime_log) if args.runtime_log else log_path
     result, observations = test_evidence(log_path)
     counts = {key: sum(value == key for value in result.values()) for key in ("pass", "fail", "skip")}
+    request_evidence = request_security_evidence()
     report = {
         "schema_version": 1,
         "suite": args.suite,
@@ -111,6 +144,7 @@ def main():
             "runtime_config_checksum": runtime_config_checksum(),
             **runtime_adaptive_evidence(),
         },
+        "request_security_evidence": request_evidence,
         "security_invariants": [
             "Authentication rejects disabled users and rotated credentials / Аутентификация отклоняет отключённых пользователей и сменённые учётные данные.",
             "Authentication sessions and credentials are isolated between sites / Сессии и учётные данные изолированы между сайтами.",
@@ -126,6 +160,9 @@ def main():
         f"HTTP: {', '.join(item['http_statuses']) or 'n/a'}"
         for item in report["tests"]
     ) or "- No matching E2E test events / Нет подходящих событий E2E."
+    report["runtime_evidence"]["blocking_reasons"] = sorted(set(
+        report["runtime_evidence"]["blocking_reasons"] + [str(item["security_reason"]) for item in request_evidence]
+    ))
     markdown = f"""# E2E evidence report / Отчёт-доказательство E2E
 
 **Suite / Набор:** `{args.suite}`<br>
