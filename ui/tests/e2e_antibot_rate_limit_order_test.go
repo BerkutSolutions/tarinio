@@ -61,6 +61,8 @@ func TestE2EAntibotChallengePrecedesActiveRateLimitFallback(t *testing.T) {
 	e2ePutProfile(t, adminClient, adminBaseURL, adminHostOverride, siteID, profile)
 	if revisionID := e2eCompileAndApply(t, adminClient, adminBaseURL, adminHostOverride); revisionID == "" {
 		t.Fatal("compile/apply antibot rate-limit E2E revision")
+	} else {
+		assertE2EArtifactActive(t, revisionID, "nginx/easy/"+siteID+".conf", "waf_antibot_guard", "waf_rate_limited_active")
 	}
 
 	noRedirect := &http.Client{

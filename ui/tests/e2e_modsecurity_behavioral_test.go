@@ -62,6 +62,8 @@ func TestE2EModSecurity_EnableDisableReenableWithScopedExclusion(t *testing.T) {
 		e2eAssertModSecurityProfile(t, updated, profile)
 		if revisionID := e2eCompileAndApply(t, client, requestBaseURL, requestHostOverride); revisionID == "" {
 			t.Fatal("compile+apply returned an empty revision ID")
+		} else if boolValue(mapGetOrCreate(profile, "security_modsecurity")["use_modsecurity"]) {
+			assertE2EArtifactActive(t, revisionID, "modsecurity/easy/"+siteID+".conf", "SecRule", "100001")
 		}
 		time.Sleep(2 * time.Second)
 		return updated

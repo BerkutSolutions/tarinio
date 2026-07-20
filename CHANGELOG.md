@@ -5,6 +5,7 @@
 - ci: security-invariants теперь проверяет trusted proxy и TOTP step-up, full — гео и ветки error pages, nightly — burst stability вместе с resilience-сценариями.
 - ci: nightly L4/L7 проверяет, что адаптивный `DROP` и правило `WAF-RUNTIME-L4` исчезают после quiet decay; флаги resilience и decay явно передаются E2E-процессу, а ускоренные параметры применяются только к одноразовому контуру.
 - ci: E2E evidence дополняется безопасным срезом API запросов с подтверждёнными `security_reason`, HTTP status и site/URI; credential и тело запроса не сохраняются.
+- ci: AntiBot и ModSecurity E2E дополнительно сверяют revision artifact control-plane с активным runtime artifact перед проверкой защитного HTTP-результата.
 
 - ci: E2E-проверка порядка AntiBot и активного rate-limit ожидает завершения переключения worker-процессов Nginx после apply revision. Это исключает ложный `404` default vhost во время reload, не ослабляя обязательный итоговый `429` для подтверждённого клиента.
 
