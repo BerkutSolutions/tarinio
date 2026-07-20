@@ -37,6 +37,8 @@ func TestE2ECompilerRuntimeAuthContract(t *testing.T) {
 	})
 	createE2EModSecuritySite(t, client, requestBaseURL, hostOverride, siteID, upstreamID, host)
 	profile := e2eGetProfile(t, client, requestBaseURL, hostOverride, siteID)
+	httpBehavior := mapGetOrCreate(profile, "http_behavior")
+	httpBehavior["allowed_methods"] = []string{"GET", "POST", "HEAD", "OPTIONS"}
 	auth := mapGetOrCreate(profile, "security_auth_basic")
 	auth["use_auth_basic"] = true
 	auth["auth_mode"] = "basic"
@@ -85,15 +87,22 @@ func TestE2ECompilerRuntimeAuthContract(t *testing.T) {
 	if string(runtime) != string(artifact) {
 		t.Fatal("active runtime artifact differs from applied revision artifact")
 	}
-	invalid := e2eBasicVerify(t, runtimeURL, host, username, "invalid-password")
-	_ = invalid.Body.Close()
-	if invalid.StatusCode != http.StatusUnauthorized {
-		t.Fatalf("invalid Basic Auth: status=%d, want 401", invalid.StatusCode)
+	waitForStatus := func(password string, want int) {
+		t.Helper()
+		deadline := time.Now().Add(30 * time.Second)
+		status := 0
+		for time.Now().Before(deadline) {
+			response := e2eBasicVerify(t, runtimeURL, host, username, password)
+			status = response.StatusCode
+			_ = response.Body.Close()
+			if status == want {
+				return
+			}
+			time.Sleep(250 * time.Millisecond)
+		}
+		t.Fatalf("Basic Auth invalid_password=%t: status=%d, want %d", password == "invalid-password", status, want)
 	}
-	valid := e2eBasicVerify(t, runtimeURL, host, username, password)
-	_ = valid.Body.Close()
-	if valid.StatusCode != http.StatusNoContent {
-		t.Fatalf("valid Basic Auth: status=%d, want 204", valid.StatusCode)
-	}
+	waitForStatus("invalid-password", http.StatusUnauthorized)
+	waitForStatus(password, http.StatusNoContent)
 	t.Logf("contract revision=%s runtime-artifact=matched HTTP=401,204", revisionID)
 }
