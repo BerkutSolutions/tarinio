@@ -113,11 +113,31 @@ func TestRenderAccessRateLimitArtifacts_RendersValidTrustedProxyCIDR(t *testing.
 		t.Fatalf("render failed: %v", err)
 	}
 	for _, artifact := range artifacts {
-		if artifact.Path == "nginx/conf.d/real_ip.conf" && strings.Contains(string(artifact.Content), "set_real_ip_from 10.0.0.0/8;") {
+		if artifact.Path == "nginx/access/site-a.conf" && strings.Contains(string(artifact.Content), "set_real_ip_from 10.0.0.0/8;") {
 			return
 		}
 	}
-	t.Fatal("expected valid trusted proxy CIDR in real_ip.conf")
+	t.Fatal("expected valid trusted proxy CIDR in site access config")
+}
+
+func TestRenderAccessRateLimitArtifacts_ScopesTrustedProxyRulesToOwningSite(t *testing.T) {
+	artifacts, err := RenderAccessRateLimitArtifacts(
+		[]SiteInput{{ID: "trusted", Enabled: true, PrimaryHost: "trusted.example.com", ListenHTTP: true}, {ID: "untrusted", Enabled: true, PrimaryHost: "untrusted.example.com", ListenHTTP: true}},
+		[]AccessPolicyInput{{ID: "trusted-policy", SiteID: "trusted", TrustedProxyCIDRs: []string{"172.16.0.0/12"}}}, nil,
+	)
+	if err != nil {
+		t.Fatalf("render failed: %v", err)
+	}
+	contents := map[string]string{}
+	for _, artifact := range artifacts {
+		contents[artifact.Path] = string(artifact.Content)
+	}
+	if !strings.Contains(contents["nginx/access/trusted.conf"], "set_real_ip_from 172.16.0.0/12;") {
+		t.Fatal("trusted site's access config must contain its trusted proxy CIDR")
+	}
+	if strings.Contains(contents["nginx/access/untrusted.conf"], "set_real_ip_from") || strings.Contains(contents["nginx/conf.d/real_ip.conf"], "set_real_ip_from") {
+		t.Fatal("trusted proxy CIDR must not extend beyond its owning site")
+	}
 }
 
 func TestRenderAccessRateLimitArtifacts_AllowlistKeepsRateLimitKeying(t *testing.T) {

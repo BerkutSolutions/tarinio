@@ -28,6 +28,22 @@ func TestE2EAutoStartSmartRuntime(t *testing.T) {
 	if _, err := os.Stat(composeFile); err != nil {
 		t.Fatalf("auto-start compose not found: %v", err)
 	}
+	// The production installer creates .env from .env.example. CI checks out a
+	// clean repository, so create the same non-secret local configuration for
+	// this isolated stack and remove it after the scenario.
+	envFile := filepath.Join(composeDir, ".env")
+	if _, err := os.Stat(envFile); os.IsNotExist(err) {
+		example, readErr := os.ReadFile(filepath.Join(composeDir, ".env.example"))
+		if readErr != nil {
+			t.Fatalf("read auto-start .env.example: %v", readErr)
+		}
+		if writeErr := os.WriteFile(envFile, example, 0o600); writeErr != nil {
+			t.Fatalf("create auto-start .env for isolated e2e stack: %v", writeErr)
+		}
+		t.Cleanup(func() { _ = os.Remove(envFile) })
+	} else if err != nil {
+		t.Fatalf("inspect auto-start .env: %v", err)
+	}
 
 	// This scenario is part of the full E2E suite, whose primary stack already
 	// owns 18080/80/443. Run the auto-start deployment on its own host ports
