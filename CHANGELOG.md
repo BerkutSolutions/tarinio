@@ -2,6 +2,7 @@
 
 - ci: DAST ограничивает время работы ZAP и при любом завершении удаляет только свой одноразовый контейнер. Зависший сканер больше не удерживает E2E resource group и не блокирует следующие pipeline.
 - ci: full E2E включает контракт Basic Auth: API-профиль → revision artifact control-plane → активный runtime artifact → фактические ответы `401` и `204`.
+- ci: security-invariants теперь проверяет trusted proxy и TOTP step-up, full — гео и ветки error pages, nightly — burst stability вместе с resilience-сценариями.
 
 - ci: E2E-проверка порядка AntiBot и активного rate-limit ожидает завершения переключения worker-процессов Nginx после apply revision. Это исключает ложный `404` default vhost во время reload, не ослабляя обязательный итоговый `429` для подтверждённого клиента.
 
