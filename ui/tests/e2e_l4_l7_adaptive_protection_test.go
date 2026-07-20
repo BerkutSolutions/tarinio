@@ -48,12 +48,21 @@ func TestE2EL4L7AdaptiveProtection(t *testing.T) {
 		putProtectionJSON(t, client, requestBaseURL+"/api/anti-ddos/settings", requestHostOverride, previousAntiDDoS)
 	})
 
+	decayLambda, holdSeconds := 0.01, 60
+	verifyDecay := strings.TrimSpace(os.Getenv("WAF_E2E_VERIFY_DECAY")) == "1"
+	if verifyDecay {
+		// Nightly uses an accelerated, but real, model profile so that expiry
+		// is observable without turning the CI job into a minute-long sleep.
+		// Keep the entry long enough for the l4 guard's reload loop to install
+		// the DROP rule, then use a fast enough decay for a bounded nightly run.
+		decayLambda, holdSeconds = 1, 8
+	}
 	protectionSettings := map[string]any{
 		"use_l4_guard": true, "chain_mode": "input", "conn_limit": 10000, "rate_per_second": 10000,
 		"rate_burst": 10000, "ports": []int{80, 443}, "target": "DROP", "enforce_l7_rate_limit": true,
 		"l7_requests_per_second": 1, "l7_burst": 1, "l7_status_code": 429,
-		"model_enabled": true, "model_poll_interval_seconds": 1, "model_decay_lambda": 0.01,
-		"model_throttle_threshold": 1.0, "model_drop_threshold": 2.0, "model_hold_seconds": 60,
+		"model_enabled": true, "model_poll_interval_seconds": 1, "model_decay_lambda": decayLambda,
+		"model_throttle_threshold": 1.0, "model_drop_threshold": 2.0, "model_hold_seconds": holdSeconds,
 		"model_throttle_rate_per_second": 1, "model_throttle_burst": 1, "model_throttle_target": "DROP",
 		"model_weight_429": 1.0, "model_weight_403": 1.8, "model_weight_444": 2.2,
 		"model_emergency_rps": 10000, "model_emergency_unique_ips": 10000, "model_emergency_per_ip_rps": 2,
@@ -132,6 +141,20 @@ func TestE2EL4L7AdaptiveProtection(t *testing.T) {
 			t.Fatalf("L4 drop did not block a new attacker connection: %s", blockedOutput)
 		}
 	})
+	if verifyDecay {
+		t.Run("adaptive drop expires after quiet decay", func(t *testing.T) {
+			deadline := time.Now().Add(45 * time.Second)
+			for time.Now().Before(deadline) {
+				adaptive = runProtectionRuntime(t, composeFile, "cat /etc/waf/l4guard-adaptive/adaptive.json 2>/dev/null || true")
+				chain = runProtectionRuntime(t, composeFile, "iptables -w -S WAF-RUNTIME-L4 2>/dev/null || true")
+				if !adaptiveHasDropEntry(adaptive, l4AttackerIP) && !strings.Contains(chain, "-s "+l4AttackerIP+"/32 -p tcp -j DROP") {
+					return
+				}
+				time.Sleep(time.Second)
+			}
+			t.Fatalf("adaptive drop did not expire after quiet decay: entries=%s rules=%s", adaptive, chain)
+		})
+	}
 }
 
 func adaptiveHasDropEntry(raw, ip string) bool {
