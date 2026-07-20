@@ -39,7 +39,7 @@ fi
 timeout --preserve-status -k 30s "${scan_timeout}s" \
   docker run --rm --cidfile "$zap_cidfile" --network host --user "$(id -u):$(id -g)" -e HOME=/tmp -w /tmp \
   -v "$OUT:/zap/wrk:rw" "$ZAP_IMAGE" \
-  "$scan" -t "$TARGET" -m 3 -I \
+  "$scan" --autooff -t "$TARGET" -m 3 -I \
   -r report.html -J report.json -w report.md -x report.xml \
   -z "-config replacer.full_list(0).description=E2EHost -config replacer.full_list(0).enabled=true -config replacer.full_list(0).matchtype=REQ_HEADER -config replacer.full_list(0).matchstr=Host -config replacer.full_list(0).regex=false -config replacer.full_list(0).replacement=$HOST"
 

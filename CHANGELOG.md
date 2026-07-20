@@ -1,5 +1,10 @@
 ## [1.5.6] - 20.07.2026
 
+- ci: DAST baseline отключает автоматически сгенерированный ZAP Automation
+  Framework plan: он записывал временный summary-файл в недоступный для
+  runner-пользователя `/tmp`; штатные JSON/HTML/XML/Markdown отчёты по-прежнему
+  сохраняются в артефактах job.
+
 - ci: multisite Basic Auth E2E сохраняет обе связанные настройки без
   промежуточных auto-apply и проверяет их одной явной compile/apply revision;
   failure diagnostics используют абсолютный путь compose-файла.
