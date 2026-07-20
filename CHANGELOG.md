@@ -9,6 +9,7 @@
 - ci: E2E custom error pages также подтверждает совпадение скомпилированной revision и активного runtime-конфига.
 - security: trusted-proxy E2E проверяет подмену `X-Forwarded-For` для IPv4 и IPv6 в доверенной и недоверенной цепочке.
 - ci: Basic Auth compiler→runtime contract явно разрешает `POST` для штатного verification endpoint и проверяет `401`/`204` без зависимости от порядка других full E2E-сценариев.
+- ci: Basic Auth E2E повторяет только транспортный запрос verification endpoint во время graceful runtime reload; итоговый HTTP-статус по-прежнему обязателен и постоянный сбой останавливает job.
 
 - ci: E2E-проверка порядка AntiBot и активного rate-limit ожидает завершения переключения worker-процессов Nginx после apply revision. Это исключает ложный `404` default vhost во время reload, не ослабляя обязательный итоговый `429` для подтверждённого клиента.
 

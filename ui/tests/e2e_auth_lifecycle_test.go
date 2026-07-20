@@ -173,19 +173,26 @@ func e2eSaveAndApplyAuthProfile(t *testing.T, client *http.Client, baseURL, host
 
 func e2eBasicVerify(t *testing.T, runtimeURL, host, username, password string) *http.Response {
 	t.Helper()
-	req, err := http.NewRequest(http.MethodPost, runtimeURL+"/auth/verify/basic", nil)
-	if err != nil {
-		t.Fatalf("create Basic Auth verification request: %v", err)
+	deadline := time.Now().Add(30 * time.Second)
+	var lastErr error
+	for time.Now().Before(deadline) {
+		req, err := http.NewRequest(http.MethodPost, runtimeURL+"/auth/verify/basic", nil)
+		if err != nil {
+			t.Fatalf("create Basic Auth verification request: %v", err)
+		}
+		if host != "" {
+			req.Host = host
+		}
+		req.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(username+":"+password)))
+		resp, err := newE2EHTTPClient(runtimeURL, false).Do(req)
+		if err == nil {
+			return resp
+		}
+		lastErr = err
+		time.Sleep(250 * time.Millisecond)
 	}
-	if host != "" {
-		req.Host = host
-	}
-	req.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(username+":"+password)))
-	resp, err := newE2EHTTPClient(runtimeURL, false).Do(req)
-	if err != nil {
-		t.Fatalf("Basic Auth verification request: %v", err)
-	}
-	return resp
+	t.Fatalf("Basic Auth verification request did not recover after runtime reload: %v", lastErr)
+	return nil
 }
 
 func e2eRequestWithCookie(t *testing.T, endpoint, host, setCookie string) *http.Response {
