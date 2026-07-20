@@ -160,7 +160,7 @@ e2e:full:
     - e2e:smoke
   script:
     - mkdir -p build/e2e/full
-    - E2E_FILTER='TestE2EAntibotTemplates/(TemplatePreviewRendering|TemplatesContainVerifyURI|TemplateSwitchSavesAndCompiles)$|TestE2EBasicAuthTemplates|TestE2EErrorPages|TestE2EL4L7AdaptiveProtection|TestE2ESecurityAndTLSMatrix|TestE2ERecoveryFlow_BadConfigThenRepair|TestE2EMultisiteBasicAuthIsolation' E2E_TIMEOUT=240 E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/full" E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/e2e/full" sh scripts/run-e2e-tests.sh
+    - E2E_FILTER='TestE2EAntibotTemplates/(TemplatePreviewRendering|TemplatesContainVerifyURI|TemplateSwitchSavesAndCompiles)$|TestE2EBasicAuthTemplates|TestE2ECompilerRuntimeAuthContract|TestE2EErrorPages|TestE2EL4L7AdaptiveProtection|TestE2ESecurityAndTLSMatrix|TestE2ERecoveryFlow_BadConfigThenRepair|TestE2EMultisiteBasicAuthIsolation' E2E_TIMEOUT=240 E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/full" E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/e2e/full" sh scripts/run-e2e-tests.sh
   after_script:
     - docker compose -f deploy/compose/e2e/docker-compose.yml down --volumes --remove-orphans || true
   artifacts:
