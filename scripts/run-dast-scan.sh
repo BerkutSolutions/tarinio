@@ -26,7 +26,7 @@ scan="zap-baseline.py"
 
 # The explicit Host replacement reaches the configured WAF virtual host while
 # Docker host networking keeps the scanner isolated from every non-E2E network.
-docker run --rm --network host --user "$(id -u):$(id -g)" -e HOME=/zap/wrk \
+docker run --rm --network host --user "$(id -u):$(id -g)" -e HOME=/tmp -w /tmp \
   -v "$OUT:/zap/wrk:rw" "$ZAP_IMAGE" \
   "$scan" -t "$TARGET" -m 3 -I \
   -r report.html -J report.json -w report.md -x report.xml \
