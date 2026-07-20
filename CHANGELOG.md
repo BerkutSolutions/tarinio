@@ -7,6 +7,7 @@
 - ci: E2E evidence дополняется безопасным срезом API запросов с подтверждёнными `security_reason`, HTTP status и site/URI; credential и тело запроса не сохраняются.
 - ci: AntiBot и ModSecurity E2E дополнительно сверяют revision artifact control-plane с активным runtime artifact перед проверкой защитного HTTP-результата.
 - ci: E2E custom error pages также подтверждает совпадение скомпилированной revision и активного runtime-конфига.
+- security: trusted-proxy E2E проверяет подмену `X-Forwarded-For` для IPv4 и IPv6 в доверенной и недоверенной цепочке.
 
 - ci: E2E-проверка порядка AntiBot и активного rate-limit ожидает завершения переключения worker-процессов Nginx после apply revision. Это исключает ложный `404` default vhost во время reload, не ослабляя обязательный итоговый `429` для подтверждённого клиента.
 

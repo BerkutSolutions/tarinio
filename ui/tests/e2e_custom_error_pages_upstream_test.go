@@ -488,10 +488,11 @@ func TestE2EBehavioral_CustomErrorPages_GeoAndDirectRuntimeBranches(t *testing.T
 	})
 
 	t.Run("TrustedProxyIdentityRejectsSpoofedForwardedFor", func(t *testing.T) {
+		const blockedIPv6 = "2001:db8::99"
 		trusted := baseBlockProfile()
 		security := mapGetOrCreate(trusted, "security_behavior_and_limits")
 		security["use_blacklist"] = true
-		security["blacklist_ip"] = []string{blockedIP}
+		security["blacklist_ip"] = []string{blockedIP, blockedIPv6}
 		security["access_trusted_proxy_cidrs"] = []string{"127.0.0.1/32", "172.16.0.0/12"}
 		saveProfile(t, trusted)
 		compileApply(t)
@@ -502,11 +503,17 @@ func TestE2EBehavioral_CustomErrorPages_GeoAndDirectRuntimeBranches(t *testing.T
 		if blocked.StatusCode != http.StatusForbidden {
 			t.Fatalf("trusted proxy must apply client IP from X-Forwarded-For: status=%d body=%.200s", blocked.StatusCode, string(blockedBody))
 		}
+		blockedV6 := doRuntimeGET("/", map[string]string{"X-Forwarded-For": blockedIPv6})
+		blockedV6Body, _ := io.ReadAll(blockedV6.Body)
+		_ = blockedV6.Body.Close()
+		if blockedV6.StatusCode != http.StatusForbidden {
+			t.Fatalf("trusted proxy must apply IPv6 client IP from X-Forwarded-For: status=%d body=%.200s", blockedV6.StatusCode, string(blockedV6Body))
+		}
 
 		untrusted := baseBlockProfile()
 		security = mapGetOrCreate(untrusted, "security_behavior_and_limits")
 		security["use_blacklist"] = true
-		security["blacklist_ip"] = []string{blockedIP}
+		security["blacklist_ip"] = []string{blockedIP, blockedIPv6}
 		security["access_trusted_proxy_cidrs"] = []string{}
 		saveProfile(t, untrusted)
 		compileApply(t)
@@ -516,6 +523,12 @@ func TestE2EBehavioral_CustomErrorPages_GeoAndDirectRuntimeBranches(t *testing.T
 		_ = spoofed.Body.Close()
 		if spoofed.StatusCode == http.StatusForbidden {
 			t.Fatalf("untrusted X-Forwarded-For must not control the client identity: body=%.200s", string(spoofedBody))
+		}
+		spoofedV6 := doRuntimeGET("/", map[string]string{"X-Forwarded-For": blockedIPv6})
+		spoofedV6Body, _ := io.ReadAll(spoofedV6.Body)
+		_ = spoofedV6.Body.Close()
+		if spoofedV6.StatusCode == http.StatusForbidden {
+			t.Fatalf("untrusted IPv6 X-Forwarded-For must not control the client identity: body=%.200s", string(spoofedV6Body))
 		}
 	})
 
