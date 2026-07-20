@@ -121,10 +121,23 @@ func TestE2EAntibotChallengePrecedesActiveRateLimitFallback(t *testing.T) {
 	antibotCookie := verifyResp.Cookies()[0]
 	_ = verifyResp.Body.Close()
 
-	limited := request(rateCookie + "; " + antibotCookie.Name + "=" + antibotCookie.Value)
-	body, _ := io.ReadAll(limited.Body)
-	_ = limited.Body.Close()
-	if limited.StatusCode != http.StatusTooManyRequests {
-		t.Fatalf("verified client with active rate-limit cookie must receive 429, got status=%d body=%s", limited.StatusCode, body)
+	// The apply API completes before every worker has switched to the new
+	// virtual-host set. The first request already proved that this site is
+	// active (302 to its challenge); wait for the verified branch as well
+	// instead of treating a transient default-server 404 during worker reload
+	// as the policy result.
+	deadline = time.Now().Add(30 * time.Second)
+	status := 0
+	var body []byte
+	for time.Now().Before(deadline) {
+		limited := request(rateCookie + "; " + antibotCookie.Name + "=" + antibotCookie.Value)
+		body, _ = io.ReadAll(limited.Body)
+		status = limited.StatusCode
+		_ = limited.Body.Close()
+		if status == http.StatusTooManyRequests {
+			return
+		}
+		time.Sleep(250 * time.Millisecond)
 	}
+	t.Fatalf("verified client with active rate-limit cookie must receive 429, got status=%d body=%s", status, body)
 }
