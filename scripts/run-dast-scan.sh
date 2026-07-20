@@ -11,8 +11,14 @@ ZAP_IMAGE="${ZAP_IMAGE:-ghcr.io/zaproxy/zaproxy:stable}"
 TARGET="${DAST_TARGET_URL:-http://127.0.0.1:10080}"
 HOST="${DAST_TARGET_HOST:-e2e-management.test}"
 mkdir -p "$OUT"
+zap_cidfile="$OUT/.zap-container-id"
+rm -f "$zap_cidfile"
 
 cleanup() {
+  if [ -s "$zap_cidfile" ]; then
+    docker rm -f "$(cat "$zap_cidfile")" >/dev/null 2>&1 || true
+  fi
+  rm -f "$zap_cidfile"
   docker compose -f "$ROOT/deploy/compose/e2e/docker-compose.yml" down --volumes --remove-orphans >/dev/null 2>&1 || true
 }
 trap cleanup EXIT INT TERM
@@ -22,11 +28,16 @@ E2E_KEEP_STACK=1 E2E_FILTER=TestE2ESmoke_LoginHealthcheckDashboard \
   E2E_LOG_DIR="$OUT" E2E_EVIDENCE_DIR="$OUT" sh "$ROOT/scripts/run-e2e-tests.sh" "$ROOT"
 
 scan="zap-baseline.py"
-[ "$MODE" = "full" ] && scan="zap-full-scan.py"
+scan_timeout="${DAST_SCAN_TIMEOUT_SECONDS:-1200}"
+if [ "$MODE" = "full" ]; then
+  scan="zap-full-scan.py"
+  scan_timeout="${DAST_SCAN_TIMEOUT_SECONDS:-2700}"
+fi
 
 # The explicit Host replacement reaches the configured WAF virtual host while
 # Docker host networking keeps the scanner isolated from every non-E2E network.
-docker run --rm --network host --user "$(id -u):$(id -g)" -e HOME=/tmp -w /tmp \
+timeout --preserve-status -k 30s "${scan_timeout}s" \
+  docker run --rm --cidfile "$zap_cidfile" --network host --user "$(id -u):$(id -g)" -e HOME=/tmp -w /tmp \
   -v "$OUT:/zap/wrk:rw" "$ZAP_IMAGE" \
   "$scan" -t "$TARGET" -m 3 -I \
   -r report.html -J report.json -w report.md -x report.xml \
