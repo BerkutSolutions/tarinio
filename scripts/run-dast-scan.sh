@@ -11,8 +11,8 @@ ZAP_IMAGE="${ZAP_IMAGE:-ghcr.io/zaproxy/zaproxy:stable}"
 TARGET="${DAST_TARGET_URL:-http://127.0.0.1:10080}"
 HOST="${DAST_TARGET_HOST:-e2e-management.test}"
 mkdir -p "$OUT"
-mkdir -p "$OUT/zap-home" "$OUT/java-prefs"
 zap_cidfile="$OUT/.zap-container-id"
+zap_home="$(mktemp -d "${TMPDIR:-/tmp}/waf-zap.XXXXXX")"
 rm -f "$zap_cidfile"
 
 cleanup() {
@@ -20,6 +20,7 @@ cleanup() {
     docker rm -f "$(cat "$zap_cidfile")" >/dev/null 2>&1 || true
   fi
   rm -f "$zap_cidfile"
+  rm -rf "$zap_home"
   docker compose -f "$ROOT/deploy/compose/e2e/docker-compose.yml" down --volumes --remove-orphans >/dev/null 2>&1 || true
 }
 trap cleanup EXIT INT TERM
@@ -38,11 +39,11 @@ fi
 # The explicit Host replacement reaches the configured WAF virtual host while
 # Docker host networking keeps the scanner isolated from every non-E2E network.
 timeout --preserve-status -k 30s "${scan_timeout}s" \
-  docker run --rm --cidfile "$zap_cidfile" --network host --user "$(id -u):$(id -g)" -e HOME=/tmp \
-  -e JAVA_TOOL_OPTIONS=-Djava.util.prefs.userRoot=/zap/wrk/java-prefs -w /tmp \
-  -v "$OUT:/zap/wrk:rw" "$ZAP_IMAGE" \
+  docker run --rm --cidfile "$zap_cidfile" --network host --user "$(id -u):$(id -g)" -e HOME=/zap/home \
+  -e JAVA_TOOL_OPTIONS=-Djava.util.prefs.userRoot=/zap/home/java-prefs -w /tmp \
+  -v "$OUT:/zap/wrk:rw" -v "$zap_home:/zap/home:rw" "$ZAP_IMAGE" \
   "$scan" --autooff -t "$TARGET" -m 3 -I \
   -r report.html -J report.json -w report.md -x report.xml \
-  -z "-dir /zap/wrk/zap-home -config replacer.full_list(0).description=E2EHost -config replacer.full_list(0).enabled=true -config replacer.full_list(0).matchtype=REQ_HEADER -config replacer.full_list(0).matchstr=Host -config replacer.full_list(0).regex=false -config replacer.full_list(0).replacement=$HOST"
+  -z "-silent -dir /zap/home -config replacer.full_list(0).description=E2EHost -config replacer.full_list(0).enabled=true -config replacer.full_list(0).matchtype=REQ_HEADER -config replacer.full_list(0).matchstr=Host -config replacer.full_list(0).regex=false -config replacer.full_list(0).replacement=$HOST"
 
 python3 "$ROOT/scripts/write-dast-evidence-report.py" --input "$OUT/report.json" --output-dir "$OUT" --mode "$MODE" --max-risk 3
