@@ -7,7 +7,7 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
-RISK = {"0": "Informational", "1": "Low", "2": "Medium", "3": "High", "4": "Critical"}
+RISK = {0: "Informational", 1: "Low", 2: "Medium", 3: "High", 4: "Critical"}
 
 
 def alerts(document):
@@ -23,7 +23,7 @@ def main():
     parser.add_argument("--max-risk", type=int, default=3)
     args = parser.parse_args()
     source = Path(args.input)
-    data = json.loads(source.read_text(encoding="utf-8", errors="replace"))
+    data = json.loads(source.read_text(encoding="utf-8-sig", errors="replace"))
     found = list(alerts(data))
     counts = Counter(int(item.get("riskcode", 0)) for item in found)
     blocking = [item for item in found if int(item.get("riskcode", 0)) >= args.max_risk]
@@ -36,7 +36,7 @@ def main():
         "status": status,
         "threshold": RISK[args.max_risk],
         "counts": {RISK[key]: counts[key] for key in sorted(RISK)},
-        "blocking_alerts": [{"name": item.get("alert", "unknown"), "risk": RISK.get(str(item.get("riskcode", 0)), "Unknown")} for item in blocking],
+        "blocking_alerts": [{"name": item.get("alert", "unknown"), "risk": RISK.get(int(item.get("riskcode", 0)), "Unknown")} for item in blocking],
     }
     out = Path(args.output_dir)
     out.mkdir(parents=True, exist_ok=True)

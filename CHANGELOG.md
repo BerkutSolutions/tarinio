@@ -1,5 +1,8 @@
 ## [1.5.6] - 20.07.2026
 
+- ci: DAST evidence report correctly maps numeric ZAP risk codes and accepts
+  UTF-8 BOM JSON input, so a completed scan does not fail during report output.
+
 - ci: DAST baseline отключает автоматически сгенерированный ZAP Automation
   Framework plan: он записывал временный summary-файл в недоступный для
   runner-пользователя `/tmp`; штатные JSON/HTML/XML/Markdown отчёты по-прежнему
