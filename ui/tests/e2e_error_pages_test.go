@@ -138,6 +138,7 @@ func TestE2EErrorPages(t *testing.T) {
 		if revID == "" {
 			t.Fatal("compile/apply returned no revision ID")
 		}
+		assertE2EArtifactActive(t, revID, "nginx/easy/"+siteID+".conf")
 
 		// Читаем скомпилированный конфиг через API
 		confResp := getWithAuth(t, client, fmt.Sprintf("%s/api/revisions/%s/artifacts/nginx/easy/%s.conf", requestBaseURL, revID, siteID), requestHostOverride)
