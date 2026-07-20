@@ -4,6 +4,9 @@
 
 ### Дашборд и E2E
 
+- ci: добавлены nightly E2E-проверки восстановления runtime после restart и краткой недоступности control-plane, Vault и Postgres; активная revision продолжает блокировать атаки.
+- security: добавлены отрицательные DAST-пробы SQLi, XSS и path traversal, контроль анонимного administrative API и проверка отсутствия ложной блокировки легитимного запроса.
+- ci: доказательные E2E-артефакты содержат безопасные шаги и HTTP-наблюдения по тестам; диагностические логи перед публикацией редактируют password, Authorization, cookie, token и secret.
 - ci: полный E2E запускает только проверяемые шаги шаблонов AntiBot, а полный challenge-flow остаётся обязательной smoke-проверкой; намеренный `skip` больше не может скрыть пропущенное доказательство.
 - ci: JSON и Markdown-артефакты E2E дополняются checksum активной runtime-конфигурации, revision ID, HTTP-статусами, причинами блокировок, а для L4/L7 — снимками adaptive entries и правил `WAF-RUNTIME-L4`.
 - ci: E2E evidence JSON теперь включает revision ID, наблюдаемые HTTP-статусы, причины блокировки и checksum активной runtime-конфигурации.

@@ -482,14 +482,21 @@ cat "$TEST_LOG" >>"$E2E_LOG_FILE"
 TEST_SUMMARY="$(cat "$TEST_SUMMARY_FILE" 2>/dev/null || true)"
 rm -f "$TEST_SUMMARY_FILE"
 
+redact_e2e_artifacts() {
+  python3 "$REPO_ROOT/scripts/redact-e2e-artifact.py" "$TEST_LOG" || true
+  python3 "$REPO_ROOT/scripts/redact-e2e-artifact.py" "$E2E_LOG_FILE" || true
+}
+
 if [ "$TEST_EXIT" -ne 0 ]; then
-  python3 "$REPO_ROOT/scripts/write-e2e-evidence-report.py" --log "$TEST_LOG" --output-dir "$E2E_EVIDENCE_DIR" --suite "$E2E_FILTER" || true
+  redact_e2e_artifacts
+  python3 "$REPO_ROOT/scripts/write-e2e-evidence-report.py" --log "$TEST_LOG" --runtime-log "$E2E_LOG_FILE" --output-dir "$E2E_EVIDENCE_DIR" --suite "$E2E_FILTER" || true
   fail_msg "Tests failed (exit $TEST_EXIT). Expected/actual details from Go output:"
   show_log_tail "$TEST_LOG" 160
   rm -f "$TEST_LOG"
   exit "$TEST_EXIT"
 fi
-python3 "$REPO_ROOT/scripts/write-e2e-evidence-report.py" --log "$TEST_LOG" --output-dir "$E2E_EVIDENCE_DIR" --suite "$E2E_FILTER"
+redact_e2e_artifacts
+python3 "$REPO_ROOT/scripts/write-e2e-evidence-report.py" --log "$TEST_LOG" --runtime-log "$E2E_LOG_FILE" --output-dir "$E2E_EVIDENCE_DIR" --suite "$E2E_FILTER"
 rm -f "$TEST_LOG"
 ok "Tests passed: ${TEST_SUMMARY:-$E2E_FILTER}"
 ok "All e2e checks passed"

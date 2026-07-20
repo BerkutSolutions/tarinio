@@ -16,8 +16,8 @@ def run_git(*args):
         return "unknown"
 
 
-def outcomes(path):
-    final = {}
+def test_evidence(path):
+    final, observations = {}, {}
     if not path.exists():
         return final
     for raw in path.read_text(encoding="utf-8", errors="replace").splitlines():
@@ -26,9 +26,18 @@ def outcomes(path):
         except json.JSONDecodeError:
             continue
         name, action = event.get("Test", ""), event.get("Action", "")
-        if name.startswith("TestE2E") and action in {"pass", "fail", "skip"}:
+        if not name.startswith("TestE2E"):
+            continue
+        if action in {"pass", "fail", "skip"}:
             final[name] = action
-    return final
+        if action == "output":
+            line = event.get("Output", "").strip()
+            lowered = line.lower()
+            if (line and len(line) <= 500 and
+                    not any(secret in lowered for secret in ("password", "authorization", "cookie", "token", "secret")) and
+                    ("status=" in lowered or "http/" in lowered or "revision" in lowered or "checksum" in lowered)):
+                observations.setdefault(name, []).append(line)
+    return final, observations
 
 
 def extract_runtime_evidence(path):
@@ -38,6 +47,20 @@ def extract_runtime_evidence(path):
         "http_statuses": sorted(set(re.findall(r"\bstatus[=: ]+(\d{3})\b", raw, re.I))),
         "blocking_reasons": sorted(set(re.findall(r"\bsecurity_reason[=: ]+[\"']?([a-z0-9_.-]+)", raw, re.I))),
     }
+
+
+def test_report(final, observations):
+    result = []
+    for name, status in sorted(final.items()):
+        lines = observations.get(name, [])[-8:]
+        result.append({
+            "name": name,
+            "status": status,
+            "steps": ["started", f"completed: {status}"],
+            "observations": lines,
+            "http_statuses": sorted(set(re.findall(r"(?:status=|HTTP/[0-9.]+\\s+)(\\d{3})", "\\n".join(lines), re.I))),
+        })
+    return result
 
 
 def runtime_config_checksum():
@@ -66,11 +89,13 @@ def runtime_adaptive_evidence():
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--log", required=True)
+    parser.add_argument("--runtime-log")
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--suite", required=True)
     args = parser.parse_args()
     log_path = Path(args.log)
-    result = outcomes(log_path)
+    runtime_log_path = Path(args.runtime_log) if args.runtime_log else log_path
+    result, observations = test_evidence(log_path)
     counts = {key: sum(value == key for value in result.values()) for key in ("pass", "fail", "skip")}
     report = {
         "schema_version": 1,
@@ -80,9 +105,9 @@ def main():
         "pipeline_url": os.getenv("CI_PIPELINE_URL", "local"),
         "status": "passed" if counts["fail"] == 0 else "failed",
         "summary": counts,
-        "tests": [{"name": name, "status": status} for name, status in sorted(result.items())],
+        "tests": test_report(result, observations),
         "runtime_evidence": {
-            **extract_runtime_evidence(log_path),
+            **extract_runtime_evidence(runtime_log_path),
             "runtime_config_checksum": runtime_config_checksum(),
             **runtime_adaptive_evidence(),
         },
@@ -96,7 +121,11 @@ def main():
     out = Path(args.output_dir)
     out.mkdir(parents=True, exist_ok=True)
     (out / "e2e-evidence.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    tests = "\n".join(f"- `{item['name']}` — **{item['status']}**" for item in report["tests"]) or "- No matching E2E test events / Нет подходящих событий E2E."
+    tests = "\n".join(
+        f"- `{item['name']}` — **{item['status']}**; steps: {', '.join(item['steps'])}; "
+        f"HTTP: {', '.join(item['http_statuses']) or 'n/a'}"
+        for item in report["tests"]
+    ) or "- No matching E2E test events / Нет подходящих событий E2E."
     markdown = f"""# E2E evidence report / Отчёт-доказательство E2E
 
 **Suite / Набор:** `{args.suite}`<br>
