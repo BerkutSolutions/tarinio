@@ -48,6 +48,21 @@ def runtime_config_checksum():
         return "unavailable"
 
 
+def runtime_adaptive_evidence():
+    commands = {
+        "adaptive_entries": ["docker", "exec", "waf-e2e-runtime", "sh", "-lc", "cat /etc/waf/l4guard-adaptive/adaptive.json 2>/dev/null || true"],
+        "iptables_rules": ["docker", "exec", "waf-e2e-runtime", "iptables", "-S", "WAF-RUNTIME-L4"],
+    }
+    result = {}
+    for name, command in commands.items():
+        try:
+            value = subprocess.check_output(command, text=True, stderr=subprocess.DEVNULL).strip()
+            result[name] = value[:12000] if value else "unavailable"
+        except Exception:
+            result[name] = "unavailable"
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--log", required=True)
@@ -66,7 +81,11 @@ def main():
         "status": "passed" if counts["fail"] == 0 else "failed",
         "summary": counts,
         "tests": [{"name": name, "status": status} for name, status in sorted(result.items())],
-        "runtime_evidence": {**extract_runtime_evidence(log_path), "runtime_config_checksum": runtime_config_checksum()},
+        "runtime_evidence": {
+            **extract_runtime_evidence(log_path),
+            "runtime_config_checksum": runtime_config_checksum(),
+            **runtime_adaptive_evidence(),
+        },
         "security_invariants": [
             "Authentication rejects disabled users and rotated credentials / Аутентификация отклоняет отключённых пользователей и сменённые учётные данные.",
             "Authentication sessions and credentials are isolated between sites / Сессии и учётные данные изолированы между сайтами.",
@@ -84,6 +103,15 @@ def main():
 **Status / Статус:** **{report['status']}**<br>
 **Commit / Коммит:** `{report['commit']}`<br>
 **Passed / Пройдено:** {counts['pass']} · **Failed / Ошибки:** {counts['fail']} · **Skipped / Пропущено:** {counts['skip']}
+
+## Runtime evidence / Доказательства runtime
+
+**Revision IDs:** {', '.join(report['runtime_evidence']['revision_ids']) or 'unavailable'}<br>
+**HTTP statuses:** {', '.join(report['runtime_evidence']['http_statuses']) or 'unavailable'}<br>
+**Blocking reasons:** {', '.join(report['runtime_evidence']['blocking_reasons']) or 'unavailable'}<br>
+**Runtime-config checksum:** `{report['runtime_evidence']['runtime_config_checksum']}`
+
+L4/L7 adaptive entries and `WAF-RUNTIME-L4` iptables rules are preserved in the JSON companion when available.
 
 ## Security invariants / Инварианты безопасности
 
