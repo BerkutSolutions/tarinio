@@ -343,9 +343,15 @@ func TestUIContract_LoginAppearanceUsesSharedThemeStyles(t *testing.T) {
 		}
 	}
 	for _, page := range []string{"login", "login2fa"} {
-		if !strings.Contains(contents[page], `/static/login-appearance.css?v=20260714-4`) || !strings.Contains(contents[page], `class="login-theme-shell"`) {
+		if !strings.Contains(contents[page], `/static/login-appearance.css?v=20260721-1`) || !strings.Contains(contents[page], `class="login-theme-shell"`) {
 			t.Fatalf("%s must use the shared login appearance shell", page)
 		}
+		if !strings.Contains(contents[page], `body.login-body{visibility:hidden;opacity:0}`) || !strings.Contains(contents[page], `login-appearance-ready`) {
+			t.Fatalf("%s must stay hidden until the selected login appearance is ready", page)
+		}
+	}
+	if strings.Index(contents["theme script"], "document.body.dataset.loginAppearance = appearance") > strings.Index(contents["theme script"], "document.body.classList.add(\"login-appearance-ready\")") {
+		t.Fatal("login appearance must be selected before the page becomes visible")
 	}
 	if strings.Contains(contents["theme styles"], "sidebar-rail") || strings.Contains(contents["theme script"], "sidebar-rail") || strings.Contains(contents["settings"], "sidebar-rail") {
 		t.Fatal("removed Sidebar Rail appearance is still exposed")

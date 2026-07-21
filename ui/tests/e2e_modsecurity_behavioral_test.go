@@ -21,12 +21,10 @@ func TestE2EModSecurity_EnableDisableReenableWithScopedExclusion(t *testing.T) {
 	client, requestBaseURL, requestHostOverride := newE2EClientAndBase(t, requestURL)
 	loginE2EUser(t, client, requestBaseURL, requestHostOverride)
 
-	const (
-		siteID     = "e2e-modsecurity-site"
-		upstreamID = "e2e-modsecurity-upstream"
-		host       = "e2e-modsecurity.test"
-		ruleID     = 100001
-	)
+	const ruleID = 100001
+	siteID := e2eUniqueID(t, "e2e-modsec")
+	upstreamID := siteID + "-upstream"
+	host := siteID + ".test"
 
 	t.Cleanup(func() {
 		resp := requestE2EJSON(t, client, http.MethodDelete, requestBaseURL+"/api/sites/"+siteID+"?auto_apply=false", requestHostOverride, nil)

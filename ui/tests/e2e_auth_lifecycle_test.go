@@ -19,7 +19,7 @@ func TestE2EBasicAuthLifecycle(t *testing.T) {
 	t.Logf("Basic Auth lifecycle runtime URL: %s", runtimeURL)
 	adminClient, requestBaseURL, hostOverride := newE2EClientAndBase(t, panelURL)
 	loginE2EUser(t, adminClient, requestBaseURL, hostOverride)
-	siteID := "e2e-auth-lifecycle"
+	siteID := e2eUniqueID(t, "e2e-auth")
 	runtimeHost = siteID + ".test"
 	upstreamID := siteID + "-upstream"
 	for _, endpoint := range []string{

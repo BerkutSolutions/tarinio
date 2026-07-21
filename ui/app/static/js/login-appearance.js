@@ -12,6 +12,7 @@ function updateLoginThemeTime() {
 }
 
 export async function applyLoginAppearance() {
+  document.body.classList.remove("login-appearance-ready");
   let appearance = defaultTheme;
   try {
     const response = await fetch("/api/public/login-appearance", {

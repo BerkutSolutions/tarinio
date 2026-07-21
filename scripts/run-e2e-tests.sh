@@ -39,6 +39,8 @@ E2E_LOG_DIR="${E2E_LOG_DIR:-$REPO_ROOT/.work/logs}"
 mkdir -p "$E2E_LOG_DIR"
 E2E_LOG_FILE="$E2E_LOG_DIR/e2e-$(date +%Y%m%d_%H%M%S).log"
 E2E_EVIDENCE_DIR="${E2E_EVIDENCE_DIR:-$E2E_LOG_DIR}"
+E2E_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+E2E_BUILD_RETRIES=0
 
 if [ "$E2E_FRESH_ONBOARDING" = "1" ]; then
   export E2E_BOOTSTRAP_ADMIN_ENABLED=false
@@ -95,6 +97,7 @@ run_compose_start() {
       return 0
     fi
     if [ "$attempt" -lt "$max_attempts" ]; then
+      E2E_BUILD_RETRIES=$attempt
       warn "Container build failed; retrying Docker registry request in 5s"
       $COMPOSE_CMD -f docker-compose.yml down --volumes --remove-orphans >>"$E2E_LOG_FILE" 2>&1 || true
       sleep 5
@@ -494,6 +497,31 @@ redact_e2e_artifacts() {
   python3 "$REPO_ROOT/scripts/redact-e2e-artifact.py" "$E2E_LOG_FILE" || true
 }
 
+write_e2e_stability() {
+  status="$1"
+  failure_class="${2:-}"
+  mkdir -p "$E2E_EVIDENCE_DIR"
+  E2E_STABILITY_PATH="$E2E_EVIDENCE_DIR/e2e-stability.json" \
+  E2E_STARTED_AT="$E2E_STARTED_AT" E2E_BUILD_RETRIES="$E2E_BUILD_RETRIES" E2E_FILTER="$E2E_FILTER" \
+  E2E_STABILITY_STATUS="$status" E2E_STABILITY_FAILURE="$failure_class" \
+  E2E_STABILITY_FINISHED="$(date -u +%Y-%m-%dT%H:%M:%SZ)" python3 - <<'PY'
+import json, os
+from pathlib import Path
+
+Path(os.environ["E2E_STABILITY_PATH"]).write_text(json.dumps({
+    "schema_version": 1,
+    "suite": os.environ.get("E2E_FILTER", "TestE2E"),
+    "started_at": os.environ["E2E_STARTED_AT"],
+    "finished_at": os.environ["E2E_STABILITY_FINISHED"],
+    "test_attempts": 1,
+    "build_retries": int(os.environ.get("E2E_BUILD_RETRIES", "0")),
+    "status": os.environ["E2E_STABILITY_STATUS"],
+    "failure_class": os.environ["E2E_STABILITY_FAILURE"] or None,
+    "flaky": int(os.environ.get("E2E_BUILD_RETRIES", "0")) > 0,
+}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+PY
+}
+
 capture_e2e_runtime_diagnostics() {
   {
     printf '\n[e2e] Runtime diagnostics captured before teardown\n'
@@ -506,6 +534,7 @@ if [ "$TEST_EXIT" -ne 0 ]; then
   capture_e2e_runtime_diagnostics
   redact_e2e_artifacts
   python3 "$REPO_ROOT/scripts/write-e2e-evidence-report.py" --log "$TEST_LOG" --runtime-log "$E2E_LOG_FILE" --output-dir "$E2E_EVIDENCE_DIR" --suite "$E2E_FILTER" || true
+  write_e2e_stability failed test
   fail_msg "Tests failed (exit $TEST_EXIT). Expected/actual details from Go output:"
   show_log_tail "$TEST_LOG" 160
   rm -f "$TEST_LOG"
@@ -513,6 +542,7 @@ if [ "$TEST_EXIT" -ne 0 ]; then
 fi
 redact_e2e_artifacts
 python3 "$REPO_ROOT/scripts/write-e2e-evidence-report.py" --log "$TEST_LOG" --runtime-log "$E2E_LOG_FILE" --output-dir "$E2E_EVIDENCE_DIR" --suite "$E2E_FILTER"
+write_e2e_stability passed
 rm -f "$TEST_LOG"
 ok "Tests passed: ${TEST_SUMMARY:-$E2E_FILTER}"
 ok "All e2e checks passed"

@@ -49,8 +49,8 @@ func TestReleaseEvidenceScript_RequiresSuccessfulE2EAndDAST(t *testing.T) {
 	if err != nil {
 		t.Fatalf("release evidence summary missing: %v", err)
 	}
-	if !strings.Contains(string(summary), "| E2E suite | Passed | Failed | Skipped |") ||
-		!strings.Contains(string(summary), "| DAST suite | High | Critical | Status |") {
+	if !strings.Contains(string(summary), "| E2E-набор | Что подтверждает | Пройдено | Ошибок | Пропусков |") ||
+		!strings.Contains(string(summary), "| DAST-набор | Что подтверждает | Высокий | Критический | Статус |") {
 		t.Fatalf("release evidence summary does not contain verification tables: %s", summary)
 	}
 
