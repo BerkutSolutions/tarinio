@@ -477,13 +477,21 @@ publish:github-release:
       echo "[release] Publishing latest GHCR image"
       docker push "ghcr.io/berkutsolutions/tarinio:latest"
       echo "[release] Creating or updating GitHub Release"
-      docker run --rm -e GH_TOKEN="$GITHUB_TOKEN" -v "$CI_PROJECT_DIR:/workspace" -w /workspace ghcr.io/cli/cli:2.90.0 \
-        release create "$release_tag" --repo BerkutSolutions/tarinio --title "TARINIO $version" --notes-file "build/release/$version/github-release-notes.md" || \
-        docker run --rm -e GH_TOKEN="$GITHUB_TOKEN" -v "$CI_PROJECT_DIR:/workspace" -w /workspace ghcr.io/cli/cli:2.90.0 \
-          release edit "$release_tag" --repo BerkutSolutions/tarinio --title "TARINIO $version" --notes-file "build/release/$version/github-release-notes.md"
       echo "[release] Uploading signed release and verification evidence"
-      docker run --rm -e GH_TOKEN="$GITHUB_TOKEN" -v "$CI_PROJECT_DIR:/workspace" -w /workspace ghcr.io/cli/cli:2.90.0 \
-        release upload "$release_tag" "build/release/$version"/release-manifest.json "build/release/$version"/signature.json "build/release/$version"/sbom.cdx.json "build/release/$version"/provenance.json "build/release/$version"/checksums.txt "build/release/$version"/release-evidence.md "build/release/$version"/release-evidence.json "build/release/$version"/release-evidence-summary.md "build/release/$version"/release-evidence-source.zip --repo BerkutSolutions/tarinio --clobber
+      python3 scripts/publish-github-release.py \
+        --repo BerkutSolutions/tarinio \
+        --tag "$release_tag" \
+        --title "TARINIO $version" \
+        --notes "build/release/$version/github-release-notes.md" \
+        --asset "build/release/$version/release-manifest.json" \
+        --asset "build/release/$version/signature.json" \
+        --asset "build/release/$version/sbom.cdx.json" \
+        --asset "build/release/$version/provenance.json" \
+        --asset "build/release/$version/checksums.txt" \
+        --asset "build/release/$version/release-evidence.md" \
+        --asset "build/release/$version/release-evidence.json" \
+        --asset "build/release/$version/release-evidence-summary.md" \
+        --asset "build/release/$version/release-evidence-source.zip"
   artifacts:
     expire_in: 30 days
     paths:
