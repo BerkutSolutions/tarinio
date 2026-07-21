@@ -108,6 +108,7 @@
 - Перед публикацией образа проверяются сгенерированные Nginx-артефакты, подпись, SBOM, provenance и `/healthz` собранного Docker-образа.
 ## E2E-стабильность
 
+- Образы control-plane и runtime переведены на Debian 13; Docker CLI в control-plane обновлён до 29. Image security gate сохраняет полный Trivy report и блокирует новые либо исправляемые High/Critical находки, а текущие upstream-unfixed CVE имеют явную версионируемую baseline policy.
 - Каждый E2E/DAST набор теперь работает в собственном Docker Compose project: отдельные контейнеры, сети, volumes и host-порты. Независимые jobs не наследуют active revision, telemetry или Docker state друг друга и могут выполняться параллельно после smoke gate.
 - Проверки runtime artifact, allowlist и L4/L7 adaptive protection получают фактические container IDs и IP из своего Compose project. Изоляция не заменяет реальные проверки: E2E всё так же сверяет candidate, active runtime, защитные HTTP-ответы и iptables DROP rule.
 - E2E-раннер теперь ждёт не только `/healthz`, но и публикации стартовой active revision runtime. Первый сценарий не может пересечься с асинхронным bootstrap apply и получить конфигурацию предыдущей ревизии.

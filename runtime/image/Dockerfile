@@ -10,7 +10,7 @@ COPY runtime/config/l4guard /src/runtime/config/l4guard
 RUN CGO_ENABLED=0 GO111MODULE=on go build -o /out/waf-runtime-launcher ./runtime/config/launcher
 RUN CGO_ENABLED=0 GO111MODULE=on go build -o /out/waf-runtime-l4-guard ./runtime/config/l4guard
 
-FROM debian:12-slim
+FROM debian:13-slim
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \

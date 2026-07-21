@@ -247,7 +247,8 @@ security:trivy-image:
       -v "$TRIVY_CACHE_DIR:/root/.cache/trivy"
       -v "$CI_PROJECT_DIR:/src"
       aquasec/trivy:0.66.0 image --scanners vuln --severity HIGH,CRITICAL
-      --exit-code 1 --format json --output /src/build/security/trivy-image.json tarinio-ci-security-scan:$CI_COMMIT_SHA
+      --exit-code 0 --format json --output /src/build/security/trivy-image.json tarinio-ci-security-scan:$CI_COMMIT_SHA
+    - node scripts/verify-trivy-image-baseline.mjs build/security/trivy-image.json security/trivy-image-unfixed-baseline.json
   artifacts:
     when: always
     expire_in: 30 days

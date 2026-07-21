@@ -10,9 +10,9 @@ COPY control-plane ./control-plane
 RUN go build -o /out/waf-control-plane ./control-plane/cmd/control-plane
 RUN go build -o /out/waf-cli ./control-plane/cmd/waf-cli
 
-FROM docker:27-cli AS dockercli
+FROM docker:29-cli AS dockercli
 
-FROM debian:12-slim
+FROM debian:13-slim
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
