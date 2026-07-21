@@ -22,7 +22,8 @@ func TestE2EDashboardAttackPopulationConsistency(t *testing.T) {
 
 	client, requestBaseURL, requestHostOverride := newE2EClientAndBase(t, baseURL)
 	loginE2EUser(t, client, requestBaseURL, requestHostOverride)
-	const siteID, upstreamID, host = "e2e-dashboard-attack", "e2e-dashboard-attack-upstream", "e2e-dashboard-attack.test"
+	siteID := e2eUniqueID(t, "e2e-dashboard")
+	upstreamID, host := siteID+"-upstream", siteID+".test"
 	deleteProtectionResource(t, client, requestBaseURL+"/api/sites/"+siteID+"?auto_apply=false", requestHostOverride)
 	deleteProtectionResource(t, client, requestBaseURL+"/api/upstreams/"+upstreamID+"?auto_apply=false", requestHostOverride)
 	createE2EModSecuritySite(t, client, requestBaseURL, requestHostOverride, siteID, upstreamID, host)

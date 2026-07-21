@@ -19,11 +19,8 @@ func TestE2EAntibotChallengePrecedesActiveRateLimitFallback(t *testing.T) {
 	adminClient, adminBaseURL, adminHostOverride := newE2EClientAndBase(t, baseURL)
 	loginE2EUser(t, adminClient, adminBaseURL, adminHostOverride)
 
-	const (
-		siteID     = "e2e-antibot-rate-limit"
-		upstreamID = "e2e-antibot-rate-limit-upstream"
-		host       = "e2e-antibot-rate-limit.test"
-	)
+	siteID := e2eUniqueID(t, "e2e-antibot")
+	upstreamID, host := siteID+"-upstream", siteID+".test"
 	deleteSite := func() {
 		resp := requestE2EJSON(t, adminClient, http.MethodDelete, adminBaseURL+"/api/sites/"+siteID+"?auto_apply=false", adminHostOverride, nil)
 		_ = resp.Body.Close()
@@ -87,7 +84,7 @@ func TestE2EAntibotChallengePrecedesActiveRateLimitFallback(t *testing.T) {
 		return resp
 	}
 
-	rateCookie := "waf_rate_limited_e2e_antibot_rate_limit=1"
+	rateCookie := "waf_rate_limited_" + siteID + "=1"
 	deadline := time.Now().Add(30 * time.Second)
 	var challenge *http.Response
 	for time.Now().Before(deadline) {

@@ -34,6 +34,7 @@ func TestReleaseEvidenceScript_RequiresSuccessfulE2EAndDAST(t *testing.T) {
 		t.Fatalf("create dast directory: %v", err)
 	}
 	writeReleaseEvidenceFixture(t, filepath.Join(e2eDir, "e2e-evidence.json"), `{"status":"passed","summary":{"pass":2,"fail":0,"skip":0}}`)
+	writeReleaseEvidenceFixture(t, filepath.Join(e2eDir, "e2e-stability.json"), `{"test_attempts":1,"build_retries":0,"flaky":false}`)
 	writeReleaseEvidenceFixture(t, filepath.Join(dastDir, "dast-evidence.json"), `{"status":"passed","threshold":"High","counts":{"High":0,"Critical":0},"blocking_alerts":[]}`)
 
 	output := filepath.Join(work, "out")
@@ -52,6 +53,12 @@ func TestReleaseEvidenceScript_RequiresSuccessfulE2EAndDAST(t *testing.T) {
 	if !strings.Contains(string(summary), "| E2E-набор | Что подтверждает | Пройдено | Ошибок | Пропусков |") ||
 		!strings.Contains(string(summary), "| DAST-набор | Что подтверждает | Высокий | Критический | Статус |") {
 		t.Fatalf("release evidence summary does not contain verification tables: %s", summary)
+	}
+	if !strings.Contains(string(summary), "| Стабильность E2E | Попыток теста | Повторов сборки | Инфраструктурная нестабильность |") {
+		t.Fatalf("release evidence summary does not contain E2E stability table: %s", summary)
+	}
+	if _, err := os.Stat(filepath.Join(output, "source-evidence", "e2e-stability", "security-invariants-e2e-stability.json")); err != nil {
+		t.Fatalf("stability source evidence missing: %v", err)
 	}
 
 	writeReleaseEvidenceFixture(t, filepath.Join(dastDir, "dast-evidence.json"), `{"status":"failed","counts":{"High":1,"Critical":0},"blocking_alerts":[{"name":"fixture"}]}`)
