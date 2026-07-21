@@ -21,6 +21,14 @@ function Invoke-Checked {
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 Set-Location $root
 
+$gitLabKey = Join-Path $root ".work/.ssh/id_ed25519"
+if (-not (Test-Path -LiteralPath $gitLabKey -PathType Leaf)) {
+  throw "GitLab SSH key not found: $gitLabKey"
+}
+$previousGitSSHCommand = $env:GIT_SSH_COMMAND
+try {
+  $env:GIT_SSH_COMMAND = 'ssh -i "' + $gitLabKey + '" -o IdentitiesOnly=yes -o BatchMode=yes'
+
 if ([string]::IsNullOrWhiteSpace($Message)) {
   $metaFile = Join-Path $root "control-plane/internal/appmeta/meta.go"
   $metaContent = Get-Content $metaFile -Raw -Encoding UTF8
@@ -45,7 +53,14 @@ if (-not [string]::IsNullOrWhiteSpace(($stagedFiles -join ""))) {
   Write-Host "no staged changes to commit"
 }
 
-Invoke-Checked -Command "git" -Arguments @("pull", "--rebase", "origin", "main")
-Invoke-Checked -Command "git" -Arguments @("push", "origin", "main")
+Invoke-Checked -Command "git" -Arguments @("pull", "--rebase", "gitlab", "main")
+Invoke-Checked -Command "git" -Arguments @("push", "gitlab", "main")
 
 Write-Host "push completed"
+} finally {
+  if ($null -eq $previousGitSSHCommand) {
+    Remove-Item Env:GIT_SSH_COMMAND -ErrorAction SilentlyContinue
+  } else {
+    $env:GIT_SSH_COMMAND = $previousGitSSHCommand
+  }
+}

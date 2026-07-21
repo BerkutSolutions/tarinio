@@ -491,8 +491,8 @@ publish:github-release:
         --asset "build/release/$version/release-evidence.md" \
         --asset "build/release/$version/release-evidence.json" \
         --asset "build/release/$version/release-evidence-summary.md" \
-        --asset "build/release/$version/release-evidence-source.zip"
-        --asset "build/release/$version/trivy-fs.json"
+        --asset "build/release/$version/release-evidence-source.zip" \
+        --asset "build/release/$version/trivy-fs.json" \
         --asset "build/release/$version/trivy-image.json"
   artifacts:
     expire_in: 30 days

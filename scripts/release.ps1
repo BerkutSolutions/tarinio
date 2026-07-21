@@ -108,129 +108,6 @@ function Invoke-NpmSecurityGate {
   )
 }
 
-function Publish-ReleaseMetadata {
-  Write-Status "RUN" "Generating signed release artifacts"
-  Invoke-Checked -Command "powershell" -Arguments @("-ExecutionPolicy", "Bypass", "-File", (Join-Path $root "scripts/generate-release-artifacts.ps1"))
-
-  Write-Status "RUN" "Staging repository changes"
-  Invoke-Checked -Command "git" -Arguments @("add", ".")
-
-  $stagedFiles = git diff --cached --name-only
-  if ($LASTEXITCODE -ne 0) {
-    throw "failed to check staged changes"
-  }
-  $hasStagedChanges = -not [string]::IsNullOrWhiteSpace(($stagedFiles -join ""))
-
-  if ($hasStagedChanges) {
-    Write-Status "RUN" ("Creating commit " + $tag)
-    Invoke-Checked -Command "git" -Arguments @("commit", "-m", $tag)
-  } else {
-    Write-Status "WARN" "No staged changes to commit"
-  }
-
-  Write-Status "RUN" "Syncing with origin/main"
-  Invoke-Checked -Command "git" -Arguments @("pull", "--rebase", "origin", "main")
-  Invoke-Checked -Command "git" -Arguments @("push", "origin", "main")
-
-  $existingTag = git tag --list $tag
-  if ($LASTEXITCODE -ne 0) {
-    throw "failed to check existing tag"
-  }
-  $tagExists = -not [string]::IsNullOrWhiteSpace(($existingTag -join ""))
-
-  if ($tagExists) {
-    Write-Status "WARN" "Tag already exists locally: $tag"
-  } else {
-    Write-Status "RUN" ("Creating git tag " + $tag)
-    Invoke-Checked -Command "git" -Arguments @("tag", "-a", $tag, "-m", "Release $version")
-  }
-
-  Write-Status "RUN" ("Pushing git tag " + $tag)
-  Invoke-Checked -Command "git" -Arguments @("push", "origin", $tag)
-  Publish-GitHubRelease
-  Write-Status "OK" ("Release metadata published for " + $version)
-}
-
-function Get-ChangelogReleaseNotes {
-  $changelogPath = Join-Path $root "CHANGELOG.md"
-  if (-not (Test-Path $changelogPath)) {
-    throw "changelog not found: $changelogPath"
-  }
-  Write-Status "RUN" ("Reading changelog section [" + $version + "] from " + $changelogPath)
-  $lines = [System.IO.File]::ReadAllLines($changelogPath)
-  $headingPattern = "^##\s+\[" + [regex]::Escape($version) + "\](?:\s|$)"
-  $start = -1
-  for ($index = 0; $index -lt $lines.Length; $index++) {
-    if ($lines[$index] -match $headingPattern) {
-      $start = $index
-      break
-    }
-  }
-  if ($start -lt 0) {
-    $available = @()
-    foreach ($line in $lines) {
-      if ($line -match '^##\s+\[([^\]]+)\]') {
-        $available += $Matches[1]
-      }
-    }
-    if ($available.Count -gt 0) {
-      Write-Status "WARN" ("Available changelog versions: " + ($available -join ", "))
-    }
-    throw "CHANGELOG.md does not contain section for [$version]"
-  }
-  $end = $lines.Length
-  for ($index = $start + 1; $index -lt $lines.Length; $index++) {
-    if ($lines[$index] -match "^##\s+") {
-      $end = $index
-      break
-    }
-  }
-  return (($lines[$start..($end - 1)]) -join "`n").Trim()
-}
-
-function Publish-GitHubRelease {
-  $ghCommand = Get-Command "gh" -ErrorAction SilentlyContinue
-  if ($null -eq $ghCommand) {
-    throw "gh CLI is required to publish GitHub Release"
-  }
-  $repo = "BerkutSolutions/tarinio"
-  $notesDir = Join-Path $root ("build/release/" + $version)
-  if (-not (Test-Path $notesDir)) {
-    New-Item -ItemType Directory -Path $notesDir -Force | Out-Null
-  }
-  $notesPath = Join-Path $notesDir "github-release-notes.md"
-  [System.IO.File]::WriteAllText($notesPath, (Get-ChangelogReleaseNotes) + "`n", [System.Text.UTF8Encoding]::new($false))
-
-  $releaseExists = $false
-  try {
-    Invoke-Checked -Command "gh" -Arguments @("release", "view", $tag, "--repo", $repo) -Quiet
-    $releaseExists = $true
-  } catch {
-    $releaseExists = $false
-  }
-  if ($releaseExists) {
-    Write-Status "RUN" ("Updating GitHub release " + $tag)
-    Invoke-Checked -Command "gh" -Arguments @("release", "edit", $tag, "--repo", $repo, "--title", ("TARINIO " + $version), "--notes-file", $notesPath)
-  } else {
-    Write-Status "RUN" ("Creating GitHub release " + $tag)
-    Invoke-Checked -Command "gh" -Arguments @("release", "create", $tag, "--repo", $repo, "--title", ("TARINIO " + $version), "--notes-file", $notesPath)
-  }
-}
-
-function Publish-DockerPackage {
-  Write-Status "RUN" ("Docker build " + $localImage)
-  Invoke-Checked -Command "docker" -Arguments @("build", "-t", $localImage, "-f", "control-plane/Dockerfile", ".") -Quiet
-  Write-Status "RUN" ("Tag image as " + $ghcrVersion)
-  Invoke-Checked -Command "docker" -Arguments @("tag", $localImage, $ghcrVersion)
-  Write-Status "RUN" ("Tag image as " + $ghcrLatest)
-  Invoke-Checked -Command "docker" -Arguments @("tag", $localImage, $ghcrLatest)
-  Write-Status "RUN" ("Push " + $ghcrVersion)
-  Invoke-Checked -Command "docker" -Arguments @("push", $ghcrVersion) -Quiet
-  Write-Status "RUN" ("Push " + $ghcrLatest)
-  Invoke-Checked -Command "docker" -Arguments @("push", $ghcrLatest) -Quiet
-  Write-Status "OK" ("Docker package published for " + $version)
-}
-
 function Invoke-WithGitLabSSHKey {
   param(
     [Parameter(Mandatory = $true)]
@@ -287,18 +164,10 @@ function Normalize-Mode([string]$Raw) {
     $value = $Raw.Trim().ToLowerInvariant()
   }
   switch ($value) {
-    "1" { return "full" }
-    "2" { return "check" }
-    "3" { return "release" }
-    "4" { return "docker" }
-    "5" { return "version" }
-    "6" { return "publish" }
-    "7" { return "gitlab" }
-    "full" { return "full" }
+    "1" { return "check" }
+    "2" { return "version" }
+    "3" { return "gitlab" }
     "check" { return "check" }
-    "release" { return "release" }
-    "publish" { return "publish" }
-    "docker" { return "docker" }
     "version" { return "version" }
     "sync-version" { return "version" }
     "gitlab" { return "gitlab" }
@@ -309,13 +178,9 @@ function Normalize-Mode([string]$Raw) {
 
 function Read-ModeInteractive {
   Write-Title "Select Mode"
-  Write-Host "1. Check and publish (ALL: checks + GitHub Release + Docker)" -ForegroundColor White
-  Write-Host "2. Check only" -ForegroundColor White
-  Write-Host "3. Release publish only (git tag + GitHub Release)" -ForegroundColor White
-  Write-Host "4. Docker package publish only" -ForegroundColor White
-  Write-Host "5. Version sync only" -ForegroundColor White
-  Write-Host "6. Publish only (release + docker, no checks)" -ForegroundColor White
-  Write-Host "7. Publish current main to GitLab (no checks)" -ForegroundColor White
+  Write-Host "1. Check only" -ForegroundColor White
+  Write-Host "2. Version sync only" -ForegroundColor White
+  Write-Host "3. Publish current main to GitLab (no checks)" -ForegroundColor White
   $choice = Read-Host "Enter number and press Enter"
   if ([string]::IsNullOrWhiteSpace($choice)) {
     Write-Status "WARN" "No mode selected. Exiting."
@@ -594,9 +459,6 @@ function Sync-ReleaseVersionContext {
   }
   $script:version = $versionMatch.Groups[1].Value
   $script:tag = "v$script:version"
-  $script:localImage = "tarinio:$script:version"
-  $script:ghcrVersion = "ghcr.io/berkutsolutions/tarinio:$script:version"
-  $script:ghcrLatest = "ghcr.io/berkutsolutions/tarinio:latest"
 }
 
 Sync-ReleaseVersionContext
@@ -606,7 +468,6 @@ Set-Location $root
 Write-Title "Release Configuration"
 Write-KeyValue "Current version" $version
 Write-KeyValue "Release tag" $tag
-Write-KeyValue "Docker image" $ghcrVersion
 
 $normalizedArgMode = Normalize-Mode $Mode
 $interactiveModeSelection = [string]::IsNullOrWhiteSpace($normalizedArgMode)
@@ -629,7 +490,6 @@ if ($interactiveModeSelection) {
       Write-Title "Release Configuration"
       Write-KeyValue "Current version" $version
       Write-KeyValue "Release tag" $tag
-      Write-KeyValue "Docker image" $ghcrVersion
       continue
     }
     $normalizedArgMode = $selectedMode
@@ -644,50 +504,11 @@ switch ($normalizedArgMode) {
     Write-Title "Release Configuration"
     Write-KeyValue "Current version" $version
     Write-KeyValue "Release tag" $tag
-    Write-KeyValue "Docker image" $ghcrVersion
   }
   "check" {
     Write-Title "Mode: Check Only"
     Invoke-LocalPreflight -SkipGoTest -CompactOutput
     Write-Status "OK" "Check completed"
-  }
-  "release" {
-    Write-Title "Mode: Release Publish Only"
-    Publish-ReleaseMetadata
-  }
-  "docker" {
-    Write-Title "Mode: Docker Package Publish Only"
-    Publish-DockerPackage
-  }
-  "full" {
-    Write-Title "Mode: Check and Publish (ALL: Checks + GitHub Release + Docker)"
-    Write-Title "Full Release Checks"
-    $expectedStartupCheckCount = 14
-    $startupResults = @(Run-StartupChecks)
-    $executedStartupCheckCount = @($startupResults).Count
-    $passedStartupCheckCount = @($startupResults | Where-Object { $_.Ok }).Count
-    $failedStartupCheckCount = $executedStartupCheckCount - $passedStartupCheckCount
-    Write-Title "Full Release Check Summary"
-    Write-KeyValue "Expected checks" ([string]$expectedStartupCheckCount)
-    Write-KeyValue "Executed checks" ([string]$executedStartupCheckCount)
-    Write-KeyValue "Passed checks" ([string]$passedStartupCheckCount)
-    Write-KeyValue "Failed checks" ([string]$failedStartupCheckCount)
-    if ($executedStartupCheckCount -ne $expectedStartupCheckCount) {
-      throw "full release check count mismatch: expected $expectedStartupCheckCount, executed $executedStartupCheckCount"
-    }
-    if ($failedStartupCheckCount -ne 0) {
-      throw "full release is blocked: startup tests failed"
-    }
-    Invoke-LocalPreflight -SkipGoTest -CompactOutput
-    Publish-ReleaseMetadata
-    Publish-DockerPackage
-    Write-Status "OK" "Full release completed"
-  }
-  "publish" {
-    Write-Title "Mode: Publish Only (Release + Docker)"
-    Publish-ReleaseMetadata
-    Publish-DockerPackage
-    Write-Status "OK" "Publish only completed"
   }
   "gitlab" {
     Write-Title "Mode: GitLab Publish Only"
