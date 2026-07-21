@@ -446,8 +446,11 @@ publish:github-release:
       fi
       GIT_ASKPASS="$askpass" GIT_TERMINAL_PROMPT=0 \
         git push "https://github.com/BerkutSolutions/tarinio.git" "refs/tags/$release_tag"
+      echo "[release] GitHub tag $release_tag is available"
+      echo "[release] Building GitHub release notes from CHANGELOG.md"
       awk -v header="## [$version]" '$0 == header { found=1 } found && NR > 1 && /^## / && $0 != header { exit } found { print }' CHANGELOG.md > "build/release/$version/github-release-notes.md"
       test -s "build/release/$version/github-release-notes.md"
+      echo "[release] Collecting verified E2E and DAST evidence"
       python3 scripts/write-release-evidence.py \
         --e2e-root build/e2e \
         --dast-root build/dast \
@@ -455,8 +458,11 @@ publish:github-release:
         --version "$version" \
         --commit "$CI_COMMIT_SHA"
       cat "build/release/$version/release-evidence-summary.md" >> "build/release/$version/github-release-notes.md"
+      echo "[release] Authenticating with GHCR"
       printf '%s' "$GITHUB_TOKEN" | docker login ghcr.io -u BerkutSolutions --password-stdin
+      echo "[release] Building image ghcr.io/berkutsolutions/tarinio:$version"
       docker build -t "ghcr.io/berkutsolutions/tarinio:$version" -f control-plane/Dockerfile .
+      echo "[release] Running image health check"
       docker rm -f tarinio-release-smoke >/dev/null 2>&1 || true
       docker run -d --rm --name tarinio-release-smoke -p 127.0.0.1::8080 "ghcr.io/berkutsolutions/tarinio:$version"
       smoke_port="$(docker port tarinio-release-smoke 8080/tcp | sed -n 's/.*:\([0-9][0-9]*\)$/\1/p' | head -n1)"
@@ -464,12 +470,16 @@ publish:github-release:
       i=0; until curl -fsS "http://127.0.0.1:$smoke_port/healthz" >/dev/null; do i=$((i + 1)); test "$i" -lt 30 || { docker logs tarinio-release-smoke; exit 1; }; sleep 1; done
       docker rm -f tarinio-release-smoke >/dev/null
       docker tag "ghcr.io/berkutsolutions/tarinio:$version" "ghcr.io/berkutsolutions/tarinio:latest"
+      echo "[release] Publishing versioned GHCR image"
       docker push "ghcr.io/berkutsolutions/tarinio:$version"
+      echo "[release] Publishing latest GHCR image"
       docker push "ghcr.io/berkutsolutions/tarinio:latest"
+      echo "[release] Creating or updating GitHub Release"
       docker run --rm -e GH_TOKEN="$GITHUB_TOKEN" -v "$CI_PROJECT_DIR:/workspace" -w /workspace ghcr.io/cli/cli:2.90.0 \
         release create "$release_tag" --repo BerkutSolutions/tarinio --title "TARINIO $version" --notes-file "build/release/$version/github-release-notes.md" || \
         docker run --rm -e GH_TOKEN="$GITHUB_TOKEN" -v "$CI_PROJECT_DIR:/workspace" -w /workspace ghcr.io/cli/cli:2.90.0 \
           release edit "$release_tag" --repo BerkutSolutions/tarinio --title "TARINIO $version" --notes-file "build/release/$version/github-release-notes.md"
+      echo "[release] Uploading signed release and verification evidence"
       docker run --rm -e GH_TOKEN="$GITHUB_TOKEN" -v "$CI_PROJECT_DIR:/workspace" -w /workspace ghcr.io/cli/cli:2.90.0 \
         release upload "$release_tag" "build/release/$version"/release-manifest.json "build/release/$version"/signature.json "build/release/$version"/sbom.cdx.json "build/release/$version"/provenance.json "build/release/$version"/checksums.txt "build/release/$version"/release-evidence.md "build/release/$version"/release-evidence.json "build/release/$version"/release-evidence-summary.md "build/release/$version"/release-evidence-source.zip --repo BerkutSolutions/tarinio --clobber
   artifacts:
