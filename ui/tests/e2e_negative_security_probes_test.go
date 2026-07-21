@@ -132,7 +132,7 @@ func TestE2ENegativeSecurityProbes(t *testing.T) {
 				if got := canaryCount(t); got != 0 {
 					t.Fatalf("%s payload reached upstream canary %d times", name, got)
 				}
-				e2eWaitForRequestTelemetry(t, client, baseURL, hostOverride, path, http.StatusForbidden, "modsecurity", "security")
+				e2eWaitForDASTTelemetry(t, client, baseURL, hostOverride, path, http.StatusForbidden)
 				t.Logf("%s: HTTP 403, upstream canary=0, telemetry reason=modsecurity", name)
 			})
 		}
@@ -190,6 +190,28 @@ func e2eSetUpstreamTarget(t *testing.T, client *http.Client, baseURL, hostOverri
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("configure DAST canary upstream: status=%d body=%s", response.StatusCode, body)
 	}
+}
+
+func e2eWaitForDASTTelemetry(t *testing.T, client *http.Client, baseURL, hostOverride, path string, status int) {
+	t.Helper()
+	deadline := time.Now().Add(30 * time.Second)
+	for time.Now().Before(deadline) {
+		response := getWithAuth(t, client, baseURL+"/api/requests?limit=1000&retention_days=1", hostOverride)
+		var rows []map[string]any
+		decodeErr := json.NewDecoder(response.Body).Decode(&rows)
+		_ = response.Body.Close()
+		if response.StatusCode == http.StatusOK && decodeErr == nil {
+			for _, row := range rows {
+				entry, _ := row["entry"].(map[string]any)
+				uri, _ := entry["uri"].(string)
+				if strings.HasPrefix(uri, path) && e2eDashboardAsInt(t, entry["status"]) == status && row["security_reason"] == "modsecurity" && row["row_type"] == "security" {
+					return
+				}
+			}
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	t.Fatalf("DAST telemetry missing path=%s status=%d reason=modsecurity type=security", path, status)
 }
 
 func e2eComposeControl(t *testing.T, composeFile string, args ...string) {
