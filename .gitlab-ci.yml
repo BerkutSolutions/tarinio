@@ -329,7 +329,7 @@ dast:negative:
     - when: never
   script:
     - mkdir -p build/dast/negative
-    - E2E_FILTER='TestE2ENegativeSecurityProbes|TestE2EDASTAuthenticatedControlPlane|TestE2EDASTSecurityHeadersAndSessionCookie' E2E_TIMEOUT=240 E2E_LOG_DIR="$CI_PROJECT_DIR/build/dast/negative" E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/dast/negative" sh scripts/run-e2e-tests.sh
+    - E2E_FILTER='TestE2ENegativeSecurityProbes|TestE2EDASTAuthenticatedControlPlane|TestE2EDASTSecurityHeadersAndSessionCookie|TestE2EDASTAPIInputFuzz' E2E_TIMEOUT=240 E2E_LOG_DIR="$CI_PROJECT_DIR/build/dast/negative" E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/dast/negative" sh scripts/run-e2e-tests.sh
   after_script:
     - docker compose -f deploy/compose/e2e/docker-compose.yml down --volumes --remove-orphans || true
   artifacts:
