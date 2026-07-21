@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "blocking_threshold": "High",
+  "accepted_alerts": [],
+  "review_policy": "Medium, Low and Informational alerts remain in the report and require review; only explicitly listed alert names may be excluded from the blocking decision."
+}

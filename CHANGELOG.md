@@ -37,6 +37,10 @@
 
 ### DAST и безопасность зависимостей
 
+- Исправлена найденная DAST-проверкой проблема management UI: добавлены `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` и ограничивающая Content Security Policy.
+- Добавлен отдельный ручной downstream pipeline DAST без ожидания unit и полного E2E. Основной pipeline временно не запускает тяжёлые DAST jobs; для version tag DAST остаётся release-gate, чтобы evidence был приложен к GitHub Release.
+- DAST enforcement использует canary-upstream: вредоносный запрос обязан получить блокировку WAF, не попасть в приложение и появиться в запросах с причиной `modsecurity`; легитимный запрос обязан достичь canary.
+- Добавлены authenticated DAST-контракты control-plane, проверка отзыва сессии, session cookies и безопасных response headers, а ZAP-результаты сопоставляются с версионируемой baseline policy.
 - DAST запускает OWASP ZAP только против одноразового E2E-контура WAF и сохраняет JSON, HTML и Markdown отчёты. High и Critical находки блокируют релиз.
 - Исправлены запуск ZAP с writable home, обработка Automation Framework и разбор числовых risk code в доказательстве DAST.
 - Добавлены негативные security-пробы SQLi, XSS, path traversal, административных API без сессии и легитимных запросов.
@@ -44,6 +48,7 @@
 
 ### Публикация и CI/CD
 
+- Публикация GitHub Release и Docker-образа временно отключена на период обкатки расширенного DAST-контура.
 - E2E-поднятие Compose-контура повторяет сетевую загрузку Docker-образов до трёх раз при кратковременном EOF Docker Hub. Повтор не применяется к уже начавшимся E2E-проверкам.
 - Ручная публикация GitHub Release теперь доступна после успешных quality gates в pipeline ветки `main`: создаётся или проверяется тег версии, публикуется образ GHCR и добавляются release assets. В конце текста релиза выводится таблица результатов E2E и DAST.
 - После успешных проверок доступны ручные jobs зеркалирования кода в GitHub и публикации подписанного GitHub Release с Docker-образом в GHCR.

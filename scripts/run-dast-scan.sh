@@ -46,4 +46,4 @@ timeout --preserve-status -k 30s "${scan_timeout}s" \
   -r report.html -J report.json -w report.md -x report.xml \
   -z "-silent -dir /zap/home -config replacer.full_list(0).description=E2EHost -config replacer.full_list(0).enabled=true -config replacer.full_list(0).matchtype=REQ_HEADER -config replacer.full_list(0).matchstr=Host -config replacer.full_list(0).regex=false -config replacer.full_list(0).replacement=$HOST"
 
-python3 "$ROOT/scripts/write-dast-evidence-report.py" --input "$OUT/report.json" --output-dir "$OUT" --mode "$MODE" --max-risk 3
+python3 "$ROOT/scripts/write-dast-evidence-report.py" --input "$OUT/report.json" --output-dir "$OUT" --mode "$MODE" --max-risk 3 --policy "$ROOT/scripts/dast-baseline-policy.json"

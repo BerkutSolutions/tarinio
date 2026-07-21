@@ -7,6 +7,18 @@ stages:
   - dast
   - publish
 
+dast:run-standalone:
+  stage: validate
+  trigger:
+    include:
+      - local: .gitlab-dast-ci.yml
+    strategy: depend
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+      allow_failure: false
+    - when: never
+
 workflow:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
@@ -281,7 +293,7 @@ dast:baseline:
   resource_group: waf-e2e-stack
   dependencies: []
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG'
+    - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+/'
     - when: never
   script:
     - mkdir -p build/dast/baseline
@@ -300,7 +312,7 @@ dast:negative:
   resource_group: waf-e2e-stack
   dependencies: []
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG'
+    - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+/'
     - when: never
   script:
     - mkdir -p build/dast/negative
@@ -319,7 +331,7 @@ dast:full:
   resource_group: waf-e2e-stack
   dependencies: []
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "schedule" || $CI_COMMIT_TAG'
+    - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+/'
     - when: never
   script:
     - mkdir -p build/dast/full
@@ -351,8 +363,6 @@ publish:github-mirror:
     - security:trivy
     - security:govulncheck
     - security:npm-audit
-    - dast:baseline
-    - dast:negative
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
       when: manual
@@ -383,8 +393,6 @@ publish:github-release:
     - e2e:security-invariants
     - e2e:management-rate-limit
     - e2e:full
-    - dast:baseline
-    - dast:negative
   needs:
     - validate:repository
     - warm:e2e-images
@@ -403,12 +411,6 @@ publish:github-release:
     - dast:baseline
     - dast:negative
   rules:
-    - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+/'
-      when: manual
-      allow_failure: false
-    - if: '$CI_COMMIT_BRANCH == "main"'
-      when: manual
-      allow_failure: false
     - when: never
   script:
     - |

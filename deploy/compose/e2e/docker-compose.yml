@@ -155,6 +155,19 @@ services:
     networks:
       - waf-e2e-net
 
+  dast-canary:
+    build:
+      context: ../../..
+      dockerfile: deploy/compose/e2e/dast-canary/Dockerfile
+    container_name: waf-e2e-dast-canary
+    restart: "no"
+    ports:
+      - "18083:8080"
+    expose:
+      - "8080"
+    networks:
+      - waf-e2e-net
+
   # Matches the user-facing hostname and port in the editor-parity scenario.
   privatebin:
     image: ealen/echo-server:latest

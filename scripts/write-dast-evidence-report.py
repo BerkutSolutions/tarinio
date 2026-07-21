@@ -21,12 +21,17 @@ def main():
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--mode", required=True)
     parser.add_argument("--max-risk", type=int, default=3)
+    parser.add_argument("--policy")
     args = parser.parse_args()
     source = Path(args.input)
     data = json.loads(source.read_text(encoding="utf-8-sig", errors="replace"))
     found = list(alerts(data))
+    policy = {}
+    if args.policy:
+        policy = json.loads(Path(args.policy).read_text(encoding="utf-8-sig"))
+    accepted = set(policy.get("accepted_alerts", []))
     counts = Counter(int(item.get("riskcode", 0)) for item in found)
-    blocking = [item for item in found if int(item.get("riskcode", 0)) >= args.max_risk]
+    blocking = [item for item in found if int(item.get("riskcode", 0)) >= args.max_risk and item.get("alert") not in accepted]
     status = "passed" if not blocking else "failed"
     report = {
         "schema_version": 1,
@@ -35,6 +40,7 @@ def main():
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "status": status,
         "threshold": RISK[args.max_risk],
+        "policy": {"accepted_alerts": sorted(accepted), "review_policy": policy.get("review_policy", "")},
         "counts": {RISK[key]: counts[key] for key in sorted(RISK)},
         "blocking_alerts": [{"name": item.get("alert", "unknown"), "risk": RISK.get(int(item.get("riskcode", 0)), "Unknown")} for item in blocking],
     }

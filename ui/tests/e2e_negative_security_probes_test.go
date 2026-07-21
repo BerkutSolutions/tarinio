@@ -2,6 +2,7 @@ package tests
 
 import (
 	"crypto/tls"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/url"
@@ -21,6 +22,10 @@ func TestE2ENegativeSecurityProbes(t *testing.T) {
 	runtimeURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_RUNTIME_URL")), "/")
 	if panelURL == "" || runtimeURL == "" {
 		t.Skip("WAF_E2E_BASE_URL and WAF_E2E_RUNTIME_URL are required")
+	}
+	canaryURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_DAST_CANARY_URL")), "/")
+	if canaryURL == "" {
+		canaryURL = "http://127.0.0.1:18083"
 	}
 	client, baseURL, hostOverride := newE2EClientAndBase(t, panelURL)
 	loginE2EUser(t, client, baseURL, hostOverride)
@@ -45,6 +50,7 @@ func TestE2ENegativeSecurityProbes(t *testing.T) {
 		e2eCompileAndApply(t, client, baseURL, hostOverride)
 	})
 	createE2EModSecuritySite(t, client, baseURL, hostOverride, siteID, upstreamID, host)
+	e2eSetUpstreamTarget(t, client, baseURL, hostOverride, upstreamID, "dast-canary", 8080)
 	profile := e2eGetProfile(t, client, baseURL, hostOverride, siteID)
 	front := mapGetOrCreate(profile, "front_service")
 	front["security_mode"] = "block"
@@ -56,7 +62,7 @@ func TestE2ENegativeSecurityProbes(t *testing.T) {
 	modsec["use_modsecurity_custom_configuration"] = true
 	modsec["custom_configuration"] = map[string]any{
 		"path":    "modsec/e2e-negative-probes.conf",
-		"content": `SecRule REQUEST_URI "@rx ^/(?:sqli|xss|traversal)-probe(?:[/?]|$)" "id:100021,phase:2,deny,status:403,log"`,
+		"content": `SecRule ARGS "@rx (?i:(?:union[[:space:]]+select|<script|\.\./\.\./|\$\())" "id:100021,phase:2,deny,status:403,log,msg:'DAST attack matrix'"`,
 	}
 	updated := e2ePutProfile(t, client, baseURL, hostOverride, siteID, profile)
 	e2eAssertModSecurityProfile(t, updated, profile)
@@ -79,21 +85,55 @@ func TestE2ENegativeSecurityProbes(t *testing.T) {
 		_ = resp.Body.Close()
 		return resp.StatusCode, nil
 	}
+	resetCanary := func(t *testing.T) {
+		t.Helper()
+		resp, err := http.Post(canaryURL+"/__dast/reset", "application/json", nil)
+		if err != nil {
+			t.Fatalf("reset DAST canary: %v", err)
+		}
+		_ = resp.Body.Close()
+		if resp.StatusCode != http.StatusNoContent {
+			t.Fatalf("reset DAST canary: status=%d", resp.StatusCode)
+		}
+	}
+	canaryCount := func(t *testing.T) int {
+		t.Helper()
+		resp, err := http.Get(canaryURL + "/__dast/records")
+		if err != nil {
+			t.Fatalf("read DAST canary: %v", err)
+		}
+		defer resp.Body.Close()
+		var payload struct {
+			Count int `json:"count"`
+		}
+		if resp.StatusCode != http.StatusOK || json.NewDecoder(resp.Body).Decode(&payload) != nil {
+			t.Fatalf("read DAST canary: status=%d", resp.StatusCode)
+		}
+		return payload.Count
+	}
 
 	t.Run("public_attacks_are_blocked", func(t *testing.T) {
 		for name, values := range map[string]url.Values{
 			"sqli":      {"id": []string{"1 UNION SELECT username FROM users"}},
 			"xss":       {"q": []string{"<script>alert(1)</script>"}},
 			"traversal": {"path": []string{"../../etc/passwd"}},
+			"command":   {"cmd": []string{"$(id)"}},
 		} {
 			t.Run(name, func(t *testing.T) {
-				status, err := publicRequest("/" + name + "-probe?" + values.Encode())
+				resetCanary(t)
+				path := "/waf/" + name + "-probe"
+				status, err := publicRequest(path + "?" + values.Encode())
 				if err != nil {
 					t.Fatal(err)
 				}
 				if status != http.StatusForbidden {
 					t.Fatalf("%s payload: status=%d, want 403", name, status)
 				}
+				if got := canaryCount(t); got != 0 {
+					t.Fatalf("%s payload reached upstream canary %d times", name, got)
+				}
+				e2eWaitForRequestTelemetry(t, client, baseURL, hostOverride, path, http.StatusForbidden, "modsecurity", "security")
+				t.Logf("%s: HTTP 403, upstream canary=0, telemetry reason=modsecurity", name)
 			})
 		}
 	})
@@ -108,13 +148,18 @@ func TestE2ENegativeSecurityProbes(t *testing.T) {
 		}
 	})
 	t.Run("legitimate_request_is_not_blocked", func(t *testing.T) {
-		status, err := publicRequest("/?" + url.Values{"q": []string{"health check"}}.Encode())
+		resetCanary(t)
+		status, err := publicRequest("/legitimate?" + url.Values{"q": []string{"health check"}}.Encode())
 		if err != nil {
 			t.Fatal(err)
 		}
 		if status == http.StatusForbidden {
 			t.Fatal("legitimate public request was blocked")
 		}
+		if got := canaryCount(t); got != 1 {
+			t.Fatalf("legitimate request reached upstream canary %d times, want 1", got)
+		}
+		t.Log("legitimate request reached upstream canary exactly once")
 	})
 	if os.Getenv("WAF_E2E_RESILIENCE") == "1" {
 		composeFile := strings.TrimSpace(os.Getenv("WAF_E2E_COMPOSE_FILE"))
@@ -133,6 +178,17 @@ func TestE2ENegativeSecurityProbes(t *testing.T) {
 			})
 			e2eWaitForPublicStatus(t, publicRequest, "/xss-probe?q=%3Cscript%3E", http.StatusForbidden)
 		})
+	}
+}
+
+func e2eSetUpstreamTarget(t *testing.T, client *http.Client, baseURL, hostOverride, upstreamID, host string, port int) {
+	t.Helper()
+	response := requestE2EJSON(t, client, http.MethodPut, baseURL+"/api/upstreams/"+upstreamID+"?auto_apply=false", hostOverride, map[string]any{
+		"id": upstreamID, "site_id": "e2e-negative-probes", "name": upstreamID, "scheme": "http", "host": host, "port": port, "base_path": "/", "pass_host_header": false,
+	})
+	body := mustReadBody(t, response.Body)
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("configure DAST canary upstream: status=%d body=%s", response.StatusCode, body)
 	}
 }
 
