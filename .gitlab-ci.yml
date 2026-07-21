@@ -47,8 +47,6 @@ validate:repository:
 warm:e2e-images:
   stage: validate
   timeout: 20m
-  rules:
-    - when: never
   script:
     - |
       set -eu
@@ -64,8 +62,6 @@ warm:e2e-images:
 unit:go:
   stage: unit
   timeout: 35m
-  rules:
-    - when: never
   script:
     - mkdir -p .ci-bin .ci-home "$NPM_CACHE_DIR"
     - |
@@ -88,8 +84,6 @@ unit:go:
 docs:build:
   stage: unit
   timeout: 30m
-  rules:
-    - when: never
   script:
     - mkdir -p "$NPM_CACHE_DIR" .ci-home
     - >-
@@ -108,8 +102,6 @@ e2e:smoke:
   stage: e2e-smoke
   timeout: 30m
   resource_group: waf-e2e-stack
-  rules:
-    - when: never
   dependencies: []
   script:
     - mkdir -p build/e2e/smoke
@@ -126,8 +118,6 @@ e2e:security-invariants:
   stage: e2e
   timeout: 35m
   resource_group: waf-e2e-stack
-  rules:
-    - when: never
   dependencies: []
   script:
     - mkdir -p build/e2e/security-invariants
@@ -147,8 +137,6 @@ e2e:management-rate-limit:
   stage: e2e
   timeout: 30m
   resource_group: waf-e2e-stack
-  rules:
-    - when: never
   dependencies: []
   needs:
     - e2e:smoke
@@ -167,8 +155,6 @@ e2e:full:
   stage: e2e
   timeout: 45m
   resource_group: waf-e2e-stack
-  rules:
-    - when: never
   dependencies: []
   needs:
     - e2e:smoke
@@ -204,8 +190,6 @@ e2e:nightly:
 validate:generated-nginx-config:
   stage: e2e-smoke
   timeout: 15m
-  rules:
-    - when: never
   dependencies: []
   script:
     - go test ./compiler/internal/compiler -run 'TestSyntaxRunner|TestRenderEasyArtifacts|TestRenderSiteUpstreamArtifacts' -count=1
@@ -214,8 +198,6 @@ e2e:fresh-onboarding:
   stage: e2e
   timeout: 30m
   resource_group: waf-e2e-stack
-  rules:
-    - when: never
   dependencies: []
   script:
     - mkdir -p build/e2e/fresh-onboarding
@@ -237,8 +219,6 @@ security:gitleaks:
   stage: security
   timeout: 20m
   dependencies: []
-  rules:
-    - when: never
   script:
     - mkdir -p build/security
     - >-
@@ -257,8 +237,6 @@ security:trivy:
   stage: security
   timeout: 35m
   dependencies: []
-  rules:
-    - when: never
   script:
     - mkdir -p build/security "$TRIVY_CACHE_DIR"
     - >-
@@ -278,8 +256,6 @@ security:govulncheck:
   stage: security
   timeout: 30m
   dependencies: []
-  rules:
-    - when: never
   script:
     - mkdir -p .bin
     - GOTOOLCHAIN=go1.26.5 GOBIN="$CI_PROJECT_DIR/.bin" go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
@@ -289,8 +265,6 @@ security:npm-audit:
   stage: security
   timeout: 25m
   dependencies: []
-  rules:
-    - when: never
   script:
     - mkdir -p "$NPM_CACHE_DIR" .ci-home
     - >-
@@ -376,6 +350,9 @@ publish:github-mirror:
     - security:govulncheck
     - security:npm-audit
   rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+      allow_failure: false
     - when: never
   script:
     - |
@@ -420,6 +397,12 @@ publish:github-release:
     - dast:baseline
     - dast:negative
   rules:
+    - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+/'
+      when: manual
+      allow_failure: false
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+      allow_failure: false
     - when: never
   script:
     - |
