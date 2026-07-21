@@ -5,6 +5,7 @@ package apiroutes
 // The httpserver contract test keeps it exactly synchronized with mux.Handle.
 var AdministrativePaths = []string{
 	"/api/setup/status", "/api/app/meta", "/api/app/ping", "/api/app/compat", "/api/app/compat/fix",
+	"/api/internal/runtime/basic-auth-login",
 	"/api/settings/runtime", "/api/settings/management-hosts", "/api/settings/management-hosts/status", "/api/settings/direct-ip-access", "/api/settings/runtime/check-updates", "/api/settings/runtime/storage-indexes", "/api/public/login-appearance", "/api/public/healthcheck-appearance", "/api/login-appearance/preview/",
 	"/api/owasp-crs/status", "/api/owasp-crs/check-updates", "/api/owasp-crs/update",
 	"/api/auth/bootstrap", "/api/auth/login", "/api/auth/login/2fa", "/api/auth/passkeys/login/begin", "/api/auth/passkeys/login/finish", "/api/auth/providers", "/api/auth/oidc/start", "/api/auth/oidc/callback", "/api/auth/logout", "/api/auth/me", "/api/auth/2fa/status", "/api/auth/2fa/setup", "/api/auth/2fa/enable", "/api/auth/2fa/disable", "/api/auth/step-up/totp", "/api/auth/change-password", "/api/auth/login/2fa/passkey/begin", "/api/auth/login/2fa/passkey/finish", "/api/auth/passkeys", "/api/auth/passkeys/register/begin", "/api/auth/passkeys/register/finish", "/api/auth/passkeys/",

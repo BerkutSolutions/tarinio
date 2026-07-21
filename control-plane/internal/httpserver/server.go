@@ -117,6 +117,7 @@ func New(
 		http.MethodPut: {rbac.PermissionSettingsGeneralWrite},
 	}, settingsRuntimeHandler))
 	mux.Handle("/api/public/login-appearance", &handlers.LoginAppearanceHandler{})
+	mux.Handle("/api/internal/runtime/basic-auth-login", handlers.NewRuntimeBasicAuthLoginHandler(os.Getenv("WAF_RUNTIME_API_TOKEN"), easySiteProfileService))
 	mux.Handle("/api/public/healthcheck-appearance", &handlers.HealthcheckAppearanceHandler{})
 	mux.Handle("/api/login-appearance/preview/", withAuth(authService, rbac.PermissionSettingsGeneralRead, &handlers.LoginAppearancePreviewHandler{}))
 	mux.Handle("/api/settings/management-hosts", withMethodAllPermissions(authService, map[string][]rbac.Permission{

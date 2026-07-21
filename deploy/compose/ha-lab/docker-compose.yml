@@ -140,6 +140,7 @@ services:
       WAF_RUNTIME_HEALTH_ADDR: 0.0.0.0:8081
       WAF_RUNTIME_API_TOKEN: ${WAF_RUNTIME_API_TOKEN:-ha-lab-runtime-shared-token}
       WAF_RUNTIME_METRICS_TOKEN: ${WAF_RUNTIME_METRICS_TOKEN:-ha-lab-runtime-metrics}
+      WAF_CONTROL_PLANE_INTERNAL_URL: ${WAF_CONTROL_PLANE_INTERNAL_URL:-http://control-plane:8080}
       WAF_L4_GUARD_ADAPTIVE_PATH: /etc/waf/l4guard-adaptive/adaptive.json
       WAF_L4_GUARD_REAPPLY_INTERVAL_SECONDS: ${WAF_L4_GUARD_REAPPLY_INTERVAL_SECONDS:-5}
     cap_add:

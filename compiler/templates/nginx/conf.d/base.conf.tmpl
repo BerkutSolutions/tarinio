@@ -133,7 +133,7 @@ map "$waf_security_reason:$waf_antibot_security_reason" $waf_request_security_re
     default $waf_security_reason;
 }
 
-log_format waf_security_json escape=json '{"timestamp":"$time_iso8601","request_id":"$request_id","client_ip":"$remote_addr","country":"$waf_country_code","city":"$waf_city_name","host":"$host","method":"$request_method","uri":"$request_uri","status":$status,"bytes_sent":$body_bytes_sent,"referer":"$http_referer","user_agent":"$http_user_agent","site":"$waf_site_id_log","management":$waf_management_telemetry,"security_reason":"$waf_request_security_reason","upstream_addr":"$upstream_addr","request_time":$request_time}';
+log_format waf_security_json escape=json '{"timestamp":"$time_iso8601","request_id":"$request_id","client_ip":"$remote_addr","country":"$waf_country_code","city":"$waf_city_name","host":"$host","method":"$request_method","uri":"$request_uri","status":$status,"bytes_sent":$body_bytes_sent,"referer":"$http_referer","user_agent":"$http_user_agent","remote_user":"$remote_user","site":"$waf_site_id_log","management":$waf_management_telemetry,"security_reason":"$waf_request_security_reason","upstream_addr":"$upstream_addr","request_time":$request_time}';
 access_log /var/log/nginx/access.log waf_security_json;
 
 limit_req_zone $binary_remote_addr zone=waf_management_login_req:10m rate=5r/s;

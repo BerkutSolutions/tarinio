@@ -173,6 +173,7 @@ func (s *requestStreamSource) ingestArchiveLocked(retentionDays int) error {
 			}
 			continue
 		}
+		reportBasicAuthLogin(item)
 		if shouldSkipRequestTelemetry(item) {
 			if errors.Is(readErr, io.EOF) {
 				break

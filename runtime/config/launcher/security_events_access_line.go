@@ -22,6 +22,7 @@ type parsedAccess struct {
 	upstreamAddr   string
 	referer        string
 	userAgent      string
+	remoteUser     string
 	securityReason string
 	when           time.Time
 }
@@ -39,6 +40,7 @@ func parseAccessLine(line string) (parsedAccess, bool) {
 			Status         int    `json:"status"`
 			Referer        string `json:"referer"`
 			UserAgent      string `json:"user_agent"`
+			RemoteUser     string `json:"remote_user"`
 			Site           string `json:"site"`
 			Management     int    `json:"management"`
 			Host           string `json:"host"`
@@ -71,6 +73,7 @@ func parseAccessLine(line string) (parsedAccess, bool) {
 				upstreamAddr:   strings.TrimSpace(item.UpstreamAddr),
 				referer:        strings.TrimSpace(item.Referer),
 				userAgent:      strings.TrimSpace(item.UserAgent),
+				remoteUser:     strings.TrimSpace(item.RemoteUser),
 				securityReason: strings.TrimSpace(item.SecurityReason),
 				when:           when.UTC(),
 			}, true

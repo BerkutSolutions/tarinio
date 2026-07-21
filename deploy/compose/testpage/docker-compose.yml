@@ -73,6 +73,7 @@ services:
       WAF_RUNTIME_HEALTH_ADDR: 0.0.0.0:8081
       WAF_RUNTIME_API_TOKEN: ${WAF_RUNTIME_API_TOKEN:-default-runtime-shared-token}
       # L4 thresholds are sourced from runtime bundle (/etc/waf/l4guard/config.json),
+      WAF_CONTROL_PLANE_INTERNAL_URL: ${WAF_CONTROL_PLANE_INTERNAL_URL:-http://control-plane:8080}
       # compiled from control-plane anti-DDoS settings.
       WAF_L4_GUARD_ADAPTIVE_PATH: /etc/waf/l4guard-adaptive/adaptive.json
       WAF_L4_GUARD_REAPPLY_INTERVAL_SECONDS: ${WAF_L4_GUARD_REAPPLY_INTERVAL_SECONDS:-5}

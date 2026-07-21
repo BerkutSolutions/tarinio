@@ -103,6 +103,7 @@ func TestE2EBasicAuthLifecycle(t *testing.T) {
 	if !strings.Contains(cookie, "waf_auth_") || !strings.Contains(cookie, "Max-Age=300") {
 		t.Fatalf("Basic Auth verification must issue a five-minute session cookie, got %q", cookie)
 	}
+	e2eWaitForBasicAuthLastLogin(t, adminClient, requestBaseURL, hostOverride, siteID, activeUser)
 
 	auth["auth_basic_password"] = rotatedPassword
 	auth["users"] = []map[string]any{
@@ -127,6 +128,24 @@ func TestE2EBasicAuthLifecycle(t *testing.T) {
 		t.Fatalf("old Basic Auth session must be revoked after profile apply: status=%d body=%s", stale.StatusCode, body)
 	}
 	_ = stale.Body.Close()
+}
+
+func e2eWaitForBasicAuthLastLogin(t *testing.T, client *http.Client, baseURL, hostOverride, siteID, username string) {
+	t.Helper()
+	deadline := time.Now().Add(15 * time.Second)
+	for time.Now().Before(deadline) {
+		profile := e2eGetEasyProfile(t, client, baseURL, hostOverride, siteID)
+		auth, _ := profile["security_auth_basic"].(map[string]any)
+		users, _ := auth["users"].([]any)
+		for _, value := range users {
+			user, _ := value.(map[string]any)
+			if user["username"] == username && strings.TrimSpace(stringValue(user["last_login_at"])) != "" {
+				return
+			}
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+	t.Fatalf("successful Basic Auth verification must update last_login_at for %s", username)
 }
 
 func e2eAssertRequestTelemetryRedacted(t *testing.T, client *http.Client, baseURL, hostOverride string, forbiddenValues ...string) {
