@@ -1,8 +1,8 @@
 ## [1.5.6] - 20.07.2026
 
-### Runtime fixes
+### Исправления runtime
 
-- Runtime waits for the active revision files to finish publishing when the pointer appears before the bundle is complete. This removes an E2E and DAST startup race.
+- Runtime ожидает завершения публикации файлов активной revision, если pointer появился раньше полного bundle. Это устраняет гонку запуска E2E и DAST.
 
 ### Сервисы и конфигурация
 
