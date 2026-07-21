@@ -36,10 +36,14 @@ func TestReleaseEvidenceScript_RequiresSuccessfulE2EAndDAST(t *testing.T) {
 	writeReleaseEvidenceFixture(t, filepath.Join(e2eDir, "e2e-evidence.json"), `{"status":"passed","summary":{"pass":2,"fail":0,"skip":0}}`)
 	writeReleaseEvidenceFixture(t, filepath.Join(e2eDir, "e2e-stability.json"), `{"test_attempts":1,"build_retries":0,"flaky":false}`)
 	writeReleaseEvidenceFixture(t, filepath.Join(dastDir, "dast-evidence.json"), `{"status":"passed","threshold":"High","counts":{"High":0,"Critical":0},"blocking_alerts":[]}`)
+	trivyFS := filepath.Join(work, "trivy-fs.json")
+	trivyImage := filepath.Join(work, "trivy-image.json")
+	writeReleaseEvidenceFixture(t, trivyFS, `{"Results":[{"Misconfigurations":[{"Severity":"HIGH","ID":"DS002"}]}]}`)
+	writeReleaseEvidenceFixture(t, trivyImage, `{"Results":[{"Vulnerabilities":[{"Severity":"CRITICAL","VulnerabilityID":"CVE-fixture","FixedVersion":"1.2.3"}]}]}`)
 
 	output := filepath.Join(work, "out")
 	python := releaseEvidencePython(t)
-	command := releaseEvidenceCommand(python, root, e2eDir, dastDir, output)
+	command := releaseEvidenceCommand(python, root, e2eDir, dastDir, trivyFS, trivyImage, output)
 	if got, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("generate valid release evidence: %v: %s", err, got)
 	}
@@ -60,9 +64,16 @@ func TestReleaseEvidenceScript_RequiresSuccessfulE2EAndDAST(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(output, "source-evidence", "e2e-stability", "security-invariants-e2e-stability.json")); err != nil {
 		t.Fatalf("stability source evidence missing: %v", err)
 	}
+	trivySummary, err := os.ReadFile(filepath.Join(output, "release-trivy-summary.md"))
+	if err != nil || !strings.Contains(string(trivySummary), "Trivy") {
+		t.Fatalf("internal Trivy classification is missing: %v: %s", err, trivySummary)
+	}
+	if strings.Contains(string(summary), "Trivy") {
+		t.Fatalf("public release evidence must not contain Trivy classification: %s", summary)
+	}
 
 	writeReleaseEvidenceFixture(t, filepath.Join(dastDir, "dast-evidence.json"), `{"status":"failed","counts":{"High":1,"Critical":0},"blocking_alerts":[{"name":"fixture"}]}`)
-	if got, err := releaseEvidenceCommand(python, root, e2eDir, dastDir, filepath.Join(work, "blocked")).CombinedOutput(); err == nil || !strings.Contains(string(got), "blocking findings") {
+	if got, err := releaseEvidenceCommand(python, root, e2eDir, dastDir, trivyFS, trivyImage, filepath.Join(work, "blocked")).CombinedOutput(); err == nil || !strings.Contains(string(got), "blocking findings") {
 		t.Fatalf("expected High DAST finding to block release evidence, err=%v output=%s", err, got)
 	}
 }
@@ -74,10 +85,12 @@ func writeReleaseEvidenceFixture(t *testing.T, path, content string) {
 	}
 }
 
-func releaseEvidenceCommand(python, root, e2eDir, dastDir, output string) *exec.Cmd {
+func releaseEvidenceCommand(python, root, e2eDir, dastDir, trivyFS, trivyImage, output string) *exec.Cmd {
 	command := exec.Command(python, "scripts/write-release-evidence.py",
 		"--e2e-root", filepath.Dir(e2eDir),
 		"--dast-root", filepath.Dir(dastDir),
+		"--trivy-report", trivyFS,
+		"--trivy-image-report", trivyImage,
 		"--output-dir", output,
 		"--version", "1.5.6",
 		"--commit", "fixture-commit")

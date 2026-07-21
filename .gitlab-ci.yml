@@ -353,6 +353,8 @@ publish:github-release:
   stage: publish
   timeout: 45m
   dependencies:
+    - security:trivy
+    - security:trivy-image
     - e2e:smoke
     - e2e:security-invariants
     - e2e:management-rate-limit
@@ -361,6 +363,8 @@ publish:github-release:
     - dast:negative
   needs:
     - publish:github-mirror
+    - security:trivy
+    - security:trivy-image
     - e2e:smoke
     - e2e:security-invariants
     - e2e:management-rate-limit
@@ -422,14 +426,18 @@ publish:github-release:
         --version "$version" \
         --output "build/release/$version/github-release-notes.md"
       test -s "build/release/$version/github-release-notes.md"
-      echo "[release] Collecting verified E2E and DAST evidence"
+      echo "[release] Collecting verified E2E, DAST and internal Trivy evidence"
       python3 scripts/write-release-evidence.py \
         --e2e-root build/e2e \
         --dast-root build/dast \
+        --trivy-report build/security/trivy-fs.json \
+        --trivy-image-report build/security/trivy-image.json \
         --output-dir "build/release/$version" \
         --version "$version" \
         --commit "$CI_COMMIT_SHA"
       cat "build/release/$version/release-evidence-summary.md" >> "build/release/$version/github-release-notes.md"
+      echo "[release] Internal Trivy classification (GitLab job log and artifact only)"
+      cat "build/release/$version/release-trivy-summary.md"
       echo "[release] Authenticating with GHCR"
       printf '%s' "$GITHUB_TOKEN" | docker login ghcr.io -u BerkutSolutions --password-stdin
       echo "[release] Building image ghcr.io/berkutsolutions/tarinio:$version"
