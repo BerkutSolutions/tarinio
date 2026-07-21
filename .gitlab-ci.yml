@@ -378,6 +378,8 @@ publish:github-release:
     - e2e:security-invariants
     - e2e:management-rate-limit
     - e2e:full
+    - dast:baseline
+    - dast:negative
   needs:
     - publish:github-mirror
     - validate:repository
