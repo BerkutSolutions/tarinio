@@ -86,6 +86,12 @@ func (s *runtimeStatus) ready() bool {
 	return s.pointerLoaded && s.bundleValidated && s.nginxRunning && s.activeRevisionID != "" && s.activeBundlePath != ""
 }
 
+func (s *runtimeStatus) activeRevision() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.activeRevisionID
+}
+
 type runtimeProcess struct {
 	mu          sync.Mutex
 	runtimeRoot string
@@ -365,6 +371,7 @@ func (s *runtimeStatus) handlers(process *runtimeProcess, securitySource *securi
 			return
 		}
 		runtimeProm.setReady(true)
+		w.Header().Set("X-WAF-Runtime-Revision", s.activeRevision())
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok\n"))
 	}))

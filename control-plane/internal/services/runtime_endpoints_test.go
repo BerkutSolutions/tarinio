@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+
+	"waf/compiler/pipeline"
 )
 
 func TestRuntimeEndpointCandidates(t *testing.T) {
@@ -55,6 +57,7 @@ func TestHTTPHealthCheckerFallsBackFromRuntimeHost(t *testing.T) {
 		if r.URL.Path != "/readyz" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
+		w.Header().Set("X-WAF-Runtime-Revision", "rev-expected")
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
@@ -66,7 +69,21 @@ func TestHTTPHealthCheckerFallsBackFromRuntimeHost(t *testing.T) {
 	checker := HTTPHealthChecker{
 		URL: "http://runtime:" + parsed.Port() + "/readyz",
 	}
-	if err := checker.Check(nil); err != nil {
+	if err := checker.Check(&pipeline.ActivePointer{RevisionID: "rev-expected"}); err != nil {
 		t.Fatalf("expected fallback health success, got: %v", err)
+	}
+}
+
+func TestHTTPHealthCheckerRejectsDifferentRuntimeRevision(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("X-WAF-Runtime-Revision", "rev-stale")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	checker := HTTPHealthChecker{URL: server.URL}
+	err := checker.Check(&pipeline.ActivePointer{RevisionID: "rev-expected"})
+	if err == nil || !strings.Contains(err.Error(), "rev-stale") {
+		t.Fatalf("expected stale revision error, got %v", err)
 	}
 }

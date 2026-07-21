@@ -1219,6 +1219,14 @@ func (h HTTPHealthChecker) Check(active *pipeline.ActivePointer) error {
 		func() {
 			defer resp.Body.Close()
 			if resp.StatusCode == http.StatusOK {
+				if active != nil {
+					want := strings.TrimSpace(active.RevisionID)
+					got := strings.TrimSpace(resp.Header.Get("X-WAF-Runtime-Revision"))
+					if want != "" && got != want {
+						lastErr = fmt.Errorf("runtime ready endpoint serves revision %q, want %q", got, want)
+						return
+					}
+				}
 				lastErr = nil
 				return
 			}
