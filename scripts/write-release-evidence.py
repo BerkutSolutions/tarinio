@@ -98,7 +98,7 @@ def main():
     dast_rows = "\n".join(f"- `{item['job']}`: High {item['counts'].get('High', 0)}, Critical {item['counts'].get('Critical', 0)}." for item in dast)
     (output / "release-evidence.md").write_text(f"""# Доказательства проверок релиза {args.version}
 
-**Коммит:** `{args.commit}`  
+**Коммит:** `{args.commit}`
 **Статус:** **пройдено**
 
 ### E2E-проверки
