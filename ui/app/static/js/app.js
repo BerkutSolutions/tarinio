@@ -625,7 +625,7 @@ async function loadMeta() {
     renderUpdateBadge(meta);
     refreshSidebarStatus(api, t);
   } catch {
-    setVersion("v1.5.8");
+    setVersion("v1.5.9");
     renderUpdateBadge(null);
     refreshSidebarStatus(api, t);
   }
@@ -691,7 +691,7 @@ function bindVisibilityLifecycle() {
 
 async function bootstrap() {
   await applyTranslations(getLanguage());
-  setVersion("v1.5.8");
+  setVersion("v1.5.9");
 
   const access = await checkEntryAccess("app");
   if (!access.allowed) {

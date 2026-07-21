@@ -177,8 +177,32 @@ function Sync-LegacyRuntimeVersion([string]$RepoRoot, [string]$TargetVersion) {
         $replacement = if ($target.Path.EndsWith("index.html")) { ">v$TargetVersion<" } else { "v$TargetVersion" }
         $updated = [regex]::Replace($raw, $target.Pattern, $replacement)
         if ($updated -eq $raw) {
+            if ($raw.Contains($replacement)) {
+                continue
+            }
             throw "legacy runtime version marker not found in $path"
         }
+        [System.IO.File]::WriteAllText($path, $updated, $utf8)
+    }
+}
+
+function Sync-ChangelogReleaseHeader([string]$RepoRoot, [string]$TargetVersion) {
+    # The top release heading is the source used by the automated GitHub
+    # release notes generator. Keep its version synchronized with AppVersion.
+    $path = Join-Path $RepoRoot "CHANGELOG.md"
+    if (-not (Test-Path $path)) {
+        throw "CHANGELOG.md not found: $path"
+    }
+
+    $utf8 = [System.Text.UTF8Encoding]::new($false)
+    $raw = [System.IO.File]::ReadAllText($path, $utf8)
+    $pattern = '(?m)\A(## \[)\d+\.\d+\.\d+(?:[-+][0-9A-Za-z\.-]+)?(\] - \d{2}\.\d{2}\.\d{4})'
+    if ($raw -notmatch $pattern) {
+        throw "top release heading not found in $path"
+    }
+
+    $updated = [regex]::Replace($raw, $pattern, ('${1}' + $TargetVersion + '${2}'), 1)
+    if ($updated -ne $raw) {
         [System.IO.File]::WriteAllText($path, $updated, $utf8)
     }
 }
@@ -191,5 +215,6 @@ Sync-PackageMetadataVersion -RepoRoot $repoRoot -TargetVersion $Version
 Sync-I18NAppVersion -RepoRoot $repoRoot -TargetVersion $Version
 Sync-DocsAndFrontendVersion -RepoRoot $repoRoot -TargetVersion $Version
 Sync-LegacyRuntimeVersion -RepoRoot $repoRoot -TargetVersion $Version
+Sync-ChangelogReleaseHeader -RepoRoot $repoRoot -TargetVersion $Version
 
 Write-Host ("Version synchronized to " + $Version)

@@ -448,7 +448,10 @@ publish:github-release:
         git push "https://github.com/BerkutSolutions/tarinio.git" "refs/tags/$release_tag"
       echo "[release] GitHub tag $release_tag is available"
       echo "[release] Building GitHub release notes from CHANGELOG.md"
-      awk -v header="## [$version]" '$0 == header { found=1 } found && NR > 1 && /^## / && $0 != header { exit } found { print }' CHANGELOG.md > "build/release/$version/github-release-notes.md"
+      python3 scripts/extract-changelog-section.py \
+        --changelog CHANGELOG.md \
+        --version "$version" \
+        --output "build/release/$version/github-release-notes.md"
       test -s "build/release/$version/github-release-notes.md"
       echo "[release] Collecting verified E2E and DAST evidence"
       python3 scripts/write-release-evidence.py \
