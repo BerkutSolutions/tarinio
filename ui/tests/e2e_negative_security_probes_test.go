@@ -64,7 +64,10 @@ func TestE2ENegativeSecurityProbes(t *testing.T) {
 		"path":    "modsec/e2e-negative-probes.conf",
 		"content": `SecRule ARGS "@rx (?i:(?:union[[:space:]]+select|<script|\.\./\.\./|\$\())" "id:100021,phase:2,deny,status:403,log,msg:'DAST attack matrix'"`,
 	}
-	updated := e2ePutProfile(t, client, baseURL, hostOverride, siteID, profile)
+	// This scenario owns its compile/apply boundary below. Letting profile
+	// persistence auto-apply and then issuing a second explicit apply creates
+	// two runtime reloads for one configuration change.
+	updated := e2ePutProfileWithoutAutoApply(t, client, baseURL, hostOverride, siteID, profile)
 	e2eAssertModSecurityProfile(t, updated, profile)
 	if revisionID := e2eCompileAndApply(t, client, baseURL, hostOverride); revisionID == "" {
 		t.Fatal("negative probe compile/apply returned an empty revision")

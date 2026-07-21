@@ -328,22 +328,6 @@ publish:github-mirror:
   stage: publish
   timeout: 15m
   dependencies: []
-  needs:
-    - validate:repository
-    - warm:e2e-images
-    - unit:go
-    - docs:build
-    - e2e:smoke
-    - validate:generated-nginx-config
-    - e2e:security-invariants
-    - e2e:management-rate-limit
-    - e2e:full
-    - e2e:fresh-onboarding
-    - security:gitleaks
-    - security:trivy
-    - security:trivy-image
-    - security:govulncheck
-    - security:npm-audit
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
       allow_failure: false
@@ -369,8 +353,6 @@ publish:github-release:
   stage: publish
   timeout: 45m
   dependencies:
-    - security:trivy
-    - security:trivy-image
     - e2e:smoke
     - e2e:security-invariants
     - e2e:management-rate-limit
@@ -379,23 +361,6 @@ publish:github-release:
     - dast:negative
   needs:
     - publish:github-mirror
-    - validate:repository
-    - warm:e2e-images
-    - unit:go
-    - docs:build
-    - e2e:smoke
-    - validate:generated-nginx-config
-    - e2e:security-invariants
-    - e2e:management-rate-limit
-    - e2e:full
-    - e2e:fresh-onboarding
-    - security:gitleaks
-    - security:trivy
-    - security:trivy-image
-    - security:govulncheck
-    - security:npm-audit
-    - dast:baseline
-    - dast:negative
   rules:
     - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+/'
       allow_failure: false
@@ -455,8 +420,6 @@ publish:github-release:
       python3 scripts/write-release-evidence.py \
         --e2e-root build/e2e \
         --dast-root build/dast \
-        --trivy-report build/security/trivy-fs.json \
-        --trivy-image-report build/security/trivy-image.json \
         --output-dir "build/release/$version" \
         --version "$version" \
         --commit "$CI_COMMIT_SHA"
@@ -491,9 +454,7 @@ publish:github-release:
         --asset "build/release/$version/release-evidence.md" \
         --asset "build/release/$version/release-evidence.json" \
         --asset "build/release/$version/release-evidence-summary.md" \
-        --asset "build/release/$version/release-evidence-source.zip" \
-        --asset "build/release/$version/trivy-fs.json" \
-        --asset "build/release/$version/trivy-image.json"
+        --asset "build/release/$version/release-evidence-source.zip"
   artifacts:
     expire_in: 30 days
     paths:

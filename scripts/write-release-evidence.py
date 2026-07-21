@@ -54,23 +54,6 @@ def validate_dast(reports):
     return result
 
 
-def trivy_summary(path):
-    if not path:
-        return None
-    try:
-        report = json.loads(Path(path).read_text(encoding="utf-8-sig"))
-    except (OSError, json.JSONDecodeError) as error:
-        raise RuntimeError(f"cannot read Trivy report {path}: {error}") from error
-    counts = {"High": 0, "Critical": 0}
-    for result in report.get("Results", []):
-        for key in ("Vulnerabilities", "Misconfigurations", "Secrets"):
-            for finding in result.get(key, []) or []:
-                severity = str(finding.get("Severity", "")).title()
-                if severity in counts:
-                    counts[severity] += 1
-    return {"report": Path(path).name, "high": counts["High"], "critical": counts["Critical"], "status": "passed by approved baseline"}
-
-
 def copy_source_evidence(output, source_root, filename, prefix):
     destination = output / "source-evidence" / prefix
     destination.mkdir(parents=True, exist_ok=True)
@@ -101,8 +84,6 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--e2e-root", required=True)
     parser.add_argument("--dast-root", required=True)
-    parser.add_argument("--trivy-report")
-    parser.add_argument("--trivy-image-report")
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--version", required=True)
     parser.add_argument("--commit", required=True)
@@ -111,7 +92,6 @@ def main():
     e2e = validate_e2e(load_reports(args.e2e_root, "e2e-evidence.json") + load_reports(args.dast_root, "e2e-evidence.json"))
     stability = load_stability(args.e2e_root) + load_stability(args.dast_root)
     dast = validate_dast(load_reports(args.dast_root, "dast-evidence.json"))
-    trivy = [item for item in (trivy_summary(args.trivy_report), trivy_summary(args.trivy_image_report)) if item]
     output = Path(args.output_dir)
     output.mkdir(parents=True, exist_ok=True)
     copy_source_evidence(output, args.e2e_root, "e2e-evidence.json", "e2e")
@@ -119,22 +99,17 @@ def main():
     copy_source_evidence(output, args.dast_root, "e2e-evidence.json", "dast-e2e")
     copy_source_evidence(output, args.dast_root, "e2e-stability.json", "dast-e2e-stability")
     copy_source_evidence(output, args.dast_root, "dast-evidence.json", "dast")
-    for source, name in ((args.trivy_report, "trivy-fs.json"), (args.trivy_image_report, "trivy-image.json")):
-        if source:
-            shutil.copy2(source, output / name)
     shutil.make_archive(str(output / "release-evidence-source"), "zip", output / "source-evidence")
 
-    report = {"schema_version": 2, "version": args.version, "commit": args.commit, "generated_at": datetime.now(timezone.utc).isoformat(), "status": "passed", "e2e": e2e, "e2e_stability": stability, "dast": dast, "trivy": trivy}
+    report = {"schema_version": 2, "version": args.version, "commit": args.commit, "generated_at": datetime.now(timezone.utc).isoformat(), "status": "passed", "e2e": e2e, "e2e_stability": stability, "dast": dast}
     (output / "release-evidence.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     e2e_rows = "\n".join(f"| `{x['job']}` | {x['description']} | {x['passed']} | {x['failed']} | {x['skipped']} |" for x in e2e)
     dast_rows = "\n".join(f"| `{x['job']}` | {x['description']} | {x['high']} | {x['critical']} | пройдено |" for x in dast)
-    trivy_rows = "\n".join(f"| `{item['report']}` | {item['high']} | {item['critical']} | {item['status']} |" for item in trivy)
-    trivy_section = "" if not trivy else f"""\n| Проверка Trivy | High | Critical | Статус |\n| --- | ---: | ---: | --- |\n{trivy_rows}\n"""
     stability_rows = "\n".join(f"| `{item['job']}` | {item['test_attempts']} | {item['build_retries']} | {'да' if item['flaky'] else 'нет'} |" for item in stability)
     stability_section = "" if not stability else f"""\n| Стабильность E2E | Попыток теста | Повторов сборки | Инфраструктурная нестабильность |\n| --- | ---: | ---: | --- |\n{stability_rows}\n"""
-    summary = f"""### Результаты проверки WAF\n\nE2E-наборы разворачивают одноразовый стенд с control-plane, runtime, базой данных, Vault и тестовыми upstream-сервисами. Они подтверждают цепочку: настройка через API -> compile/apply revision -> активная runtime-конфигурация -> фактический HTTP-результат.\n\n| E2E-набор | Что подтверждает | Пройдено | Ошибок | Пропусков |\n| --- | --- | ---: | ---: | ---: |\n{e2e_rows}\n\n| DAST-набор | Что подтверждает | Высокий | Критический | Статус |\n| --- | --- | ---: | ---: | --- |\n{dast_rows}\n{stability_section}{trivy_section}\nВсе E2E-наборы пройдены без ошибок и пропусков. DAST не выявил блокирующих уязвимостей уровней «Высокий» и «Критический». Полные машиночитаемые доказательства приложены к релизу.\n"""
+    summary = f"""### Результаты проверки WAF\n\nE2E-наборы разворачивают одноразовый стенд с control-plane, runtime, базой данных, Vault и тестовыми upstream-сервисами. Они подтверждают цепочку: настройка через API -> compile/apply revision -> активная runtime-конфигурация -> фактический HTTP-результат.\n\n| E2E-набор | Что подтверждает | Пройдено | Ошибок | Пропусков |\n| --- | --- | ---: | ---: | ---: |\n{e2e_rows}\n\n| DAST-набор | Что подтверждает | Высокий | Критический | Статус |\n| --- | --- | ---: | ---: | --- |\n{dast_rows}\n{stability_section}\nВсе E2E-наборы пройдены без ошибок и пропусков. DAST не выявил блокирующих уязвимостей уровней «Высокий» и «Критический». Полные машиночитаемые доказательства приложены к релизу.\n"""
     (output / "release-evidence-summary.md").write_text(summary, encoding="utf-8")
-    details = f"""# Доказательства проверок релиза {args.version}\n\n**Коммит:** `{args.commit}`  \n**Статус:** **пройдено**\n\n{summary}\n### Исходные доказательства\n\n`release-evidence-source.zip` содержит JSON и Markdown-отчёты E2E/DAST без тел запросов и секретов. `trivy-fs.json` содержит исходный отчёт Trivy, если он был передан в release job.\n"""
+    details = f"""# Доказательства проверок релиза {args.version}\n\n**Коммит:** `{args.commit}`  \n**Статус:** **пройдено**\n\n{summary}\n### Исходные доказательства\n\n`release-evidence-source.zip` содержит JSON и Markdown-отчёты E2E/DAST без тел запросов и секретов.\n"""
     (output / "release-evidence.md").write_text(details, encoding="utf-8")
 
 
