@@ -361,6 +361,12 @@ publish:github-release:
     - dast:negative
   needs:
     - publish:github-mirror
+    - e2e:smoke
+    - e2e:security-invariants
+    - e2e:management-rate-limit
+    - e2e:full
+    - dast:baseline
+    - dast:negative
   rules:
     - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+/'
       allow_failure: false
