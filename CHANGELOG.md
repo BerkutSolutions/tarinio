@@ -1,5 +1,9 @@
 ## [1.5.6] - 20.07.2026
 
+### Runtime fixes
+
+- Runtime waits for the active revision files to finish publishing when the pointer appears before the bundle is complete. This removes an E2E and DAST startup race.
+
 ### Сервисы и конфигурация
 
 - Исправлена синхронизация простого и сырого редакторов сервиса. Любое изменение в простом режиме сразу отражается в `WAF_SITE_*`, а изменение в сыром режиме возвращается в простой draft и сохраняется в ресурсах сервиса.

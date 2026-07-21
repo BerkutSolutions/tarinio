@@ -61,6 +61,35 @@ func TestWaitForInitialBundleAcceptsCompletePublishedCandidate(t *testing.T) {
 	}
 }
 
+func TestWaitForInitialBundleWaitsForCandidateAfterPointer(t *testing.T) {
+	root := t.TempDir()
+	candidate := filepath.Join(root, "candidates", "rev-000001")
+	active := filepath.Join(root, "active")
+	if err := os.MkdirAll(active, 0o755); err != nil {
+		t.Fatalf("create active directory: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(active, "current.json"), []byte(`{"revision_id":"rev-000001","candidate_path":"candidates/rev-000001"}`), 0o600); err != nil {
+		t.Fatalf("write active pointer: %v", err)
+	}
+
+	go func() {
+		time.Sleep(120 * time.Millisecond)
+		for _, relative := range []string{"manifest.json", "nginx/nginx.conf", "modsecurity/modsecurity.conf"} {
+			path := filepath.Join(candidate, relative)
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+				return
+			}
+			if err := os.WriteFile(path, []byte("ok"), 0o600); err != nil {
+				return
+			}
+		}
+	}()
+
+	if err := waitForInitialBundle(root, time.Second); err != nil {
+		t.Fatalf("waitForInitialBundle after early pointer: %v", err)
+	}
+}
+
 func TestWaitForInitialBundleTimesOutWithoutPointer(t *testing.T) {
 	if err := waitForInitialBundle(t.TempDir(), 20*time.Millisecond); err == nil {
 		t.Fatal("expected timeout when no initial bundle is published")

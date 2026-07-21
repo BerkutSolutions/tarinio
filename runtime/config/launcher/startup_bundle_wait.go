@@ -32,6 +32,7 @@ func waitForInitialBundle(runtimeRoot string, timeout time.Duration) error {
 		return nil
 	}
 	deadline := time.Now().Add(timeout)
+	var lastValidationErr error
 	for {
 		pointer, err := loadActivePointer(runtimeRoot)
 		if err == nil {
@@ -40,14 +41,18 @@ func waitForInitialBundle(runtimeRoot string, timeout time.Duration) error {
 				return fmt.Errorf("resolve initial runtime bundle: %w", resolveErr)
 			}
 			if validateErr := validateCandidateBundle(candidatePath); validateErr != nil {
-				return fmt.Errorf("validate initial runtime bundle: %w", validateErr)
+				lastValidationErr = validateErr
+			} else {
+				return nil
 			}
-			return nil
 		}
-		if !errors.Is(err, errActivePointerMissing) {
+		if err != nil && !errors.Is(err, errActivePointerMissing) {
 			return fmt.Errorf("read initial runtime bundle: %w", err)
 		}
 		if time.Now().After(deadline) {
+			if lastValidationErr != nil {
+				return fmt.Errorf("timed out after %s waiting for complete initial runtime bundle: %w", timeout, lastValidationErr)
+			}
 			return fmt.Errorf("timed out after %s waiting for initial runtime bundle at %s", timeout, filepath.Join(runtimeRoot, "active", "current.json"))
 		}
 		time.Sleep(100 * time.Millisecond)
