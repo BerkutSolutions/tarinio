@@ -25,7 +25,9 @@ def main():
     section = "".join(lines[start:end]).strip() + "\n"
     if section == header + "\n":
         raise RuntimeError(f"release section {header!r} is empty")
-    Path(args.output).write_text(section, encoding="utf-8")
+    output = Path(args.output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(section, encoding="utf-8")
 
 
 if __name__ == "__main__":

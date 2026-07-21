@@ -467,9 +467,8 @@ publish:github-release:
       docker build -t "ghcr.io/berkutsolutions/tarinio:$version" -f control-plane/Dockerfile .
       echo "[release] Running image health check"
       docker rm -f tarinio-release-smoke >/dev/null 2>&1 || true
-      docker run -d --rm --name tarinio-release-smoke -p 127.0.0.1::8080 "ghcr.io/berkutsolutions/tarinio:$version"
-      smoke_port="$(docker port tarinio-release-smoke 8080/tcp | sed -n 's/.*:\([0-9][0-9]*\)$/\1/p' | head -n1)"
-      test -n "$smoke_port"
+      smoke_port=18082
+      docker run -d --rm --name tarinio-release-smoke -e CONTROL_PLANE_SECURITY_PEPPER=release-smoke-pepper -p "127.0.0.1:$smoke_port:8080" "ghcr.io/berkutsolutions/tarinio:$version"
       i=0; until curl -fsS "http://127.0.0.1:$smoke_port/healthz" >/dev/null; do i=$((i + 1)); test "$i" -lt 30 || { docker logs tarinio-release-smoke; exit 1; }; sleep 1; done
       docker rm -f tarinio-release-smoke >/dev/null
       docker tag "ghcr.io/berkutsolutions/tarinio:$version" "ghcr.io/berkutsolutions/tarinio:latest"
