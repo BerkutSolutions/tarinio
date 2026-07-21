@@ -17,8 +17,10 @@ func e2eUniqueID(t *testing.T, prefix string) string {
 	name := strings.ToLower(t.Name())
 	name = strings.NewReplacer("/", "-", "_", "-", " ", "-").Replace(name)
 	name = strings.Trim(name, "-")
-	if len(name) > 22 {
-		name = name[len(name)-22:]
+	if len(name) > 8 {
+		name = name[len(name)-8:]
 	}
-	return fmt.Sprintf("%s-%s-%x-%d", prefix, name, time.Now().UnixNano(), atomic.AddUint64(&e2eIDSequence, 1))
+	// Site IDs flow into Nginx shared-memory zone names. Keep them compact
+	// enough for Nginx while retaining per-test uniqueness.
+	return fmt.Sprintf("%s-%s-%x-%d", prefix, name, time.Now().UnixNano()&0xffffff, atomic.AddUint64(&e2eIDSequence, 1))
 }
