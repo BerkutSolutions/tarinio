@@ -31,6 +31,7 @@ server {
 {{- end }}
     if ($waf_host_allowed = 0) { return 421; }
     server_name {{ range $index, $name := .ServerNames }}{{ if $index }} {{ end }}{{ $name }}{{ end }};
+    add_header X-WAF-Runtime-Revision "{{ .RuntimeRevisionID }}" always;
     add_header Server-Timing 'rid;desc="$request_id",ip;desc="$remote_addr",ts;desc="$msec"' always;
 {{- if or (not .UseEasyConfig) (and .UseEasyConfig .UseCustomErrorPages) }}
     proxy_intercept_errors on;

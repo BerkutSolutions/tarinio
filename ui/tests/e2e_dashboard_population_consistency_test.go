@@ -47,7 +47,7 @@ func TestE2EDashboardAttackPopulationConsistency(t *testing.T) {
 	t.Logf("generated anti-bot telemetry rows: %d", len(requestRows))
 	t.Logf("runtime dashboard summary after attack: %#v", e2eDirectRuntimeDashboardSummary(t))
 
-	stats := waitForDashboardAttacker(t, client, requestBaseURL, requestHostOverride, "172.30.0.30", requestRows)
+	stats := waitForDashboardAttacker(t, client, requestBaseURL, requestHostOverride, e2eAttackerIP(), requestRows)
 
 	attacksDay := e2eDashboardAsInt(t, stats["attacks_day"])
 	requestsDay := e2eDashboardAsInt(t, stats["requests_day"])
@@ -95,12 +95,16 @@ func TestE2EDashboardAttackPopulationConsistency(t *testing.T) {
 
 func e2eDirectRuntimeDashboardSummary(t *testing.T) map[string]any {
 	t.Helper()
-	request, err := http.NewRequest(http.MethodGet, "http://127.0.0.1:18081/requests/dashboard-summary?since="+time.Now().UTC().Add(-24*time.Hour).Format(time.RFC3339), nil)
+	runtimeURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_RUNTIME_HEALTH_URL")), "/")
+	if runtimeURL == "" {
+		runtimeURL = "http://127.0.0.1:18081"
+	}
+	request, err := http.NewRequest(http.MethodGet, runtimeURL+"/requests/dashboard-summary?since="+time.Now().UTC().Add(-24*time.Hour).Format(time.RFC3339), nil)
 	if err != nil {
 		t.Fatalf("create runtime dashboard summary request: %v", err)
 	}
 	request.Header.Set("X-WAF-Runtime-Token", "e2e-test-runtime-token")
-	response, err := newE2EHTTPClient("http://127.0.0.1:18081", false).Do(request)
+	response, err := newE2EHTTPClient(runtimeURL, false).Do(request)
 	if err != nil {
 		t.Fatalf("fetch runtime dashboard summary: %v", err)
 	}

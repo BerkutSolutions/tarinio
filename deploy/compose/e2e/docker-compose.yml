@@ -1,6 +1,8 @@
 # E2E test stack — full control-plane + runtime stack for behavioral testing.
 # Used by scripts/run-e2e-tests.sh: spun up, tested, torn down with volumes.
-# Stack name: waf-e2e (all volumes/containers prefixed to avoid collision).
+# Every invocation is namespaced by Docker Compose project. Do not add explicit
+# container, network or volume names here: independent E2E suites must be able
+# to run concurrently without sharing mutable runtime state.
 # Runtime is exposed on port 18081 (health) and 10080 (HTTP proxy).
 
 services:
@@ -8,7 +10,6 @@ services:
     build:
       context: ../../..
       dockerfile: control-plane/Dockerfile
-    container_name: waf-e2e-control-plane
     restart: "no"
     environment:
       CONTROL_PLANE_HTTP_ADDR: 0.0.0.0:8080
@@ -53,7 +54,7 @@ services:
       - waf-e2e-vault-app-token:/var/run/waf-app-token:ro
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
-      - "18082:8080"
+      - "${E2E_CONTROL_PLANE_DIRECT_PORT:-18082}:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -71,7 +72,6 @@ services:
     build:
       context: ../../..
       dockerfile: runtime/image/Dockerfile
-    container_name: waf-e2e-runtime
     restart: "no"
     environment:
       WAF_RUNTIME_ROOT: /var/lib/waf
@@ -108,9 +108,9 @@ services:
       - waf-e2e-l4-adaptive:/etc/waf/l4guard-adaptive:ro
       - waf-e2e-vault-app-token:/var/run/waf-app-token:ro
     ports:
-      - "10080:80"
-      - "10443:443"
-      - "18081:8081"
+      - "${E2E_RT_PORT:-10080}:80"
+      - "${E2E_RT_HTTPS_PORT:-10443}:443"
+      - "${E2E_RT_HLT_PORT:-18081}:8081"
     expose:
       - "80"
       - "443"
@@ -132,13 +132,12 @@ services:
     build:
       context: ../../..
       dockerfile: ui/Dockerfile
-    container_name: waf-e2e-ui
     restart: "no"
     depends_on:
       control-plane:
         condition: service_healthy
     ports:
-      - "18080:80"
+      - "${E2E_PORT:-18080}:80"
     expose:
       - "80"
     networks:
@@ -147,7 +146,6 @@ services:
   # Minimal upstream target for behavioral tests — echoes requests back
   upstream-echo:
     image: ealen/echo-server:latest
-    container_name: waf-e2e-upstream-echo
     restart: "no"
     environment:
       PORT: "8888"
@@ -160,10 +158,9 @@ services:
     build:
       context: ../../..
       dockerfile: deploy/compose/e2e/dast-canary/Dockerfile
-    container_name: waf-e2e-dast-canary
     restart: "no"
     ports:
-      - "18083:8080"
+      - "${E2E_DAST_CANARY_PORT:-18083}:8080"
     expose:
       - "8080"
     networks:
@@ -172,7 +169,6 @@ services:
   # Matches the user-facing hostname and port in the editor-parity scenario.
   privatebin:
     image: ealen/echo-server:latest
-    container_name: waf-e2e-privatebin
     restart: "no"
     environment:
       PORT: "8080"
@@ -183,27 +179,22 @@ services:
 
   e2e-attacker:
     image: busybox:1.36
-    container_name: waf-e2e-attacker
     restart: "no"
     command: ["sh", "-c", "while true; do sleep 3600; done"]
     networks:
-      waf-e2e-net:
-        ipv4_address: 172.30.0.30
+      - waf-e2e-net
 
   e2e-l4-attacker:
     image: busybox:1.36
-    container_name: waf-e2e-l4-attacker
     restart: "no"
     command: ["sh", "-c", "while true; do sleep 3600; done"]
     networks:
-      waf-e2e-net:
-        ipv4_address: 172.30.0.31
+      - waf-e2e-net
 
   tarinio-sentinel:
     build:
       context: ../../..
       dockerfile: deploy/compose/auto-start/ddos-model/Dockerfile
-    container_name: waf-e2e-sentinel
     restart: "no"
     environment:
       MODEL_SOURCE_BACKEND: file
@@ -240,7 +231,6 @@ services:
 
   postgres:
     image: postgres:15
-    container_name: waf-e2e-postgres
     restart: "no"
     environment:
       POSTGRES_USER: waf
@@ -259,7 +249,6 @@ services:
 
   vault:
     image: hashicorp/vault:1.18
-    container_name: waf-e2e-vault
     restart: "no"
     cap_add:
       - IPC_LOCK
@@ -288,32 +277,17 @@ services:
       - waf-e2e-net
 
 networks:
-  waf-e2e-net:
-    name: waf-e2e-net
-    ipam:
-      config:
-        - subnet: 172.30.0.0/24
+  waf-e2e-net: {}
 
 volumes:
   waf-e2e-runtime-data:
-    name: waf-e2e-runtime-data
   waf-e2e-control-plane-data:
-    name: waf-e2e-control-plane-data
   waf-e2e-certificates-data:
-    name: waf-e2e-certificates-data
   waf-e2e-postgres-data:
-    name: waf-e2e-postgres-data
   waf-e2e-vault-data:
-    name: waf-e2e-vault-data
   waf-e2e-vault-bootstrap:
-    name: waf-e2e-vault-bootstrap
   waf-e2e-vault-app-token:
-    name: waf-e2e-vault-app-token
   waf-e2e-nginx-logs:
-    name: waf-e2e-nginx-logs
   waf-e2e-request-archive-data:
-    name: waf-e2e-request-archive-data
   waf-e2e-l4-adaptive:
-    name: waf-e2e-l4-adaptive
   waf-e2e-sentinel-state:
-    name: waf-e2e-sentinel-state

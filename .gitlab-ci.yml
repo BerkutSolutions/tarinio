@@ -101,13 +101,10 @@ docs:build:
 e2e:smoke:
   stage: e2e-smoke
   timeout: 30m
-  resource_group: waf-e2e-stack
   dependencies: []
   script:
     - mkdir -p build/e2e/smoke
-    - E2E_FILTER='TestE2ESmoke_LoginHealthcheckDashboard|TestE2EAntibotChallengePrecedesActiveRateLimitFallback|TestE2EBasicAuthLifecycle|TestE2EModSecurity_EnableDisableReenableWithScopedExclusion|TestE2EDashboardAttackPopulationConsistency' E2E_TIMEOUT=240 E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/smoke" E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/e2e/smoke" sh scripts/run-e2e-tests.sh
-  after_script:
-    - docker compose -f deploy/compose/e2e/docker-compose.yml down --volumes --remove-orphans || true
+    - E2E_PROJECT=ci-smoke E2E_PORT=18080 E2E_RT_PORT=10080 E2E_RT_HTTPS_PORT=10443 E2E_RT_HLT_PORT=18081 E2E_CONTROL_PLANE_DIRECT_PORT=18082 E2E_DAST_CANARY_PORT=18083 E2E_FILTER='TestE2ESmoke_LoginHealthcheckDashboard|TestE2EAntibotChallengePrecedesActiveRateLimitFallback|TestE2EBasicAuthLifecycle|TestE2EModSecurity_EnableDisableReenableWithScopedExclusion|TestE2EDashboardAttackPopulationConsistency' E2E_TIMEOUT=240 E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/smoke" E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/e2e/smoke" sh scripts/run-e2e-tests.sh
   artifacts:
     when: always
     expire_in: 14 days
@@ -117,16 +114,13 @@ e2e:smoke:
 e2e:security-invariants:
   stage: e2e
   timeout: 35m
-  resource_group: waf-e2e-stack
   dependencies: []
   script:
     - mkdir -p build/e2e/security-invariants
     - >-
       E2E_FILTER='TestE2EBasicAuthLifecycle|TestE2EMultisiteBasicAuthIsolation|TestE2ESecurityModesReality|TestE2ERequestStorageParity|TestE2EDashboardAttackPopulationConsistency|TestE2EAntibotChallengePrecedesActiveRateLimitFallback|TestE2EManagementModSecuritySafeguardKeepsAppPingAvailable|TestE2EAdminPanelModSecurityBypassesEveryAdministrativeRoute|TestE2EModSecurity_EnableDisableReenableWithScopedExclusion|TestE2ERecoveryFlow_BadConfigThenRepair|TestE2ERecovery_InvalidCandidateDoesNotReplaceActiveProtection|TestE2ESecurityInvariant_PasswordChangeRevokesOtherSessionAndRecordsLogin|TestE2EServiceEditorParity|TestE2ESecurityAndTLSMatrix/RBACNegativeMatrix$|TestE2ETOTPStepUpProtectsCertificateExportAndLocksFailures|TestE2EBehavioral_CustomErrorPages_GeoAndDirectRuntimeBranches/TrustedProxyIdentityRejectsSpoofedForwardedFor$'
-      E2E_TIMEOUT=240 E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/security-invariants"
+      E2E_PROJECT=ci-security E2E_PORT=18180 E2E_RT_PORT=10180 E2E_RT_HTTPS_PORT=11443 E2E_RT_HLT_PORT=18181 E2E_CONTROL_PLANE_DIRECT_PORT=18182 E2E_DAST_CANARY_PORT=18183 E2E_TIMEOUT=240 E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/security-invariants"
       E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/e2e/security-invariants" sh scripts/run-e2e-tests.sh
-  after_script:
-    - docker compose -f deploy/compose/e2e/docker-compose.yml down --volumes --remove-orphans || true
   artifacts:
     when: always
     expire_in: 30 days
@@ -136,15 +130,12 @@ e2e:security-invariants:
 e2e:management-rate-limit:
   stage: e2e
   timeout: 30m
-  resource_group: waf-e2e-stack
   dependencies: []
   needs:
     - e2e:smoke
   script:
     - mkdir -p build/e2e/management-rate-limit
-    - E2E_FILTER=TestE2EManagementHostIsExcludedFromGlobalL7RateLimit E2E_TIMEOUT=240 E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/management-rate-limit" E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/e2e/management-rate-limit" sh scripts/run-e2e-tests.sh
-  after_script:
-    - docker compose -f deploy/compose/e2e/docker-compose.yml down --volumes --remove-orphans || true
+    - E2E_PROJECT=ci-management E2E_PORT=18280 E2E_RT_PORT=10280 E2E_RT_HTTPS_PORT=12443 E2E_RT_HLT_PORT=18281 E2E_CONTROL_PLANE_DIRECT_PORT=18282 E2E_DAST_CANARY_PORT=18283 E2E_FILTER=TestE2EManagementHostIsExcludedFromGlobalL7RateLimit E2E_TIMEOUT=240 E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/management-rate-limit" E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/e2e/management-rate-limit" sh scripts/run-e2e-tests.sh
   artifacts:
     when: always
     expire_in: 30 days
@@ -154,15 +145,12 @@ e2e:management-rate-limit:
 e2e:full:
   stage: e2e
   timeout: 45m
-  resource_group: waf-e2e-stack
   dependencies: []
   needs:
     - e2e:smoke
   script:
     - mkdir -p build/e2e/full
-    - E2E_FILTER='TestE2EAntibotTemplates/(TemplatePreviewRendering|TemplatesContainVerifyURI|TemplateSwitchSavesAndCompiles)$|TestE2EBasicAuthTemplates|TestE2ECompilerRuntimeAuthContract|TestE2EErrorPages|TestE2EBehavioral_CustomErrorPages_GeoAndDirectRuntimeBranches|TestE2EL4L7AdaptiveProtection|TestE2ESecurityAndTLSMatrix|TestE2ERecoveryFlow_BadConfigThenRepair|TestE2EMultisiteBasicAuthIsolation' E2E_TIMEOUT=240 E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/full" E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/e2e/full" sh scripts/run-e2e-tests.sh
-  after_script:
-    - docker compose -f deploy/compose/e2e/docker-compose.yml down --volumes --remove-orphans || true
+    - E2E_PROJECT=ci-full E2E_PORT=18380 E2E_RT_PORT=10380 E2E_RT_HTTPS_PORT=13443 E2E_RT_HLT_PORT=18381 E2E_CONTROL_PLANE_DIRECT_PORT=18382 E2E_DAST_CANARY_PORT=18383 E2E_FILTER='TestE2EAntibotTemplates/(TemplatePreviewRendering|TemplatesContainVerifyURI|TemplateSwitchSavesAndCompiles)$|TestE2EBasicAuthTemplates|TestE2ECompilerRuntimeAuthContract|TestE2EErrorPages|TestE2EBehavioral_CustomErrorPages_GeoAndDirectRuntimeBranches|TestE2EL4L7AdaptiveProtection|TestE2ESecurityAndTLSMatrix|TestE2ERecoveryFlow_BadConfigThenRepair|TestE2EMultisiteBasicAuthIsolation' E2E_TIMEOUT=240 E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/full" E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/e2e/full" sh scripts/run-e2e-tests.sh
   artifacts:
     when: always
     expire_in: 30 days
@@ -172,15 +160,12 @@ e2e:full:
 e2e:nightly:
   stage: e2e
   timeout: 60m
-  resource_group: waf-e2e-stack
   dependencies: []
   rules:
     - when: never
   script:
     - mkdir -p build/e2e/nightly
-    - WAF_E2E_RESILIENCE=1 WAF_E2E_VERIFY_DECAY=1 E2E_FILTER='TestE2EL4L7AdaptiveProtection|TestE2ESecurityModesReality|TestE2ERecoveryFlow_BadConfigThenRepair|TestE2ENegativeSecurityProbes|TestE2EBurstStability' E2E_TIMEOUT=300 E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/nightly" E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/e2e/nightly" sh scripts/run-e2e-tests.sh
-  after_script:
-    - docker compose -f deploy/compose/e2e/docker-compose.yml down --volumes --remove-orphans || true
+    - E2E_PROJECT=ci-nightly E2E_PORT=18480 E2E_RT_PORT=10480 E2E_RT_HTTPS_PORT=14443 E2E_RT_HLT_PORT=18481 E2E_CONTROL_PLANE_DIRECT_PORT=18482 E2E_DAST_CANARY_PORT=18483 WAF_E2E_RESILIENCE=1 WAF_E2E_VERIFY_DECAY=1 E2E_FILTER='TestE2EL4L7AdaptiveProtection|TestE2ESecurityModesReality|TestE2ERecoveryFlow_BadConfigThenRepair|TestE2ENegativeSecurityProbes|TestE2EBurstStability' E2E_TIMEOUT=300 E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/nightly" E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/e2e/nightly" sh scripts/run-e2e-tests.sh
   artifacts:
     when: always
     expire_in: 30 days
@@ -197,18 +182,15 @@ validate:generated-nginx-config:
 e2e:fresh-onboarding:
   stage: e2e
   timeout: 30m
-  resource_group: waf-e2e-stack
   dependencies: []
   script:
     - mkdir -p build/e2e/fresh-onboarding
     - >-
-      E2E_FRESH_ONBOARDING=1
+      E2E_PROJECT=ci-onboarding E2E_PORT=18580 E2E_RT_PORT=10580 E2E_RT_HTTPS_PORT=15443 E2E_RT_HLT_PORT=18581 E2E_CONTROL_PLANE_DIRECT_PORT=18582 E2E_DAST_CANARY_PORT=18583 E2E_FRESH_ONBOARDING=1
       E2E_FILTER=TestFreshOnboardingSelfSignedTLS
       E2E_TIMEOUT=240
       E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/fresh-onboarding"
       sh scripts/run-e2e-tests.sh
-  after_script:
-    - docker compose -f deploy/compose/e2e/docker-compose.yml down --volumes --remove-orphans || true
   artifacts:
     when: always
     expire_in: 14 days
@@ -297,16 +279,13 @@ security:npm-audit:
 dast:baseline:
   stage: dast
   timeout: 40m
-  resource_group: waf-e2e-stack
   dependencies: []
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
     - when: never
   script:
     - mkdir -p build/dast/baseline
-    - DAST_OUTPUT_DIR="$CI_PROJECT_DIR/build/dast/baseline" sh scripts/run-dast-scan.sh baseline
-  after_script:
-    - docker compose -f deploy/compose/e2e/docker-compose.yml down --volumes --remove-orphans || true
+    - E2E_PROJECT=ci-dast-baseline E2E_PORT=18680 E2E_RT_PORT=10680 E2E_RT_HTTPS_PORT=16443 E2E_RT_HLT_PORT=18681 E2E_CONTROL_PLANE_DIRECT_PORT=18682 E2E_DAST_CANARY_PORT=18683 DAST_TARGET_URL=http://127.0.0.1:10680 DAST_OUTPUT_DIR="$CI_PROJECT_DIR/build/dast/baseline" sh scripts/run-dast-scan.sh baseline
   artifacts:
     when: always
     expire_in: 30 days
@@ -316,16 +295,13 @@ dast:baseline:
 dast:negative:
   stage: dast
   timeout: 35m
-  resource_group: waf-e2e-stack
   dependencies: []
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
     - when: never
   script:
     - mkdir -p build/dast/negative
-    - E2E_FILTER='TestE2ENegativeSecurityProbes|TestE2EDASTAuthenticatedControlPlane|TestE2EDASTSecurityHeadersAndSessionCookie|TestE2EDASTAPIInputFuzz' E2E_TIMEOUT=240 E2E_LOG_DIR="$CI_PROJECT_DIR/build/dast/negative" E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/dast/negative" sh scripts/run-e2e-tests.sh
-  after_script:
-    - docker compose -f deploy/compose/e2e/docker-compose.yml down --volumes --remove-orphans || true
+    - E2E_PROJECT=ci-dast-negative E2E_PORT=18780 E2E_RT_PORT=10780 E2E_RT_HTTPS_PORT=17443 E2E_RT_HLT_PORT=18781 E2E_CONTROL_PLANE_DIRECT_PORT=18782 E2E_DAST_CANARY_PORT=18783 E2E_FILTER='TestE2ENegativeSecurityProbes|TestE2EDASTAuthenticatedControlPlane|TestE2EDASTSecurityHeadersAndSessionCookie|TestE2EDASTAPIInputFuzz' E2E_TIMEOUT=240 E2E_LOG_DIR="$CI_PROJECT_DIR/build/dast/negative" E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/dast/negative" sh scripts/run-e2e-tests.sh
   artifacts:
     when: always
     expire_in: 30 days
@@ -335,15 +311,12 @@ dast:negative:
 dast:full:
   stage: dast
   timeout: 60m
-  resource_group: waf-e2e-stack
   dependencies: []
   rules:
     - when: never
   script:
     - mkdir -p build/dast/full
-    - DAST_OUTPUT_DIR="$CI_PROJECT_DIR/build/dast/full" sh scripts/run-dast-scan.sh full
-  after_script:
-    - docker compose -f deploy/compose/e2e/docker-compose.yml down --volumes --remove-orphans || true
+    - E2E_PROJECT=ci-dast-full E2E_PORT=18880 E2E_RT_PORT=10880 E2E_RT_HTTPS_PORT=18443 E2E_RT_HLT_PORT=18881 E2E_CONTROL_PLANE_DIRECT_PORT=18882 E2E_DAST_CANARY_PORT=18883 DAST_TARGET_URL=http://127.0.0.1:10880 DAST_OUTPUT_DIR="$CI_PROJECT_DIR/build/dast/full" sh scripts/run-dast-scan.sh full
   artifacts:
     when: always
     expire_in: 30 days

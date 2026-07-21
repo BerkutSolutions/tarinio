@@ -187,6 +187,17 @@ func (b *DevFastStartBootstrapper) runUnlocked(ctx context.Context) error {
 		if attempt >= b.cfg.MaxAttempts {
 			break
 		}
+		// The bootstrapper runs asynchronously because runtime starts only after
+		// the control plane becomes healthy. If another actor successfully
+		// applies a revision while a bootstrap attempt is retrying, the initial
+		// snapshot is stale and must never overwrite that newer configuration.
+		_, active, activeErr := b.revisions.CurrentActive()
+		if activeErr != nil {
+			return activeErr
+		}
+		if active {
+			return nil
+		}
 		time.Sleep(time.Duration(b.cfg.RetryDelaySeconds) * time.Second)
 	}
 

@@ -36,6 +36,7 @@ func TestE2EL4L7AdaptiveProtection(t *testing.T) {
 	if _, err := os.Stat(composeFile); err != nil {
 		t.Fatalf("compose file: %v", err)
 	}
+	l4IP := e2eL4AttackerIP()
 
 	client, requestBaseURL, requestHostOverride := newE2EClientAndBase(t, baseURL)
 	loginE2EUser(t, client, requestBaseURL, requestHostOverride)
@@ -117,23 +118,23 @@ func TestE2EL4L7AdaptiveProtection(t *testing.T) {
 		deadline := time.Now().Add(35 * time.Second)
 		for time.Now().Before(deadline) {
 			adaptive = runProtectionRuntime(t, composeFile, "cat /etc/waf/l4guard-adaptive/adaptive.json 2>/dev/null || true")
-			if adaptiveHasDropEntry(adaptive, l4AttackerIP) {
+			if adaptiveHasDropEntry(adaptive, l4IP) {
 				return
 			}
 			time.Sleep(time.Second)
 		}
-		t.Fatalf("adaptive model did not emit a drop entry for attacker %s: %s", l4AttackerIP, adaptive)
+		t.Fatalf("adaptive model did not emit a drop entry for attacker %s: %s", l4IP, adaptive)
 	})
 	t.Run("L4 guard drops new connections from the adaptive IP", func(t *testing.T) {
 		deadline := time.Now().Add(12 * time.Second)
 		for time.Now().Before(deadline) {
 			chain = runProtectionRuntime(t, composeFile, "iptables -w -S WAF-RUNTIME-L4 2>/dev/null || true")
-			if strings.Contains(chain, "-s "+l4AttackerIP+"/32 -p tcp -j DROP") {
+			if strings.Contains(chain, "-s "+l4IP+"/32 -p tcp -j DROP") {
 				break
 			}
 			time.Sleep(500 * time.Millisecond)
 		}
-		if !strings.Contains(chain, "-s "+l4AttackerIP+"/32 -p tcp -j DROP") {
+		if !strings.Contains(chain, "-s "+l4IP+"/32 -p tcp -j DROP") {
 			t.Fatalf("L4 guard did not install attacker drop rule: %s", chain)
 		}
 		blockedOutput := runProtectionCompose(t, composeFile, l4AttackerService, "wget --tries=1 -T 3 -S -O /dev/null --header='Host: "+host+"' http://runtime/ 2>&1 || true")
@@ -147,7 +148,7 @@ func TestE2EL4L7AdaptiveProtection(t *testing.T) {
 			for time.Now().Before(deadline) {
 				adaptive = runProtectionRuntime(t, composeFile, "cat /etc/waf/l4guard-adaptive/adaptive.json 2>/dev/null || true")
 				chain = runProtectionRuntime(t, composeFile, "iptables -w -S WAF-RUNTIME-L4 2>/dev/null || true")
-				if !adaptiveHasDropEntry(adaptive, l4AttackerIP) && !strings.Contains(chain, "-s "+l4AttackerIP+"/32 -p tcp -j DROP") {
+				if !adaptiveHasDropEntry(adaptive, l4IP) && !strings.Contains(chain, "-s "+l4IP+"/32 -p tcp -j DROP") {
 					return
 				}
 				time.Sleep(time.Second)

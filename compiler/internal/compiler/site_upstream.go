@@ -50,6 +50,7 @@ type nginxSiteData struct {
 	UseCustomErrorPages bool
 	ErrorStatusCodes    []int
 	MTLSSnippet         string
+	RuntimeRevisionID   string
 }
 
 type nginxHostMapEntry struct {
@@ -172,6 +173,7 @@ func RenderSiteUpstreamArtifactsWithOptions(sites []SiteInput, upstreams []Upstr
 			UseCustomErrorPages:       site.UseCustomErrorPages,
 			ErrorStatusCodes:          responseErrorStatusCodes(),
 			MTLSSnippet:               mtlsSnippet,
+			RuntimeRevisionID:         options.RuntimeRevisionID,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("render site template for %s: %w", site.ID, err)

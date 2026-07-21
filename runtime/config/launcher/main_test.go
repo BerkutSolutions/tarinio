@@ -45,6 +45,13 @@ func TestWaitForHTTPProxyRevisionRequiresActiveRevision(t *testing.T) {
 	}
 }
 
+func TestRuntimeReloadReadinessTimeoutStaysBelowControlPlaneRequestBudget(t *testing.T) {
+	const readinessTimeout = 5 * time.Second
+	if readinessTimeout >= 20*time.Second {
+		t.Fatal("reload readiness timeout must leave time for apply to return its rollback result")
+	}
+}
+
 func TestSelectFirstExisting(t *testing.T) {
 	root := t.TempDir()
 	first := filepath.Join(root, "missing")

@@ -10,6 +10,7 @@ OUT="${DAST_OUTPUT_DIR:-$ROOT/build/dast/$MODE}"
 ZAP_IMAGE="${ZAP_IMAGE:-ghcr.io/zaproxy/zaproxy:stable}"
 TARGET="${DAST_TARGET_URL:-http://127.0.0.1:10080}"
 HOST="${DAST_TARGET_HOST:-e2e-management.test}"
+E2E_PROJECT="${E2E_PROJECT:-waf-dast-$MODE}"
 mkdir -p "$OUT"
 zap_cidfile="$OUT/.zap-container-id"
 zap_home="$(mktemp -d "${TMPDIR:-/tmp}/waf-zap.XXXXXX")"
@@ -21,12 +22,12 @@ cleanup() {
   fi
   rm -f "$zap_cidfile"
   rm -rf "$zap_home"
-  docker compose -f "$ROOT/deploy/compose/e2e/docker-compose.yml" down --volumes --remove-orphans >/dev/null 2>&1 || true
+  COMPOSE_PROJECT_NAME="$E2E_PROJECT" docker compose -f "$ROOT/deploy/compose/e2e/docker-compose.yml" down --volumes --remove-orphans >/dev/null 2>&1 || true
 }
 trap cleanup EXIT INT TERM
 
 # Reuse the real bootstrap, compile/apply and readiness path used by E2E.
-E2E_KEEP_STACK=1 E2E_FILTER=TestE2ESmoke_LoginHealthcheckDashboard \
+E2E_PROJECT="$E2E_PROJECT" E2E_KEEP_STACK=1 E2E_FILTER=TestE2ESmoke_LoginHealthcheckDashboard \
   E2E_LOG_DIR="$OUT" E2E_EVIDENCE_DIR="$OUT" sh "$ROOT/scripts/run-e2e-tests.sh" "$ROOT"
 
 scan="zap-baseline.py"

@@ -294,6 +294,24 @@ func (s *ApplyService) runApply(ctx context.Context, revision revisions.Revision
 			return fmt.Errorf("rollback failed: %w", rollbackErr)
 		}
 		if rollbackResult.Succeeded {
+			// Atomic activation only changes the pointer. Runtime has already
+			// relinked its layout to the rejected candidate, so reload the known
+			// good bundle before reporting failure. Otherwise current.json and the
+			// files served by nginx disagree after a rejected apply.
+			restored := rollbackResult.ActivationPointer
+			if restored == nil {
+				return errors.New("rollback did not return an activation pointer")
+			}
+			restoreResult := s.reloadRunner.Run(restored)
+			if !restoreResult.ReloadSucceeded || !restoreResult.HealthCheckSucceeded {
+				if restoreResult.HealthCheckError != nil {
+					return fmt.Errorf("rollback runtime reload failed: %w", restoreResult.HealthCheckError)
+				}
+				if restoreResult.ReloadError != nil {
+					return fmt.Errorf("rollback runtime reload failed: %w", restoreResult.ReloadError)
+				}
+				return errors.New("rollback runtime reload failed")
+			}
 			s.emitEvent(events.Event{
 				Type:              events.TypeRollbackPerformed,
 				Severity:          events.SeverityWarning,

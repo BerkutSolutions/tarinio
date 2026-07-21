@@ -18,6 +18,8 @@
 #   GO_CMD            go binary (default: go)
 #   E2E_KEEP_STACK    set to 1 to skip teardown (debug)
 #   E2E_BUILD_ATTEMPTS docker compose build/start attempts (default: 3)
+#   E2E_BOOTSTRAP_REVISION_TIMEOUT seconds to wait for the initial active revision (default: E2E_TIMEOUT)
+#   E2E_PROJECT      Docker Compose project name (default: waf-e2e)
 
 set -eu
 
@@ -31,7 +33,9 @@ E2E_RT_HLT_PORT="${E2E_RT_HLT_PORT:-18081}"
 E2E_USER="${E2E_USER:-e2e-admin}"
 E2E_PASS="${E2E_PASS:-e2e-password-1234}"
 E2E_TIMEOUT="${E2E_TIMEOUT:-180}"
+E2E_BOOTSTRAP_REVISION_TIMEOUT="${E2E_BOOTSTRAP_REVISION_TIMEOUT:-$E2E_TIMEOUT}"
 E2E_FILTER="${E2E_FILTER:-TestE2E}"
+E2E_PROJECT="${E2E_PROJECT:-waf-e2e}"
 E2E_FRESH_ONBOARDING="${E2E_FRESH_ONBOARDING:-0}"
 E2E_KEEP_STACK="${E2E_KEEP_STACK:-0}"
 GO_CMD="${GO_CMD:-go}"
@@ -41,6 +45,8 @@ E2E_LOG_FILE="$E2E_LOG_DIR/e2e-$(date +%Y%m%d_%H%M%S).log"
 E2E_EVIDENCE_DIR="${E2E_EVIDENCE_DIR:-$E2E_LOG_DIR}"
 E2E_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 E2E_BUILD_RETRIES=0
+export COMPOSE_PROJECT_NAME="$E2E_PROJECT"
+export E2E_PORT E2E_RT_PORT E2E_RT_HTTPS_PORT E2E_RT_HLT_PORT
 
 if [ "$E2E_FRESH_ONBOARDING" = "1" ]; then
   export E2E_BOOTSTRAP_ADMIN_ENABLED=false
@@ -171,6 +177,9 @@ def display_name(name: str) -> str:
 def suite_name(name: str) -> str:
     return f"{display_name(name)} suite"
 
+def is_e2e_test(name: str) -> bool:
+    return name.startswith("TestE2E") or name.startswith("TestFreshOnboarding")
+
 seen = {}
 order = []
 outputs = {}
@@ -181,7 +190,7 @@ for line in open(path, encoding="utf-8", errors="replace"):
     except Exception:
         continue
     test = item.get("Test") or ""
-    if not test.startswith("TestE2E"):
+    if not is_e2e_test(test):
         continue
     if "/" in test:
         parents.add(test.split("/", 1)[0])
@@ -288,6 +297,9 @@ def display_name(name: str) -> str:
 def suite_name(name: str) -> str:
     return f"{display_name(name)} suite"
 
+def is_e2e_test(name: str) -> bool:
+    return name.startswith("TestE2E") or name.startswith("TestFreshOnboarding")
+
 outputs = {}
 summary = ""
 parents = set()
@@ -311,7 +323,7 @@ with open(log_path, "w", encoding="utf-8", errors="replace") as log:
                 elapsed = item.get("Elapsed")
                 summary = f"ok waf/ui/tests {elapsed}s" if elapsed is not None else "ok waf/ui/tests"
                 continue
-            if not test.startswith("TestE2E"):
+            if not is_e2e_test(test):
                 continue
             if action == "run":
                 started_tests.add(test)
@@ -410,6 +422,7 @@ trap cleanup EXIT INT TERM
 # Bring up stack.
 step "Starting e2e stack (control-plane=:$E2E_PORT runtime=:$E2E_RT_PORT)"
 info "Detailed log: $E2E_LOG_FILE"
+info "Isolated Compose project: $E2E_PROJECT"
 cd "$E2E_COMPOSE_DIR"
 $COMPOSE_CMD -f docker-compose.yml down --volumes --remove-orphans >>"$E2E_LOG_FILE" 2>&1 || true
 run_compose_start
@@ -458,12 +471,22 @@ if [ "$E2E_FRESH_ONBOARDING" != "1" ]; then
   done
   ok "Runtime healthy after ${elapsed}s"
 
-  # The compose stack's dev-fast-start revision already owns the active runtime
-  # configuration. Do not race it with a second blind apply: every E2E that
-  # changes policy performs and verifies its own compile/apply transaction.
-  # A previous unconditional apply intermittently stopped the runtime reload
-  # listener before the first test could submit its verified revision.
-  ok "Bootstrap runtime revision is ready"
+  # Health proves only that the reload listener is alive. The asynchronous
+  # dev-fast-start transaction must also publish its initial revision before a
+  # test starts its own compile/apply; otherwise the bootstrap can race the
+  # first scenario and replace its configuration.
+  step "Waiting for bootstrap runtime revision (timeout ${E2E_BOOTSTRAP_REVISION_TIMEOUT}s)"
+  elapsed=0
+  until $COMPOSE_CMD -f docker-compose.yml exec -T runtime sh -c '[ -s /var/lib/waf/active/current.json ]' >>"$E2E_LOG_FILE" 2>&1; do
+    [ "$elapsed" -ge "$E2E_BOOTSTRAP_REVISION_TIMEOUT" ] && {
+      fail_msg "bootstrap runtime revision timeout"
+      $COMPOSE_CMD -f docker-compose.yml logs control-plane runtime --tail=100 >&2
+      exit 1
+    }
+    sleep 2
+    elapsed=$((elapsed + 2))
+  done
+  ok "Bootstrap runtime revision is ready after ${elapsed}s"
 fi
 
 # Run tests.
@@ -485,7 +508,22 @@ WAF_E2E_ANTIBOT_BASE_URL="${WAF_E2E_ANTIBOT_BASE_URL:-$E2E_RUNTIME_HTTPS_URL}"
 WAF_E2E_AUTOSTART_SMART="${WAF_E2E_AUTOSTART_SMART:-1}"
 WAF_E2E_L4_L7_PROTECTION="${WAF_E2E_L4_L7_PROTECTION:-1}"
 WAF_E2E_FRESH_ONBOARDING="${E2E_FRESH_ONBOARDING}"
-export WAF_E2E_BASE_URL WAF_E2E_USERNAME WAF_E2E_PASSWORD WAF_E2E_RUNTIME_URL WAF_E2E_RUNTIME_HTTPS_URL WAF_E2E_RUNTIME_HEALTH_URL WAF_E2E_RUNTIME_API_TOKEN WAF_E2E_COMPOSE_FILE WAF_E2E_MANAGEMENT_HOST WAF_E2E_AUTH_BASE_URL WAF_E2E_ANTIBOT_BASE_URL WAF_E2E_AUTOSTART_SMART WAF_E2E_L4_L7_PROTECTION WAF_E2E_FRESH_ONBOARDING WAF_E2E_RESILIENCE WAF_E2E_VERIFY_DECAY GO_CMD E2E_FILTER
+WAF_E2E_DAST_CANARY_URL="${WAF_E2E_DAST_CANARY_URL:-http://127.0.0.1:${E2E_DAST_CANARY_PORT:-18083}}"
+WAF_E2E_CONTROL_PLANE_CONTAINER="$($COMPOSE_CMD -f "$COMPOSE_FILE" ps -q control-plane)"
+WAF_E2E_RUNTIME_CONTAINER="$($COMPOSE_CMD -f "$COMPOSE_FILE" ps -q runtime)"
+WAF_E2E_ATTACKER_CONTAINER="$($COMPOSE_CMD -f "$COMPOSE_FILE" ps -q e2e-attacker)"
+WAF_E2E_L4_ATTACKER_CONTAINER="$($COMPOSE_CMD -f "$COMPOSE_FILE" ps -q e2e-l4-attacker)"
+if [ -z "$WAF_E2E_CONTROL_PLANE_CONTAINER" ] || [ -z "$WAF_E2E_RUNTIME_CONTAINER" ] || [ -z "$WAF_E2E_ATTACKER_CONTAINER" ] || [ -z "$WAF_E2E_L4_ATTACKER_CONTAINER" ]; then
+  fail_msg "could not resolve isolated E2E container IDs"
+  exit 1
+fi
+WAF_E2E_ATTACKER_IP="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$WAF_E2E_ATTACKER_CONTAINER")"
+WAF_E2E_L4_ATTACKER_IP="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$WAF_E2E_L4_ATTACKER_CONTAINER")"
+if [ -z "$WAF_E2E_ATTACKER_IP" ] || [ -z "$WAF_E2E_L4_ATTACKER_IP" ]; then
+  fail_msg "could not resolve isolated E2E attacker IP addresses"
+  exit 1
+fi
+export WAF_E2E_BASE_URL WAF_E2E_USERNAME WAF_E2E_PASSWORD WAF_E2E_RUNTIME_URL WAF_E2E_RUNTIME_HTTPS_URL WAF_E2E_RUNTIME_HEALTH_URL WAF_E2E_RUNTIME_API_TOKEN WAF_E2E_COMPOSE_FILE WAF_E2E_MANAGEMENT_HOST WAF_E2E_AUTH_BASE_URL WAF_E2E_ANTIBOT_BASE_URL WAF_E2E_AUTOSTART_SMART WAF_E2E_L4_L7_PROTECTION WAF_E2E_FRESH_ONBOARDING WAF_E2E_RESILIENCE WAF_E2E_VERIFY_DECAY WAF_E2E_DAST_CANARY_URL WAF_E2E_ATTACKER_IP WAF_E2E_L4_ATTACKER_IP WAF_E2E_CONTROL_PLANE_CONTAINER WAF_E2E_RUNTIME_CONTAINER WAF_E2E_ATTACKER_CONTAINER WAF_E2E_L4_ATTACKER_CONTAINER GO_CMD E2E_FILTER
 TEST_SUMMARY_FILE="$(mktemp)"
 E2E_SUMMARY_OUT="$TEST_SUMMARY_FILE" run_go_e2e_stream || TEST_EXIT=$?
 cat "$TEST_LOG" >>"$E2E_LOG_FILE"

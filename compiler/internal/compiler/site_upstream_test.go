@@ -316,15 +316,24 @@ func TestRenderSiteUpstreamArtifacts_EmitsRuntimeRevisionMarker(t *testing.T) {
 	if err != nil {
 		t.Fatalf("render failed: %v", err)
 	}
+	baseMarker, siteMarker := false, false
 	for _, artifact := range artifacts {
 		if artifact.Path == "nginx/conf.d/base.conf" {
 			if !strings.Contains(string(artifact.Content), `add_header X-WAF-Runtime-Revision "rev-000123" always;`) {
 				t.Fatalf("base config must expose the active revision marker: %s", artifact.Content)
 			}
-			return
+			baseMarker = true
+		}
+		if artifact.Path == "nginx/sites/site-a.conf" {
+			if !strings.Contains(string(artifact.Content), `add_header X-WAF-Runtime-Revision "rev-000123" always;`) {
+				t.Fatalf("site config must expose the active revision marker: %s", artifact.Content)
+			}
+			siteMarker = true
 		}
 	}
-	t.Fatal("nginx base config artifact was not rendered")
+	if !baseMarker || !siteMarker {
+		t.Fatalf("expected base and site runtime revision markers, got base=%t site=%t", baseMarker, siteMarker)
+	}
 }
 
 func TestRenderSiteUpstreamArtifacts_DisabledServiceLeavesNoRuntimeArtifacts(t *testing.T) {

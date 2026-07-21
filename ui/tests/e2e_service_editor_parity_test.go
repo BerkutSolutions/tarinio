@@ -21,6 +21,7 @@ func TestE2EServiceEditorParity(t *testing.T) {
 	}
 	client, requestBaseURL, hostOverride := newE2EClientAndBase(t, baseURL)
 	loginE2EUser(t, client, requestBaseURL, hostOverride)
+	attackerIP := e2eAttackerIP()
 
 	const siteID = "e2e-editor-parity"
 	const upstreamID = siteID + "-upstream"
@@ -66,7 +67,7 @@ func TestE2EServiceEditorParity(t *testing.T) {
 		"id": upstreamID, "site_id": siteID, "name": upstreamID, "scheme": "http", "host": "privatebin", "port": 8080, "base_path": "/",
 	}), "save changed upstream from simple editor", http.StatusOK)
 	assertE2EStatus(t, postJSON(t, client, requestBaseURL+"/api/access-policies/upsert?auto_apply=false", hostOverride, map[string]any{
-		"id": siteID + "-access", "site_id": siteID, "enabled": true, "allowlist": []string{"172.30.0.30"},
+		"id": siteID + "-access", "site_id": siteID, "enabled": true, "allowlist": []string{attackerIP},
 	}), "save service allowlist", http.StatusCreated, http.StatusOK)
 
 	// A subsequent Easy Profile save must not erase the independently persisted
@@ -110,7 +111,7 @@ func TestE2EServiceEditorParity(t *testing.T) {
 			t.Fatalf("raw allowlist has unexpected type: %#v", policy)
 		}
 		for _, entry := range entries {
-			if entry == "172.30.0.30" {
+			if entry == attackerIP {
 				foundAllowlist = true
 			}
 		}
@@ -140,7 +141,7 @@ func TestE2EServiceEditorParity(t *testing.T) {
 		t.Fatalf("compiled revision retained stale upstream: %s", revisionArtifact)
 	}
 	accessArtifact, err := exec.Command("docker", "exec", controlPlaneContainer, "cat", "/var/lib/waf/candidates/"+revisionID+"/nginx/access/"+siteID+".conf").CombinedOutput()
-	if err != nil || !strings.Contains(string(accessArtifact), "allow 172.30.0.30;") || !strings.Contains(string(accessArtifact), "deny all;") {
+	if err != nil || !strings.Contains(string(accessArtifact), "allow "+attackerIP+";") || !strings.Contains(string(accessArtifact), "deny all;") {
 		t.Fatalf("compiled allowlist is incomplete: err=%v artifact=%s", err, accessArtifact)
 	}
 	activeArtifact, err := exec.Command("docker", "exec", runtimeContainer, "cat", "/etc/waf/current/"+artifactPath).CombinedOutput()
@@ -148,14 +149,22 @@ func TestE2EServiceEditorParity(t *testing.T) {
 		t.Fatalf("active runtime artifact differs from revision: err=%v", err)
 	}
 
-	allowed := e2eContainerHTTPStatus(t, "waf-e2e-attacker", host)
+	allowed := e2eContainerHTTPStatus(t, e2eContainerName(t, "WAF_E2E_ATTACKER_CONTAINER", "waf-e2e-attacker"), host)
 	if allowed != http.StatusOK {
 		t.Fatalf("allowlisted E2E client: status=%d, want 200 from protected upstream", allowed)
 	}
-	if denied := e2eContainerHTTPStatus(t, "waf-e2e-l4-attacker", host); denied != http.StatusForbidden {
+	if denied := e2eContainerHTTPStatus(t, e2eContainerName(t, "WAF_E2E_L4_ATTACKER_CONTAINER", "waf-e2e-l4-attacker"), host); denied != http.StatusForbidden {
 		t.Fatalf("non-allowlisted E2E client: status=%d, want 403", denied)
 	}
-	t.Logf("editor/raw/runtime parity revision=%s upstream=privatebin:8080 allowlist=172.30.0.30 allowed_status=%d", revisionID, allowed)
+	t.Logf("editor/raw/runtime parity revision=%s upstream=privatebin:8080 allowlist=%s allowed_status=%d", revisionID, attackerIP, allowed)
+}
+
+func e2eContainerName(t *testing.T, environment, fallback string) string {
+	t.Helper()
+	if name := strings.TrimSpace(os.Getenv(environment)); name != "" {
+		return name
+	}
+	return fallback
 }
 
 func e2eContainerHTTPStatus(t *testing.T, container, host string) int {

@@ -106,3 +106,11 @@
 - После успешных проверок доступны ручные jobs зеркалирования кода в GitHub и публикации подписанного GitHub Release с Docker-образом в GHCR.
 - GitHub Release теперь содержит единый `release-evidence.md/json` и архив исходных очищенных E2E/DAST-доказательств. Публикация завершается ошибкой, если E2E содержат fail/skip или DAST сообщает High/Critical.
 - Перед публикацией образа проверяются сгенерированные Nginx-артефакты, подпись, SBOM, provenance и `/healthz` собранного Docker-образа.
+## E2E-стабильность
+
+- Каждый E2E/DAST набор теперь работает в собственном Docker Compose project: отдельные контейнеры, сети, volumes и host-порты. Независимые jobs не наследуют active revision, telemetry или Docker state друг друга и могут выполняться параллельно после smoke gate.
+- Проверки runtime artifact, allowlist и L4/L7 adaptive protection получают фактические container IDs и IP из своего Compose project. Изоляция не заменяет реальные проверки: E2E всё так же сверяет candidate, active runtime, защитные HTTP-ответы и iptables DROP rule.
+- E2E-раннер теперь ждёт не только `/healthz`, но и публикации стартовой active revision runtime. Первый сценарий не может пересечься с асинхронным bootstrap apply и получить конфигурацию предыдущей ревизии.
+- Проверка preview страниц ошибок использует тот же защищённый API `/api/error-pages/preview/<slug>`, что и интерфейс, вместо внутреннего runtime-маршрута через UI-порт.
+- Evidence учитывает first-onboarding сценарий наравне с `TestE2E*`: зелёный отчёт больше не может показать `0` выполненных тестов для фактически пройденного onboarding/TLS контракта.
+- Неудачный apply теперь откатывает не только pointer active revision, но и реально перезагружает и проверяет последнюю рабочую конфигурацию runtime; отдельный E2E подтверждает сохранение ModSecurity `403` после невалидного candidate.

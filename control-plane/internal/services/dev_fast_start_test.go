@@ -110,9 +110,15 @@ func (f *fakeDevFastStartTLSConfigs) Update(ctx context.Context, item tlsconfigs
 
 type fakeDevFastStartRevisions struct {
 	active bool
+	calls  int
+	activeAfterCalls int
 }
 
 func (f *fakeDevFastStartRevisions) CurrentActive() (revisions.Revision, bool, error) {
+	f.calls++
+	if f.activeAfterCalls > 0 && f.calls >= f.activeAfterCalls {
+		f.active = true
+	}
 	if !f.active {
 		return revisions.Revision{}, false, nil
 	}
@@ -298,6 +304,34 @@ func TestDevFastStartBootstrapperRunRetriesApplyFailures(t *testing.T) {
 
 	if err := bootstrapper.Run(context.Background()); err != nil {
 		t.Fatalf("expected retry to recover apply failure, got %v", err)
+	}
+}
+
+func TestDevFastStartBootstrapperRunStopsRetryWhenAnotherRevisionBecomesActive(t *testing.T) {
+	revisions := &fakeDevFastStartRevisions{activeAfterCalls: 2}
+	apply := &fakeDevFastStartApply{failBefore: 1}
+	bootstrapper := NewDevFastStartBootstrapper(
+		config.DevFastStartConfig{
+			Enabled: true, Host: "localhost", CertificateID: "control-plane-localhost-tls",
+			ManagementSiteID: "control-plane-access", UpstreamHost: "ui", UpstreamPort: 80,
+			RetryDelaySeconds: 1, MaxAttempts: 3,
+		},
+		&fakeDevFastStartSites{items: []sites.Site{{ID: "control-plane-access", PrimaryHost: "localhost", Enabled: true}}},
+		&fakeDevFastStartUpstreams{items: []upstreams.Upstream{{ID: "control-plane-access-upstream", SiteID: "control-plane-access", Host: "ui", Port: 80, Scheme: "http"}}},
+		&fakeDevFastStartCertificates{items: []certificates.Certificate{{ID: "control-plane-localhost-tls", CommonName: "localhost", Status: "active"}}},
+		&fakeDevFastStartMaterials{exists: true},
+		&fakeDevFastStartTLSConfigs{items: []tlsconfigs.TLSConfig{{SiteID: "control-plane-access", CertificateID: "control-plane-localhost-tls"}}},
+		revisions, &fakeDevFastStartCompile{}, apply, &fakeDevFastStartIssuer{},
+		&fakeDevFastStartEasyProfiles{items: map[string]easysiteprofiles.EasySiteProfile{"control-plane-access": easysiteprofiles.DefaultProfile("control-plane-access")}},
+		&fakeDevFastStartEasyProfiles{items: map[string]easysiteprofiles.EasySiteProfile{"control-plane-access": easysiteprofiles.DefaultProfile("control-plane-access")}},
+		nil,
+	)
+
+	if err := bootstrapper.Run(context.Background()); err != nil {
+		t.Fatalf("expected stale bootstrap retry to stop cleanly, got %v", err)
+	}
+	if apply.calls != 1 {
+		t.Fatalf("expected no stale bootstrap reapply after another revision activates, got %d calls", apply.calls)
 	}
 }
 

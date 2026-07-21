@@ -424,7 +424,10 @@ error_page 426 /__waf_errors/{{ .SiteID }}/426.html?rid=$request_id&ip=$remote_a
 error_page 428 /__waf_errors/{{ .SiteID }}/428.html?rid=$request_id&ip=$remote_addr&ts=$msec;
 {{- end }}
 {{- if not (sliceContains .DisabledErrorPages "429") }}
-error_page 429 /__waf_errors/{{ .SiteID }}/429.html?rid=$request_id&ip=$remote_addr&ts=$msec;
+# Preserve the protection decision while rendering the branded body. Without
+# an explicit status nginx serves the internal static error page as HTTP 200,
+# which breaks clients and hides an active rate-limit block.
+error_page 429 =429 /__waf_errors/{{ .SiteID }}/429.html?rid=$request_id&ip=$remote_addr&ts=$msec;
 {{- end }}
 {{- if not (sliceContains .DisabledErrorPages "431") }}
 error_page 431 /__waf_errors/{{ .SiteID }}/431.html?rid=$request_id&ip=$remote_addr&ts=$msec;

@@ -98,12 +98,16 @@ func (f *fakeApplyExecutor) Run(name string, args []string, workdir string) erro
 }
 
 type fakeApplyHealthChecker struct {
-	err   error
-	calls int
+	err     error
+	errors  []error
+	calls   int
 }
 
 func (f *fakeApplyHealthChecker) Check(active *pipeline.ActivePointer) error {
 	f.calls++
+	if index := f.calls - 1; index < len(f.errors) {
+		return f.errors[index]
+	}
 	return f.err
 }
 
@@ -226,7 +230,7 @@ func TestApplyService_RollsBackToKnownGoodOnHealthFailure(t *testing.T) {
 		},
 	}
 	exec := &fakeApplyExecutor{}
-	health := &fakeApplyHealthChecker{err: errors.New("unhealthy")}
+	health := &fakeApplyHealthChecker{errors: []error{errors.New("unhealthy"), nil}}
 	eventStore := &fakeEventStore{}
 	eventService := NewEventService(eventStore)
 	service := NewApplyService(root, revisionStore, snapshotReader, jobStore, eventService, exec, exec, health, nil)
@@ -250,6 +254,12 @@ func TestApplyService_RollsBackToKnownGoodOnHealthFailure(t *testing.T) {
 	}
 	if !strings.Contains(string(content), "rev-good") {
 		t.Fatalf("expected rollback to known-good, got %s", string(content))
+	}
+	if exec.reloadCalls != 2 {
+		t.Fatalf("expected failed apply and rollback to both reload runtime, got %d reloads", exec.reloadCalls)
+	}
+	if health.calls != 2 {
+		t.Fatalf("expected failed apply and rollback to both verify runtime health, got %d checks", health.calls)
 	}
 	if len(eventStore.items) != 4 {
 		t.Fatalf("expected 4 events, got %+v", eventStore.items)

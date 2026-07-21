@@ -158,7 +158,11 @@ func (p *runtimeProcess) reloadCurrent() error {
 		runtimeProm.recordReload("failed")
 		return err
 	}
-	if err := waitForHTTPProxyRevision(pointer.RevisionID, 10*time.Second); err != nil {
+	// A successful nginx reload publishes its revision marker immediately. Keep
+	// this bounded well below the control-plane request timeout so an invalid
+	// candidate fails and rolls back promptly instead of leaving apply callers
+	// waiting through transport retries.
+	if err := waitForHTTPProxyRevision(pointer.RevisionID, 5*time.Second); err != nil {
 		runtimeProm.recordReload("failed")
 		return err
 	}

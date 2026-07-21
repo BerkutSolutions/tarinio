@@ -13,7 +13,8 @@ import (
 )
 
 // TestE2EErrorPages проверяет:
-// 1. Preview-страницы ошибок отдаются через /preview/<slug>
+// 1. Preview-страницы ошибок отдаются через защищённый API
+//    /api/error-pages/preview/<slug>.
 // 2. Исключения (disabled_error_pages) сохраняются и читаются обратно
 // 3. После compile+apply исключённая страница не отображается (error_page директива убрана)
 //
@@ -34,20 +35,21 @@ func TestE2EErrorPages(t *testing.T) {
 	}
 
 	t.Run("PreviewPagesAccessible", func(t *testing.T) {
-		// Проверяем что preview-страницы отдаются через /preview/<slug>
+		// Preview является функцией UI и доступен только через API с сессией.
+		// Путь /preview/<slug> принадлежит management vhost runtime, а не UI.
 		slugs := []string{"400", "401", "403", "404", "429", "500", "502", "503"}
 		for _, slug := range slugs {
 			slug := slug
 			t.Run("preview_"+slug, func(t *testing.T) {
-				url := requestBaseURL + "/preview/" + slug
+				url := requestBaseURL + "/api/error-pages/preview/" + slug
 				resp := getWithAuth(t, client, url, requestHostOverride)
 				defer resp.Body.Close()
 				body, _ := io.ReadAll(resp.Body)
 				if resp.StatusCode != http.StatusOK {
-					t.Fatalf("GET /preview/%s: want 200, got %d body=%s", slug, resp.StatusCode, string(body))
+					t.Fatalf("GET /api/error-pages/preview/%s: want 200, got %d body=%s", slug, resp.StatusCode, string(body))
 				}
 				if len(body) < 100 {
-					t.Fatalf("GET /preview/%s: response too short (%d bytes), likely empty page", slug, len(body))
+					t.Fatalf("GET /api/error-pages/preview/%s: response too short (%d bytes), likely empty page", slug, len(body))
 				}
 			})
 		}

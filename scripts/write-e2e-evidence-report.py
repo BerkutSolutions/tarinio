@@ -28,7 +28,7 @@ def test_evidence(path):
         except json.JSONDecodeError:
             continue
         name, action = event.get("Test", ""), event.get("Action", "")
-        if not name.startswith("TestE2E"):
+        if not (name.startswith("TestE2E") or name.startswith("TestFreshOnboarding")):
             continue
         if action in {"pass", "fail", "skip"}:
             final[name] = action
@@ -66,17 +66,19 @@ def test_report(final, observations):
 
 
 def runtime_config_checksum():
+    runtime = os.getenv("WAF_E2E_RUNTIME_CONTAINER", "waf-e2e-runtime")
     try:
-        out = subprocess.check_output(["docker", "exec", "waf-e2e-runtime", "sh", "-lc", "find /etc/waf/nginx -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum"], text=True, stderr=subprocess.DEVNULL)
+        out = subprocess.check_output(["docker", "exec", runtime, "sh", "-lc", "find /etc/waf/nginx -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum"], text=True, stderr=subprocess.DEVNULL)
         return out.split()[0]
     except Exception:
         return "unavailable"
 
 
 def runtime_adaptive_evidence():
+    runtime = os.getenv("WAF_E2E_RUNTIME_CONTAINER", "waf-e2e-runtime")
     commands = {
-        "adaptive_entries": ["docker", "exec", "waf-e2e-runtime", "sh", "-lc", "cat /etc/waf/l4guard-adaptive/adaptive.json 2>/dev/null || true"],
-        "iptables_rules": ["docker", "exec", "waf-e2e-runtime", "iptables", "-S", "WAF-RUNTIME-L4"],
+        "adaptive_entries": ["docker", "exec", runtime, "sh", "-lc", "cat /etc/waf/l4guard-adaptive/adaptive.json 2>/dev/null || true"],
+        "iptables_rules": ["docker", "exec", runtime, "iptables", "-S", "WAF-RUNTIME-L4"],
     }
     result = {}
     for name, command in commands.items():

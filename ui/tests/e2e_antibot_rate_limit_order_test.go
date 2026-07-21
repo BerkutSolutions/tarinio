@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -51,6 +52,9 @@ func TestE2EAntibotChallengePrecedesActiveRateLimitFallback(t *testing.T) {
 	antibot := mapGetOrCreate(profile, "security_antibot")
 	antibot["antibot_challenge"] = "javascript"
 	antibot["antibot_uri"] = "/challenge"
+	// This scenario isolates AntiBot ordering from CRS signature detection;
+	// ModSecurity itself is covered by its dedicated smoke E2E.
+	mapGetOrCreate(profile, "security_modsecurity")["use_modsecurity"] = false
 	limits := mapGetOrCreate(profile, "security_behavior_and_limits")
 	limits["use_bad_behavior"] = true
 	limits["bad_behavior_status_codes"] = []any{429}
@@ -79,6 +83,10 @@ func TestE2EAntibotChallengePrecedesActiveRateLimitFallback(t *testing.T) {
 		}
 		req.Host = host
 		req.Header.Set("Cookie", cookie)
+		// The policy scenario is a browser challenge flow. A browser-like user
+		// agent keeps the request outside unrelated CRS bot signatures, so a
+		// 403 here can only represent the policy being tested.
+		req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/126.0.0.0 Safari/537.36")
 		resp, err := noRedirect.Do(req)
 		if err != nil {
 			t.Fatalf("runtime request: %v", err)
@@ -111,6 +119,7 @@ func TestE2EAntibotChallengePrecedesActiveRateLimitFallback(t *testing.T) {
 		t.Fatalf("build challenge verification request: %v", err)
 	}
 	verifyRequest.Host = host
+	verifyRequest.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/126.0.0.0 Safari/537.36")
 	verifyResp, err := noRedirect.Do(verifyRequest)
 	if err != nil {
 		t.Fatalf("verify challenge: %v", err)
@@ -120,8 +129,17 @@ func TestE2EAntibotChallengePrecedesActiveRateLimitFallback(t *testing.T) {
 		_ = verifyResp.Body.Close()
 		t.Fatalf("challenge verification must set antibot cookie: status=%d body=%s", verifyResp.StatusCode, body)
 	}
-	antibotCookie := verifyResp.Cookies()[0]
+	var antibotCookie *http.Cookie
+	for _, cookie := range verifyResp.Cookies() {
+		if strings.HasPrefix(cookie.Name, "waf_antibot_") && cookie.Value != "" {
+			antibotCookie = cookie
+			break
+		}
+	}
 	_ = verifyResp.Body.Close()
+	if antibotCookie == nil {
+		t.Fatalf("challenge verification did not return an antibot cookie: %s", verifyResp.Header.Values("Set-Cookie"))
+	}
 
 	// The apply API completes before every worker has switched to the new
 	// virtual-host set. The first request already proved that this site is
@@ -139,27 +157,38 @@ func TestE2EAntibotChallengePrecedesActiveRateLimitFallback(t *testing.T) {
 		if status == http.StatusTooManyRequests {
 			return
 		}
+		if status == http.StatusForbidden {
+		t.Fatalf("verified client must reach rate-limit branch, got 403 with cookies %s=%s and %s=%s", rateCookieName, "1", antibotCookie.Name, antibotCookie.Value)
+		}
 		time.Sleep(250 * time.Millisecond)
 	}
 	t.Fatalf("verified client with active rate-limit cookie must receive 429, got status=%d body=%s", status, body)
 }
 
-func e2eRateLimitCookieName(t *testing.T, client *http.Client, baseURL, hostOverride, revisionID, siteID string) string {
+func e2eRateLimitCookieName(t *testing.T, _ *http.Client, _ string, _ string, revisionID, siteID string) string {
 	t.Helper()
-	response := getWithAuth(t, client, baseURL+"/api/revisions/"+revisionID+"/artifacts/nginx/sites/"+siteID+".conf", hostOverride)
-	body := mustReadBody(t, response.Body)
-	if response.StatusCode != http.StatusOK {
-		t.Fatalf("read rate-limit artifact: status=%d body=%s", response.StatusCode, body)
+	container := strings.TrimSpace(os.Getenv("WAF_E2E_CONTROL_PLANE_CONTAINER"))
+	if container == "" {
+		container = "waf-e2e-control-plane"
 	}
+	body, err := exec.Command("docker", "exec", container, "cat", "/var/lib/waf/candidates/"+revisionID+"/nginx/sites/"+siteID+".conf").CombinedOutput()
+	if err != nil {
+		t.Fatalf("read rate-limit artifact from candidate: %v: %s", err, body)
+	}
+	text := string(body)
 	const marker = `add_header Set-Cookie "waf_rate_limited_`
-	start := strings.Index(body, marker)
-	if start < 0 {
-		t.Fatalf("rate-limit cookie is missing from artifact: %s", body)
+	for remaining := text; ; {
+		start := strings.Index(remaining, marker)
+		if start < 0 {
+			break
+		}
+		rest := remaining[start+len(`add_header Set-Cookie "`):]
+		name, tail, found := strings.Cut(rest, "=1;")
+		if found && strings.HasPrefix(name, "waf_rate_limited_") && !strings.HasPrefix(name, "waf_rate_limited_escalated_") {
+			return name
+		}
+		remaining = tail
 	}
-	rest := body[start+len(`add_header Set-Cookie "`):]
-	name, _, found := strings.Cut(rest, "=1;")
-	if !found || !strings.HasPrefix(name, "waf_rate_limited_") {
-		t.Fatalf("cannot parse rate-limit cookie from artifact: %s", rest)
-	}
-	return name
+	t.Fatalf("rate-limit cookie is missing from artifact: %s", text)
+	return ""
 }

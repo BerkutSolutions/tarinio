@@ -2,11 +2,23 @@ package tests
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 )
+
+func e2eEnvironmentValue(name, fallback string) string {
+	if value := strings.TrimSpace(os.Getenv(name)); value != "" {
+		return value
+	}
+	return fallback
+}
+
+func e2eAttackerIP() string { return e2eEnvironmentValue("WAF_E2E_ATTACKER_IP", "172.30.0.30") }
+
+func e2eL4AttackerIP() string { return e2eEnvironmentValue("WAF_E2E_L4_ATTACKER_IP", "172.30.0.31") }
 
 var e2eIDSequence uint64
 
