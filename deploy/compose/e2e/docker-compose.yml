@@ -19,7 +19,6 @@ services:
       WAF_RUNTIME_HEALTH_URL: http://runtime:8081/readyz
       WAF_RUNTIME_RELOAD_URL: http://runtime:8081/reload
       WAF_RUNTIME_API_TOKEN: e2e-test-runtime-token
-      WAF_CONTROL_PLANE_INTERNAL_URL: http://control-plane:8080
       CONTROL_PLANE_SENTINEL_BAN_SYNC_ENABLED: "false"
       POSTGRES_DSN: postgres://waf:e2e-test-postgres-pw@postgres:5432/waf?sslmode=disable
       OPENSEARCH_ENDPOINT: ""
@@ -79,6 +78,7 @@ services:
       WAF_REQUEST_ARCHIVE_ROOT: /var/lib/waf-request-archive
       WAF_RUNTIME_HEALTH_ADDR: 0.0.0.0:8081
       WAF_RUNTIME_API_TOKEN: e2e-test-runtime-token
+      WAF_CONTROL_PLANE_INTERNAL_URL: http://control-plane:8080
       # The control plane atomically stages the initial TLS revision. Waiting for
       # that pointer avoids booting runtime between pointer publication and key
       # material availability on the shared read-only volume.

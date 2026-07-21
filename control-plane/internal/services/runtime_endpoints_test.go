@@ -52,6 +52,48 @@ func TestHTTPReloadExecutorFallsBackFromRuntimeHost(t *testing.T) {
 	}
 }
 
+func TestHTTPReloadExecutorRetriesOneTransportInterruption(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts == 1 {
+			hijacker := w.(http.Hijacker)
+			conn, _, err := hijacker.Hijack()
+			if err != nil {
+				t.Fatalf("hijack first request: %v", err)
+			}
+			_ = conn.Close()
+			return
+		}
+		if r.URL.Path != "/reload" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+	if err := (HTTPReloadExecutor{URL: server.URL + "/reload"}).Run("nginx", nil, ""); err != nil {
+		t.Fatalf("transport retry must recover: %v", err)
+	}
+	if attempts != 2 {
+		t.Fatalf("expected one retry, got %d attempts", attempts)
+	}
+}
+
+func TestHTTPReloadExecutorDoesNotRetryRuntimeResponseFailure(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		attempts++
+		http.Error(w, "invalid candidate", http.StatusBadGateway)
+	}))
+	defer server.Close()
+	if err := (HTTPReloadExecutor{URL: server.URL + "/reload"}).Run("nginx", nil, ""); err == nil {
+		t.Fatal("runtime response failure must fail apply")
+	}
+	if attempts != 1 {
+		t.Fatalf("runtime response failure must not retry, got %d attempts", attempts)
+	}
+}
+
 func TestHTTPHealthCheckerFallsBackFromRuntimeHost(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/readyz" {
