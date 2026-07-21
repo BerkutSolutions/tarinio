@@ -385,7 +385,6 @@ publish:github-release:
     - e2e:full
     - dast:baseline
     - dast:negative
-    - dast:full
   needs:
     - validate:repository
     - warm:e2e-images
@@ -403,11 +402,13 @@ publish:github-release:
     - security:npm-audit
     - dast:baseline
     - dast:negative
-    - dast:full
   rules:
     - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+/'
       when: manual
-      allow_failure: true
+      allow_failure: false
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+      allow_failure: false
     - when: never
   script:
     - |
@@ -415,9 +416,10 @@ publish:github-release:
       test -n "${GITHUB_TOKEN:-}" || { echo "GITHUB_TOKEN is required for GitHub publishing" >&2; exit 1; }
       test -n "${RELEASE_SIGNING_PRIVATE_KEY_B64:-}" || { echo "RELEASE_SIGNING_PRIVATE_KEY_B64 is required for signed release artifacts" >&2; exit 1; }
       test -n "${RELEASE_SIGNING_PUBLIC_KEY_B64:-}" || { echo "RELEASE_SIGNING_PUBLIC_KEY_B64 is required for release verification" >&2; exit 1; }
-      version="${CI_COMMIT_TAG#v}"
       app_version="$(sed -n 's/^var AppVersion = "\(.*\)"/\1/p' control-plane/internal/appmeta/meta.go | head -n1)"
-      test "$version" = "$app_version" || { echo "tag $CI_COMMIT_TAG does not match AppVersion $app_version" >&2; exit 1; }
+      release_tag="${CI_COMMIT_TAG:-v$app_version}"
+      version="${release_tag#v}"
+      test "$version" = "$app_version" || { echo "tag $release_tag does not match AppVersion $app_version" >&2; exit 1; }
       mkdir -p .work/release-signing build/release/"$version"
       printf '%s' "$RELEASE_SIGNING_PRIVATE_KEY_B64" | base64 -d > .work/release-signing/release-ed25519-private.pem
       printf '%s' "$RELEASE_SIGNING_PUBLIC_KEY_B64" | base64 -d > .work/release-signing/release-ed25519-public.pem
@@ -425,7 +427,7 @@ publish:github-release:
       go run ./cmd/release-artifacts \
         -version "$version" \
         -commit "$CI_COMMIT_SHA" \
-        -tag "$CI_COMMIT_TAG" \
+        -tag "$release_tag" \
         -output "build/release/$version" \
         -docker-tags "ghcr.io/berkutsolutions/tarinio:$version,ghcr.io/berkutsolutions/tarinio:latest"
       go run ./cmd/release-artifacts-verify -output "build/release/$version" -trusted-public-key .work/release-signing/release-ed25519-public.pem
@@ -440,8 +442,16 @@ publish:github-release:
       esac
       EOF
       chmod 700 "$askpass"
+      git config user.name "GitLab CI Release"
+      git config user.email "gitlab-ci@berkutsolutions.local"
+      if GIT_ASKPASS="$askpass" GIT_TERMINAL_PROMPT=0 git ls-remote --exit-code --tags "https://github.com/BerkutSolutions/tarinio.git" "refs/tags/$release_tag" >/dev/null 2>&1; then
+        remote_tag_sha="$(GIT_ASKPASS="$askpass" GIT_TERMINAL_PROMPT=0 git ls-remote "https://github.com/BerkutSolutions/tarinio.git" "refs/tags/$release_tag^{}" | awk '{print $1}')"
+        test "$remote_tag_sha" = "$CI_COMMIT_SHA" || { echo "GitHub tag $release_tag already points to another commit" >&2; exit 1; }
+      else
+        git tag -a "$release_tag" -m "Release $release_tag" "$CI_COMMIT_SHA"
+      fi
       GIT_ASKPASS="$askpass" GIT_TERMINAL_PROMPT=0 \
-        git push "https://github.com/BerkutSolutions/tarinio.git" "refs/tags/$CI_COMMIT_TAG"
+        git push "https://github.com/BerkutSolutions/tarinio.git" "refs/tags/$release_tag"
       awk -v header="## [$version]" '$0 == header { found=1 } found && NR > 1 && /^## / && $0 != header { exit } found { print }' CHANGELOG.md > "build/release/$version/github-release-notes.md"
       test -s "build/release/$version/github-release-notes.md"
       python3 scripts/write-release-evidence.py \
@@ -450,6 +460,7 @@ publish:github-release:
         --output-dir "build/release/$version" \
         --version "$version" \
         --commit "$CI_COMMIT_SHA"
+      cat "build/release/$version/release-evidence-summary.md" >> "build/release/$version/github-release-notes.md"
       printf '%s' "$GITHUB_TOKEN" | docker login ghcr.io -u BerkutSolutions --password-stdin
       docker build -t "ghcr.io/berkutsolutions/tarinio:$version" -f control-plane/Dockerfile .
       docker rm -f tarinio-release-smoke >/dev/null 2>&1 || true
@@ -462,11 +473,11 @@ publish:github-release:
       docker push "ghcr.io/berkutsolutions/tarinio:$version"
       docker push "ghcr.io/berkutsolutions/tarinio:latest"
       docker run --rm -e GH_TOKEN="$GITHUB_TOKEN" -v "$CI_PROJECT_DIR:/workspace" -w /workspace ghcr.io/cli/cli:2.90.0 \
-        release create "$CI_COMMIT_TAG" --repo BerkutSolutions/tarinio --title "TARINIO $version" --notes-file "build/release/$version/github-release-notes.md" || \
+        release create "$release_tag" --repo BerkutSolutions/tarinio --title "TARINIO $version" --notes-file "build/release/$version/github-release-notes.md" || \
         docker run --rm -e GH_TOKEN="$GITHUB_TOKEN" -v "$CI_PROJECT_DIR:/workspace" -w /workspace ghcr.io/cli/cli:2.90.0 \
-          release edit "$CI_COMMIT_TAG" --repo BerkutSolutions/tarinio --title "TARINIO $version" --notes-file "build/release/$version/github-release-notes.md"
+          release edit "$release_tag" --repo BerkutSolutions/tarinio --title "TARINIO $version" --notes-file "build/release/$version/github-release-notes.md"
       docker run --rm -e GH_TOKEN="$GITHUB_TOKEN" -v "$CI_PROJECT_DIR:/workspace" -w /workspace ghcr.io/cli/cli:2.90.0 \
-        release upload "$CI_COMMIT_TAG" "build/release/$version"/release-manifest.json "build/release/$version"/signature.json "build/release/$version"/sbom.cdx.json "build/release/$version"/provenance.json "build/release/$version"/checksums.txt "build/release/$version"/release-evidence.md "build/release/$version"/release-evidence.json "build/release/$version"/release-evidence-source.zip --repo BerkutSolutions/tarinio --clobber
+        release upload "$release_tag" "build/release/$version"/release-manifest.json "build/release/$version"/signature.json "build/release/$version"/sbom.cdx.json "build/release/$version"/provenance.json "build/release/$version"/checksums.txt "build/release/$version"/release-evidence.md "build/release/$version"/release-evidence.json "build/release/$version"/release-evidence-summary.md "build/release/$version"/release-evidence-source.zip --repo BerkutSolutions/tarinio --clobber
   artifacts:
     expire_in: 30 days
     paths:

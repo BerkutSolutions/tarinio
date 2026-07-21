@@ -45,6 +45,14 @@ func TestReleaseEvidenceScript_RequiresSuccessfulE2EAndDAST(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(output, "release-evidence.md")); err != nil {
 		t.Fatalf("release summary missing: %v", err)
 	}
+	summary, err := os.ReadFile(filepath.Join(output, "release-evidence-summary.md"))
+	if err != nil {
+		t.Fatalf("release evidence summary missing: %v", err)
+	}
+	if !strings.Contains(string(summary), "| E2E suite | Passed | Failed | Skipped |") ||
+		!strings.Contains(string(summary), "| DAST suite | High | Critical | Status |") {
+		t.Fatalf("release evidence summary does not contain verification tables: %s", summary)
+	}
 
 	writeReleaseEvidenceFixture(t, filepath.Join(dastDir, "dast-evidence.json"), `{"status":"failed","counts":{"High":1,"Critical":0},"blocking_alerts":[{"name":"fixture"}]}`)
 	if got, err := releaseEvidenceCommand(python, root, e2eDir, dastDir, filepath.Join(work, "blocked")).CombinedOutput(); err == nil || !strings.Contains(string(got), "blocking findings") {

@@ -94,6 +94,26 @@ def main():
         ],
     }
     (output / "release-evidence.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    e2e_table = "\n".join(
+        f"| `{item['job']}` | {item['passed']} | {item['failed']} | {item['skipped']} |"
+        for item in e2e
+    )
+    dast_table = "\n".join(
+        f"| `{item['job']}` | {item['counts'].get('High', 0)} | {item['counts'].get('Critical', 0)} | passed |"
+        for item in dast
+    )
+    (output / "release-evidence-summary.md").write_text(f"""### WAF verification summary
+
+| E2E suite | Passed | Failed | Skipped |
+| --- | ---: | ---: | ---: |
+{e2e_table}
+
+| DAST suite | High | Critical | Status |
+| --- | ---: | ---: | --- |
+{dast_table}
+
+All E2E suites passed without failures or skipped tests. DAST found no blocking High or Critical vulnerabilities. Full machine-readable evidence is attached to this release.
+""", encoding="utf-8")
     e2e_rows = "\n".join(f"- `{item['job']}`: пройдено {item['passed']}; ошибок {item['failed']}; пропусков {item['skipped']}." for item in e2e)
     dast_rows = "\n".join(f"- `{item['job']}`: High {item['counts'].get('High', 0)}, Critical {item['counts'].get('Critical', 0)}." for item in dast)
     (output / "release-evidence.md").write_text(f"""# Доказательства проверок релиза {args.version}
