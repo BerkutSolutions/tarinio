@@ -37,6 +37,7 @@
 
 ### DAST и безопасность зависимостей
 
+- DAST выполняется в общем pipeline на `main` перед release stage. На период обкатки временно отключены остальные CI jobs и публикация, поэтому запускаются только `dast:baseline` и `dast:negative`.
 - Исправлена найденная DAST-проверкой проблема management UI: добавлены `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` и ограничивающая Content Security Policy.
 - Добавлен отдельный ручной downstream pipeline DAST без ожидания unit и полного E2E. Основной pipeline временно не запускает тяжёлые DAST jobs; для version tag DAST остаётся release-gate, чтобы evidence был приложен к GitHub Release.
 - DAST enforcement использует canary-upstream: вредоносный запрос обязан получить блокировку WAF, не попасть в приложение и появиться в запросах с причиной `modsecurity`; легитимный запрос обязан достичь canary.

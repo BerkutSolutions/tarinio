@@ -7,18 +7,6 @@ stages:
   - dast
   - publish
 
-dast:run-standalone:
-  stage: validate
-  trigger:
-    include:
-      - local: .gitlab-dast-ci.yml
-    strategy: depend
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-      when: manual
-      allow_failure: false
-    - when: never
-
 workflow:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
@@ -59,6 +47,8 @@ validate:repository:
 warm:e2e-images:
   stage: validate
   timeout: 20m
+  rules:
+    - when: never
   script:
     - |
       set -eu
@@ -74,6 +64,8 @@ warm:e2e-images:
 unit:go:
   stage: unit
   timeout: 35m
+  rules:
+    - when: never
   script:
     - mkdir -p .ci-bin .ci-home "$NPM_CACHE_DIR"
     - |
@@ -96,6 +88,8 @@ unit:go:
 docs:build:
   stage: unit
   timeout: 30m
+  rules:
+    - when: never
   script:
     - mkdir -p "$NPM_CACHE_DIR" .ci-home
     - >-
@@ -114,6 +108,8 @@ e2e:smoke:
   stage: e2e-smoke
   timeout: 30m
   resource_group: waf-e2e-stack
+  rules:
+    - when: never
   dependencies: []
   script:
     - mkdir -p build/e2e/smoke
@@ -130,6 +126,8 @@ e2e:security-invariants:
   stage: e2e
   timeout: 35m
   resource_group: waf-e2e-stack
+  rules:
+    - when: never
   dependencies: []
   script:
     - mkdir -p build/e2e/security-invariants
@@ -149,6 +147,8 @@ e2e:management-rate-limit:
   stage: e2e
   timeout: 30m
   resource_group: waf-e2e-stack
+  rules:
+    - when: never
   dependencies: []
   needs:
     - e2e:smoke
@@ -167,6 +167,8 @@ e2e:full:
   stage: e2e
   timeout: 45m
   resource_group: waf-e2e-stack
+  rules:
+    - when: never
   dependencies: []
   needs:
     - e2e:smoke
@@ -187,7 +189,6 @@ e2e:nightly:
   resource_group: waf-e2e-stack
   dependencies: []
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "schedule"'
     - when: never
   script:
     - mkdir -p build/e2e/nightly
@@ -203,6 +204,8 @@ e2e:nightly:
 validate:generated-nginx-config:
   stage: e2e-smoke
   timeout: 15m
+  rules:
+    - when: never
   dependencies: []
   script:
     - go test ./compiler/internal/compiler -run 'TestSyntaxRunner|TestRenderEasyArtifacts|TestRenderSiteUpstreamArtifacts' -count=1
@@ -211,6 +214,8 @@ e2e:fresh-onboarding:
   stage: e2e
   timeout: 30m
   resource_group: waf-e2e-stack
+  rules:
+    - when: never
   dependencies: []
   script:
     - mkdir -p build/e2e/fresh-onboarding
@@ -232,6 +237,8 @@ security:gitleaks:
   stage: security
   timeout: 20m
   dependencies: []
+  rules:
+    - when: never
   script:
     - mkdir -p build/security
     - >-
@@ -250,6 +257,8 @@ security:trivy:
   stage: security
   timeout: 35m
   dependencies: []
+  rules:
+    - when: never
   script:
     - mkdir -p build/security "$TRIVY_CACHE_DIR"
     - >-
@@ -269,6 +278,8 @@ security:govulncheck:
   stage: security
   timeout: 30m
   dependencies: []
+  rules:
+    - when: never
   script:
     - mkdir -p .bin
     - GOTOOLCHAIN=go1.26.5 GOBIN="$CI_PROJECT_DIR/.bin" go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
@@ -278,6 +289,8 @@ security:npm-audit:
   stage: security
   timeout: 25m
   dependencies: []
+  rules:
+    - when: never
   script:
     - mkdir -p "$NPM_CACHE_DIR" .ci-home
     - >-
@@ -293,7 +306,7 @@ dast:baseline:
   resource_group: waf-e2e-stack
   dependencies: []
   rules:
-    - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+/'
+    - if: '$CI_COMMIT_BRANCH == "main"'
     - when: never
   script:
     - mkdir -p build/dast/baseline
@@ -312,11 +325,11 @@ dast:negative:
   resource_group: waf-e2e-stack
   dependencies: []
   rules:
-    - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+/'
+    - if: '$CI_COMMIT_BRANCH == "main"'
     - when: never
   script:
     - mkdir -p build/dast/negative
-    - E2E_FILTER=TestE2ENegativeSecurityProbes E2E_TIMEOUT=240 E2E_LOG_DIR="$CI_PROJECT_DIR/build/dast/negative" E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/dast/negative" sh scripts/run-e2e-tests.sh
+    - E2E_FILTER='TestE2ENegativeSecurityProbes|TestE2EDASTAuthenticatedControlPlane|TestE2EDASTSecurityHeadersAndSessionCookie' E2E_TIMEOUT=240 E2E_LOG_DIR="$CI_PROJECT_DIR/build/dast/negative" E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/dast/negative" sh scripts/run-e2e-tests.sh
   after_script:
     - docker compose -f deploy/compose/e2e/docker-compose.yml down --volumes --remove-orphans || true
   artifacts:
@@ -331,7 +344,6 @@ dast:full:
   resource_group: waf-e2e-stack
   dependencies: []
   rules:
-    - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+/'
     - when: never
   script:
     - mkdir -p build/dast/full
@@ -364,9 +376,6 @@ publish:github-mirror:
     - security:govulncheck
     - security:npm-audit
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-      when: manual
-      allow_failure: false
     - when: never
   script:
     - |
