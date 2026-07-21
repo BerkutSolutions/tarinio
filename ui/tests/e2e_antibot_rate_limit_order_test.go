@@ -57,10 +57,12 @@ func TestE2EAntibotChallengePrecedesActiveRateLimitFallback(t *testing.T) {
 	limits["bad_behavior_ban_time_seconds"] = 60
 	// The explicit compile/apply below is the scenario's synchronization point.
 	e2ePutProfileWithoutAutoApply(t, adminClient, adminBaseURL, adminHostOverride, siteID, profile)
+	rateCookieName := ""
 	if revisionID := e2eCompileAndApply(t, adminClient, adminBaseURL, adminHostOverride); revisionID == "" {
 		t.Fatal("compile/apply antibot rate-limit E2E revision")
 	} else {
 		assertE2EArtifactActive(t, revisionID, "nginx/easy/"+siteID+".conf", "waf_antibot_guard", "waf_rate_limited_active")
+		rateCookieName = e2eRateLimitCookieName(t, adminClient, adminBaseURL, adminHostOverride, revisionID, siteID)
 	}
 
 	noRedirect := &http.Client{
@@ -84,7 +86,7 @@ func TestE2EAntibotChallengePrecedesActiveRateLimitFallback(t *testing.T) {
 		return resp
 	}
 
-	rateCookie := "waf_rate_limited_" + siteID + "=1"
+	rateCookie := rateCookieName + "=1"
 	deadline := time.Now().Add(30 * time.Second)
 	var challenge *http.Response
 	for time.Now().Before(deadline) {
@@ -140,4 +142,24 @@ func TestE2EAntibotChallengePrecedesActiveRateLimitFallback(t *testing.T) {
 		time.Sleep(250 * time.Millisecond)
 	}
 	t.Fatalf("verified client with active rate-limit cookie must receive 429, got status=%d body=%s", status, body)
+}
+
+func e2eRateLimitCookieName(t *testing.T, client *http.Client, baseURL, hostOverride, revisionID, siteID string) string {
+	t.Helper()
+	response := getWithAuth(t, client, baseURL+"/api/revisions/"+revisionID+"/artifacts/nginx/sites/"+siteID+".conf", hostOverride)
+	body := mustReadBody(t, response.Body)
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("read rate-limit artifact: status=%d body=%s", response.StatusCode, body)
+	}
+	const marker = `add_header Set-Cookie "waf_rate_limited_`
+	start := strings.Index(body, marker)
+	if start < 0 {
+		t.Fatalf("rate-limit cookie is missing from artifact: %s", body)
+	}
+	rest := body[start+len(`add_header Set-Cookie "`):]
+	name, _, found := strings.Cut(rest, "=1;")
+	if !found || !strings.HasPrefix(name, "waf_rate_limited_") {
+		t.Fatalf("cannot parse rate-limit cookie from artifact: %s", rest)
+	}
+	return name
 }
