@@ -17,6 +17,7 @@
 #   COMPOSE_CMD       docker compose command (auto-detected)
 #   GO_CMD            go binary (default: go)
 #   E2E_KEEP_STACK    set to 1 to skip teardown (debug)
+#   E2E_BUILD_ATTEMPTS docker compose build/start attempts (default: 3)
 
 set -eu
 
@@ -80,6 +81,27 @@ run_quiet() {
     return 0
   fi
   fail_msg "$label failed (log: $E2E_LOG_FILE)"
+  show_log_tail "$E2E_LOG_FILE" 120
+  return 1
+}
+
+run_compose_start() {
+  max_attempts="${E2E_BUILD_ATTEMPTS:-3}"
+  attempt=1
+  while [ "$attempt" -le "$max_attempts" ]; do
+    step "Build and start containers (attempt $attempt/$max_attempts)"
+    if $COMPOSE_CMD -f docker-compose.yml up -d --build >>"$E2E_LOG_FILE" 2>&1; then
+      ok "Build and start containers"
+      return 0
+    fi
+    if [ "$attempt" -lt "$max_attempts" ]; then
+      warn "Container build failed; retrying Docker registry request in 5s"
+      $COMPOSE_CMD -f docker-compose.yml down --volumes --remove-orphans >>"$E2E_LOG_FILE" 2>&1 || true
+      sleep 5
+    fi
+    attempt=$((attempt + 1))
+  done
+  fail_msg "Build and start containers failed after $max_attempts attempts (log: $E2E_LOG_FILE)"
   show_log_tail "$E2E_LOG_FILE" 120
   return 1
 }
@@ -387,7 +409,7 @@ step "Starting e2e stack (control-plane=:$E2E_PORT runtime=:$E2E_RT_PORT)"
 info "Detailed log: $E2E_LOG_FILE"
 cd "$E2E_COMPOSE_DIR"
 $COMPOSE_CMD -f docker-compose.yml down --volumes --remove-orphans >>"$E2E_LOG_FILE" 2>&1 || true
-run_quiet "Build and start containers" $COMPOSE_CMD -f docker-compose.yml up -d --build
+run_compose_start
 ok "Containers are up"
 
 # Wait for control-plane health.
