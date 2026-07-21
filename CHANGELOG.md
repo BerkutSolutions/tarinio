@@ -37,6 +37,7 @@
 
 ### DAST и безопасность зависимостей
 
+- Canary-upstream DAST запускается от непривилегированного пользователя; исправлена находка Trivy `DS002`.
 - В DAST enforcement добавлен безопасный API fuzzing: malformed JSON, лишние поля и oversized header обязаны завершаться контролируемым не-5xx ответом.
 - Исправлена проверка DAST telemetry: сопоставление защищённого запроса учитывает query string, сохраняя обязательные проверки `403`, причины `modsecurity` и недоступности upstream.
 - DAST выполняется в общем pipeline на `main` перед release stage. На период обкатки временно отключены остальные CI jobs и публикация, поэтому запускаются только `dast:baseline` и `dast:negative`.
