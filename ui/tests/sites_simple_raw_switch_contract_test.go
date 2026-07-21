@@ -1,22 +1,12 @@
 package tests
 
 import (
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 )
 
 func TestSitesSimpleRawSwitchContracts(t *testing.T) {
-	command := "node"
-	if runtime.GOOS == "windows" {
-		command = "node.exe"
-	}
-	if _, err := exec.LookPath(command); err != nil {
-		t.Skipf("%s is required for the simple/raw switch contract", command)
-	}
-
 	script := `
 import { bindDetailCore } from "./ui/app/static/js/pages/sites.detail-core-bindings.js";
 import { defaultSiteDraft } from "./ui/app/static/js/pages/sites.draft-core.js";
@@ -65,7 +55,7 @@ if (!shouldUpsertBaseResources(rawDraft, persistedSite, staleUpstream, null)) {
 	if err != nil {
 		t.Fatalf("resolve repository root: %v", err)
 	}
-	cmd := exec.Command(command, "--input-type=module", "--eval", script)
+	cmd := nodeESMCommand(t, script)
 	cmd.Dir = root
 	output, err := cmd.CombinedOutput()
 	if err != nil {

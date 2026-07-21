@@ -1,22 +1,12 @@
 package tests
 
 import (
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 )
 
 func TestSitesRawEditor_RoundTripsEveryDraftField(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		if _, err := exec.LookPath("node.exe"); err != nil {
-			t.Skip("node.exe is required for the raw editor contract")
-		}
-	} else if _, err := exec.LookPath("node"); err != nil {
-		t.Skip("node is required for the raw editor contract")
-	}
-
 	script := `
 import { defaultSiteDraft } from "./ui/app/static/js/pages/sites.draft-core.js";
 import { draftToEnvText, envToDraft } from "./ui/app/static/js/pages/sites.import-pipeline.js";
@@ -36,15 +26,11 @@ for (const field of Object.keys(draft)) {
   }
 }
 `
-	command := "node"
-	if runtime.GOOS == "windows" {
-		command = "node.exe"
-	}
 	root, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
 		t.Fatalf("resolve repository root: %v", err)
 	}
-	cmd := exec.Command(command, "--input-type=module", "--eval", script)
+	cmd := nodeESMCommand(t, script)
 	cmd.Dir = root
 	output, err := cmd.CombinedOutput()
 	if err != nil {

@@ -8,6 +8,17 @@ import (
 	"testing"
 )
 
+func releaseEvidencePython(t *testing.T) string {
+	t.Helper()
+	for _, command := range []string{"python3", "python"} {
+		if _, err := exec.LookPath(command); err == nil {
+			return command
+		}
+	}
+	t.Skip("python3 or python is required for release evidence tests")
+	return ""
+}
+
 func TestReleaseEvidenceScript_RequiresSuccessfulE2EAndDAST(t *testing.T) {
 	root, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
@@ -26,7 +37,8 @@ func TestReleaseEvidenceScript_RequiresSuccessfulE2EAndDAST(t *testing.T) {
 	writeReleaseEvidenceFixture(t, filepath.Join(dastDir, "dast-evidence.json"), `{"status":"passed","threshold":"High","counts":{"High":0,"Critical":0},"blocking_alerts":[]}`)
 
 	output := filepath.Join(work, "out")
-	command := releaseEvidenceCommand(root, e2eDir, dastDir, output)
+	python := releaseEvidencePython(t)
+	command := releaseEvidenceCommand(python, root, e2eDir, dastDir, output)
 	if got, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("generate valid release evidence: %v: %s", err, got)
 	}
@@ -35,7 +47,7 @@ func TestReleaseEvidenceScript_RequiresSuccessfulE2EAndDAST(t *testing.T) {
 	}
 
 	writeReleaseEvidenceFixture(t, filepath.Join(dastDir, "dast-evidence.json"), `{"status":"failed","counts":{"High":1,"Critical":0},"blocking_alerts":[{"name":"fixture"}]}`)
-	if got, err := releaseEvidenceCommand(root, e2eDir, dastDir, filepath.Join(work, "blocked")).CombinedOutput(); err == nil || !strings.Contains(string(got), "blocking findings") {
+	if got, err := releaseEvidenceCommand(python, root, e2eDir, dastDir, filepath.Join(work, "blocked")).CombinedOutput(); err == nil || !strings.Contains(string(got), "blocking findings") {
 		t.Fatalf("expected High DAST finding to block release evidence, err=%v output=%s", err, got)
 	}
 }
@@ -47,8 +59,8 @@ func writeReleaseEvidenceFixture(t *testing.T, path, content string) {
 	}
 }
 
-func releaseEvidenceCommand(root, e2eDir, dastDir, output string) *exec.Cmd {
-	command := exec.Command("python", "scripts/write-release-evidence.py",
+func releaseEvidenceCommand(python, root, e2eDir, dastDir, output string) *exec.Cmd {
+	command := exec.Command(python, "scripts/write-release-evidence.py",
 		"--e2e-root", filepath.Dir(e2eDir),
 		"--dast-root", filepath.Dir(dastDir),
 		"--output-dir", output,
