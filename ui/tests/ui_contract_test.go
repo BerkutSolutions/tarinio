@@ -180,6 +180,23 @@ func TestUIContract_OnboardingAndSidebarMarkers(t *testing.T) {
 			},
 		},
 		{
+			name: "service editor policy ownership",
+			files: []string{
+				filepath.Join("..", "app", "static", "js", "pages", "sites.access-upsert.js"),
+				filepath.Join("..", "app", "static", "js", "pages", "sites.resource-actions.js"),
+				filepath.Join("..", "app", "static", "js", "pages", "sites.runtime-state.js"),
+				filepath.Join("..", "app", "static", "js", "pages", "sites.detail-events-actions.js"),
+				filepath.Join("..", "app", "static", "js", "pages", "sites.detail-submit-delete.js"),
+			},
+			markers: []string{
+				"startsWith(`easy-${siteID}-`)",
+				"policiesForSite.find",
+				"existingIsCompatibility && !isCompatibilityPolicy",
+				"await putWithPostFallback(ctx, easyProfilePath",
+				"await upsertAccessPolicy(draft, ctx, existingAccessPolicy, saveOptions);",
+			},
+		},
+		{
 			name:  "basic auth password visibility binding",
 			files: []string{filepath.Join("..", "app", "static", "js", "pages", "sites.detail-events-rules.js")},
 			markers: []string{

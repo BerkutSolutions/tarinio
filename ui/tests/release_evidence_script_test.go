@@ -1,0 +1,59 @@
+package tests
+
+import (
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func TestReleaseEvidenceScript_RequiresSuccessfulE2EAndDAST(t *testing.T) {
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatalf("resolve repository root: %v", err)
+	}
+	work := t.TempDir()
+	e2eDir := filepath.Join(work, "e2e", "security-invariants")
+	dastDir := filepath.Join(work, "dast", "baseline")
+	if err := os.MkdirAll(e2eDir, 0o755); err != nil {
+		t.Fatalf("create e2e directory: %v", err)
+	}
+	if err := os.MkdirAll(dastDir, 0o755); err != nil {
+		t.Fatalf("create dast directory: %v", err)
+	}
+	writeReleaseEvidenceFixture(t, filepath.Join(e2eDir, "e2e-evidence.json"), `{"status":"passed","summary":{"pass":2,"fail":0,"skip":0}}`)
+	writeReleaseEvidenceFixture(t, filepath.Join(dastDir, "dast-evidence.json"), `{"status":"passed","threshold":"High","counts":{"High":0,"Critical":0},"blocking_alerts":[]}`)
+
+	output := filepath.Join(work, "out")
+	command := releaseEvidenceCommand(root, e2eDir, dastDir, output)
+	if got, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("generate valid release evidence: %v: %s", err, got)
+	}
+	if _, err := os.Stat(filepath.Join(output, "release-evidence.md")); err != nil {
+		t.Fatalf("release summary missing: %v", err)
+	}
+
+	writeReleaseEvidenceFixture(t, filepath.Join(dastDir, "dast-evidence.json"), `{"status":"failed","counts":{"High":1,"Critical":0},"blocking_alerts":[{"name":"fixture"}]}`)
+	if got, err := releaseEvidenceCommand(root, e2eDir, dastDir, filepath.Join(work, "blocked")).CombinedOutput(); err == nil || !strings.Contains(string(got), "blocking findings") {
+		t.Fatalf("expected High DAST finding to block release evidence, err=%v output=%s", err, got)
+	}
+}
+
+func writeReleaseEvidenceFixture(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("write fixture %s: %v", path, err)
+	}
+}
+
+func releaseEvidenceCommand(root, e2eDir, dastDir, output string) *exec.Cmd {
+	command := exec.Command("python", "scripts/write-release-evidence.py",
+		"--e2e-root", filepath.Dir(e2eDir),
+		"--dast-root", filepath.Dir(dastDir),
+		"--output-dir", output,
+		"--version", "1.5.6",
+		"--commit", "fixture-commit")
+	command.Dir = root
+	return command
+}

@@ -22,10 +22,15 @@ export async function upsertAccessPolicy(draft, ctx, existingAccessPolicy, optio
   const allowlist = Array.from(new Set(allowlistSources));
   const denylist = normalizeStringArray(draft.access_denylist);
   if (!allowlist.length && !denylist.length && !existingAccessPolicy) return;
-  const payload = { id: String(existingAccessPolicy?.id || `${siteID}-access`), site_id: siteID, enabled: true, allowlist, denylist };
+  // Do not reuse the Easy Profile compatibility resource. It is a projection
+  // owned by the backend and may be rebuilt after profile saves.
+  const existingID = String(existingAccessPolicy?.id || "");
+  const policyID = existingID.startsWith(`easy-${siteID}-`) ? `${siteID}-access` : (existingID || `${siteID}-access`);
+  const payload = { id: policyID, site_id: siteID, enabled: true, allowlist, denylist };
   const resolvePolicyForSite = async () => {
     const accessPolicies = normalizeArray(await ctx.api.get("/api/access-policies", requestOptions));
-    return accessPolicies.find((item) => normalizeSiteID(item?.site_id) === siteID) || null;
+    const policiesForSite = accessPolicies.filter((item) => normalizeSiteID(item?.site_id) === siteID);
+    return policiesForSite.find((item) => !String(item?.id || "").startsWith(`easy-${siteID}-`)) || policiesForSite[0] || null;
   };
   const normalizeListForCompare = (values) => normalizeStringArray(values).slice().sort();
   const matchesPayload = (policy) => {

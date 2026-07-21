@@ -219,9 +219,11 @@ export function bindDetailActionEvents(params) {
       if (shouldUpsertBaseResources(draft, existingSite, existingUpstream, existingTLSConfig)) {
         await upsertSiteResources(draft, ctx, existingSite, existingUpstream, existingTLSConfig, saveOptions);
       }
-      await upsertAccessPolicy(draft, ctx, existingAccessPolicy, saveOptions);
       const easyProfilePath = `/api/easy-site-profiles/${encodeURIComponent(draft.id)}`;
       await putWithPostFallback(ctx, easyProfilePath, draftToEasyProfile(draft), saveOptions);
+      // Access policy is the canonical representation of allow/deny lists.
+      // Persist it after the compatibility bridge used by the Easy Profile.
+      await upsertAccessPolicy(draft, ctx, existingAccessPolicy, saveOptions);
       await compileAndApplySiteRevision(ctx, draft?.id ? [draft.id] : []);
       ctx.notify(ctx.t("toast.siteSaved"));
       go(`${routeBase()}/${encodeURIComponent(draft.id)}`);

@@ -92,17 +92,22 @@ func (s *AccessPolicyService) Upsert(ctx context.Context, item accesspolicies.Ac
 	if err := s.ensureSiteExists(item.SiteID); err != nil {
 		return accesspolicies.AccessPolicy{}, err
 	}
-	existing, findErr := s.findBySiteID(item.SiteID)
+	items, findErr := s.store.List()
 	if findErr != nil {
 		return accesspolicies.AccessPolicy{}, findErr
 	}
-	if existing != nil {
-		item.ID = existing.ID
-		out, err = s.store.Update(item)
-	} else {
-		if strings.TrimSpace(item.ID) == "" {
-			item.ID = item.SiteID + "-access"
+	requestedID := strings.TrimSpace(item.ID)
+	if requestedID == "" {
+		requestedID = item.SiteID + "-access"
+	}
+	item.ID = requestedID
+	for _, existing := range items {
+		if existing.ID == requestedID {
+			out, err = s.store.Update(item)
+			break
 		}
+	}
+	if out.ID == "" && err == nil {
 		out, err = s.store.Create(item)
 	}
 	if err != nil {

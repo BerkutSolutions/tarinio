@@ -37,10 +37,15 @@ export function rebuildIndexes(state, deps = {}) {
   }
   for (const accessPolicy of state.accessPolicies) {
     const siteID = normalizeSiteID(accessPolicy?.site_id);
-    if (!siteID || state.accessBySite.has(siteID)) {
+    if (!siteID) {
       continue;
     }
-    state.accessBySite.set(siteID, accessPolicy);
+    const existing = state.accessBySite.get(siteID);
+    const isCompatibilityPolicy = String(accessPolicy?.id || "").startsWith(`easy-${siteID}-`);
+    const existingIsCompatibility = String(existing?.id || "").startsWith(`easy-${siteID}-`);
+    if (!existing || (existingIsCompatibility && !isCompatibilityPolicy)) {
+      state.accessBySite.set(siteID, accessPolicy);
+    }
   }
   for (const easyProfile of state.easyProfiles) {
     const siteID = normalizeSiteID(easyProfile?.site_id);

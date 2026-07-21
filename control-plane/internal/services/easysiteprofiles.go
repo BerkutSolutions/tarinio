@@ -349,20 +349,26 @@ func (s *EasySiteProfileService) syncEasyToLegacy(profile easysiteprofiles.EasyS
 		if err != nil {
 			return err
 		}
-		accessID := "easy-" + profile.SiteID + "-access"
+		legacyAccessID := "easy-" + profile.SiteID + "-access"
+		accessID := legacyAccessID
 		accessExists := false
 		for _, item := range policies {
-			if item.SiteID == profile.SiteID {
-				accessID = item.ID
+			if item.ID == legacyAccessID {
 				accessExists = true
-				break
+			}
+			if item.SiteID == profile.SiteID && item.ID != legacyAccessID {
+				// A first-class policy belongs to the simple/raw editor. Never
+				// overwrite it through the legacy Easy Profile projection.
+				return nil
 			}
 		}
+		// The simple/raw editor owns its first-class <site>-access policy.
+		// Preserve it when an unrelated Easy Profile save runs its legacy bridge.
+		// The easy-<site>-access policy remains fully owned by this bridge.
 		target := accesspolicies.AccessPolicy{
 			ID:                accessID,
 			SiteID:            profile.SiteID,
 			Enabled:           profile.SecurityBehaviorAndLimits.UseBlacklist || profile.SecurityBehaviorAndLimits.UseExceptions,
-			AllowList:         nil,
 			DenyList:          append([]string(nil), profile.SecurityBehaviorAndLimits.BlacklistIP...),
 			TrustedProxyCIDRs: append([]string(nil), profile.SecurityBehaviorAndLimits.AccessTrustedProxyCIDRs...),
 		}

@@ -84,6 +84,19 @@ func TestStore_RejectsSecondPolicyForSameSite(t *testing.T) {
 	}
 }
 
+func TestStore_AllowsFirstClassPolicyAlongsideEasyCompatibilityPolicy(t *testing.T) {
+	store, err := NewStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("create store failed: %v", err)
+	}
+	if _, err := store.Create(AccessPolicy{ID: "easy-site-a-access", SiteID: "site-a"}); err != nil {
+		t.Fatalf("create compatibility policy: %v", err)
+	}
+	if _, err := store.Create(AccessPolicy{ID: "site-a-access", SiteID: "site-a", AllowList: []string{"198.51.100.0/24"}}); err != nil {
+		t.Fatalf("create first-class policy alongside compatibility policy: %v", err)
+	}
+}
+
 func TestStore_NormalizesAndSortsLists(t *testing.T) {
 	store, err := NewStore(t.TempDir())
 	if err != nil {

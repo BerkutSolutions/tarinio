@@ -58,7 +58,8 @@ func TestE2EAntibotChallengePrecedesActiveRateLimitFallback(t *testing.T) {
 	limits["use_bad_behavior"] = true
 	limits["bad_behavior_status_codes"] = []any{429}
 	limits["bad_behavior_ban_time_seconds"] = 60
-	e2ePutProfile(t, adminClient, adminBaseURL, adminHostOverride, siteID, profile)
+	// The explicit compile/apply below is the scenario's synchronization point.
+	e2ePutProfileWithoutAutoApply(t, adminClient, adminBaseURL, adminHostOverride, siteID, profile)
 	if revisionID := e2eCompileAndApply(t, adminClient, adminBaseURL, adminHostOverride); revisionID == "" {
 		t.Fatal("compile/apply antibot rate-limit E2E revision")
 	} else {

@@ -74,7 +74,7 @@ func (s *Store) Create(item AccessPolicy) (AccessPolicy, error) {
 		if existing.ID == item.ID {
 			return AccessPolicy{}, fmt.Errorf("access policy %s already exists", item.ID)
 		}
-		if existing.SiteID == item.SiteID {
+		if existing.SiteID == item.SiteID && !isEasyCompatibilityPair(existing, item) {
 			return AccessPolicy{}, fmt.Errorf("access policy for site %s already exists", item.SiteID)
 		}
 	}
@@ -117,7 +117,7 @@ func (s *Store) Update(item AccessPolicy) (AccessPolicy, error) {
 		return AccessPolicy{}, err
 	}
 	for _, existing := range current.Policies {
-		if existing.SiteID == item.SiteID && existing.ID != item.ID {
+		if existing.SiteID == item.SiteID && existing.ID != item.ID && !isEasyCompatibilityPair(existing, item) {
 			return AccessPolicy{}, fmt.Errorf("access policy for site %s already exists", item.SiteID)
 		}
 	}
@@ -135,6 +135,15 @@ func (s *Store) Update(item AccessPolicy) (AccessPolicy, error) {
 		return item, nil
 	}
 	return AccessPolicy{}, fmt.Errorf("access policy %s not found", item.ID)
+}
+
+func isEasyCompatibilityPair(left, right AccessPolicy) bool {
+	if left.SiteID != right.SiteID {
+		return false
+	}
+	legacyID := "easy-" + left.SiteID + "-access"
+	primaryID := left.SiteID + "-access"
+	return (left.ID == legacyID && right.ID == primaryID) || (left.ID == primaryID && right.ID == legacyID)
 }
 
 func (s *Store) Delete(id string) error {

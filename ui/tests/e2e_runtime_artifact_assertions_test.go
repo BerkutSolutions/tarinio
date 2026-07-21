@@ -30,12 +30,18 @@ func assertE2EArtifactActive(t *testing.T, revisionID, artifactPath string, requ
 		}
 	}
 	deadline := time.Now().Add(30 * time.Second)
+	activeRevision := false
 	for time.Now().Before(deadline) {
 		active, currentErr := exec.Command("docker", "exec", runtimeContainer, "cat", "/var/lib/waf/active/current.json").CombinedOutput()
 		if currentErr == nil && strings.Contains(string(active), revisionID) {
+			activeRevision = true
 			break
 		}
 		time.Sleep(250 * time.Millisecond)
+	}
+	if !activeRevision {
+		current, _ := exec.Command("docker", "exec", runtimeContainer, "cat", "/var/lib/waf/active/current.json").CombinedOutput()
+		t.Fatalf("runtime did not activate revision %s within 30s: %s", revisionID, current)
 	}
 	runtime, err := exec.Command("docker", "exec", runtimeContainer, "cat", "/etc/waf/current/"+artifactPath).CombinedOutput()
 	if err != nil {

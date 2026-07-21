@@ -894,7 +894,21 @@ func mapAccessInputs(items []accesspolicies.AccessPolicy, profiles []easysitepro
 	for _, p := range profiles {
 		modeBysite[p.SiteID] = strings.ToLower(strings.TrimSpace(p.FrontService.SecurityMode))
 	}
-	sorted := append([]accesspolicies.AccessPolicy(nil), items...)
+	// A first-class policy (<site>-access) is authoritative when old data also
+	// contains an Easy Profile compatibility policy (easy-<site>-access).
+	// Keep one deterministic policy per site so generated runtime config cannot
+	// depend on lexical ordering of legacy IDs.
+	bySite := make(map[string]accesspolicies.AccessPolicy, len(items))
+	for _, item := range items {
+		current, exists := bySite[item.SiteID]
+		if !exists || (strings.HasPrefix(current.ID, "easy-") && !strings.HasPrefix(item.ID, "easy-")) {
+			bySite[item.SiteID] = item
+		}
+	}
+	sorted := make([]accesspolicies.AccessPolicy, 0, len(bySite))
+	for _, item := range bySite {
+		sorted = append(sorted, item)
+	}
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].ID < sorted[j].ID })
 	out := make([]pipeline.AccessPolicyInput, 0, len(sorted))
 	for _, item := range sorted {

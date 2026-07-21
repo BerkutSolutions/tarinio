@@ -263,7 +263,7 @@ func e2eCompileAndApply(t *testing.T, client *http.Client, requestBaseURL, reque
 // e2eWaitForRevisionJob ждёт завершения job по prefix за 30с.
 func e2eWaitForRevisionJob(t *testing.T, client *http.Client, requestBaseURL, requestHostOverride, jobPrefix string) {
 	t.Helper()
-	// Простая пауза — jobs обычно завершаются < 3с
-	// Для надёжности без polling достаточно подождать
+	// Compile and apply endpoints return only after their job completes. Runtime
+	// activation is asserted separately against the exact revision artifact.
 	_ = jobPrefix
 }

@@ -90,7 +90,7 @@ func TestAccessPolicyService_UpsertCreatesWhenMissing(t *testing.T) {
 	}
 }
 
-func TestAccessPolicyService_UpsertUpdatesExistingBySiteID(t *testing.T) {
+func TestAccessPolicyService_UpsertCreatesExplicitPolicyAlongsideLegacyBridge(t *testing.T) {
 	store := &fakeAccessPolicyStore{
 		items: []accesspolicies.AccessPolicy{
 			{ID: "legacy-access-id", SiteID: "site-a", AllowList: []string{"10.0.0.1"}},
@@ -110,13 +110,13 @@ func TestAccessPolicyService_UpsertUpdatesExistingBySiteID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("upsert failed: %v", err)
 	}
-	if out.ID != "legacy-access-id" {
-		t.Fatalf("expected existing id preserved, got %+v", out)
+	if out.ID != "different-id" {
+		t.Fatalf("expected explicit id preserved, got %+v", out)
 	}
-	if len(store.items) != 1 || store.items[0].ID != "legacy-access-id" {
-		t.Fatalf("expected in-place update, got %+v", store.items)
+	if len(store.items) != 2 {
+		t.Fatalf("expected separate first-class policy, got %+v", store.items)
 	}
-	if len(store.items[0].DenyList) != 1 || store.items[0].DenyList[0] != "192.168.1.1" {
-		t.Fatalf("expected denylist updated, got %+v", store.items[0])
+	if len(store.items[1].DenyList) != 1 || store.items[1].DenyList[0] != "192.168.1.1" {
+		t.Fatalf("expected first-class denylist, got %+v", store.items)
 	}
 }

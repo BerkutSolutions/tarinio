@@ -529,6 +529,19 @@ func TestMapAccessInputs_AllowlistDefaultsToDenyForAllSites(t *testing.T) {
 	}
 }
 
+func TestMapAccessInputs_PrefersFirstClassPolicyOverEasyCompatibilityPolicy(t *testing.T) {
+	got := mapAccessInputs([]accesspolicies.AccessPolicy{
+		{ID: "easy-site-a-access", SiteID: "site-a", AllowList: []string{"10.0.0.0/24"}},
+		{ID: "site-a-access", SiteID: "site-a", AllowList: []string{"198.51.100.0/24"}},
+	}, nil)
+	if len(got) != 1 {
+		t.Fatalf("expected one canonical policy, got %+v", got)
+	}
+	if got[0].ID != "site-a-access" || len(got[0].AllowCIDRs) != 1 || got[0].AllowCIDRs[0] != "198.51.100.0/24" {
+		t.Fatalf("first-class access policy did not win: %+v", got[0])
+	}
+}
+
 func TestApplyAntiDDoSRateOverrides_SkipsManagementSite(t *testing.T) {
 	siteInputs := []pipeline.SiteInput{
 		{ID: "control-plane-access", Enabled: true},

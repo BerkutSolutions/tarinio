@@ -13,8 +13,10 @@ export async function upsertAccessPolicy(draft, ctx, existingAccessPolicy, optio
   if (!allowlist.length && !denylist.length && !existingAccessPolicy) {
     return;
   }
+  const existingID = String(existingAccessPolicy?.id || "");
+  const policyID = existingID.startsWith(`easy-${siteID}-`) ? `${siteID}-access` : (existingID || `${siteID}-access`);
   const payload = {
-    id: String(existingAccessPolicy?.id || `${siteID}-access`),
+    id: policyID,
     site_id: siteID,
     enabled: true,
     allowlist,
@@ -22,7 +24,8 @@ export async function upsertAccessPolicy(draft, ctx, existingAccessPolicy, optio
   };
   const resolvePolicyForSite = async () => {
     const accessPolicies = deps.normalizeArray(await ctx.api.get("/api/access-policies", requestOptions));
-    return accessPolicies.find((item) => deps.normalizeSiteID(item?.site_id) === siteID) || null;
+    const policiesForSite = accessPolicies.filter((item) => deps.normalizeSiteID(item?.site_id) === siteID);
+    return policiesForSite.find((item) => !String(item?.id || "").startsWith(`easy-${siteID}-`)) || policiesForSite[0] || null;
   };
   const normalizeListForCompare = (values) => deps.normalizeStringArray(values).slice().sort();
   const matchesPayload = (policy) => {

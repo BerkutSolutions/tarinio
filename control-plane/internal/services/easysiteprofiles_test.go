@@ -311,6 +311,36 @@ func TestEasySiteProfileService_UpsertSyncsLegacyPolicies(t *testing.T) {
 	}
 }
 
+func TestEasySiteProfileService_UpsertPreservesStandaloneAllowlist(t *testing.T) {
+	accessStore := &fakeEasyAccessStore{items: []accesspolicies.AccessPolicy{{
+		ID:        "service-a-access",
+		SiteID:    "service-a",
+		Enabled:   true,
+		AllowList: []string{"198.51.100.40"},
+	}}}
+	service := NewEasySiteProfileService(
+		&fakeEasySiteProfileStore{items: map[string]easysiteprofiles.EasySiteProfile{}},
+		&fakeSiteReader{items: []sites.Site{{ID: "service-a", PrimaryHost: "service.example.com"}}},
+		&fakeEasyWAFStore{},
+		accessStore,
+		&fakeEasyRateStore{},
+		nil,
+		nil,
+		nil,
+	)
+
+	profile := easysiteprofiles.DefaultProfile("service-a")
+	if _, err := service.Upsert(context.Background(), profile); err != nil {
+		t.Fatalf("upsert profile: %v", err)
+	}
+	if len(accessStore.items) != 1 {
+		t.Fatalf("expected one access policy, got %+v", accessStore.items)
+	}
+	if got := accessStore.items[0].AllowList; len(got) != 1 || got[0] != "198.51.100.40" {
+		t.Fatalf("standalone allowlist was erased by profile save: %+v", accessStore.items[0])
+	}
+}
+
 func TestEasySiteProfileService_UpsertTransparentDisablesLegacyWAF(t *testing.T) {
 	wafStore := &fakeEasyWAFStore{}
 	service := NewEasySiteProfileService(
