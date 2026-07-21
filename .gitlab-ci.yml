@@ -351,7 +351,6 @@ publish:github-mirror:
     - security:npm-audit
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
-      when: manual
       allow_failure: false
     - when: never
   script:
@@ -380,6 +379,7 @@ publish:github-release:
     - e2e:management-rate-limit
     - e2e:full
   needs:
+    - publish:github-mirror
     - validate:repository
     - warm:e2e-images
     - unit:go
@@ -398,10 +398,8 @@ publish:github-release:
     - dast:negative
   rules:
     - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+/'
-      when: manual
       allow_failure: false
     - if: '$CI_COMMIT_BRANCH == "main"'
-      when: manual
       allow_failure: false
     - when: never
   script:

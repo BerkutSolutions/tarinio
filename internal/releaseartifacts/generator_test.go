@@ -146,7 +146,7 @@ func TestVerifyReleaseArtifactsRejectsArtifactProvidedReplacementKey(t *testing.
 	manifest := []byte(`{"format":"tarinio-release-artifacts/v1","signing_key_id":"replacement"}`)
 	signature := ed25519.Sign(privateKey, manifest)
 	files := map[string][]byte{
-		"release-manifest.json": manifest,
+		"release-manifest.json":  manifest,
 		"checksums.txt":          nil,
 		"sbom.cdx.json":          []byte(`{}`),
 		"provenance.json":        []byte(`{}`),
@@ -160,6 +160,31 @@ func TestVerifyReleaseArtifactsRejectsArtifactProvidedReplacementKey(t *testing.
 	}
 	if err := Verify(replacement, trustedKeyPath); err == nil {
 		t.Fatal("expected replacement artifact directory key to be rejected")
+	}
+}
+
+func TestEnsureSigningKeyDerivesIDWhenCIKeyIDFileIsAbsent(t *testing.T) {
+	root := t.TempDir()
+	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "release-ed25519-private.pem"), pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: privateKey}), 0o600); err != nil {
+		t.Fatalf("write private key: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "release-ed25519-public.pem"), pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: publicKey}), 0o644); err != nil {
+		t.Fatalf("write public key: %v", err)
+	}
+
+	keyID, _, loadedPrivate, err := ensureSigningKey(root)
+	if err != nil {
+		t.Fatalf("ensure signing key: %v", err)
+	}
+	if want := "release-" + hex.EncodeToString(publicKey[:6]); keyID != want {
+		t.Fatalf("key ID=%q, want %q", keyID, want)
+	}
+	if !loadedPrivate.Equal(privateKey) {
+		t.Fatal("loaded private key differs from CI signing key")
 	}
 }
 

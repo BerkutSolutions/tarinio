@@ -341,10 +341,18 @@ func ensureSigningKey(root string) (string, string, ed25519.PrivateKey, error) {
 			return "", "", nil, fmt.Errorf("read release signing public key: %w", err)
 		}
 		keyIDRaw, err := os.ReadFile(keyIDPath)
-		if err != nil {
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return "", "", nil, fmt.Errorf("read release signing key id: %w", err)
 		}
-		return strings.TrimSpace(string(keyIDRaw)), strings.TrimSpace(string(publicRaw)), ed25519.PrivateKey(block.Bytes), nil
+		keyID := strings.TrimSpace(string(keyIDRaw))
+		if keyID == "" {
+			publicBlock, _ := pem.Decode(publicRaw)
+			if publicBlock == nil || len(publicBlock.Bytes) != ed25519.PublicKeySize {
+				return "", "", nil, errors.New("invalid release signing public key")
+			}
+			keyID = "release-" + hex.EncodeToString(publicBlock.Bytes[:6])
+		}
+		return keyID, strings.TrimSpace(string(publicRaw)), ed25519.PrivateKey(block.Bytes), nil
 	}
 	if !errors.Is(err, os.ErrNotExist) {
 		return "", "", nil, fmt.Errorf("read release signing key: %w", err)

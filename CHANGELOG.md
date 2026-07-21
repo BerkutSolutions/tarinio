@@ -52,6 +52,7 @@
 
 ### Публикация и CI/CD
 
+- После quality gates GitHub mirror и release/GHCR публикация выполняются автоматически по порядку: сначала mirror, затем release. CI вычисляет ID существующего Ed25519 ключа подписи из public key, поэтому `key-id.txt` не требуется в GitLab Variables.
 - Восстановлен полный pipeline: validate, unit, smoke, полный E2E, security и расширенный DAST. Публикации GitHub mirror, GitHub Release и GHCR остаются ручными и доступны только после успешных quality gates.
 - E2E-поднятие Compose-контура повторяет сетевую загрузку Docker-образов до трёх раз при кратковременном EOF Docker Hub. Повтор не применяется к уже начавшимся E2E-проверкам.
 - Ручная публикация GitHub Release теперь доступна после успешных quality gates в pipeline ветки `main`: создаётся или проверяется тег версии, публикуется образ GHCR и добавляются release assets. В конце текста релиза выводится таблица результатов E2E и DAST.
