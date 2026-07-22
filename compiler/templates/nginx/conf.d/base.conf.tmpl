@@ -101,6 +101,7 @@ map $waf_site_id_log $waf_management_telemetry {
 }
 
 map "$waf_site_id:$uri" $waf_unknown_host {
+    "_global:/__waf_runtime/readiness" 0;
     ~^_global:(?!/\.well-known/acme-challenge/) 1;
     default 0;
 }
@@ -144,6 +145,17 @@ server {
     add_header X-WAF-Runtime-Revision "{{ .RuntimeRevisionID }}" always;
     add_header Server-Timing "rid;desc=$request_id,ip;desc=$remote_addr,ts;desc=$msec" always;
     proxy_intercept_errors on;
+
+    # Used only by the launcher after a reload. This cannot depend on an
+    # upstream, host map, or protected-site policy, otherwise a valid bundle
+    # can be rolled back merely because the probe itself is routed as a site.
+    location = /__waf_runtime/readiness {
+        allow 127.0.0.1;
+        allow ::1;
+        deny all;
+        access_log off;
+        return 204;
+    }
 {{- range .ErrorStatusCodes }}
     error_page {{ . }} /__waf_errors/_global/{{ . }}.html?rid=$request_id&ip=$remote_addr&ts=$msec;
 {{- end }}

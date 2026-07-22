@@ -45,6 +45,20 @@ func TestWaitForHTTPProxyRevisionRequiresActiveRevision(t *testing.T) {
 	}
 }
 
+func TestWaitForHTTPProxyRevisionUsesDedicatedLocalRoute(t *testing.T) {
+	if runtimeProxyReadinessPath != "/__waf_runtime/readiness" {
+		t.Fatalf("unexpected runtime readiness path: %q", runtimeProxyReadinessPath)
+	}
+}
+
+func TestNginxCommandArgsKeepRuntimeConfigAndDirective(t *testing.T) {
+	args := nginxCommandArgs("daemon off;")
+	want := []string{"-p", "/etc/waf/nginx", "-c", "nginx.conf", "-g", "daemon off;"}
+	if strings.Join(args, "|") != strings.Join(want, "|") {
+		t.Fatalf("nginx args=%q, want=%q", args, want)
+	}
+}
+
 func TestRuntimeReloadReadinessTimeoutStaysBelowControlPlaneRequestBudget(t *testing.T) {
 	const readinessTimeout = 5 * time.Second
 	if readinessTimeout >= 20*time.Second {

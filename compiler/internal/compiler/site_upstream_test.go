@@ -322,6 +322,17 @@ func TestRenderSiteUpstreamArtifacts_EmitsRuntimeRevisionMarker(t *testing.T) {
 			if !strings.Contains(string(artifact.Content), `add_header X-WAF-Runtime-Revision "rev-000123" always;`) {
 				t.Fatalf("base config must expose the active revision marker: %s", artifact.Content)
 			}
+			for _, fragment := range []string{
+				`"_global:/__waf_runtime/readiness" 0;`,
+				`location = /__waf_runtime/readiness {`,
+				`allow 127.0.0.1;`,
+				`allow ::1;`,
+				`return 204;`,
+			} {
+				if !strings.Contains(string(artifact.Content), fragment) {
+					t.Fatalf("base config must provide isolated runtime readiness route %q: %s", fragment, artifact.Content)
+				}
+			}
 			baseMarker = true
 		}
 		if artifact.Path == "nginx/sites/site-a.conf" {

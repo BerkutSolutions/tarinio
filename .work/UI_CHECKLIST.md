@@ -6,6 +6,7 @@
 - Login appearance: hard-refresh `/login` and `/login/2fa` with each saved login theme. The selected themed screen must be the first visible UI; the legacy card must never flash before it.
 - Login appearance runtime: temporarily delay `/api/public/login-appearance` in browser DevTools and reload both login routes. The page may stay blank while the theme resolves, but it must not render the unthemed legacy layout.
 - Basic Auth branding: open a protected site without its authentication cookie. The `/auth` page must show the TARINIO logo and TARINIO favicon before access to the upstream; Network must show successful local PNG responses from `/auth/assets/logo-wide.png`, `/auth/assets/logo-mark.png`, and `/auth/assets/favicon.png`.
+- Revision apply recovery: apply a revision for a protected service whose upstream is unavailable or returns an error. The runtime must still confirm its local revision marker through the loopback-only readiness route; a valid Nginx configuration must not be rolled back because the protected upstream is unhealthy.
 
 - Экран входа: обновить `/login` и `/login/2fa` с выбранным оформлением и убедиться, что до загрузки темы не показывается прежняя карточка входа.
 - Маршрутизация UI: проверить прямые ссылки на известные разделы и их вложенные маршруты; запрос `/.ssh/id_ed25519` должен вернуть `404`, а не dashboard.

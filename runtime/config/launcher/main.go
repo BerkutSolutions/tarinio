@@ -22,6 +22,7 @@ const defaultHealthAddr = "127.0.0.1:8081"
 const runtimeAuthHeader = "X-WAF-Runtime-Token"
 const legacyRuntimeAuthHeader = "X-WAF-Internal-Token"
 const defaultBootstrapUIUpstream = "http://ui:80"
+const runtimeProxyReadinessPath = "/__waf_runtime/readiness"
 
 func bootstrapUIUpstream() string {
 	if v := strings.TrimSpace(os.Getenv("WAF_BOOTSTRAP_UI_UPSTREAM")); v != "" {
@@ -177,7 +178,7 @@ func (p *runtimeProcess) reloadCurrent() error {
 // old worker is not sufficient. Its status is deliberately not prescribed by
 // a site policy.
 func waitForHTTPProxyRevision(revisionID string, timeout time.Duration) error {
-	return waitForHTTPProxyRevisionAt("http://127.0.0.1/", revisionID, timeout)
+	return waitForHTTPProxyRevisionAt("http://127.0.0.1"+runtimeProxyReadinessPath, revisionID, timeout)
 }
 
 func waitForHTTPProxyRevisionAt(endpoint, revisionID string, timeout time.Duration) error {
@@ -239,11 +240,11 @@ func (p *runtimeProcess) startOrReloadLocked() error {
 		return err
 	}
 	globalDirective := p.nginxGlobalDirective("/etc/waf/nginx/nginx.conf", true)
+	if err := validateNginxConfiguration(globalDirective); err != nil {
+		return err
+	}
 	if p.cmd == nil || p.cmd.Process == nil || p.cmd.ProcessState != nil {
-		args := []string{"-p", "/etc/waf/nginx", "-c", "nginx.conf"}
-		if strings.TrimSpace(globalDirective) != "" {
-			args = append(args, "-g", globalDirective)
-		}
+		args := nginxCommandArgs(globalDirective)
 		cmd := exec.Command("nginx", args...)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
@@ -256,6 +257,27 @@ func (p *runtimeProcess) startOrReloadLocked() error {
 		return nil
 	}
 	return p.cmd.Process.Signal(syscall.SIGHUP)
+}
+
+func nginxCommandArgs(globalDirective string) []string {
+	args := []string{"-p", "/etc/waf/nginx", "-c", "nginx.conf"}
+	if strings.TrimSpace(globalDirective) != "" {
+		args = append(args, "-g", globalDirective)
+	}
+	return args
+}
+
+func validateNginxConfiguration(globalDirective string) error {
+	args := append(nginxCommandArgs(globalDirective), "-t")
+	output, err := exec.Command("nginx", args...).CombinedOutput()
+	if err == nil {
+		return nil
+	}
+	details := strings.TrimSpace(string(output))
+	if details == "" {
+		return fmt.Errorf("nginx configuration validation failed: %w", err)
+	}
+	return fmt.Errorf("nginx configuration validation failed: %w: %s", err, details)
 }
 
 func writeBootstrapNginxConfig(rootDir, uiUpstream string) error {
