@@ -1,0 +1,11 @@
+/* First stylesheet on login routes. Keeps all UI hidden until the selected
+   server-side appearance has been resolved without requiring inline CSP. */
+body.login-body:not(.login-appearance-ready) {
+  visibility: hidden;
+  opacity: 0;
+}
+
+body.login-body.login-appearance-ready {
+  visibility: visible;
+  opacity: 1;
+}

@@ -13,10 +13,10 @@ import (
 )
 
 // TestE2EErrorPages проверяет:
-// 1. Preview-страницы ошибок отдаются через защищённый API
-//    /api/error-pages/preview/<slug>.
-// 2. Исключения (disabled_error_pages) сохраняются и читаются обратно
-// 3. После compile+apply исключённая страница не отображается (error_page директива убрана)
+//  1. Preview-страницы ошибок отдаются через защищённый API
+//     /api/error-pages/preview/<slug>.
+//  2. Исключения (disabled_error_pages) сохраняются и читаются обратно
+//  3. После compile+apply исключённая страница не отображается (error_page директива убрана)
 //
 // Требует: WAF_E2E_BASE_URL (control-plane UI URL)
 func TestE2EErrorPages(t *testing.T) {
@@ -259,7 +259,30 @@ func e2eCompileAndApply(t *testing.T, client *http.Client, requestBaseURL, reque
 	}
 
 	e2eWaitForRevisionJob(t, client, requestBaseURL, requestHostOverride, "apply-"+revID)
+	e2eWaitForRuntimeRevision(t, revID)
 	return revID
+}
+
+// e2eWaitForRuntimeRevision makes apply failures deterministic for every E2E
+// caller instead of allowing a later HTTP assertion to report stale state.
+func e2eWaitForRuntimeRevision(t *testing.T, revisionID string) {
+	t.Helper()
+	runtimeContainer := strings.TrimSpace(os.Getenv("WAF_E2E_RUNTIME_CONTAINER"))
+	if runtimeContainer == "" {
+		runtimeContainer = "waf-e2e-runtime"
+	}
+	deadline := time.Now().Add(30 * time.Second)
+	var active []byte
+	var err error
+	for time.Now().Before(deadline) {
+		active, err = exec.Command("docker", "exec", runtimeContainer, "cat", "/var/lib/waf/active/current.json").CombinedOutput()
+		if err == nil && strings.Contains(string(active), revisionID) {
+			return
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+	logs, _ := exec.Command("docker", "logs", "--tail", "80", runtimeContainer).CombinedOutput()
+	t.Fatalf("runtime did not activate revision %s within 30s: active=%s err=%v runtime_logs=%s", revisionID, active, err, logs)
 }
 
 // e2eWaitForRevisionJob ждёт завершения job по prefix за 30с.

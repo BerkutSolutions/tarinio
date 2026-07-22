@@ -28,10 +28,12 @@ spec:
           image: tarinio-runtime:lab
           imagePullPolicy: IfNotPresent
           securityContext:
+            allowPrivilegeEscalation: false
             capabilities:
+              drop:
+                - ALL
               add:
                 - NET_ADMIN
-                - NET_RAW
           ports:
             - containerPort: 80
             - containerPort: 443

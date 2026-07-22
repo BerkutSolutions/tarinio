@@ -1,5 +1,9 @@
 2026-07-21
 
+- Login first paint: with cache disabled in DevTools, hard-refresh `/login` and `/login/2fa` for every saved appearance. Before the public appearance endpoint answers, the page may be blank but must never show the legacy centred login card; the first visible frame must use the selected theme.
+- Login first paint fallback: temporarily block `/api/public/login-appearance` and reload both login routes. The default themed appearance may be shown after the request fails, but no legacy layout may be painted at any point.
+- Login CSP: reload `/login` and `/login/2fa` with Console open. There must be no CSP violation for an inline `<style>` or inline `onerror` handler.
+
 - Error-page preview: after signing in, open a custom-error-page preview from the service editor. It must load through `/api/error-pages/preview/<slug>` with the authenticated UI session; an unauthenticated request must remain rejected.
 - Runtime/API: start a fresh environment and run the first compile/apply immediately after the panel is ready. The active revision must remain the revision returned by the operation; startup bootstrap must not replace it later.
 

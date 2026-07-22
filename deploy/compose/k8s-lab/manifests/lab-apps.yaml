@@ -18,9 +18,17 @@ spec:
       labels:
         app: site-a
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: http-echo
           image: hashicorp/http-echo:1.0.0
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
           args:
             - "-listen=:5678"
             - "-text=K8S-LAB SITE A: example.com"
@@ -55,9 +63,17 @@ spec:
       labels:
         app: site-b
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: http-echo
           image: hashicorp/http-echo:1.0.0
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
           args:
             - "-listen=:5678"
             - "-text=K8S-LAB SITE B: domen.example.com"
@@ -92,9 +108,17 @@ spec:
       labels:
         app: site-c
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: http-echo
           image: hashicorp/http-echo:1.0.0
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
           args:
             - "-listen=:5678"
             - "-text=K8S-LAB SITE C: ex.example.com"

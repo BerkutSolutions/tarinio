@@ -346,9 +346,15 @@ func TestUIContract_LoginAppearanceUsesSharedThemeStyles(t *testing.T) {
 		if !strings.Contains(contents[page], `/static/login-appearance.css?v=20260721-1`) || !strings.Contains(contents[page], `class="login-theme-shell"`) {
 			t.Fatalf("%s must use the shared login appearance shell", page)
 		}
-		if !strings.Contains(contents[page], `body.login-body{visibility:hidden!important;opacity:0!important}`) || !strings.Contains(contents[page], `login-appearance-ready`) {
-			t.Fatalf("%s must stay hidden until the selected login appearance is ready", page)
+		if !strings.Contains(contents[page], `/static/login-bootstrap.css?v=20260722-1`) {
+			t.Fatalf("%s must load the CSP-safe bootstrap guard before showing the selected login appearance", page)
 		}
+		if strings.Contains(contents[page], `<style>`) || strings.Contains(contents[page], `/static/styles.css`) {
+			t.Fatalf("%s must not retain inline styles or the legacy login stylesheet", page)
+		}
+	}
+	if !strings.Contains(contents["theme script"], `login-appearance-ready`) {
+		t.Fatal("login appearance script must reveal the page only after selecting a theme")
 	}
 	if strings.Index(contents["theme script"], "document.body.dataset.loginAppearance = appearance") > strings.Index(contents["theme script"], "document.body.classList.add(\"login-appearance-ready\")") {
 		t.Fatal("login appearance must be selected before the page becomes visible")

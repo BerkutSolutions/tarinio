@@ -104,9 +104,15 @@ run_compose_start() {
     fi
     if [ "$attempt" -lt "$max_attempts" ]; then
       E2E_BUILD_RETRIES=$attempt
-      warn "Container build failed; retrying Docker registry request in 5s"
+      retry_delay=$((attempt * 5))
+      if grep -Eq 'registry-1\.docker\.io|failed to resolve source metadata|: EOF' "$E2E_LOG_FILE"; then
+        E2E_INFRASTRUCTURE_INSTABILITY=1
+        warn "Docker registry request failed; retrying in ${retry_delay}s"
+      else
+        warn "Container build failed; retrying in ${retry_delay}s"
+      fi
       $COMPOSE_CMD -f docker-compose.yml down --volumes --remove-orphans >>"$E2E_LOG_FILE" 2>&1 || true
-      sleep 5
+      sleep "$retry_delay"
     fi
     attempt=$((attempt + 1))
   done
