@@ -72,6 +72,27 @@ location = {{ .AuthGateLoginURI }} {
     default_type text/html;
     alias /etc/waf/errors/{{ .SiteID }}/auth.html;
 }
+location = {{ .AuthGateLoginURI }}/assets/logo-wide.png {
+    proxy_intercept_errors off;
+    modsecurity off;
+    default_type image/png;
+    alias /usr/share/tarinio/auth-assets/logo-wide.png;
+    add_header Cache-Control "public, max-age=604800, immutable" always;
+}
+location = {{ .AuthGateLoginURI }}/assets/logo-mark.png {
+    proxy_intercept_errors off;
+    modsecurity off;
+    default_type image/png;
+    alias /usr/share/tarinio/auth-assets/logo-mark.png;
+    add_header Cache-Control "public, max-age=604800, immutable" always;
+}
+location = {{ .AuthGateLoginURI }}/assets/favicon.png {
+    proxy_intercept_errors off;
+    modsecurity off;
+    default_type image/png;
+    alias /usr/share/tarinio/auth-assets/favicon.png;
+    add_header Cache-Control "public, max-age=604800, immutable" always;
+}
 {{- if .AuthBasicEnabled }}
 location = {{ .AuthGateVerifyBasicURI }} {
     proxy_intercept_errors off;

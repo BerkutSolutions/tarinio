@@ -128,8 +128,8 @@ func TestRenderEasyArtifacts_BasicAuthTemplateVariants(t *testing.T) {
 			if !strings.Contains(page, `body class="`+variant+`"`) || !strings.Contains(page, `fetch("/auth/verify/basic"`) {
 				t.Fatalf("expected themed, working Basic Auth page for %s", variant)
 			}
-			if !strings.Contains(page, "logo800x300_no-text.png") || !strings.Contains(page, "logo512.png") {
-				t.Fatalf("expected local logos in %s", variant)
+			if !strings.Contains(page, `href="/auth/assets/favicon.png"`) || !strings.Contains(page, `src="/auth/assets/logo-wide.png"`) || !strings.Contains(page, `src="/auth/assets/logo-mark.png"`) {
+				t.Fatalf("expected local TARINIO assets in %s", variant)
 			}
 			if !strings.Contains(page, "https://github.com/BerkutSolutions/tarinio") || !strings.Contains(page, "Secured by") {
 				t.Fatalf("expected Tarinio footer link in %s", variant)
@@ -140,5 +140,28 @@ func TestRenderEasyArtifacts_BasicAuthTemplateVariants(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestRenderEasyArtifacts_BasicAuthAssetsUseRuntimeLocalRoutes(t *testing.T) {
+	artifacts, err := RenderEasyRateLimitArtifacts(
+		[]SiteInput{{ID: "site-a", Enabled: true, PrimaryHost: "a.example.com", ListenHTTP: true, DefaultUpstreamID: "site-a-upstream"}},
+		[]UpstreamInput{{ID: "site-a-upstream", SiteID: "site-a", Host: "backend.internal", Port: 8080, Scheme: "http"}},
+		[]EasyProfileInput{{SiteID: "site-a", AllowedMethods: []string{"GET"}, UseAuthBasic: true, AuthMode: "basic", AuthUsers: []ServiceAuthUserInput{{Username: "admin", Password: "secret", Enabled: true}}}},
+	)
+	if err != nil {
+		t.Fatalf("render easy rate limit artifacts: %v", err)
+	}
+	locations := mapArtifactsByPath(artifacts)["nginx/easy-locations/site-a.conf"]
+	for _, route := range []string{
+		`location = /auth/assets/logo-wide.png {`,
+		`location = /auth/assets/logo-mark.png {`,
+		`location = /auth/assets/favicon.png {`,
+		`alias /usr/share/tarinio/auth-assets/`,
+		`default_type image/png;`,
+	} {
+		if !strings.Contains(locations, route) {
+			t.Fatalf("expected Basic Auth local asset route %q, got: %s", route, locations)
+		}
 	}
 }

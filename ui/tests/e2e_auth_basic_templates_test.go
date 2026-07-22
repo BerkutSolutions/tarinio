@@ -31,8 +31,8 @@ func TestE2EBasicAuthTemplates(t *testing.T) {
 	}
 
 	const (
-		siteID     = "e2e-basic-auth-template-site"
-		upstreamID = "e2e-basic-auth-template-upstream"
+		siteID      = "e2e-basic-auth-template-site"
+		upstreamID  = "e2e-basic-auth-template-upstream"
 		runtimeHost = "e2e-basic-auth-template.test"
 	)
 	for _, path := range []string{
@@ -107,8 +107,24 @@ func TestE2EBasicAuthTemplates(t *testing.T) {
 	}
 	pageBody, _ := io.ReadAll(page.Body)
 	_ = page.Body.Close()
-	if page.StatusCode != http.StatusOK || !strings.Contains(string(pageBody), `body class="v6"`) || !strings.Contains(string(pageBody), "logo800x300_no-text.png") {
+	if page.StatusCode != http.StatusOK || !strings.Contains(string(pageBody), `body class="v6"`) || !strings.Contains(string(pageBody), `/auth/assets/logo-wide.png`) || !strings.Contains(string(pageBody), `/auth/assets/favicon.png`) {
 		t.Fatalf("selected runtime page did not render v6 with logo: status=%d body=%.500s", page.StatusCode, pageBody)
+	}
+	for _, assetPath := range []string{"/auth/assets/logo-wide.png", "/auth/assets/logo-mark.png", "/auth/assets/favicon.png"} {
+		assetRequest, err := http.NewRequest(http.MethodGet, runtimeURL+assetPath, nil)
+		if err != nil {
+			t.Fatalf("create Basic Auth asset request %s: %v", assetPath, err)
+		}
+		assetRequest.Host = runtimeHost
+		asset, err := runtimeClient.Do(assetRequest)
+		if err != nil {
+			t.Fatalf("get Basic Auth asset %s: %v", assetPath, err)
+		}
+		body, _ := io.ReadAll(asset.Body)
+		_ = asset.Body.Close()
+		if asset.StatusCode != http.StatusOK || !strings.HasPrefix(asset.Header.Get("Content-Type"), "image/png") || len(body) == 0 {
+			t.Fatalf("Basic Auth asset %s: status=%d content-type=%q bytes=%d", assetPath, asset.StatusCode, asset.Header.Get("Content-Type"), len(body))
+		}
 	}
 	req, err := http.NewRequest(http.MethodPost, runtimeURL+"/auth/verify/basic", nil)
 	if err != nil {

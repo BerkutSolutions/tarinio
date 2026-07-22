@@ -29,6 +29,7 @@ export async function applyLoginAppearance() {
     // Keep the default theme when the control plane is unavailable.
   } finally {
     document.body.dataset.loginAppearance = appearance;
+    await new Promise((resolve) => window.requestAnimationFrame(resolve));
     document.body.classList.add("login-appearance-ready");
     updateLoginThemeTime();
   }
