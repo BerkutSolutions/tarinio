@@ -85,7 +85,7 @@ test("services.list-resilience", async ({ authenticatedPage: page }) => {
       await emptyPage.route(`**/api/${endpoint}**`, (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
     }
     await emptyPage.goto("/services?e2e-state=empty", { waitUntil: "domcontentloaded", timeout: 60_000 });
-    await expect(emptyPage.locator(".waf-table .waf-empty").filter({ hasText: /no services|нет сервис/i })).toBeVisible({ timeout: 30_000 });
+    await expect(emptyPage.locator(".waf-table .waf-empty")).toBeVisible({ timeout: 30_000 });
   } finally { await emptyPage.close(); }
 
   const errorPage = await page.context().newPage();

@@ -556,7 +556,7 @@ WAF_E2E_RUN_ID="${WAF_E2E_RUN_ID:-${E2E_PROJECT}-$(date +%s)}"
 export WAF_E2E_DISPOSABLE WAF_BROWSER_BASE_URL WAF_E2E_RUN_ID
 if [ "$E2E_DASHBOARD_SEED" = "1" ] || { [ "$E2E_BROWSER_ONLY" = "1" ] && [ "$E2E_DASHBOARD_SEED" = "auto" ] && printf '%s' "$E2E_BROWSER_SPECS" | grep -Eq '(dashboard|requests-complete)\.spec\.ts'; }; then
   step "Seeding real Dashboard telemetry"
-  sh "$REPO_ROOT/scripts/seed-dashboard-telemetry.sh" "$COMPOSE_FILE" "$E2E_BASE_URL" "$E2E_USER" "$E2E_PASS" "$WAF_E2E_MANAGEMENT_HOST" >>"$E2E_LOG_FILE" 2>&1
+  sh "$REPO_ROOT/scripts/seed-dashboard-telemetry.sh" "$COMPOSE_FILE" "$E2E_BASE_URL" "$E2E_USER" "$E2E_PASS" >>"$E2E_LOG_FILE" 2>&1
   ok "Dashboard telemetry is aggregated"
 fi
 TEST_SUMMARY_FILE="$(mktemp)"
@@ -571,6 +571,7 @@ if [ "$E2E_BROWSER_ONLY" = "1" ]; then
       -v "$REPO_ROOT:/workspace" -w /workspace/e2e/browser "$E2E_BROWSER_IMAGE" \
       bash -lc 'npm ci --prefer-offline --no-audit --fund=false && npx playwright test --project=setup' >>"$E2E_LOG_FILE" 2>&1
     WAF_BROWSER_FAULT_SYNC_FILE="$E2E_LOG_DIR/requests-backend-fault"
+    WAF_BROWSER_FAULT_SYNC_CONTAINER_FILE="/workspace/build/e2e/$(basename "$E2E_LOG_DIR")/requests-backend-fault"
     export WAF_BROWSER_FAULT_SYNC_FILE
     rm -f "$WAF_BROWSER_FAULT_SYNC_FILE".*
     (
@@ -590,8 +591,8 @@ if [ "$E2E_BROWSER_ONLY" = "1" ]; then
     -e HOME=/tmp -e CI -e CI_COMMIT_SHA -e CI_PIPELINE_URL \
     -e WAF_E2E_DISPOSABLE -e WAF_BROWSER_BASE_URL -e WAF_E2E_RUNTIME_URL \
     -e WAF_E2E_USERNAME -e WAF_E2E_PASSWORD -e WAF_E2E_RUN_ID \
-    -e WAF_BROWSER_RESULTS_FILE -e WAF_BROWSER_OUTPUT_DIR -e WAF_BROWSER_JUNIT_FILE -e WAF_BROWSER_FAULT_SYNC_FILE \
-    -e WAF_BROWSER_WORKERS=1 -e E2E_BROWSER_SPECS -e E2E_BROWSER_RUNTIME_FAULT \
+    -e WAF_BROWSER_RESULTS_FILE -e WAF_BROWSER_OUTPUT_DIR -e WAF_BROWSER_JUNIT_FILE -e WAF_BROWSER_FAULT_SYNC_CONTAINER_FILE \
+    -e WAF_BROWSER_WORKERS="${E2E_BROWSER_WORKERS:-1}" -e E2E_BROWSER_SPECS -e E2E_BROWSER_RUNTIME_FAULT \
     -v "$REPO_ROOT:/workspace" -w /workspace/e2e/browser "$E2E_BROWSER_IMAGE" \
     bash -lc 'npm ci --prefer-offline --no-audit --fund=false && if [ "$E2E_BROWSER_RUNTIME_FAULT" = "requests-backend" ]; then npm test -- --project=desktop --project=mobile --no-deps $E2E_BROWSER_SPECS; else npm test -- $E2E_BROWSER_SPECS; fi' >"$TEST_LOG" 2>&1 || TEST_EXIT=$?
   TEST_SUMMARY="browser:$E2E_BROWSER_SPECS"

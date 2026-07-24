@@ -745,14 +745,16 @@ pre-security:failure-gate:
           lines.extend([f"## {heading}", "", url, ""])
           if name.startswith("e2e:") and name != "e2e:browser:gate":
               directory = name.removeprefix("e2e:").replace("browser:", "browser-")
-              logs = sorted(pathlib.Path("build/e2e", directory).rglob("*.log"))
+              root = pathlib.Path("build/e2e", directory)
+              job_log = root / "job.log"
+              logs = [job_log] if job_log.exists() else sorted(root.rglob("*.log"))
               if logs:
                   markers = ("[fail]", "--- fail:", "timeouterror:", "error:", "failed to", "panic:", "fatal:")
                   excerpts = []
                   for log_path in logs:
                       content = log_path.read_text(encoding="utf-8", errors="replace").splitlines()
                       positions = [index for index, line in enumerate(content) if any(marker in line.lower() for marker in markers)]
-                      for index in positions[:8]:
+                      for index in positions[:2]:
                           start, end = max(0, index - 10), min(len(content), index + 28)
                           excerpt = [f"[{log_path.name}]", *content[start:end]]
                           if excerpt not in excerpts:
