@@ -287,6 +287,14 @@ func (s *DashboardService) StatsForActor(actorID string) (DashboardStats, error)
 	if cached, ok := s.snapshot(); ok {
 		return s.filterDismissedServiceErrors(cached, actorID), nil
 	}
+	// The HTTP handler must stay responsive while the first background refresh
+	// is collecting request/archive data. Building a snapshot inline can block
+	// behind a busy runtime or database during disposable-stack startup. Return
+	// the complete empty shape; the sampler will publish the real snapshot.
+	if s.backgroundRefreshStarted() {
+		go func() { _ = s.refreshSnapshot() }()
+		return emptyDashboardSnapshot(time.Now().UTC()), nil
+	}
 	stats, err := s.buildSnapshot()
 	if err != nil {
 		return DashboardStats{}, err

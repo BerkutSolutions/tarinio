@@ -88,6 +88,30 @@ func (s *DashboardService) snapshot() (DashboardStats, bool) {
 	return s.sampler.snapshot, true
 }
 
+func (s *DashboardService) backgroundRefreshStarted() bool {
+	s.sampler.mu.RLock()
+	defer s.sampler.mu.RUnlock()
+	return s.sampler.started
+}
+
+func emptyDashboardSnapshot(now time.Time) DashboardStats {
+	return DashboardStats{
+		GeneratedAt:            now.Format(time.RFC3339Nano),
+		ObservationWindowHours: 24,
+		Services:               []DashboardServiceStatus{},
+		RequestTopSites:        []DashboardKeyCount{},
+		RequestTopURLs:         []DashboardKeyCount{},
+		TopAttackerIPs:         []DashboardKeyCount{},
+		TopAttackerCountries:   []DashboardKeyCount{},
+		MostAttackedURLs:       []DashboardKeyCount{},
+		PopularErrors:          []DashboardKeyCount{},
+		RequestsSeries:         buildHourlySeries(map[time.Time]int{}, now),
+		AttacksSeries:          buildHourlySeries(map[time.Time]int{}, now),
+		BlockedSeries:          buildHourlySeries(map[time.Time]int{}, now),
+		UpstreamHealth:         []DashboardUpstreamHealth{},
+	}
+}
+
 func (s *DashboardService) storeSnapshot(stats DashboardStats) {
 	s.sampler.mu.Lock()
 	s.sampler.snapshot = stats
