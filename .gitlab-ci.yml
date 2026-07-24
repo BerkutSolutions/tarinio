@@ -542,7 +542,6 @@ e2e:failure-evidence:
   timeout: 10m
   when: always
   allow_failure: true
-  dependencies: []
   needs:
     - job: e2e:smoke
       artifacts: true
@@ -602,7 +601,6 @@ pre-security:failure-gate:
   stage: pre-security
   timeout: 15m
   when: always
-  dependencies: []
   needs:
     - job: e2e:failure-evidence
       artifacts: true
