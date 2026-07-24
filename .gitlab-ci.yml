@@ -343,10 +343,13 @@ e2e:api-registry:
   script:
     - test -n "${WAF_E2E_PASSWORD:-}" || { echo "WAF_E2E_PASSWORD is required" >&2; exit 1; }
     - mkdir -p "build/e2e/$E2E_BROWSER_SLICE"
-    - BROWSER_E2E_IMAGE_JOB="${BROWSER_E2E_IMAGE}-${CI_PROJECT_ID}-${CI_PIPELINE_ID}-${E2E_BROWSER_SLICE}"; docker build -t "$BROWSER_E2E_IMAGE_JOB" -f e2e/browser/Dockerfile.ci .
-    - >-
+    - |
+      set -o pipefail
+      E2E_BROWSER_JOB_LOG="$CI_PROJECT_DIR/build/e2e/$E2E_BROWSER_SLICE/job.log"
+      BROWSER_E2E_IMAGE_JOB="${BROWSER_E2E_IMAGE}-${CI_PROJECT_ID}-${CI_PIPELINE_ID}-${E2E_BROWSER_SLICE}"
+      docker build -t "$BROWSER_E2E_IMAGE_JOB" -f e2e/browser/Dockerfile.ci . 2>&1 | tee "$E2E_BROWSER_JOB_LOG"
       E2E_BROWSER_ONLY=1
-      E2E_BROWSER_IMAGE="${BROWSER_E2E_IMAGE}-${CI_PROJECT_ID}-${CI_PIPELINE_ID}-${E2E_BROWSER_SLICE}"
+      E2E_BROWSER_IMAGE="$BROWSER_E2E_IMAGE_JOB"
       E2E_BROWSER_SPECS="$E2E_BROWSER_SPECS"
       E2E_PROJECT="${E2E_BROWSER_PROJECT}-${CI_PIPELINE_ID}"
       E2E_PORT="$E2E_BROWSER_UI_PORT"
@@ -363,7 +366,8 @@ e2e:api-registry:
       WAF_BROWSER_OUTPUT_DIR="../../build/e2e/$E2E_BROWSER_SLICE/artifacts"
       WAF_BROWSER_JUNIT_FILE="../../build/e2e/$E2E_BROWSER_SLICE/junit.xml"
       WAF_E2E_RUN_ID="$CI_PIPELINE_ID-$E2E_BROWSER_SLICE"
-      sh scripts/run-e2e-tests.sh
+      export E2E_BROWSER_ONLY E2E_BROWSER_IMAGE E2E_BROWSER_SPECS E2E_PROJECT E2E_PORT E2E_RT_PORT E2E_RT_HTTPS_PORT E2E_RT_HLT_PORT E2E_CONTROL_PLANE_DIRECT_PORT E2E_DAST_CANARY_PORT E2E_MTLS_UPSTREAM_PORT E2E_TIMEOUT E2E_LOG_DIR E2E_EVIDENCE_DIR WAF_BROWSER_RESULTS_FILE WAF_BROWSER_OUTPUT_DIR WAF_BROWSER_JUNIT_FILE WAF_E2E_RUN_ID
+      sh scripts/run-e2e-tests.sh 2>&1 | tee -a "$E2E_BROWSER_JOB_LOG"
   artifacts:
     when: always
     expire_in: 30 days
@@ -677,17 +681,18 @@ pre-security:failure-gate:
           lines.extend([f"## {heading}", "", url, ""])
           if name.startswith("e2e:") and name != "e2e:browser:gate":
               directory = name.removeprefix("e2e:").replace("browser:", "browser-")
-              logs = sorted(pathlib.Path("build/e2e", directory).glob("*.log"))
+              logs = sorted(pathlib.Path("build/e2e", directory).rglob("*.log"))
               if logs:
-                  content = logs[-1].read_text(encoding="utf-8", errors="replace").splitlines()
                   markers = ("[fail]", "--- fail:", "timeouterror:", "error:", "failed to", "panic:", "fatal:")
-                  positions = [index for index, line in enumerate(content) if any(marker in line.lower() for marker in markers)]
                   excerpts = []
-                  for index in positions[:8]:
-                      start, end = max(0, index - 10), min(len(content), index + 28)
-                      excerpt = content[start:end]
-                      if excerpt not in excerpts:
-                          excerpts.append(excerpt)
+                  for log_path in logs:
+                      content = log_path.read_text(encoding="utf-8", errors="replace").splitlines()
+                      positions = [index for index, line in enumerate(content) if any(marker in line.lower() for marker in markers)]
+                      for index in positions[:8]:
+                          start, end = max(0, index - 10), min(len(content), index + 28)
+                          excerpt = [f"[{log_path.name}]", *content[start:end]]
+                          if excerpt not in excerpts:
+                              excerpts.append(excerpt)
                   diagnostic = [line for excerpt in excerpts for line in excerpt]
                   if not diagnostic:
                       diagnostic = ["No error marker was found in the E2E log."]
