@@ -12,15 +12,17 @@
 - Четыре реальные атакующие нагрузки ModSecurity получают HTTP 403 и не достигают canary, а безопасный запрос достигает его один раз.
 - Шарды Activity/Audit и Settings/cross-module проверяют реальный API/runtime и desktop/mobile без повторов и пропусков.
 
+## [1.5.14] - 22.07.2026
+
 ### Браузерные E2E
 
-- Added an isolated Playwright package under e2e/browser with a disposable-stack guard and localhost-only base URL policy.
-- Added desktop/mobile route smoke checks, read-only API contracts for every implemented WAF tab, Dashboard widget/CPU/Memory checks, and first Services workflows.
-- Extended scripts/run-e2e-tests.ps1 with -Browser to run Go and browser suites on the namespaced disposable stack.
-- Browser runner now uses the disposable HTTPS management virtual host with local Chromium host mapping, matching the real guard.js redirect path.
-- Added 20-minute per-test timeout, real login-form E2E, Services editor mode/validation workflow, and Bans invalid-input validation.
-- Verified full desktop and mobile browser suites at 42/42 passed each; registry coverage reports 100% for the currently registered workflow slice.
-- Fixed disposable API/runtime evidence helpers to use Compose service container names and dynamically discovered attacker IPs; Services mutation/editor parity and settings roundtrip suites now run against the actual stack.
+- Добавлен изолированный пакет Playwright в `e2e/browser`, с защитой disposable-стенда и политикой base URL только для localhost.
+- Добавлены smoke-проверки маршрутов desktop/mobile, read-only API-контракты для всех реализованных вкладок WAF, проверки виджетов Dashboard/CPU/Memory и первые сценарии Services.
+- `scripts/run-e2e-tests.ps1` расширен флагом `-Browser` для запуска Go- и browser-наборов на namespaced disposable-стенде.
+- Browser runner использует disposable HTTPS management virtual host и локальную Chromium host-map, соответствующую реальному пути редиректа `guard.js`.
+- Добавлены 20-минутный таймаут на тест, реальный E2E формы входа, сценарий режимов/валидации редактора Services и валидация неверного ввода в Bans.
+- Полные desktop и mobile browser-наборы подтверждены с результатом 42/42 каждый; registry coverage показывает 100% для зарегистрированного среза сценариев.
+- Вспомогательные средства evidence для disposable API/runtime переведены на имена Compose-сервисов и динамически найденные IP атакующего; сценарии мутаций/редактора Services и round-trip Settings теперь выполняются на реальном стенде.
 
 ### Интерфейс входа
 
@@ -124,23 +126,23 @@
 - ui/e2e: добавлен Anti-DDoS valid save/invalid boundary/reload/restore workflow с проверкой отсутствия partial save.
 ### Завершение E2E: Bans, ревизии и TLS
 
-- Completed Bans desktop/mobile workflows, including real read-only 403 error paths for create, extend and unban without denylist mutation.
-- Completed Revisions desktop/mobile workflows with bulk delete, cross-role RBAC, visible apply errors and active-revision invariants.
-- Completed TLS desktop/mobile workflows with self-signed/ACME, auto-renew validation/runtime coverage, PEM/ZIP import and distinct-approver TOTP-protected export download.
-- Moved Playwright authentication state outside `test-results` so result cleanup cannot invalidate dependent projects.
+- Завершены desktop/mobile-сценарии Bans, включая реальные read-only пути с `403` для create, extend и unban без мутации denylist.
+- Завершены desktop/mobile-сценарии Revisions: массовое удаление, cross-role RBAC, видимые ошибки apply и инварианты активной revision.
+- Завершены desktop/mobile-сценарии TLS: self-signed/ACME, валидация auto-renew/runtime, импорт PEM/ZIP и защищённое TOTP скачивание экспорта другим approver.
+- Playwright authentication state вынесен за пределы `test-results`, поэтому очистка результатов не может инвалидировать зависимые проекты.
 ### Завершение E2E: события
 
-- Added server-side Events type/severity/site/date filtering, RFC3339 validation, deterministic ordering and pagination-before-response semantics.
-- Completed Events desktop/mobile coverage for detail, keyboard, pagination, loading, empty, backend-error and malformed states.
-- Added accessible `aria-current` marking to the active Events pager button.
+- Добавлены server-side фильтры Events по type/severity/site/date, валидация RFC3339, детерминированная сортировка и пагинация до формирования ответа.
+- Завершено desktop/mobile-покрытие Events: detail, keyboard, пагинация, loading, empty, backend-error и malformed states.
+- Активная кнопка пагинатора Events получила доступную маркировку `aria-current`.
 ### Завершение E2E: активность и аудит
 
-- Added server-side Audit category filtering with totals calculated before pagination, plus validated dates/status/category/offset and a 500-row limit clamp.
-- Completed desktop/mobile Activity presets, filters, keyboard submit, previous/next pagination and resilience states.
-- Added direct evidence queries for critical Bans, Revisions, Anti-DDoS, CRS, TLS and Administration mutations.
+- Добавлена server-side фильтрация Audit по category с подсчётом totals до пагинации, а также валидация dates/status/category/offset и ограничение `limit` до 500 строк.
+- Завершены desktop/mobile-сценарии Activity: presets, filters, отправка с клавиатуры, previous/next pagination и resilience states.
+- Добавлены прямые evidence-запросы для критичных мутаций Bans, Revisions, Anti-DDoS, CRS, TLS и Administration.
 ### Завершение E2E: настройки
 
-- Completed all Settings desktop/mobile workflows for runtime, locales, storage, security, logging, secrets, management hosts, appearance and update checks.
-- Made runtime settings updates transactional so rejected mixed payloads cannot partially mutate in-memory state.
-- Normalized storage-index responses with canonical streams and per-item storage types, including offline empty payloads.
-- Prevented masked Vault saves from rewriting unchanged secrets and removed global-pepper coupling from Vault writes.
+- Завершены все desktop/mobile-сценарии Settings для runtime, locales, storage, security, logging, secrets, management hosts, appearance и проверки обновлений.
+- Обновления runtime settings сделаны транзакционными: отклонённый смешанный payload не может частично изменить in-memory state.
+- Ответы storage-index нормализованы: canonical streams и тип storage для каждого элемента, включая offline пустые payload.
+- Сохранение маскированных Vault-значений больше не переписывает неизменённые secrets; удалена зависимость Vault writes от global pepper.
