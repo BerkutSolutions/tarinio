@@ -55,7 +55,7 @@ validate:repository:
     - cd e2e/browser && npm ci --prefer-offline --no-audit --fund=false && npm run test:coverage && npm run test:strict-results
 
 warm:e2e-images:
-  stage: validate
+  stage: unit
   allow_failure: true
   timeout: 20m
   script:
