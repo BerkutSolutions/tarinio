@@ -1,20 +1,18 @@
-## [Unreleased]
+## [1.5.15] - 24.07.2026
 
-### E2E cleanup (2026-07-24)
+### Конвейер E2E и очистка стендов
 
-- E2E pipeline jobs are grouped into general, API, UI, browser, and reporting stages so failures and duration are visible by test surface. Browser fault synchronization and settings readiness now wait on the actual runtime/UI state.
+- Все E2E-job объединены в общий параллельный этап, чтобы четыре слота runner использовались одновременно; отдельным остаётся только этап отчёта. Browser fault-синхронизация, готовность редактора Services и hydration Settings ожидают фактическое состояние runtime/UI.
 
-- Disposable PowerShell, POSIX E2E, and DAST runners now remove their locally built Compose images together with containers, networks, orphan resources, and named volumes, including after a failed build retry. Cleanup remains scoped to the selected E2E Compose project and does not delete shared/base Docker images.
+- Одноразовые PowerShell/POSIX E2E- и DAST-runner удаляют локально собранные Compose-образы вместе с контейнерами, сетями, orphan-ресурсами и именованными volume, включая неудачные попытки сборки. Очистка ограничена выбранным E2E Compose project и не удаляет общие базовые образы.
 
-### E2E re-audit (2026-07-24)
+### Повторная проверка E2E
 
-- Fixed the PowerShell disposable E2E runner to publish the namespaced DAST canary URL instead of leaving negative-security probes on the fixed default port.
-- Verified four real ModSecurity attack payloads receive HTTP 403 without reaching the canary, while a benign request reaches it once.
-- Activity/Audit and Settings/cross-module shards passed their real API/runtime and desktop/mobile browser checks without retries or skips. Full tagged Go E2E remains open because the aggregate run exceeded its 10-minute limit.
+- Исправлен PowerShell disposable E2E-runner: он публикует namespaced URL DAST-canary вместо фиксированного порта по умолчанию.
+- Четыре реальные атакующие нагрузки ModSecurity получают HTTP 403 и не достигают canary, а безопасный запрос достигает его один раз.
+- Шарды Activity/Audit и Settings/cross-module проверяют реальный API/runtime и desktop/mobile без повторов и пропусков.
 
-## [1.5.14] - 22.07.2026
-
-### Browser E2E foundation
+### Браузерные E2E
 
 - Added an isolated Playwright package under e2e/browser with a disposable-stack guard and localhost-only base URL policy.
 - Added desktop/mobile route smoke checks, read-only API contracts for every implemented WAF tab, Dashboard widget/CPU/Memory checks, and first Services workflows.
@@ -30,23 +28,23 @@
 - Экран входа становится видимым только после выбора оформления и следующего кадра браузера, поэтому пользователь сразу видит сохранённую тему.
 - Legacy-правила centered login card удалены из общего stylesheet; login и 2FA используют только выбранные тематические стили.
 
-### Basic Auth
+### Базовая HTTP-аутентификация
 
 - Страница Basic Auth получает широкий и компактный логотипы TARINIO, а также favicon из локальных runtime-ресурсов `/auth/assets/...`.
 - Запросы оформления Basic Auth не направляются в upstream защищаемого сайта.
 
-### Runtime и применение ревизий
+### Ядро и применение ревизий
 
 - Проверка готовности revision после reload вынесена на отдельный loopback-only маршрут Nginx. Она не зависит от upstream, host-map, AntiBot, Basic Auth и правил защищаемого сайта.
 - Перед reload launcher выполняет `nginx -t`; невалидная конфигурация сразу возвращает точную причину ошибки вместо ложного таймаута и незаметного сохранения старой revision.
 - Добавлен E2E-сценарий применения valid revision с недоступным upstream: revision должна стать активной, а runtime обязан подтвердить свой маркер локально.
 
-### Проверки
+### Проверки и доказательства
 
 - Добавлены контрактные проверки раннего bootstrap-скрытия login/2FA, локальных Basic Auth assets и изолированного readiness-маршрута runtime.
 - Полный набор Go-тестов и целевые E2E-сценарии Basic Auth и reload readiness проходят успешно.
 
-### Безопасность и E2E
+### Безопасность, E2E и эксплуатация
 
 - E2E теперь завершает `compile + apply` только после подтверждения, что runtime переключился именно на созданную revision. При нарушении инварианта отчёт содержит активный указатель revision и последние логи runtime, а не маскирует проблему последующей HTTP-проверкой.
 - Повтор Docker Compose при временной ошибке Docker Registry использует возрастающую паузу и отдельно отмечает сетевую нестабильность в evidence; функциональные ошибки сборки и тестов по-прежнему не ретраятся как успешные.
@@ -56,7 +54,6 @@
 - Устранена гонка асинхронного Dev Fast Start и API-применения revision: bootstrap больше не может применить устаревший снимок после уже активированной оператором revision. В single-node режиме все apply дополнительно сериализуются process-local lock; добавлен regression-тест stale bootstrap apply.
 - Убраны все HIGH/CRITICAL Kubernetes misconfiguration в lab manifests и profile overlays: включены `RuntimeDefault` seccomp, запрет повышения привилегий, минимальные capabilities и read-only root filesystem с явными `emptyDir`/PVC для state, logs, runtime и temporary data.
 - Служебные образы CLI, sentinel, request archive и HA/enterprise toolbox запускаются непривилегированными UID. Sentinel получает только read-only группу Nginx access log, сохраняя запись state и adaptive output в выделенные volumes; это подтверждено L4/L7 E2E.
-## Unreleased
 
 - bans/e2e: повторный Stage 5 audit на fresh disposable stack прошёл без skip/retry: tagged Go API/runtime `2/2` (с negative validation subtests), isolated desktop/mobile Playwright shard `9/9`. Подтверждены реальные denylist/audit readback, Create/Extend/Unban/cancel, country/detail, pagination и server-side read-only RBAC `403`.
 - requests/api: устранён hidden fallback в `/api/requests`: недоступный runtime request backend теперь честно возвращает `502`, а не успешный пустой список. Handler regression и disposable E2E с pause/unpause runtime подтверждают отказ и восстановление.
@@ -125,23 +122,23 @@
 - ui/e2e: добавлен TLS certificate metadata и site binding create/delete workflow с API readback и cleanup.
 - ui/e2e: добавлен обратимый Settings runtime persistence workflow с API readback, reload и восстановлением исходного значения.
 - ui/e2e: добавлен Anti-DDoS valid save/invalid boundary/reload/restore workflow с проверкой отсутствия partial save.
-### E2E completion — Bans, Revisions, TLS
+### Завершение E2E: Bans, ревизии и TLS
 
 - Completed Bans desktop/mobile workflows, including real read-only 403 error paths for create, extend and unban without denylist mutation.
 - Completed Revisions desktop/mobile workflows with bulk delete, cross-role RBAC, visible apply errors and active-revision invariants.
 - Completed TLS desktop/mobile workflows with self-signed/ACME, auto-renew validation/runtime coverage, PEM/ZIP import and distinct-approver TOTP-protected export download.
 - Moved Playwright authentication state outside `test-results` so result cleanup cannot invalidate dependent projects.
-### Events E2E completion
+### Завершение E2E: события
 
 - Added server-side Events type/severity/site/date filtering, RFC3339 validation, deterministic ordering and pagination-before-response semantics.
 - Completed Events desktop/mobile coverage for detail, keyboard, pagination, loading, empty, backend-error and malformed states.
 - Added accessible `aria-current` marking to the active Events pager button.
-### Activity/Audit E2E completion
+### Завершение E2E: активность и аудит
 
 - Added server-side Audit category filtering with totals calculated before pagination, plus validated dates/status/category/offset and a 500-row limit clamp.
 - Completed desktop/mobile Activity presets, filters, keyboard submit, previous/next pagination and resilience states.
 - Added direct evidence queries for critical Bans, Revisions, Anti-DDoS, CRS, TLS and Administration mutations.
-### Settings E2E completion
+### Завершение E2E: настройки
 
 - Completed all Settings desktop/mobile workflows for runtime, locales, storage, security, logging, secrets, management hosts, appearance and update checks.
 - Made runtime settings updates transactional so rejected mixed payloads cannot partially mutate in-memory state.

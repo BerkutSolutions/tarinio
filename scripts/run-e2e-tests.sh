@@ -556,7 +556,7 @@ WAF_E2E_RUN_ID="${WAF_E2E_RUN_ID:-${E2E_PROJECT}-$(date +%s)}"
 export WAF_E2E_DISPOSABLE WAF_BROWSER_BASE_URL WAF_E2E_RUN_ID
 if [ "$E2E_DASHBOARD_SEED" = "1" ] || { [ "$E2E_BROWSER_ONLY" = "1" ] && [ "$E2E_DASHBOARD_SEED" = "auto" ] && printf '%s' "$E2E_BROWSER_SPECS" | grep -Eq '(dashboard|requests-complete)\.spec\.ts'; }; then
   step "Seeding real Dashboard telemetry"
-  sh "$REPO_ROOT/scripts/seed-dashboard-telemetry.sh" "$COMPOSE_FILE" "$E2E_BASE_URL" "$E2E_USER" "$E2E_PASS" >>"$E2E_LOG_FILE" 2>&1
+  sh "$REPO_ROOT/scripts/seed-dashboard-telemetry.sh" "$COMPOSE_FILE" "$E2E_BASE_URL" "$E2E_USER" "$E2E_PASS" "$WAF_E2E_MANAGEMENT_HOST" >>"$E2E_LOG_FILE" 2>&1
   ok "Dashboard telemetry is aggregated"
 fi
 TEST_SUMMARY_FILE="$(mktemp)"

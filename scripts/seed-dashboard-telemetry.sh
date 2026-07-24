@@ -19,7 +19,7 @@ while [ "$hour" -lt 24 ]; do
 done
 docker compose -f "$compose_file" exec -T runtime sh -c 'cat >> /var/log/nginx/access.log' <"$events_file"
 login_payload=$(printf '{\"username\":\"%s\",\"password\":\"%s\"}' "$username" "$password")
-curl -fsS -c "$cookie_jar" -H 'Content-Type: application/json' -d "$login_payload" "$base_url/api/auth/login" >/dev/null
+curl -fsS -c "$cookie_jar" -H "Host: $management_host" -H 'Content-Type: application/json' -d "$login_payload" "$base_url/api/auth/login" >/dev/null
 attempt=0
 while [ "$attempt" -lt 30 ]; do
   stats=$(curl -fsS -b "$cookie_jar" -H "Host: $management_host" "$base_url/api/dashboard/stats" || true)

@@ -1,6 +1,7 @@
 import { expect, test } from "../fixtures/auth";
 import { CleanupLedger, e2eID } from "../support/isolation";
 import { runtimeBaseURL } from "../support/env";
+import { openPage } from "../support/waits";
 
 test("services.enable-disable-runtime", async ({ authenticatedPage: page }, testInfo) => {
   const siteID = e2eID(testInfo, "e2e-toggle");
@@ -90,8 +91,9 @@ test("services.list-resilience", async ({ authenticatedPage: page }) => {
 
   const errorPage = await page.context().newPage();
   try {
+    await openPage(errorPage, "/services?e2e-state=error", errorPage.locator("#services-refresh"));
     await errorPage.route("**/api/sites**", (route) => route.fulfill({ status: 503, contentType: "application/json", body: '{"error":"synthetic services outage"}' }));
-    await errorPage.goto("/services?e2e-state=error", { waitUntil: "domcontentloaded", timeout: 60_000 });
+    await errorPage.locator("#services-refresh").click();
     await expect(errorPage.locator(".alert").last()).toContainText("synthetic services outage", { timeout: 30_000 });
   } finally { await errorPage.close(); }
 });

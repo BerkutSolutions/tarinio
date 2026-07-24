@@ -1,5 +1,6 @@
 import { expect, test } from "../fixtures/auth";
 import { CleanupLedger, e2eID } from "../support/isolation";
+import { openPage } from "../support/waits";
 
 test("services.toggles-conditional-fields-dynamic-lists-readback", async ({ authenticatedPage: page }, testInfo) => {
   test.setTimeout(5 * 60_000);
@@ -31,7 +32,7 @@ test("services.toggles-conditional-fields-dynamic-lists-readback", async ({ auth
     result = await api("/api/upstreams?auto_apply=false", { method: "POST", body: JSON.stringify({ id: upstreamID, site_id: siteID, scheme: "http", host: "upstream-echo", port: 8888 }) });
     expect([200, 201], result.body).toContain(result.status);
 
-    await page.goto(`/services/${siteID}`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+    await openPage(page, `/services/${siteID}`, page.locator("#service-editor-form"));
     await page.locator("#service-security-mode").selectOption("monitor");
     await page.locator("#service-profile").selectOption("api");
     await page.locator("#service-ca-server").selectOption("custom");
