@@ -65,8 +65,16 @@ warm:e2e-images:
         if docker image inspect "$image" >/dev/null 2>&1; then
           echo "[ci] E2E base image is cached: $image"
         else
-          echo "[ci] Pulling required E2E base image: $image"
-          docker pull "$image"
+          attempt=1
+          until docker pull "$image"; do
+            if [ "$attempt" -ge 3 ]; then
+              echo "[ci] Could not pull E2E base image after $attempt attempts: $image" >&2
+              exit 1
+            fi
+            echo "[ci] Pull failed for $image; retrying in $((attempt * 5))s" >&2
+            sleep "$((attempt * 5))"
+            attempt=$((attempt + 1))
+          done
         fi
       done
 
