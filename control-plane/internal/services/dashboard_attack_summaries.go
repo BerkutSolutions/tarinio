@@ -8,6 +8,10 @@ import (
 	"waf/control-plane/internal/events"
 )
 
+func dashboardObservationStart(now time.Time) time.Time {
+	return now.UTC().Truncate(time.Hour).Add(-23 * time.Hour)
+}
+
 func summarizeRequests(items []map[string]any, cutoff, now time.Time) (int, int, []DashboardKeyCount, []DashboardKeyCount, []DashboardTimeCount, []DashboardTimeCount, int, []DashboardKeyCount) {
 	var total int
 	series := map[time.Time]int{}
@@ -231,8 +235,7 @@ func summarizeRequestAttacks(items []map[string]any, cutoff time.Time) requestAt
 }
 
 func buildHourlySeries(values map[time.Time]int, now time.Time) []DashboardTimeCount {
-	end := now.UTC().Truncate(time.Hour)
-	start := end.Add(-23 * time.Hour)
+	start := dashboardObservationStart(now)
 	out := make([]DashboardTimeCount, 0, 24)
 	for i := 0; i < 24; i++ {
 		ts := start.Add(time.Duration(i) * time.Hour)

@@ -11,6 +11,8 @@ export function renderListView(state, ctx, deps) {
     formatServiceProfile
   } = deps;
   const hostCounts = new Map();
+  const permissions = new Set((Array.isArray(ctx?.currentUser?.permissions) ? ctx.currentUser.permissions : []).map((item) => String(item || "").trim().toLowerCase()));
+  const canWrite = permissions.has("sites.write");
   for (const site of state.filteredSites) {
     const hostKey = String(site?.primary_host || site?.id || "").trim().toLowerCase();
     if (!hostKey) {
@@ -27,10 +29,10 @@ export function renderListView(state, ctx, deps) {
             <div class="muted">${escapeHtml(ctx.t("sites.list.subtitle"))}</div>
           </div>
           <div class="waf-actions">
-            <button class="btn primary btn-sm" type="button" id="services-create">${escapeHtml(ctx.t("sites.action.createSite"))}</button>
-            <button class="btn ghost btn-sm" type="button" id="services-import">${escapeHtml(ctx.t("sites.action.import"))}</button>
+            ${canWrite ? `<button class="btn primary btn-sm" type="button" id="services-create">${escapeHtml(ctx.t("sites.action.createSite"))}</button>` : ""}
+            ${canWrite ? `<button class="btn ghost btn-sm" type="button" id="services-import">${escapeHtml(ctx.t("sites.action.import"))}</button>` : ""}
             <button class="btn ghost btn-sm" type="button" id="services-export">${escapeHtml(ctx.t("sites.action.export"))}</button>
-            <button class="btn ghost btn-sm" type="button" id="services-delete-selected">${escapeHtml(ctx.t("sites.action.deleteSelected"))}</button>
+            ${canWrite ? `<button class="btn ghost btn-sm" type="button" id="services-delete-selected">${escapeHtml(ctx.t("sites.action.deleteSelected"))}</button>` : ""}
             <button class="btn ghost btn-sm" type="button" id="services-refresh">${escapeHtml(ctx.t("common.refresh"))}</button>
           </div>
         </div>
@@ -56,7 +58,7 @@ export function renderListView(state, ctx, deps) {
               <thead>
                 <tr>
                   <th class="waf-check-col">
-                    <input type="checkbox" id="services-select-all"${state.filteredSites.length && state.filteredSites.every((site) => state.selectedSiteIDs.has(site.id)) ? " checked" : ""}>
+                    ${canWrite ? `<input type="checkbox" id="services-select-all"${state.filteredSites.length && state.filteredSites.every((site) => state.selectedSiteIDs.has(site.id)) ? " checked" : ""}>` : ""}
                   </th>
                   <th>${escapeHtml(ctx.t("sites.table.name"))}</th>
                   <th>${escapeHtml(ctx.t("sites.table.profile"))}</th>
@@ -101,7 +103,7 @@ export function renderListView(state, ctx, deps) {
                   return `
                     <tr class="waf-table-row-clickable" data-open-site-edit="${escapeHtml(site.id)}">
                       <td class="waf-check-col">
-                        <input type="checkbox" data-select-site="${escapeHtml(site.id)}"${state.selectedSiteIDs.has(site.id) ? " checked" : ""}>
+                        ${canWrite ? `<input type="checkbox" data-select-site="${escapeHtml(site.id)}"${state.selectedSiteIDs.has(site.id) ? " checked" : ""}>` : ""}
                       </td>
                       <td>
                         <button class="waf-link-button" type="button" data-open-service="${escapeHtml(serviceURL)}" title="${escapeHtml(ctx.t("sites.action.openService"))}">${escapeHtml(displayHost)}</button>
@@ -124,7 +126,7 @@ export function renderListView(state, ctx, deps) {
                       <td>
                         <div class="waf-actions">
                           <button class="btn ghost btn-sm" type="button" data-open-site="${escapeHtml(site.id)}">${escapeHtml(ctx.t("common.edit"))}</button>
-                          <button class="btn ghost btn-sm" type="button" data-toggle-site="${escapeHtml(site.id)}" data-toggle-enabled="${site.enabled ? "1" : "0"}">${escapeHtml(ctx.t(site.enabled ? "common.disable" : "common.enable"))}</button>
+                          ${canWrite ? `<button class="btn ghost btn-sm" type="button" data-toggle-site="${escapeHtml(site.id)}" data-toggle-enabled="${site.enabled ? "1" : "0"}">${escapeHtml(ctx.t(site.enabled ? "common.disable" : "common.enable"))}</button>` : ""}
                         </div>
                       </td>
                     </tr>

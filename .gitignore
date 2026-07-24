@@ -29,6 +29,11 @@ coverage.out
 # Dependency folders
 node_modules/
 node_modules/.cache/
+e2e/browser/.auth/
+e2e/browser/test-results/
+e2e/browser/playwright-report/
+/test-results/
+mtls-upstream.exe
 
 # Python/tooling caches
 __pycache__/

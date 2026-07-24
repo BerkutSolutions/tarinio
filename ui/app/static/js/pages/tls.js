@@ -1,4 +1,5 @@
 import { escapeHtml, formatDate, statusBadge } from "../ui.js";
+import { createTLSExportStepUp } from "./tls.export-step-up.js";
 
 function rfc3339Placeholder() {
   const now = new Date();
@@ -333,6 +334,7 @@ export async function renderTLS(container, ctx) {
 
   const certImportArchiveInput = container.querySelector("#tls-certificate-import-archive");
   const selectedIDs = () => Array.from(selectedCertificateIDs.values());
+  const runStepUpExport = createTLSExportStepUp(container, ctx, downloadBlob);
 
   const bindCertificateSelection = (certificates) => {
     container.querySelectorAll("[data-cert-select-id]").forEach((node) => {
@@ -497,31 +499,7 @@ export async function renderTLS(container, ctx) {
       return;
     }
     try {
-      const response = await fetch("/api/certificate-materials/export", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          Accept: "application/zip, application/json",
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ certificate_ids: ids })
-      });
-      if (!response.ok) {
-        const bodyText = await response.text();
-        let message = `HTTP ${response.status}`;
-        if (bodyText) {
-          try {
-            const payload = JSON.parse(bodyText);
-            message = String(payload?.error || payload?.message || message);
-          } catch {
-            message = bodyText;
-          }
-        }
-        throw new Error(message);
-      }
-      const blob = await response.blob();
-      downloadBlob(ids.length === 1 ? `${ids[0]}-materials.zip` : "certificate-materials.zip", blob);
-      ctx.notify(ctx.t("tls.certificates.exportArchive"));
+      await runStepUpExport(ids);
     } catch (error) {
       ctx.notify(`${ctx.t("sites.tls.exportFailed")}: ${String(error?.message || error)}`, "error");
     }
@@ -710,7 +688,6 @@ export async function renderTLS(container, ctx) {
 
   await Promise.all([load(), loadAutoRenewSettings()]);
 }
-
 
 
 

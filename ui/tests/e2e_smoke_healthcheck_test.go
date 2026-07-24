@@ -1,3 +1,5 @@
+//go:build e2e
+
 package tests
 
 import (
@@ -18,7 +20,7 @@ const defaultE2EBrowserUserAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/
 func TestE2ESmoke_LoginHealthcheckDashboard(t *testing.T) {
 	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL")), "/")
 	if baseURL == "" {
-		t.Skip("WAF_E2E_BASE_URL is not set; skipping e2e smoke test")
+		t.Fatal("WAF_E2E_BASE_URL is not set; skipping e2e smoke test")
 	}
 	challengeURI := normalizeChallengeURI(strings.TrimSpace(os.Getenv("WAF_E2E_ANTIBOT_CHALLENGE_URI")))
 

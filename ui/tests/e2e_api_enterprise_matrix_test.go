@@ -1,3 +1,5 @@
+//go:build e2e
+
 package tests
 
 import (
@@ -12,7 +14,7 @@ import (
 func TestE2EAPIEnterpriseMatrix(t *testing.T) {
 	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL")), "/")
 	if baseURL == "" {
-		t.Skip("WAF_E2E_BASE_URL is not set; skipping enterprise matrix")
+		t.Fatal("WAF_E2E_BASE_URL is not set; skipping enterprise matrix")
 	}
 
 	client, requestBaseURL, requestHostOverride := newE2EClientAndBase(t, baseURL)
@@ -46,13 +48,17 @@ func TestE2EAPIEnterpriseMatrix(t *testing.T) {
 	})
 
 	t.Run("SCIMSurface", func(t *testing.T) {
+		scimBaseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_CONTROL_PLANE_URL")), "/")
+		if scimBaseURL == "" {
+			scimBaseURL = requestBaseURL
+		}
 		paths := []string{
 			"/scim/v2/ServiceProviderConfig",
 			"/scim/v2/Users",
 			"/scim/v2/Groups",
 		}
 		for _, path := range paths {
-			resp := requestRaw(t, client, http.MethodGet, requestBaseURL+path, requestHostOverride, nil)
+			resp := requestRaw(t, client, http.MethodGet, scimBaseURL+path, requestHostOverride, nil)
 			assertAnyStatus(t, resp, path, http.StatusOK, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotImplemented)
 		}
 	})
@@ -70,12 +76,12 @@ func TestE2EAPIEnterpriseMatrix(t *testing.T) {
 		}
 		scripts := catalog.Scripts
 		if len(scripts) == 0 {
-			t.Skip("no administration scripts in catalog")
+			t.Fatal("no administration scripts in catalog")
 		}
 
 		scriptID := strings.TrimSpace(fmt.Sprint(scripts[0]["id"]))
 		if scriptID == "" {
-			t.Skip("first script has empty id")
+			t.Fatal("first script has empty id")
 		}
 		runResp := postJSON(t, client, requestBaseURL+"/api/administration/scripts/"+scriptID+"/run", requestHostOverride, map[string]any{
 			"input": map[string]any{},
@@ -98,7 +104,7 @@ func TestE2EAPIEnterpriseMatrix(t *testing.T) {
 				assertAnyStatus(t, downloadResp, "download run artifact", http.StatusOK, http.StatusNotFound, http.StatusBadRequest)
 				return
 			}
-			t.Skip("run response has no run id; skip download check")
+			t.Fatal("run response has no run id; skip download check")
 		}
 	})
 }

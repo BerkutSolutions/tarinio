@@ -25,10 +25,19 @@ spec:
       labels:
         app: clickhouse
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: clickhouse
           image: clickhouse/clickhouse-server:24.8
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
           ports:
             - containerPort: 8443
           readinessProbe:
@@ -50,6 +59,10 @@ spec:
               mountPath: /etc/clickhouse-server/users.d/50-waf-runtime.xml
               subPath: 50-waf-runtime.xml
               readOnly: true
+            - name: clickhouse-logs
+              mountPath: /var/log/clickhouse-server
+            - name: clickhouse-tmp
+              mountPath: /tmp
       volumes:
         - name: clickhouse-data
           persistentVolumeClaim:
@@ -63,6 +76,10 @@ spec:
         - name: clickhouse-users
           secret:
             secretName: tarinio-lab-clickhouse-users
+        - name: clickhouse-logs
+          emptyDir: {}
+        - name: clickhouse-tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

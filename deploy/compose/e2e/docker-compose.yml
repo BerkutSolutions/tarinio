@@ -33,7 +33,7 @@ services:
       CONTROL_PLANE_BOOTSTRAP_ADMIN_ID: e2e-admin
       CONTROL_PLANE_BOOTSTRAP_ADMIN_USERNAME: e2e-admin
       CONTROL_PLANE_BOOTSTRAP_ADMIN_EMAIL: e2e@tarinio.test
-      CONTROL_PLANE_BOOTSTRAP_ADMIN_PASSWORD: e2e-password-1234
+      CONTROL_PLANE_BOOTSTRAP_ADMIN_PASSWORD: "${E2E_PASS:?E2E_PASS is required for the disposable E2E stack}"
       CONTROL_PLANE_ACME_ENABLED: "false"
       CONTROL_PLANE_DEV_FAST_START_ENABLED: "${E2E_DEV_FAST_START_ENABLED:-true}"
       CONTROL_PLANE_DEV_FAST_START_HOST: "e2e-management.test"
@@ -133,6 +133,10 @@ services:
       context: ../../..
       dockerfile: ui/Dockerfile
     restart: "no"
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
     depends_on:
       control-plane:
         condition: service_healthy
@@ -151,6 +155,19 @@ services:
       PORT: "8888"
     expose:
       - "8888"
+    networks:
+      - waf-e2e-net
+
+  mtls-upstream:
+    build:
+      context: ../../..
+      dockerfile: deploy/compose/e2e/mtls-upstream/Dockerfile
+    restart: "no"
+    ports:
+      - "${E2E_MTLS_UPSTREAM_PORT:-18084}:8080"
+    expose:
+      - "8080"
+      - "8443"
     networks:
       - waf-e2e-net
 

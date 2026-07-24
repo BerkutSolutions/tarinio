@@ -43,6 +43,7 @@ type AuditEvent struct {
 
 type Query struct {
 	Action       string
+	Category     string
 	ActorUserID  string
 	ActorIP      string
 	ResourceType string
@@ -170,6 +171,9 @@ func (s *Store) List(query Query) (ListResult, error) {
 	from, _ := parseTime(query.From)
 	to, _ := parseTime(query.To)
 	for _, item := range current.Events {
+		if query.Category != "" && auditCategory(item.Action) != strings.TrimSpace(query.Category) {
+			continue
+		}
 		if query.Action != "" && item.Action != strings.TrimSpace(query.Action) {
 			continue
 		}
@@ -221,6 +225,17 @@ func (s *Store) List(query Query) (ListResult, error) {
 	}
 	page := append([]AuditEvent(nil), filtered[offset:end]...)
 	return ListResult{Items: page, Total: total, Limit: limit, Offset: offset}, nil
+}
+
+func auditCategory(action string) string {
+	action = strings.ToLower(strings.TrimSpace(action))
+	if strings.HasPrefix(action, "auth.") {
+		return "auth"
+	}
+	if strings.HasPrefix(action, "revision.") {
+		return "rollout"
+	}
+	return "config"
 }
 
 func (s *Store) loadLocked() (*state, error) {

@@ -1,0 +1,153 @@
+{
+  "workflowIds": [
+    "dashboard.stats-complete",
+    "dashboard.containers-runtime",
+    "dashboard.observation-window",
+    "services.management-host-mutations",
+    "services.editor-parity",
+    "services.settings-roundtrip",
+    "auth.login-ui-real-submit",
+    "dashboard.load",
+    "dashboard.widgets",
+    "dashboard.series-consistency",
+    "dashboard.top-data",
+    "dashboard.details",
+    "dashboard.picker-persistence",
+    "dashboard.layout-reset-resize",
+    "dashboard.resilience-states",
+    "dashboard.memory-progress",
+    "dashboard.cpu-progress",
+    "services.list-load",
+    "services.search",
+    "services.sort",
+    "services.create-route",
+    "services.editor-modes-search-validation-back",
+    "services.export-invalid-import",
+    "services.save-delete-mutation",
+    "services.bulk-delete-confirm-cancel",
+    "services.select-all",
+    "services.selection-navigation",
+    "services.valid-import-cleanup",
+    "services.enable-disable-runtime",
+    "services.list-resilience",
+    "services.readonly-rbac",
+    "services.validation-reference-matrix",
+    "services.rate-limit-modsecurity-runtime",
+    "services.basic-auth-mask-reveal-preview",
+    "services.editor-help-modals-all-controls",
+    "services.editor-draft-mode-parity-and-back-cancel",
+    "services.custom-error-pages-controls-preview-runtime",
+    "services.editor-all-tabs-responsive-layout",
+    "services.editor-keyboard-labels-and-beforeunload",
+    "services.antibot-template-preview-and-readback",
+    "services.certificate-picker-errors-export-binding",
+    "services.toggles-conditional-fields-dynamic-lists-readback",
+    "services.virtual-patches-api-readback",
+    "services.api-resources",
+    "requests.read-contract",
+    "requests.backend-failure-visible",
+    "requests.read-controls",
+    "requests.pagination-sort-detail",
+    "requests.real-runtime-filter-pagination-detail",
+    "requests.real-backend-failure-keeps-shell",
+    "bans.read-contract",
+    "bans.read-controls",
+    "bans.create-validation",
+    "bans.create-cancel",
+    "bans.create-extend-unban-mutation",
+    "bans.detail-country-keyboard-pagination-cancel",
+    "bans.duration-and-unauthorized-site-errors",
+    "bans.readonly-rbac-and-server-errors",
+    "revisions.read-contract",
+    "revisions.read-controls",
+    "anti-ddos.read-contract",
+    "anti-ddos.help-modal",
+    "anti-ddos.save-validation-restore",
+    "anti-ddos.management-rate-limit-exclusion",
+    "anti-ddos.all-groups-roundtrip-restore",
+    "anti-ddos.server-validation-no-partial-save",
+    "anti-ddos.rule-suggestions-create-list-detail-status",
+    "anti-ddos.logs-refresh-detail-or-empty",
+    "owasp-crs.read-contract",
+    "owasp-crs.check-update-hourly-persistence-restore",
+    "owasp-crs.api-validation-and-disabled-busy-state",
+    "owasp-crs.read-controls",
+    "owasp-crs.official-digest",
+    "tls.read-contract",
+    "tls.self-signed-selection-detail-validation",
+    "tls.auto-renew-persistence-and-validation",
+    "tls.acme-conditional-fields-and-disabled-errors",
+    "tls.import-export-step-up-errors-and-mobile-layout",
+    "tls.upload-and-valid-archive-import",
+    "tls.read-controls",
+    "tls.certificate-binding-create-delete",
+    "administration.read-contract",
+    "administration.read-controls",
+    "administration.user-create-edit-readback",
+    "administration.role-create-edit-readback",
+    "administration.enterprise-scim-scripts",
+    "events.read-contract",
+    "events.read-controls",
+    "activity.read-contract",
+    "activity.read-controls",
+    "settings.read-contract",
+    "settings.read-controls",
+    "settings.validation-no-partial-save",
+    "settings.runtime-toggle-persistence-restore",
+    "settings.language-all-locales-persistence-restore",
+    "revisions.detail-modal-close",
+    "revisions.clear-statuses-control"
+    ,"revisions.compile-apply-rollback-artifact"
+    ,"revisions.validation-delete-active-and-missing-errors"
+    ,"revisions.status-and-delete-confirm-cancel-ui"
+    ,"revisions.apply-and-delete-success-ui"
+    ,"events.api-filter-pagination-detail-contract"
+    ,"events.browser-pagination-detail-keyboard"
+    ,"events.loading-empty-error-malformed"
+    ,"activity.api-filter-pagination-and-critical-mutations"
+    ,"activity.presets-submit-pagination-keyboard"
+    ,"activity.loading-empty-error-malformed"
+    ,"settings.storage-roundtrip-indexes-and-no-partial-save"
+    ,"settings.security-roundtrip-direct-ip-and-validation"
+    ,"settings.logging-backends-routing-migration-roundtrip"
+    ,"settings.secrets-masked-save-and-toggle"
+    ,"settings.management-hosts-validation-status-restore"
+    ,"settings.appearance-preview-save-reload-restore"
+    ,"settings.update-check-success-disabled-offline"
+    ,"cross-module.settings-services-tls-antiddos-compile-apply-audit"
+    ,"cross-resilience-429-403-5xx-malformed-and-slow-api"
+    ,"cross-i18n-all-locales-core-labels-errors-and-modals"
+    ,"cross-security-headers-cookies-and-no-secret-leak"
+    ,"cross-security.readonly-rbac-and-session-expiry-return-login"
+  ],
+  "minimumBrowserCoverageByTab": {
+    "auth": 100,
+    "dashboard": 100,
+    "services": 100,
+    "requests": 100,
+    "bans": 100,
+    "revisions": 100,
+    "anti-ddos": 100,
+    "owasp-crs": 100,
+    "tls": 100,
+    "administration": 100,
+    "events": 100,
+    "activity": 100,
+    "settings": 100,
+    "cross-module": 100
+  },
+  "minimumApiCoverageByTab": {
+    "dashboard": 100,
+    "services": 100,
+    "requests": 100,
+    "bans": 100,
+    "revisions": 100,
+    "anti-ddos": 100,
+    "owasp-crs": 100,
+    "tls": 100,
+    "administration": 100,
+    "events": 100,
+    "activity": 100,
+    "settings": 100
+  }
+}

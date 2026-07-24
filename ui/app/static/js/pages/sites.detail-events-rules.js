@@ -70,6 +70,8 @@ export function bindDetailRuleEvents(params) {
     render();
   });
 
+  let helpReturnFocus = null;
+
   function toggleHelpModal(modalID, open) {
     const modal = container.querySelector(`#${modalID}`);
     if (!modal) {
@@ -77,9 +79,25 @@ export function bindDetailRuleEvents(params) {
     }
     modal.classList.toggle("waf-hidden", !open);
     if (open) {
+      helpReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       modal.focus();
+    } else if (helpReturnFocus?.isConnected) {
+      helpReturnFocus.focus();
+      helpReturnFocus = null;
     }
   }
+
+  container.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") {
+      return;
+    }
+    const modal = container.querySelector(".waf-modal[role='dialog']:not(.waf-hidden)");
+    if (!modal?.id) {
+      return;
+    }
+    event.preventDefault();
+    toggleHelpModal(modal.id, false);
+  });
 
   container.querySelector("#service-auth-help-btn")?.addEventListener("click", () => toggleHelpModal("service-auth-help-modal", true));
   container.querySelector("#service-antibot-help-btn")?.addEventListener("click", () => toggleHelpModal("service-antibot-help-modal", true));
@@ -102,7 +120,6 @@ export function bindDetailRuleEvents(params) {
   container.querySelector("#service-upstream-mtls-help-btn")?.addEventListener("click", () => toggleHelpModal("service-upstreamMtls-chapter-help-modal", true));
   container.querySelector("#service-front-main-help-btn")?.addEventListener("click", () => toggleHelpModal("service-front-main-help-modal", true));
   container.querySelector("#service-front-mtls-help-btn")?.addEventListener("click", () => toggleHelpModal("service-front-mtls-help-modal", true));
-  container.querySelector("#service-traffic-allowlist-help-btn")?.addEventListener("click", () => toggleHelpModal("service-traffic-allowlist-help-modal", true));
   container.querySelectorAll("[data-help-close]").forEach((button) => {
     button.addEventListener("click", () => toggleHelpModal(String(button.dataset.helpClose || ""), false));
   });

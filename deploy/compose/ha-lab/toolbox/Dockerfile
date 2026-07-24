@@ -22,5 +22,7 @@ COPY deploy/compose/ha-lab/tools /tools
 
 RUN chmod +x /tools/*.sh
 
+USER 65532:65532
+
 ENTRYPOINT ["/bin/sh", "-lc"]
 CMD ["sleep infinity"]

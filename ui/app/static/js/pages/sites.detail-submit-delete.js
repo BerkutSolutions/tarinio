@@ -16,6 +16,7 @@ export function bindDetailSubmitDelete(container, state, ctx, deps) {
     draftToEasyProfile,
     go,
     deleteServiceWithResources,
+    clearUnsavedChanges,
   } = deps;
   const feedback = container.querySelector("#sites-feedback");
   const back = () => go(routeBase());
@@ -54,6 +55,7 @@ export function bindDetailSubmitDelete(container, state, ctx, deps) {
       await upsertAccessPolicy(draft, ctx, existingAccessPolicy, saveOptions);
       await compileAndApplySiteRevision(ctx, draft?.id ? [draft.id] : []);
       ctx.notify(ctx.t("toast.siteSaved"));
+      clearUnsavedChanges();
       go(`${routeBase()}/${encodeURIComponent(draft.id)}`);
     } catch (error) {
       console.warn("save site failed", error);
@@ -73,6 +75,7 @@ export function bindDetailSubmitDelete(container, state, ctx, deps) {
     try {
       await deleteServiceWithResources(siteID, ctx, { upstreams: state.upstreams });
       ctx.notify(ctx.t("toast.siteDeleted"));
+      clearUnsavedChanges();
       back();
     } catch (_error) {
       setError(feedback, ctx.t("sites.error.deleteSite"));

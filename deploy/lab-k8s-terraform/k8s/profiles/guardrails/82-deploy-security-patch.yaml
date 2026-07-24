@@ -12,7 +12,7 @@ spec:
         - name: control-plane
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: false
+            readOnlyRootFilesystem: true
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -44,4 +44,4 @@ spec:
         - name: runtime
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: false
+            readOnlyRootFilesystem: true

@@ -86,6 +86,8 @@ export async function renderSitesRuntime(container, ctx, deps) {
     certificates: [],
     accessPolicies: [],
     easyProfiles: [],
+    virtualPatches: [],
+    virtualPatchesSiteID: "",
     geoCatalog: buildGeoCatalogFallback(),
     search: "",
     sort: "updated-desc",

@@ -1,3 +1,5 @@
+//go:build e2e
+
 package tests
 
 import (
@@ -15,7 +17,7 @@ import (
 
 func TestE2EAutoStartSmartRuntime(t *testing.T) {
 	if strings.TrimSpace(os.Getenv("WAF_E2E_AUTOSTART_SMART")) != "1" {
-		t.Skip("set WAF_E2E_AUTOSTART_SMART=1 to run auto-start smart e2e")
+		t.Fatal("set WAF_E2E_AUTOSTART_SMART=1 to run auto-start smart e2e")
 	}
 
 	repoRoot, err := filepath.Abs("..")
@@ -46,12 +48,28 @@ func TestE2EAutoStartSmartRuntime(t *testing.T) {
 	}
 
 	// This scenario is part of the full E2E suite, whose primary stack already
-	// owns 18080/80/443. Run the auto-start deployment on its own host ports
-	// instead of tearing down the stack being tested by the other scenarios.
+	// owns its runtime ports. Keep the auto-start deployment isolated from both
+	// that stack and any developer-owned auto-start project.
+	uiPort := firstNonEmptyAutoStart(strings.TrimSpace(os.Getenv("WAF_E2E_AUTOSTART_UI_PORT")), "19683")
+	runtimeHTTPPort := firstNonEmptyAutoStart(strings.TrimSpace(os.Getenv("WAF_E2E_AUTOSTART_RUNTIME_HTTP_PORT")), "11681")
+	runtimeHTTPSPort := firstNonEmptyAutoStart(strings.TrimSpace(os.Getenv("WAF_E2E_AUTOSTART_RUNTIME_HTTPS_PORT")), "24444")
+	project := firstNonEmptyAutoStart(strings.TrimSpace(os.Getenv("WAF_E2E_AUTOSTART_PROJECT")), "strict-autostart-e2e")
+	previousRuntimeContainer, runtimeContainerSet := os.LookupEnv("WAF_E2E_RUNTIME_CONTAINER")
+	if err := os.Setenv("WAF_E2E_RUNTIME_CONTAINER", project+"-runtime-1"); err != nil {
+		t.Fatalf("set auto-start runtime container: %v", err)
+	}
+	t.Cleanup(func() {
+		if runtimeContainerSet {
+			_ = os.Setenv("WAF_E2E_RUNTIME_CONTAINER", previousRuntimeContainer)
+		} else {
+			_ = os.Unsetenv("WAF_E2E_RUNTIME_CONTAINER")
+		}
+	})
 	autoStartEnv := []string{
-		"WAF_UI_HTTP_PORT=18083",
-		"WAF_RUNTIME_HTTP_PORT=10081",
-		"WAF_RUNTIME_HTTPS_PORT=10444",
+		"COMPOSE_PROJECT_NAME=" + project,
+		"WAF_UI_HTTP_PORT=" + uiPort,
+		"WAF_RUNTIME_HTTP_PORT=" + runtimeHTTPPort,
+		"WAF_RUNTIME_HTTPS_PORT=" + runtimeHTTPSPort,
 	}
 	runCmdSoft(composeDir, autoStartEnv, "docker", "compose", "-f", composeFile, "down", "--volumes", "--remove-orphans")
 	t.Log("starting clean auto-start compose stack")
@@ -60,7 +78,7 @@ func TestE2EAutoStartSmartRuntime(t *testing.T) {
 		runCmdSoft(composeDir, autoStartEnv, "docker", "compose", "-f", composeFile, "down", "--volumes", "--remove-orphans")
 	})
 
-	baseURL := firstNonEmptyAutoStart(strings.TrimSpace(os.Getenv("WAF_E2E_AUTOSTART_BASE_URL")), "http://127.0.0.1:18083")
+	baseURL := firstNonEmptyAutoStart(strings.TrimSpace(os.Getenv("WAF_E2E_AUTOSTART_BASE_URL")), "http://127.0.0.1:"+uiPort)
 	client, requestBaseURL, requestHostOverride := newE2EClientAndBase(t, baseURL)
 	previousUsername, usernameSet := os.LookupEnv("WAF_E2E_USERNAME")
 	previousPassword, passwordSet := os.LookupEnv("WAF_E2E_PASSWORD")
@@ -81,59 +99,22 @@ func TestE2EAutoStartSmartRuntime(t *testing.T) {
 	t.Log("waiting for auto-start management login")
 	loginE2EUserWithRetry(t, client, requestBaseURL, requestHostOverride)
 	t.Log("auto-start management login succeeded")
-	edgeClient, _, _ := newE2EClientAndBase(t, "https://127.0.0.1:10444")
+	edgeClient, _, _ := newE2EClientAndBase(t, "http://127.0.0.1:"+runtimeHTTPPort)
 
 	siteID := "autotest-site"
 	siteHost := "autotest.localhost"
 	upstreamID := "autotest-upstream"
 
-	t.Run("AntiDDoSAndErrors", func(t *testing.T) {
-		t.Log("checking Anti-DDoS API and runtime edge")
-		getSettings := getWithAuth(t, client, requestBaseURL+"/api/anti-ddos/settings", requestHostOverride)
-		assertStatusOK(t, getSettings, "get anti-ddos settings")
-
-		updateSettings := requestJSON(t, client, http.MethodPut, requestBaseURL+"/api/anti-ddos/settings", requestHostOverride, map[string]any{
-			"use_l4_guard":            false,
-			"chain_mode":              "auto",
-			"conn_limit":              200,
-			"rate_per_second":         100,
-			"rate_burst":              200,
-			"ports":                   []int{80, 443},
-			"target":                  "REJECT",
-			"enforce_l7_rate_limit":   true,
-			"l7_requests_per_second":  1,
-			"l7_burst":                1,
-			"l7_status_code":          429,
-			"model_enabled":           true,
-			"model_poll_interval_sec": 5,
-		})
-		assertStatusOK(t, updateSettings, "update anti-ddos settings")
-
-		edgeURL := "https://127.0.0.1:10444/"
-		var gotRate bool
-		for i := 0; i < 8; i++ {
-			resp := getWithHost(t, edgeClient, edgeURL, siteHost)
-			if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusForbidden {
-				gotRate = true
-				_ = resp.Body.Close()
-				autoUnbanLoopback(t, client, requestBaseURL, requestHostOverride, siteID)
-				time.Sleep(500 * time.Millisecond)
-				continue
-			}
-			_ = resp.Body.Close()
-			time.Sleep(150 * time.Millisecond)
-		}
-		if !gotRate {
-			t.Log("rate/ban screen was not triggered in this run; continuing with functional checks")
-		}
-	})
-
 	t.Run("ServiceCRUD", func(t *testing.T) {
 		t.Log("checking site and upstream CRUD")
 		createSiteResp := postJSON(t, client, requestBaseURL+"/api/sites?auto_apply=false", requestHostOverride, map[string]any{
-			"id":           siteID,
-			"primary_host": siteHost,
-			"enabled":      true,
+			"id":                  siteID,
+			"primary_host":        siteHost,
+			"enabled":             true,
+			"listen_http":         true,
+			"listen_https":        false,
+			"use_easy_config":     true,
+			"default_upstream_id": upstreamID,
 		})
 		assertStatusIn(t, createSiteResp, "create site", http.StatusCreated, http.StatusOK)
 
@@ -153,6 +134,54 @@ func TestE2EAutoStartSmartRuntime(t *testing.T) {
 			"description":  "autotest",
 		})
 		assertStatusOK(t, updateSiteResp, "update site")
+		profile := e2eGetEasyProfile(t, client, requestBaseURL, requestHostOverride, siteID)
+		if profile == nil {
+			t.Fatal("read auto-start site profile for L7 enforcement")
+		}
+		limits, ok := profile["security_behavior_and_limits"].(map[string]any)
+		if !ok {
+			t.Fatal("auto-start site profile has no security behavior settings")
+		}
+		limits["use_limit_req"] = true
+		limits["limit_req_url"] = "/"
+		limits["limit_req_rate"] = "1r/s"
+		limits["use_bad_behavior"] = false
+		profile["security_behavior_and_limits"] = limits
+		profile["site_id"] = siteID
+		profileResp := postJSON(t, client, requestBaseURL+"/api/easy-site-profiles/"+siteID, requestHostOverride, profile)
+		assertStatusIn(t, profileResp, "configure site L7 rate limit", http.StatusOK, http.StatusCreated)
+		e2eCompileAndApply(t, client, requestBaseURL, requestHostOverride)
+	})
+
+	t.Run("AntiDDoSAndErrors", func(t *testing.T) {
+		t.Log("checking real Anti-DDoS L7 enforcement on the compiled auto-start runtime")
+		getSettings := getWithAuth(t, client, requestBaseURL+"/api/anti-ddos/settings", requestHostOverride)
+		assertStatusOK(t, getSettings, "get anti-ddos settings")
+
+		updateSettings := requestJSON(t, client, http.MethodPut, requestBaseURL+"/api/anti-ddos/settings", requestHostOverride, map[string]any{
+			"use_l4_guard": false, "chain_mode": "auto", "conn_limit": 200, "rate_per_second": 100, "rate_burst": 200,
+			"ports": []int{80, 443}, "target": "REJECT", "enforce_l7_rate_limit": true,
+			"l7_requests_per_second": 1, "l7_burst": 1, "l7_status_code": 429, "model_enabled": true, "model_poll_interval_sec": 5,
+		})
+		assertStatusOK(t, updateSettings, "update anti-ddos settings")
+		e2eCompileAndApply(t, client, requestBaseURL, requestHostOverride)
+
+		edgeURL := "http://127.0.0.1:" + runtimeHTTPPort + "/"
+		var gotRate bool
+		for i := 0; i < 8; i++ {
+			resp := getWithHost(t, edgeClient, edgeURL, siteHost)
+			if resp.StatusCode == http.StatusTooManyRequests {
+				gotRate = true
+			}
+			_ = resp.Body.Close()
+			if gotRate {
+				break
+			}
+			time.Sleep(150 * time.Millisecond)
+		}
+		if !gotRate {
+			t.Fatalf("compiled runtime never enforced configured L7 rate limit (expected HTTP 429)")
+		}
 	})
 
 	t.Run("UIAndModules", func(t *testing.T) {

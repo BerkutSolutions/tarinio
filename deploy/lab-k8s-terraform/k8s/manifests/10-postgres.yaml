@@ -23,10 +23,19 @@ spec:
       labels:
         app: postgres
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: postgres
           image: postgres:15
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
           ports:
             - containerPort: 5432
           env:
@@ -48,6 +57,10 @@ spec:
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/postgresql/data
+            - name: postgres-runtime
+              mountPath: /var/run/postgresql
+            - name: postgres-tmp
+              mountPath: /tmp
           readinessProbe:
             exec:
               command:
@@ -60,6 +73,10 @@ spec:
         - name: postgres-data
           persistentVolumeClaim:
             claimName: postgres-data
+        - name: postgres-runtime
+          emptyDir: {}
+        - name: postgres-tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

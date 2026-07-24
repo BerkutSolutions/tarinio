@@ -3,7 +3,7 @@ import { clamp, formatNumber, formatPercent, formatBytes } from "./dashboard.lay
 
 function renderSystemMemory(stats, ctx) {
   const system = stats?.system || {};
-  const usedPercent = Number(system.memory_used_percent || 0);
+  const usedPercent = clamp(Number(system.memory_used_percent || 0), 0, 100);
   return `
     <button type="button" class="dashboard-widget-content dashboard-system dashboard-system-clickable" data-widget-action="memory">
       <div class="dashboard-system-main">${escapeHtml(formatPercent(usedPercent))}</div>

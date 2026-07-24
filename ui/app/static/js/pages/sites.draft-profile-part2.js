@@ -233,6 +233,9 @@ export function validateDraftPart2(draft, ctx, deps) {
   if (!Number.isInteger(draft.upstream_port) || draft.upstream_port < 1 || draft.upstream_port > 65535) {
     return ctx.t("sites.validation.portRange");
   }
+  if (!["http", "https"].includes(String(draft.upstream_scheme || "").trim().toLowerCase())) {
+    return ctx.t("sites.validation.upstreamScheme");
+  }
   if (!deps.normalizeStringArray(draft.allowed_methods).length) {
     return ctx.t("sites.validation.allowedMethodsRequired");
   }

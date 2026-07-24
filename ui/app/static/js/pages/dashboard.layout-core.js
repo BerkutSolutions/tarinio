@@ -91,7 +91,7 @@ function loadVisibleWidgetIDs(scopeID = "") {
   if (!Array.isArray(parsed) || !parsed.length) {
     return fallback;
   }
-  const allowed = new Set(fallback);
+  const allowed = new Set(WIDGETS.map((widget) => widget.id));
   const unique = [];
   parsed.forEach((id) => {
     const token = String(id || "");

@@ -43,6 +43,16 @@ func (f *fakeRevisionStoreForApply) Get(revisionID string) (revisions.Revision, 
 	return revisions.Revision{}, false, nil
 }
 
+func (f *fakeRevisionStoreForApply) CurrentActive() (revisions.Revision, bool, error) {
+	if f.active == "" {
+		return revisions.Revision{}, false, nil
+	}
+	if f.revision.ID == f.active {
+		return f.revision, true, nil
+	}
+	return revisions.Revision{ID: f.active}, true, nil
+}
+
 func (f *fakeRevisionStoreForApply) MarkActive(revisionID string) error {
 	f.active = revisionID
 	return nil
@@ -98,9 +108,9 @@ func (f *fakeApplyExecutor) Run(name string, args []string, workdir string) erro
 }
 
 type fakeApplyHealthChecker struct {
-	err     error
-	errors  []error
-	calls   int
+	err    error
+	errors []error
+	calls  int
 }
 
 func (f *fakeApplyHealthChecker) Check(active *pipeline.ActivePointer) error {
@@ -193,6 +203,76 @@ func TestApplyService_ApplyUsesRevisionSnapshotAndMarksActive(t *testing.T) {
 	}
 	if len(eventStore.items) != 2 || eventStore.items[0].Type != events.TypeApplyStarted || eventStore.items[1].Type != events.TypeApplySucceeded {
 		t.Fatalf("unexpected success events: %+v", eventStore.items)
+	}
+}
+
+func TestApplyService_MapTLSInputsStagesEasyProfileMTLSMaterials(t *testing.T) {
+	const caID = "ca-material"
+	const clientID = "client-material"
+	ref := func(id, name string) string { return "certificate-materials/files/" + id + "/" + name }
+	reader := &fakeSnapshotReader{files: map[string][]byte{
+		ref(caID, "certificate.pem"):     []byte("CA"),
+		ref(caID, "private.key"):         []byte("CA-KEY"),
+		ref(clientID, "certificate.pem"): []byte("CLIENT"),
+		ref(clientID, "private.key"):     []byte("CLIENT-KEY"),
+	}}
+	service := &ApplyService{snapshots: reader}
+	profiles := []easysiteprofiles.EasySiteProfile{{
+		SiteID:       "site-mtls",
+		FrontService: easysiteprofiles.FrontServiceSettings{MTLSEnabled: true, MTLSClientCARef: ref(caID, "certificate.pem")},
+		UpstreamRouting: easysiteprofiles.UpstreamRoutingSettings{
+			UpstreamMTLSEnabled: true, UpstreamMTLSCertRef: ref(clientID, "certificate.pem"), UpstreamMTLSKeyRef: ref(clientID, "private.key"), UpstreamMTLSCARef: ref(caID, "certificate.pem"),
+		},
+	}}
+	materials := []revisionsnapshots.CertificateMaterialSnapshot{
+		{CertificateID: caID, CertificateRef: ref(caID, "certificate.pem"), PrivateKeyRef: ref(caID, "private.key")},
+		{CertificateID: clientID, CertificateRef: ref(clientID, "certificate.pem"), PrivateKeyRef: ref(clientID, "private.key")},
+	}
+	_, _, artifacts, err := service.mapTLSInputs(nil, materials, profiles)
+	if err != nil {
+		t.Fatalf("map TLS inputs: %v", err)
+	}
+	paths := make(map[string]string, len(artifacts))
+	for _, artifact := range artifacts {
+		paths[artifact.Path] = string(artifact.Content)
+	}
+	for path, want := range map[string]string{
+		"tls/materials/ca-material/certificate.pem":     "CA",
+		"tls/materials/client-material/certificate.pem": "CLIENT",
+		"tls/materials/client-material/private.key":     "CLIENT-KEY",
+	} {
+		if paths[path] != want {
+			t.Fatalf("artifact %s=%q, want %q", path, paths[path], want)
+		}
+	}
+	easy := mapEasyInputs(profiles, nil)[0]
+	if easy.MTLS.MTLSClientCARef != "/etc/waf/tls/materials/ca-material/certificate.pem" || easy.UpstreamMTLS.UpstreamMTLSCertRef != "/etc/waf/tls/materials/client-material/certificate.pem" || easy.UpstreamMTLS.UpstreamMTLSKeyRef != "/etc/waf/tls/materials/client-material/private.key" || easy.UpstreamMTLS.UpstreamMTLSCARef != "/etc/waf/tls/materials/ca-material/certificate.pem" {
+		t.Fatalf("Easy mTLS refs were not mapped to runtime material paths: %+v %+v", easy.MTLS, easy.UpstreamMTLS)
+	}
+}
+
+func TestApplyService_ApplyIfNoActiveRevisionSkipsStaleBootstrap(t *testing.T) {
+	root := t.TempDir()
+	revisionStore := &fakeRevisionStoreForApply{
+		revision: revisions.Revision{ID: "rev-bootstrap"},
+		active:   "rev-operator",
+	}
+	jobStore, err := jobs.NewStore(filepath.Join(root, "jobs"))
+	if err != nil {
+		t.Fatalf("new job store: %v", err)
+	}
+	exec := &fakeApplyExecutor{}
+	service := NewApplyService(root, revisionStore, &fakeSnapshotReader{}, jobStore, NewEventService(&fakeEventStore{}), exec, exec, &fakeApplyHealthChecker{}, nil)
+
+	job, skipped, err := service.ApplyIfNoActiveRevision(context.Background(), "rev-bootstrap")
+	if err != nil {
+		t.Fatalf("conditional apply failed: %v", err)
+	}
+	if !skipped || job.ID != "" {
+		t.Fatalf("expected stale bootstrap apply to be skipped, got job=%+v skipped=%t", job, skipped)
+	}
+	if exec.syntaxCalls != 0 || exec.reloadCalls != 0 {
+		t.Fatalf("stale bootstrap must not compile or reload: syntax=%d reload=%d", exec.syntaxCalls, exec.reloadCalls)
 	}
 }
 

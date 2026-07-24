@@ -1,3 +1,5 @@
+//go:build e2e
+
 package tests
 
 import (
@@ -12,7 +14,7 @@ import (
 func TestE2EDASTAuthenticatedControlPlane(t *testing.T) {
 	panelURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL")), "/")
 	if panelURL == "" {
-		t.Skip("WAF_E2E_BASE_URL is required")
+		t.Fatal("WAF_E2E_BASE_URL is required")
 	}
 
 	anonymous, baseURL, hostOverride := newE2EClientAndBase(t, panelURL)

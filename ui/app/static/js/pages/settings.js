@@ -44,7 +44,7 @@ export async function renderSettings(container, ctx) {
   }
 
   container.innerHTML = `
-    <div class="waf-page-stack" id="settings-page">
+    <div class="waf-page-stack" id="settings-page" aria-busy="true" inert>
       <div id="settings-alert" class="alert" hidden></div>
 
       <section class="waf-card settings-tabs-card">
@@ -806,4 +806,8 @@ export async function renderSettings(container, ctx) {
   }
 
   await renderRuntime();
+  const settingsPage = container.querySelector("#settings-page");
+  settingsPage?.removeAttribute("inert");
+  settingsPage?.setAttribute("aria-busy", "false");
+  settingsPage?.setAttribute("data-runtime-ready", "true");
 }

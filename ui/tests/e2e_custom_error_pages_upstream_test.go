@@ -1,3 +1,5 @@
+//go:build e2e
+
 package tests
 
 import (
@@ -15,11 +17,11 @@ import (
 func TestE2EBehavioral_CustomErrorPages_UpstreamDrivenBranches(t *testing.T) {
 	baseURL := strings.TrimSpace(os.Getenv("WAF_E2E_RUNTIME_URL"))
 	if baseURL == "" {
-		t.Skip("WAF_E2E_RUNTIME_URL not set; skipping behavioral runtime tests")
+		t.Fatal("WAF_E2E_RUNTIME_URL not set; skipping behavioral runtime tests")
 	}
 	requestURL := strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL"))
 	if requestURL == "" {
-		t.Skip("WAF_E2E_BASE_URL not set; skipping behavioral runtime tests")
+		t.Fatal("WAF_E2E_BASE_URL not set; skipping behavioral runtime tests")
 	}
 
 	client, requestBaseURL, requestHostOverride := newE2EClientAndBase(t, requestURL)
@@ -229,11 +231,11 @@ func assertRuntimeErrorPageMetadata(t *testing.T, serverTiming string) {
 func TestE2EBehavioral_CustomErrorPages_GeoAndDirectRuntimeBranches(t *testing.T) {
 	baseURL := strings.TrimSpace(os.Getenv("WAF_E2E_RUNTIME_URL"))
 	if baseURL == "" {
-		t.Skip("WAF_E2E_RUNTIME_URL not set; skipping behavioral runtime tests")
+		t.Fatal("WAF_E2E_RUNTIME_URL not set; skipping behavioral runtime tests")
 	}
 	requestURL := strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL"))
 	if requestURL == "" {
-		t.Skip("WAF_E2E_BASE_URL not set; skipping behavioral runtime tests")
+		t.Fatal("WAF_E2E_BASE_URL not set; skipping behavioral runtime tests")
 	}
 
 	client, requestBaseURL, requestHostOverride := newE2EClientAndBase(t, requestURL)

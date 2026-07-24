@@ -16,7 +16,7 @@ func nodeESMCommand(t *testing.T, script string) *exec.Cmd {
 	}
 	version, err := exec.Command(command, "--version").Output()
 	if err != nil {
-		t.Skipf("%s is required for frontend contract tests", command)
+		t.Fatalf("%s is required for frontend contract tests: %v", command, err)
 	}
 	majorText := strings.TrimPrefix(strings.TrimSpace(string(version)), "v")
 	majorText = strings.SplitN(majorText, ".", 2)[0]

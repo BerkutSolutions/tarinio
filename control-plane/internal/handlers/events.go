@@ -1,7 +1,10 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -49,6 +52,17 @@ func (h *EventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	items, err := h.events.List()
 	if err != nil {
 		if cached, ok := h.cachedEvents(); ok {
+			cached, filterErr := filterMonitoringEvents(cached, r)
+			if filterErr != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"error": filterErr.Error()})
+				return
+			}
+			sort.SliceStable(cached, func(i, j int) bool {
+				if cached[i].OccurredAt == cached[j].OccurredAt {
+					return cached[i].ID < cached[j].ID
+				}
+				return cached[i].OccurredAt > cached[j].OccurredAt
+			})
 			offset, limit := monitoringEventsPage(r)
 			total := len(cached)
 			if offset >= total {
@@ -88,6 +102,18 @@ func (h *EventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		items = filtered
 	}
 	h.storeEvents(items)
+	var filterErr error
+	items, filterErr = filterMonitoringEvents(items, r)
+	if filterErr != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": filterErr.Error()})
+		return
+	}
+	sort.SliceStable(items, func(i, j int) bool {
+		if items[i].OccurredAt == items[j].OccurredAt {
+			return items[i].ID < items[j].ID
+		}
+		return items[i].OccurredAt > items[j].OccurredAt
+	})
 	offset, limit := monitoringEventsPage(r)
 	total := len(items)
 	if offset >= total {
@@ -100,11 +126,64 @@ func (h *EventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		items = items[offset:end]
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"events":  items,
-		"total":   total,
-		"limit":   limit,
-		"offset":  offset,
+		"events": items,
+		"total":  total,
+		"limit":  limit,
+		"offset": offset,
 	})
+}
+
+func filterMonitoringEvents(items []events.Event, r *http.Request) ([]events.Event, error) {
+	query := r.URL.Query()
+	typeFilter := strings.ToLower(strings.TrimSpace(query.Get("type")))
+	severityFilter := strings.ToLower(strings.TrimSpace(query.Get("severity")))
+	siteFilter := strings.ToLower(strings.TrimSpace(query.Get("site_id")))
+	parseBoundary := func(name string) (*time.Time, error) {
+		raw := strings.TrimSpace(query.Get(name))
+		if raw == "" {
+			return nil, nil
+		}
+		parsed, err := time.Parse(time.RFC3339, raw)
+		if err != nil {
+			return nil, errors.New(name + " must be RFC3339")
+		}
+		parsed = parsed.UTC()
+		return &parsed, nil
+	}
+	from, err := parseBoundary("from")
+	if err != nil {
+		return nil, err
+	}
+	to, err := parseBoundary("to")
+	if err != nil {
+		return nil, err
+	}
+	filtered := make([]events.Event, 0, len(items))
+	for _, item := range items {
+		if typeFilter != "" && !strings.Contains(strings.ToLower(string(item.Type)), typeFilter) {
+			continue
+		}
+		if severityFilter != "" && !strings.Contains(strings.ToLower(string(item.Severity)), severityFilter) {
+			continue
+		}
+		if siteFilter != "" && !strings.Contains(strings.ToLower(item.SiteID), siteFilter) {
+			continue
+		}
+		if from != nil || to != nil {
+			occurred, parseErr := time.Parse(time.RFC3339Nano, item.OccurredAt)
+			if parseErr != nil {
+				continue
+			}
+			if from != nil && occurred.Before(*from) {
+				continue
+			}
+			if to != nil && occurred.After(*to) {
+				continue
+			}
+		}
+		filtered = append(filtered, item)
+	}
+	return filtered, nil
 }
 
 func monitoringEventsPage(r *http.Request) (int, int) {

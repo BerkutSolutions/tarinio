@@ -1,3 +1,5 @@
+//go:build e2e
+
 package tests
 
 import (
@@ -17,7 +19,7 @@ func TestE2EServiceEditorParity(t *testing.T) {
 	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL")), "/")
 	runtimeURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_RUNTIME_URL")), "/")
 	if baseURL == "" || runtimeURL == "" {
-		t.Skip("WAF_E2E_BASE_URL and WAF_E2E_RUNTIME_URL are required")
+		t.Fatal("WAF_E2E_BASE_URL and WAF_E2E_RUNTIME_URL are required")
 	}
 	client, requestBaseURL, hostOverride := newE2EClientAndBase(t, baseURL)
 	loginE2EUser(t, client, requestBaseURL, hostOverride)
@@ -126,11 +128,11 @@ func TestE2EServiceEditorParity(t *testing.T) {
 	}
 	controlPlaneContainer := strings.TrimSpace(os.Getenv("WAF_E2E_CONTROL_PLANE_CONTAINER"))
 	if controlPlaneContainer == "" {
-		controlPlaneContainer = "waf-e2e-control-plane"
+		controlPlaneContainer = "e2e-control-plane-1"
 	}
 	runtimeContainer := strings.TrimSpace(os.Getenv("WAF_E2E_RUNTIME_CONTAINER"))
 	if runtimeContainer == "" {
-		runtimeContainer = "waf-e2e-runtime"
+		runtimeContainer = "e2e-runtime-1"
 	}
 	artifactPath := "nginx/sites/" + siteID + ".conf"
 	revisionArtifact, err := exec.Command("docker", "exec", controlPlaneContainer, "cat", "/var/lib/waf/candidates/"+revisionID+"/"+artifactPath).CombinedOutput()
@@ -149,11 +151,11 @@ func TestE2EServiceEditorParity(t *testing.T) {
 		t.Fatalf("active runtime artifact differs from revision: err=%v", err)
 	}
 
-	allowed := e2eContainerHTTPStatus(t, e2eContainerName(t, "WAF_E2E_ATTACKER_CONTAINER", "waf-e2e-attacker"), host)
+	allowed := e2eContainerHTTPStatus(t, e2eContainerName(t, "WAF_E2E_ATTACKER_CONTAINER", "e2e-e2e-attacker-1"), host)
 	if allowed != http.StatusOK {
 		t.Fatalf("allowlisted E2E client: status=%d, want 200 from protected upstream", allowed)
 	}
-	if denied := e2eContainerHTTPStatus(t, e2eContainerName(t, "WAF_E2E_L4_ATTACKER_CONTAINER", "waf-e2e-l4-attacker"), host); denied != http.StatusForbidden {
+	if denied := e2eContainerHTTPStatus(t, e2eContainerName(t, "WAF_E2E_L4_ATTACKER_CONTAINER", "e2e-e2e-l4-attacker-1"), host); denied != http.StatusForbidden {
 		t.Fatalf("non-allowlisted E2E client: status=%d, want 403", denied)
 	}
 	t.Logf("editor/raw/runtime parity revision=%s upstream=privatebin:8080 allowlist=%s allowed_status=%d", revisionID, attackerIP, allowed)

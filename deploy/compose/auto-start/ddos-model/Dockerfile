@@ -8,4 +8,10 @@ RUN CGO_ENABLED=0 go build -o /out/tarinio-sentinel ./cmd/tarinio-sentinel
 FROM alpine:3.20
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=builder /out/tarinio-sentinel /usr/local/bin/tarinio-sentinel
+
+RUN mkdir -p /state /out \
+    && chown 65532:65532 /state /out
+
+USER 65532:4
+
 ENTRYPOINT ["/usr/local/bin/tarinio-sentinel"]

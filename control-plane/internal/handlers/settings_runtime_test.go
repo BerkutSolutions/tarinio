@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -293,6 +294,25 @@ func TestParseLoggingSettingsRequiresNewVaultTokenWhenAddressChanges(t *testing.
 	}
 }
 
+func TestParseLoggingSettingsMaskedVaultSecretsDoNotTriggerNetworkWrite(t *testing.T) {
+	current := loggingconfig.Normalize(loggingconfig.Settings{
+		SecretProvider: loggingconfig.SecretProviderVault,
+		Vault:          loggingconfig.VaultSettings{Enabled: true, Address: "http://127.0.0.1:1", Mount: "secret", PathPrefix: "tarinio", TokenEnc: "stored-token"},
+		OpenSearch:     loggingconfig.OpenSearchSettings{PasswordEnc: "stored-password"},
+	})
+	next, err := parseLoggingSettings(map[string]any{
+		"secret_provider": "vault",
+		"vault":           map[string]any{"enabled": true, "address": "http://127.0.0.1:1", "mount": "secret", "path_prefix": "tarinio", "token": loggingconfig.MaskedSecretValue},
+		"opensearch":      map[string]any{"password": loggingconfig.MaskedSecretValue},
+	}, current, "pepper-for-tests", true)
+	if err != nil {
+		t.Fatalf("masked save must not contact Vault: %v", err)
+	}
+	if next.Vault.TokenEnc != current.Vault.TokenEnc || next.OpenSearch.PasswordEnc != current.OpenSearch.PasswordEnc {
+		t.Fatalf("masked secrets were not preserved")
+	}
+}
+
 func TestParseLoggingSettingsStoresSecretsInVault(t *testing.T) {
 	var gotPath string
 	var gotPayload map[string]any
@@ -401,6 +421,43 @@ func TestSettingsRuntimeHandler_StorageRetentionRequiresStorageWritePermission(t
 	handler.ServeHTTP(allowedResponse, allowed)
 	if allowedResponse.Code != http.StatusOK {
 		t.Fatalf("expected storage mutation to succeed, got %d: %s", allowedResponse.Code, allowedResponse.Body.String())
+	}
+}
+
+func TestSettingsRuntimeHandler_InvalidMixedPayloadDoesNotPartiallySave(t *testing.T) {
+	handler := NewSettingsRuntimeHandler(t.TempDir(), "", "pepper-for-tests")
+	before := handler.responsePayload()
+	body := []byte(`{"update_checks_enabled":false,"storage":{"logs_days":0}}`)
+	request := httptest.NewRequest(http.MethodPut, "/api/settings/runtime", bytes.NewReader(body))
+	request = request.WithContext(auth.ContextWithSession(request.Context(), auth.SessionView{
+		UserID: "storage-writer", Permissions: []string{"settings.general.write", "settings.storage.write"},
+	}))
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", response.Code, response.Body.String())
+	}
+	after := handler.responsePayload()
+	if after["update_checks_enabled"] != before["update_checks_enabled"] {
+		t.Fatalf("update_checks_enabled changed after rejected mixed payload: before=%v after=%v", before["update_checks_enabled"], after["update_checks_enabled"])
+	}
+	if !reflect.DeepEqual(after["storage"], before["storage"]) {
+		t.Fatalf("storage changed after rejected mixed payload")
+	}
+}
+
+func TestSettingsRuntimeHandler_StorageIndexesEndpointReturnsStablePayload(t *testing.T) {
+	handler := NewSettingsRuntimeHandler(t.TempDir(), "", "pepper-for-tests")
+	request := httptest.NewRequest(http.MethodGet, "/api/settings/runtime/storage-indexes?stream=requests&limit=7&offset=0", nil)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || strings.TrimSpace(response.Body.String()) == "null" {
+		t.Fatalf("expected stable payload, got %d %s", response.Code, response.Body.String())
+	}
+	for _, marker := range []string{`"stream":"requests"`, `"items":[]`, `"limit":7`, `"offset":0`} {
+		if !strings.Contains(response.Body.String(), marker) {
+			t.Fatalf("missing %s in %s", marker, response.Body.String())
+		}
 	}
 }
 

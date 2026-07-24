@@ -23,10 +23,19 @@ spec:
       labels:
         app: control-plane
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: control-plane
           image: tarinio-control-plane:lab
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
           ports:
             - containerPort: 8080
           env:
@@ -160,10 +169,14 @@ spec:
           volumeMounts:
             - name: waf-runtime-data
               mountPath: /var/lib/waf
+            - name: control-plane-tmp
+              mountPath: /tmp
       volumes:
         - name: waf-runtime-data
           persistentVolumeClaim:
             claimName: waf-runtime-data
+        - name: control-plane-tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

@@ -1,3 +1,5 @@
+//go:build e2e
+
 package tests
 
 import (
@@ -12,7 +14,7 @@ import (
 
 func TestFreshOnboardingSelfSignedTLS(t *testing.T) {
 	if strings.TrimSpace(os.Getenv("WAF_E2E_FRESH_ONBOARDING")) != "1" {
-		t.Skip("run scripts/run-e2e-tests.ps1 -FreshOnboarding to exercise clean onboarding")
+		t.Fatal("run scripts/run-e2e-tests.ps1 -FreshOnboarding to exercise clean onboarding")
 	}
 	runtimeURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_RUNTIME_URL")), "/")
 	httpsURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_RUNTIME_HTTPS_URL")), "/")

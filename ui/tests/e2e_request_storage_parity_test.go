@@ -1,3 +1,5 @@
+//go:build e2e
+
 package tests
 
 import (
@@ -19,7 +21,7 @@ func TestE2ERequestStorageParity(t *testing.T) {
 	runtimeURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_RUNTIME_HEALTH_URL")), "/")
 	token := strings.TrimSpace(os.Getenv("WAF_E2E_RUNTIME_API_TOKEN"))
 	if panelURL == "" || runtimeURL == "" || token == "" {
-		t.Skip("E2E panel URL, runtime URL or runtime token is not configured")
+		t.Fatal("E2E panel URL, runtime URL or runtime token is not configured")
 	}
 
 	compact := e2eRuntimeDashboardSummary(t, runtimeURL, token, "limit=1&retention_days=1&tz_offset_minutes=0")

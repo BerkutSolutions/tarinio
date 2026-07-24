@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 
+	"waf/control-plane/internal/audits"
+	"waf/control-plane/internal/auth"
 	"waf/control-plane/internal/services"
 )
 
@@ -27,10 +29,30 @@ type owaspCRSService interface {
 
 type OWASPCRSHandler struct {
 	service owaspCRSService
+	audits  interface{ Emit(audits.AuditEvent) }
 }
 
 func NewOWASPCRSHandler(service owaspCRSService) *OWASPCRSHandler {
 	return &OWASPCRSHandler{service: service}
+}
+
+func (h *OWASPCRSHandler) SetAuditEmitter(emitter interface{ Emit(audits.AuditEvent) }) {
+	h.audits = emitter
+}
+
+func (h *OWASPCRSHandler) emitAudit(r *http.Request, action string, err error) {
+	if h.audits == nil {
+		return
+	}
+	actor := ""
+	if session, ok := auth.SessionFromContext(r.Context()); ok {
+		actor = session.UserID
+	}
+	status := audits.StatusSucceeded
+	if err != nil {
+		status = audits.StatusFailed
+	}
+	h.audits.Emit(audits.AuditEvent{ActorUserID: actor, ActorIP: audits.ActorIPFromContext(r.Context()), Action: action, ResourceType: "owasp_crs", ResourceID: "runtime", Status: status, Summary: action})
 }
 
 func (h *OWASPCRSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -74,6 +96,7 @@ func (h *OWASPCRSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			status, err := h.service.SetHourlyAutoUpdate(r.Context(), value)
+			h.emitAudit(r, "owasp_crs.hourly_auto_update", err)
 			if err != nil {
 				writeOWASPCRSError(w, err)
 				return
@@ -82,6 +105,7 @@ func (h *OWASPCRSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		status, err := h.service.Update(r.Context())
+		h.emitAudit(r, "owasp_crs.update", err)
 		if err != nil {
 			writeOWASPCRSError(w, err)
 			return

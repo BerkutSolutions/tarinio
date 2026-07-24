@@ -1,3 +1,5 @@
+//go:build e2e
+
 package tests
 
 import (
@@ -17,7 +19,7 @@ import (
 func TestE2EQualityMatrix_MainPagesAndAPIs(t *testing.T) {
 	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL")), "/")
 	if baseURL == "" {
-		t.Skip("WAF_E2E_BASE_URL is not set; skipping e2e quality matrix")
+		t.Fatal("WAF_E2E_BASE_URL is not set; skipping e2e quality matrix")
 	}
 	requestBaseURL := baseURL
 	requestHostOverride := ""

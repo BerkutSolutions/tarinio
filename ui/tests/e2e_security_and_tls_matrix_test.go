@@ -1,3 +1,5 @@
+//go:build e2e
+
 package tests
 
 import (
@@ -10,10 +12,17 @@ import (
 func TestE2ESecurityAndTLSMatrix(t *testing.T) {
 	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL")), "/")
 	if baseURL == "" {
-		t.Skip("WAF_E2E_BASE_URL is not set; skipping security/tls matrix")
+		t.Fatal("WAF_E2E_BASE_URL is not set; skipping security/tls matrix")
 	}
 	adminClient, requestBaseURL, requestHostOverride := newE2EClientAndBase(t, baseURL)
 	loginE2EUser(t, adminClient, requestBaseURL, requestHostOverride)
+	antiDDoSBefore := getProtectionJSON(t, adminClient, requestBaseURL+"/api/anti-ddos/settings", requestHostOverride)
+	t.Cleanup(func() {
+		putProtectionJSON(t, adminClient, requestBaseURL+"/api/anti-ddos/settings", requestHostOverride, antiDDoSBefore)
+		if revisionID := e2eCompileAndApply(t, adminClient, requestBaseURL, requestHostOverride); revisionID == "" {
+			t.Error("restore security/tls anti-ddos settings did not activate a revision")
+		}
+	})
 
 	t.Run("BrowserContracts", func(t *testing.T) {
 		pages := []struct {

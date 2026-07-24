@@ -57,6 +57,16 @@ func (h *AntiDDoSHandler) upsert(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "anti-ddos limits must not be negative"})
 		return
 	}
+	if item.EnforceL7Rate && (item.L7StatusCode < 100 || item.L7StatusCode > 599) {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "anti-ddos l7_status_code must be between 100 and 599"})
+		return
+	}
+	for _, port := range item.Ports {
+		if port <= 0 || port > 65535 {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "anti-ddos ports must be between 1 and 65535"})
+			return
+		}
+	}
 	updated, err := h.service.Upsert(withActorIP(r), item)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})

@@ -7,8 +7,13 @@ import (
 	"strings"
 	"testing"
 
+	"waf/control-plane/internal/audits"
 	"waf/control-plane/internal/services"
 )
+
+type captureOWASPCRSAudits struct{ events []audits.AuditEvent }
+
+func (c *captureOWASPCRSAudits) Emit(event audits.AuditEvent) { c.events = append(c.events, event) }
 
 type fakeOWASPCRSService struct{}
 
@@ -52,6 +57,8 @@ func (f *fakeOWASPCRSService) SetHourlyAutoUpdate(ctx context.Context, enabled b
 
 func TestOWASPCRSHandler_StatusAndUpdate(t *testing.T) {
 	handler := NewOWASPCRSHandler(&fakeOWASPCRSService{})
+	capture := &captureOWASPCRSAudits{}
+	handler.SetAuditEmitter(capture)
 
 	statusReq := httptest.NewRequest(http.MethodGet, "/api/owasp-crs/status", nil)
 	statusResp := httptest.NewRecorder()
@@ -71,5 +78,8 @@ func TestOWASPCRSHandler_StatusAndUpdate(t *testing.T) {
 	}
 	if !strings.Contains(updateResp.Body.String(), "\"active_version\":\"4.1.0\"") {
 		t.Fatalf("unexpected update response body: %s", updateResp.Body.String())
+	}
+	if len(capture.events) != 1 || capture.events[0].Action != "owasp_crs.update" || capture.events[0].Status != audits.StatusSucceeded {
+		t.Fatalf("expected successful CRS update audit, got %+v", capture.events)
 	}
 }

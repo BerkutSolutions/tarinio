@@ -1,3 +1,5 @@
+//go:build e2e
+
 package tests
 
 import (
@@ -14,7 +16,7 @@ func TestE2EAntibotChallengePrecedesActiveRateLimitFallback(t *testing.T) {
 	runtimeURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_RUNTIME_URL")), "/")
 	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL")), "/")
 	if runtimeURL == "" || baseURL == "" {
-		t.Skip("WAF_E2E_BASE_URL and WAF_E2E_RUNTIME_URL are required; skipping antibot/rate-limit order E2E")
+		t.Fatal("WAF_E2E_BASE_URL and WAF_E2E_RUNTIME_URL are required; skipping antibot/rate-limit order E2E")
 	}
 
 	adminClient, adminBaseURL, adminHostOverride := newE2EClientAndBase(t, baseURL)

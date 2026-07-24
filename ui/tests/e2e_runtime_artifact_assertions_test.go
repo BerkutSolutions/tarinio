@@ -51,3 +51,38 @@ func assertE2EArtifactActive(t *testing.T, revisionID, artifactPath string, requ
 		t.Fatalf("active runtime artifact differs from revision %s: %s", revisionID, artifactPath)
 	}
 }
+
+// assertE2EArtifactActiveWithout proves a directive was removed from both the
+// exact candidate and the active runtime artifact after an explicit apply.
+func assertE2EArtifactActiveWithout(t *testing.T, revisionID, artifactPath string, forbidden ...string) {
+	t.Helper()
+	controlPlane := strings.TrimSpace(os.Getenv("WAF_E2E_CONTROL_PLANE_CONTAINER"))
+	if controlPlane == "" {
+		controlPlane = "waf-e2e-control-plane"
+	}
+	runtimeContainer := strings.TrimSpace(os.Getenv("WAF_E2E_RUNTIME_CONTAINER"))
+	if runtimeContainer == "" {
+		runtimeContainer = "waf-e2e-runtime"
+	}
+	candidate, err := exec.Command("docker", "exec", controlPlane, "cat", "/var/lib/waf/candidates/"+revisionID+"/"+artifactPath).CombinedOutput()
+	if err != nil {
+		t.Fatalf("read compiled artifact %s: %v: %s", artifactPath, err, candidate)
+	}
+	for _, value := range forbidden {
+		if strings.Contains(string(candidate), value) {
+			t.Fatalf("compiled artifact %s unexpectedly contains %q", artifactPath, value)
+		}
+	}
+	runtime, err := exec.Command("docker", "exec", runtimeContainer, "cat", "/etc/waf/current/"+artifactPath).CombinedOutput()
+	if err != nil {
+		t.Fatalf("read active artifact %s: %v: %s", artifactPath, err, runtime)
+	}
+	if string(candidate) != string(runtime) {
+		t.Fatalf("active runtime artifact differs from revision %s: %s", revisionID, artifactPath)
+	}
+	for _, value := range forbidden {
+		if strings.Contains(string(runtime), value) {
+			t.Fatalf("active artifact %s unexpectedly contains %q", artifactPath, value)
+		}
+	}
+}

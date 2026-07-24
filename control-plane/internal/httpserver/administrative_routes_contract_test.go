@@ -4,11 +4,29 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"os"
 	"strconv"
+	"strings"
 	"testing"
 
 	"waf/control-plane/apiroutes"
 )
+
+func TestAdministrationDeleteRoutesRequireWritePermissions(t *testing.T) {
+	content, err := os.ReadFile("server.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := string(content)
+	for _, required := range []string{
+		"http.MethodDelete: {rbac.PermissionAdministrationWrite, rbac.PermissionAdministrationUsersWrite}",
+		"http.MethodDelete: {rbac.PermissionAdministrationWrite, rbac.PermissionAdministrationRolesWrite}",
+	} {
+		if !strings.Contains(server, required) {
+			t.Fatalf("administration DELETE route is missing zero-trust permission contract %q", required)
+		}
+	}
+}
 
 func TestAdministrativeRouteCatalogMatchesServerMux(t *testing.T) {
 	file, err := parser.ParseFile(token.NewFileSet(), "server.go", nil, 0)

@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"waf/compiler/pipeline"
@@ -32,6 +33,7 @@ import (
 
 type revisionStoreForApply interface {
 	Get(revisionID string) (revisions.Revision, bool, error)
+	CurrentActive() (revisions.Revision, bool, error)
 	MarkActive(revisionID string) error
 	MarkFailed(revisionID string) error
 	RecordApplyResult(revisionID string, jobID string, status string, result string, appliedAt string) error
@@ -43,6 +45,7 @@ type revisionSnapshotReader interface {
 }
 
 type ApplyService struct {
+	applyMu        sync.Mutex
 	revisions      revisionStoreForApply
 	snapshots      revisionSnapshotReader
 	jobs           JobStore
@@ -79,6 +82,37 @@ func NewApplyService(runtimeRoot string, revisions revisionStoreForApply, snapsh
 }
 
 func (s *ApplyService) Apply(ctx context.Context, revisionID string) (job jobs.Job, err error) {
+	// Single-node deployments do not have a distributed coordinator, but
+	// bootstrap and API requests can still apply revisions concurrently. The
+	// runtime can reload only one candidate at a time, so serialize it locally.
+	s.applyMu.Lock()
+	defer s.applyMu.Unlock()
+	return s.applyWithCoordinator(ctx, revisionID)
+}
+
+// ApplyIfNoActiveRevision is for asynchronous bootstrap only. It makes the
+// active-revision decision under the same lock as apply, so bootstrap cannot
+// overwrite a configuration that an API request activated meanwhile.
+func (s *ApplyService) ApplyIfNoActiveRevision(ctx context.Context, revisionID string) (job jobs.Job, skipped bool, err error) {
+	s.applyMu.Lock()
+	defer s.applyMu.Unlock()
+
+	if s.revisions == nil {
+		return jobs.Job{}, false, errors.New("revision store is required")
+	}
+	active, exists, activeErr := s.revisions.CurrentActive()
+	if activeErr != nil {
+		return jobs.Job{}, false, activeErr
+	}
+	if exists && strings.TrimSpace(active.ID) != strings.TrimSpace(revisionID) {
+		return jobs.Job{}, true, nil
+	}
+	job, err = s.applyWithCoordinator(ctx, revisionID)
+	return job, false, err
+}
+
+func (s *ApplyService) applyWithCoordinator(ctx context.Context, revisionID string) (job jobs.Job, err error) {
+
 	if s.coord == nil {
 		s.coord = NewNoopDistributedCoordinator()
 	}
@@ -709,6 +743,35 @@ func (s *ApplyService) mapTLSInputs(configs []tlsconfigs.TLSConfig, materials []
 	certInputs := make([]pipeline.CertificateInput, 0, len(sortedConfigs))
 	tlsMaterialArtifacts := make([]pipeline.ArtifactOutput, 0, len(sortedConfigs)*2)
 	seenMaterialArtifacts := map[string]struct{}{}
+	appendMaterial := func(certificateID string, includePrivateKey bool) error {
+		material, ok := materialByCertificateID[certificateID]
+		if !ok {
+			return fmt.Errorf("mTLS material %s not found in revision snapshot", certificateID)
+		}
+		certificateKey := certificateID + "/certificate.pem"
+		if _, seen := seenMaterialArtifacts[certificateKey]; !seen {
+			certificatePEM, err := s.snapshots.ReadMaterial(material.CertificateRef)
+			if err != nil {
+				return err
+			}
+			seenMaterialArtifacts[certificateKey] = struct{}{}
+			tlsMaterialArtifacts = append(tlsMaterialArtifacts, pipeline.NewArtifact("tls/materials/"+certificateKey, pipeline.ArtifactKindTLSRef, certificatePEM))
+		}
+		if !includePrivateKey {
+			return nil
+		}
+		privateKey := certificateID + "/private.key"
+		if _, seen := seenMaterialArtifacts[privateKey]; seen {
+			return nil
+		}
+		privateKeyPEM, err := s.snapshots.ReadMaterial(material.PrivateKeyRef)
+		if err != nil {
+			return err
+		}
+		seenMaterialArtifacts[privateKey] = struct{}{}
+		tlsMaterialArtifacts = append(tlsMaterialArtifacts, pipeline.NewArtifact("tls/materials/"+privateKey, pipeline.ArtifactKindTLSRef, privateKeyPEM))
+		return nil
+	}
 	for _, config := range sortedConfigs {
 		tlsInputs = append(tlsInputs, pipeline.TLSConfigInput{
 			ID:                  config.SiteID + "-tls",
@@ -737,7 +800,8 @@ func (s *ApplyService) mapTLSInputs(configs []tlsconfigs.TLSConfig, materials []
 			StorageRef:    fmt.Sprintf("/etc/waf/tls/materials/%s/certificate.pem", config.CertificateID),
 			PrivateKeyRef: fmt.Sprintf("/etc/waf/tls/materials/%s/private.key", config.CertificateID),
 		})
-		seenMaterialArtifacts[config.CertificateID] = struct{}{}
+		seenMaterialArtifacts[config.CertificateID+"/certificate.pem"] = struct{}{}
+		seenMaterialArtifacts[config.CertificateID+"/private.key"] = struct{}{}
 		tlsMaterialArtifacts = append(tlsMaterialArtifacts,
 			pipeline.NewArtifact(fmt.Sprintf("tls/materials/%s/certificate.pem", config.CertificateID), pipeline.ArtifactKindTLSRef, certificatePEM),
 			pipeline.NewArtifact(fmt.Sprintf("tls/materials/%s/private.key", config.CertificateID), pipeline.ArtifactKindTLSRef, privateKeyPEM),
@@ -752,21 +816,27 @@ func (s *ApplyService) mapTLSInputs(configs []tlsconfigs.TLSConfig, materials []
 		if certificateID == "" {
 			continue
 		}
-		if _, ok := seenMaterialArtifacts[certificateID]; ok {
-			continue
-		}
-		material, ok := materialByCertificateID[certificateID]
-		if !ok {
-			return nil, nil, nil, fmt.Errorf("mTLS CA material %s not found in revision snapshot", certificateID)
-		}
-		certificatePEM, err := s.snapshots.ReadMaterial(material.CertificateRef)
-		if err != nil {
+		if err := appendMaterial(certificateID, false); err != nil {
 			return nil, nil, nil, err
 		}
-		seenMaterialArtifacts[certificateID] = struct{}{}
-		tlsMaterialArtifacts = append(tlsMaterialArtifacts,
-			pipeline.NewArtifact(fmt.Sprintf("tls/materials/%s/certificate.pem", certificateID), pipeline.ArtifactKindTLSRef, certificatePEM),
-		)
+	}
+
+	for _, profile := range profiles {
+		if !profile.UpstreamRouting.UpstreamMTLSEnabled {
+			continue
+		}
+		for _, ref := range []string{profile.UpstreamRouting.UpstreamMTLSCertRef, profile.UpstreamRouting.UpstreamMTLSKeyRef} {
+			if certificateID := certificateMaterialIDFromRef(ref); certificateID != "" {
+				if err := appendMaterial(certificateID, true); err != nil {
+					return nil, nil, nil, err
+				}
+			}
+		}
+		if certificateID := certificateMaterialIDFromRef(profile.UpstreamRouting.UpstreamMTLSCARef); certificateID != "" {
+			if err := appendMaterial(certificateID, false); err != nil {
+				return nil, nil, nil, err
+			}
+		}
 	}
 
 	return tlsInputs, certInputs, tlsMaterialArtifacts, nil
@@ -779,7 +849,7 @@ func certificateMaterialIDFromRef(ref string) string {
 	}
 	parts := strings.Split(ref, "/")
 	for i := 0; i+2 < len(parts); i++ {
-		if parts[i] == "files" && parts[i+2] == "certificate.pem" {
+		if parts[i] == "files" && (parts[i+2] == "certificate.pem" || parts[i+2] == "private.key") {
 			return parts[i+1]
 		}
 	}
@@ -881,6 +951,17 @@ func runtimeCertificateMaterialPath(ref string) string {
 	}
 	if certificateID := certificateMaterialIDFromRef(ref); certificateID != "" {
 		return "/etc/waf/tls/materials/" + certificateID + "/certificate.pem"
+	}
+	return "/var/lib/waf/control-plane/" + strings.TrimLeft(ref, "/")
+}
+
+func runtimeCertificateMaterialKeyPath(ref string) string {
+	ref = strings.TrimSpace(ref)
+	if ref == "" || strings.HasPrefix(ref, "/") {
+		return ref
+	}
+	if certificateID := certificateMaterialIDFromRef(ref); certificateID != "" {
+		return "/etc/waf/tls/materials/" + certificateID + "/private.key"
 	}
 	return "/var/lib/waf/control-plane/" + strings.TrimLeft(ref, "/")
 }
@@ -1146,15 +1227,15 @@ func mapEasyInputs(items []easysiteprofiles.EasySiteProfile, virtualPatches []vi
 				MTLSEnabled:     item.FrontService.MTLSEnabled,
 				MTLSOptional:    item.FrontService.MTLSOptional,
 				MTLSVerifyDepth: item.FrontService.MTLSVerifyDepth,
-				MTLSClientCARef: item.FrontService.MTLSClientCARef,
+				MTLSClientCARef: runtimeCertificateMaterialPath(item.FrontService.MTLSClientCARef),
 				MTLSPassHeaders: item.FrontService.MTLSPassHeaders,
 			},
 
 			UpstreamMTLS: pipeline.UpstreamMTLSInput{
 				UpstreamMTLSEnabled: item.UpstreamRouting.UpstreamMTLSEnabled,
-				UpstreamMTLSCertRef: item.UpstreamRouting.UpstreamMTLSCertRef,
-				UpstreamMTLSKeyRef:  item.UpstreamRouting.UpstreamMTLSKeyRef,
-				UpstreamMTLSCARef:   item.UpstreamRouting.UpstreamMTLSCARef,
+				UpstreamMTLSCertRef: runtimeCertificateMaterialPath(item.UpstreamRouting.UpstreamMTLSCertRef),
+				UpstreamMTLSKeyRef:  runtimeCertificateMaterialKeyPath(item.UpstreamRouting.UpstreamMTLSKeyRef),
+				UpstreamMTLSCARef:   runtimeCertificateMaterialPath(item.UpstreamRouting.UpstreamMTLSCARef),
 			},
 
 			UseModSecurity:                    item.SecurityModSecurity.UseModSecurity,

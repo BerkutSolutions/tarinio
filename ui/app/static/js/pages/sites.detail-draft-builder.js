@@ -1,3 +1,5 @@
+import { readGeoTimeWindowDraftRows } from "./sites.geo-time-window-draft.js";
+
 export function buildDetailDraftFromForm(container, state, deps = {}) {
   const {
     computeUpstreamID,
@@ -207,7 +209,7 @@ export function buildDetailDraftFromForm(container, state, deps = {}) {
       cbs.forEach((cb) => { if (!cb.checked) disabled.push(cb.dataset.epSlug); });
       return disabled;
     })(),
-    geo_time_windows: normalizeGeoTimeWindows(state.draft.geo_time_windows),
+    geo_time_windows: normalizeGeoTimeWindows(readGeoTimeWindowDraftRows(container)),
     api_positive_security_enabled: Boolean(state.draft.api_positive_security_enabled),
     api_positive_openapi_schema_ref: String(state.draft.api_positive_openapi_schema_ref || "").trim(),
     api_positive_enforcement_mode: String(state.draft.api_positive_enforcement_mode || "monitor").trim().toLowerCase() || "monitor",

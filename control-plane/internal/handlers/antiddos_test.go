@@ -50,3 +50,20 @@ func TestAntiDDoSHandler_GetPutAndPost(t *testing.T) {
 		t.Fatalf("expected 200, got %d", postResp.Code)
 	}
 }
+
+func TestAntiDDoSHandlerRejectsOutOfRangeStatusAndInvalidPorts(t *testing.T) {
+	for name, body := range map[string]string{
+		"status too high": `{"use_l4_guard":true,"chain_mode":"input","conn_limit":10,"rate_per_second":10,"rate_burst":10,"ports":[443],"target":"DROP","enforce_l7_rate_limit":true,"l7_requests_per_second":10,"l7_burst":10,"l7_status_code":600}`,
+		"invalid ports":   `{"use_l4_guard":true,"chain_mode":"input","conn_limit":10,"rate_per_second":10,"rate_burst":10,"ports":[0,70000],"target":"DROP","enforce_l7_rate_limit":false}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			handler := NewAntiDDoSHandler(&fakeAntiDDoSService{})
+			req := httptest.NewRequest(http.MethodPut, "/api/anti-ddos/settings", bytes.NewBufferString(body))
+			resp := httptest.NewRecorder()
+			handler.ServeHTTP(resp, req)
+			if resp.Code != http.StatusBadRequest {
+				t.Fatalf("expected 400, got %d body=%s", resp.Code, resp.Body.String())
+			}
+		})
+	}
+}

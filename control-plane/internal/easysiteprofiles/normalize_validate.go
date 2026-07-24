@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-var rateRegexp = regexp.MustCompile(`^\d+r/s$`)
+var rateRegexp = regexp.MustCompile(`^\d+r/[sm]$`)
 var crsVersionRegexp = regexp.MustCompile(`^[0-9]+(\.[0-9]+)?$`)
 var safeHeaderValueRegexp = regexp.MustCompile(`^[^\r\n"]+$`)
 var safeHostHeaderRegexp = regexp.MustCompile(`^(?i:[a-z0-9][a-z0-9.-]*[a-z0-9]|[a-z0-9])(:[0-9]{1,5})?$`)
@@ -298,7 +298,7 @@ func validateProfile(profile EasySiteProfile) error {
 		return errors.New("easy site profile security_behavior_and_limits.limit_req_url must start with /")
 	}
 	if !rateRegexp.MatchString(profile.SecurityBehaviorAndLimits.LimitReqRate) {
-		return errors.New("easy site profile security_behavior_and_limits.limit_req_rate must match Nr/s")
+		return errors.New("easy site profile security_behavior_and_limits.limit_req_rate must match Nr/s or Nr/m")
 	}
 	if len(profile.SecurityBehaviorAndLimits.CustomLimitRules) > 32 {
 		return errors.New("easy site profile security_behavior_and_limits.custom_limit_rules must not exceed 32 entries")
@@ -308,7 +308,7 @@ func validateProfile(profile EasySiteProfile) error {
 			return errors.New("easy site profile security_behavior_and_limits.custom_limit_rules.path must start with /")
 		}
 		if !rateRegexp.MatchString(rule.Rate) {
-			return errors.New("easy site profile security_behavior_and_limits.custom_limit_rules.rate must match Nr/s")
+			return errors.New("easy site profile security_behavior_and_limits.custom_limit_rules.rate must match Nr/s or Nr/m")
 		}
 	}
 

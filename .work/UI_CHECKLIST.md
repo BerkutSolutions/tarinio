@@ -1,5 +1,26 @@
 2026-07-21
 
+2026-07-24 — E2E re-audit stages 12–14
+
+- [x] Activity/Audit: `audit-stage12` passed 3 real Go API/runtime subtests and 6 desktop/mobile Playwright checks, with no retry or skip.
+- [x] Settings and cross-module/security: `settings-cross-stage13-14` passed 8 real Go E2E suites plus 28 desktop/mobile browser checks (including auth setup), with no retry or skip.
+- [x] Negative security probes: four hostile requests were blocked by runtime with HTTP 403 and never reached the real canary; the benign request reached it exactly once.
+- [>] Full release proof remains required: full tagged Go E2E exceeded the enforced 10-minute limit before completion; repeat after runner optimization, all CI shards, and exact aggregate coverage must be green before closing stages.
+
+2026-07-24 — Этап 5 Bans повторно подтверждён на изолированном WAF стенде.
+
+- Bans UI: на desktop и mobile создать ban для TEST-NET IP, открыть detail через keyboard, проверить country/detail, Extend, Cancel и Unban. После Unban строка должна исчезнуть, а denylist API и audit должны показать фактическую мутацию.
+- Bans RBAC/API: отдельная read-only сессия должна видеть отказ `403` при Create/Extend/Unban без изменения denylist; invalid IP и missing site/duration должны быть отвергнуты сервером.
+
+2026-07-23 — Browser E2E continuation: проверить в disposable stack Services export download (JSON содержит sites/upstreams/tls_configs), invalid import rejection и возврат в редактор; Revisions clear-statuses не должен показывать backend error; Bans create modal cancel должен закрываться без mutation. Проверить Requests page size, сортировку и открытие detail с клавиатуры/Escape на desktop/mobile.
+
+- Services mutations: создать изолированный service, изменить host через UI Save и убедиться по API list, что значение сохранилось; удалить через editor и подтвердить отсутствие. Для двух изолированных сервисов проверить bulk Delete Cancel (объекты остаются) и Confirm (оба удаляются).
+- Bans mutation: для уникального TEST-NET IP выполнить Create, Extend и Unban; denylist должен изменяться в API, строка исчезать после unban, а audit содержать `accesspolicy.unban`.
+- Administration mutation: создать и изменить изолированного user и role через modal, подтвердить API readback и permission selection; проверить, что modal permission clicks не перекрываются sidebar. Зафиксировать отсутствие Delete-кнопок как product gap, не подменять его API cleanup.
+- TLS mutation: создать certificate metadata через UI, связать с изолированным site, подтвердить оба объекта через API, затем удалить binding и certificate через UI и проверить cleanup.
+- Settings persistence: изменить `update_checks_enabled` через UI, подтвердить API и состояние после reload, затем восстановить исходное значение и повторно подтвердить API.
+- Anti-DDoS persistence: переключить model enabled, Save, проверить API/reload; задать invalid L7 status code 99 и убедиться, что API не изменился; восстановить полный исходный payload.
+
 - Login first paint: with cache disabled in DevTools, hard-refresh `/login` and `/login/2fa` for every saved appearance. Before the public appearance endpoint answers, the page may be blank but must never show the legacy centred login card; the first visible frame must use the selected theme.
 - Login first paint fallback: temporarily block `/api/public/login-appearance` and reload both login routes. The default themed appearance may be shown after the request fails, but no legacy layout may be painted at any point.
 - Login CSP: reload `/login` and `/login/2fa` with Console open. There must be no CSP violation for an inline `<style>` or inline `onerror` handler.
@@ -194,16 +215,16 @@
 Ожидает ручную UI/API/runtime-проверку
 
 - Management login: let an authenticated management session expire on `/dashboard` or another app page, then confirm the redirect goes through `/challenge` before `/login` so the login screen loads with CSS instead of a broken unstyled shell.
-РћР¶РёРґР°РµС‚ СЂСѓС‡РЅСѓСЋ UI/API/runtime-РїСЂРѕРІРµСЂРєСѓ
+Ожидает ручную UI/API/runtime-проверку
 
 - Management login: leave `/login` open until the antibot challenge is stale, then try password, passkey, or SSO sign-in and confirm the page re-enters challenge flow instead of failing with a raw `403`.
-РћР¶РёРґР°РµС‚ СЂСѓС‡РЅСѓСЋ UI/API/runtime-РїСЂРѕРІРµСЂРєСѓ
+Ожидает ручную UI/API/runtime-проверку
 
 - Management login 2FA: leave `/login/2fa` open until the challenge is stale, then submit the code or passkey and confirm the page refreshes challenge access before retrying instead of showing a late `403` or losing styles.
-РћР¶РёРґР°РµС‚ СЂСѓС‡РЅСѓСЋ UI/API/runtime-РїСЂРѕРІРµСЂРєСѓ
+Ожидает ручную UI/API/runtime-проверку
 
 - Duplicate-tab logout/session expiry: with two management tabs open, sign out or let the session expire from one tab and confirm the other tab recovers to a styled login/challenge flow rather than a CSS-less login page or inconsistent `403`.
-РћР¶РёРґР°РµС‚ СЂСѓС‡РЅСѓСЋ UI/API/runtime-РїСЂРѕРІРµСЂРєСѓ
+Ожидает ручную UI/API/runtime-проверку
 
 - Management UI: confirm Services and its `/static/js/pages/sites.js` module load after login; verify an ordinary service does not receive the management ModSecurity bypass.
 Ожидает ручную UI/API/runtime-проверку
@@ -376,3 +397,111 @@
 
 - [ ] Management UI: открыть `/login` и `/dashboard`, убедиться, что интерфейс и вход работают после включения CSP и защитных HTTP-заголовков.
 - [ ] API/runtime: проверить ответ management UI на наличие `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy: same-origin` и CSP без разрешённого внешнего происхождения.
+
+2026-07-23
+
+- [x] Services Basic Auth: в disposable stack добавить и удалить второго пользователя, сохранить v6 и TTL=5, подтвердить API readback, после reload проверить маску точной длины, reveal/hide исходного пароля и audit `easysiteprofile.auth_password.reveal` для текущего site. Targeted run: setup + desktop + mobile `3/3`, `--retries=0`.
+- [x] Browser auth state: запуск Playwright из package и из корня использует один абсолютный storage-state path; setup и dependent desktop/mobile projects не расходятся по working directory.
+- [x] Services list/update integrity: search и sort не меняют GET `/api/sites`, `name-asc` совпадает с API host/id ordering, а UI update хоста сохраняет исходный `site.id`. `services.spec.ts` desktop/mobile: `15/15`, `--retries=0`.
+- [x] Services help: открыть каждый из 20 chapter/frame/Auth/Anti-Bot help controls на desktop/mobile; dialog должен быть единственным по ID, получать focus, закрываться Escape с возвратом focus и кнопкой Close. DNSBL help должен иметь собственную кнопку и модалку. Targeted run: `3/3`, `--retries=0`.
+- [x] Services editor draft/cancel: изменить host/id/upstream, перейти Easy → Raw → Easy, проверить round-trip полей; верхняя и нижняя Back должны вернуть в список без создания site по API. Desktop/mobile: `3/3`, `--retries=0`.
+- [x] Services custom error pages: Disable all/Enable all должны переключать весь список, 404 — отключаться отдельно, Preview — открывать `/api/error-pages/preview/404`; после save/readback и compile/apply runtime 404 остается обычным, а 500 получает branded HTML и `Server-Timing`. Desktop/mobile: `2/2` каждый, без retry.
+- [x] Services responsive editor: пройти все 11 wizard tabs на desktop/mobile и проверить отсутствие горизонтального document/panel overflow и controls вне viewport. Blocking, Geo и ModSecurity grids должны сжиматься до одной колонки на узком экране. Targeted run: `3/3`, без retry.
+- [x] Services unsaved/keyboard: label host переводит focus в input, Tab — в Service ID; изменение формы активирует beforeunload и confirm на обеих Back. Dismiss сохраняет URL/draft, Accept выходит без API mutation, успешные Save/Delete не показывают повторный discard. Desktop/mobile navigation run: `5/5`, без retry.
+- [x] Services Anti-Bot preview: cookie показывает notice без popup; JavaScript v4 открывает `/api/error-pages/preview/antibot-v4`, captcha v4 — `/api/error-pages/preview/captcha-v4`; save/readback сохраняет captcha + v4. Desktop/mobile: `2/2` каждый, без retry.
+- [x] Services certificate: выбрать self-signed cert через import picker, получить ошибку на invalid ZIP, запросить export approval отдельным TOTP-пользователем, одобрить другим admin и скачать ZIP; сохранить TLS binding и подтвердить `/api/tls-configs`. Desktop/mobile: `2/2` каждый, без retry.
+
+- [x] Services validation/reference matrix: desktop/mobile submit отклоняет пустые Service ID/host/upstream host, port 0 и 65536, а также invalid upstream scheme; API отклоняет duplicate primary host, missing/nonexistent site reference и cross-site upstream reassignment без частичной записи. Targeted runs: desktop `2/2`, mobile `2/2`, `--retries=0`.
+- [x] Services Traffic/ModSecurity: включить request limit `1r/s` и custom ModSecurity rule в видимых вкладках, сохранить, подтвердить API profile readback и собственную active revision; runtime обязан вернуть `429` на flood и `403` на rule path. Desktop/mobile: `2/2` каждый, `--retries=0`.
+
+- [x] Administration → Users/Roles Delete: на desktop и mobile сначала отменить confirm и убедиться через API, что сущность сохранилась; затем подтвердить и проверить исчезновение строки, API absence, audit event и cleanup. Targeted browser run: `5/5`, `--retries=0`.
+- [x] Administration RBAC: пользователь без обеих write-permissions не видит Create/Edit/Delete; прямой DELETE защищён сервером сочетанием `administration.write` и соответствующего `administration.users.write`/`administration.roles.write`. Built-in admin и стандартные роли не имеют Delete-кнопки.
+
+- [x] Services list: select one/select all/unselect all, row navigation, Edit/Back и external service popup с точным URL подтверждены на desktop/mobile.
+- [x] Services import: selected ENV export, file chooser cancel без мутации, valid import, site/upstream API readback, editor prefill, cleanup и revision restore подтверждены на desktop/mobile.
+- [x] Services enable/disable: после UI-клика дождаться смены кнопки и API `enabled`; disabled host не должен попадать в upstream, enabled host должен снова вернуть upstream echo после active revision apply.
+- [x] Services resilience: normal, loading, empty и upstream 503 list states подтверждены на desktop/mobile.
+- [x] Services RBAC: роль только с resource read permissions видит список/просмотр, не видит mutation controls; прямой POST `/api/sites` возвращает 403.
+
+- [x] Dashboard API/runtime: deterministic seed подтверждает 24 hourly buckets и точное равенство requests/attacks/blocked series дневным totals; top IP/country/URL/error breakdowns непустые, Docker overview/logs читаются для реального контейнера.
+- [x] Dashboard widgets/details: Services, traffic counters, top lists, popular errors, containers, CPU и Memory открывают detail; modal закрывается overlay, Escape и кнопкой Close.
+- [x] Dashboard layout: initially-hidden widget сохраняется после reload; desktop resize изменяет geometry/localStorage и переживает reload, Reset возвращает normalized default; mobile не включает drag resize.
+- [x] Dashboard CPU/Memory: labels, used/free/total или cores/goroutines/heap, progress width и границы 0/fraction/100/>100 clamp подтверждены на desktop/mobile.
+- [x] Dashboard resilience: loading, upstream 503, empty, zero и partial payload визуально отрисовываются без пустого mount и без необработанной ошибки. Dashboard run 19/19, полный suite 133/133 без retry/skipped.
+
+- [x] Administration → Users: создать и изменить disposable пользователя, нажать Delete, подтвердить диалог; строка должна исчезнуть, API readback не должен содержать пользователя, audit должен содержать `administration.user.delete`, активные сессии пользователя должны быть отозваны. Built-in admin не должен иметь кнопку удаления.
+- [x] Administration → Roles: создать и изменить custom role, нажать Delete и подтвердить; API и таблица не должны содержать роль, audit должен содержать `administration.role.delete`. Стандартные и назначенные пользователям роли удалить нельзя.
+- [x] Browser infrastructure: общий helper подтверждает navigation/API payload/toast/modal/loading/error/stable-DOM ожидания на desktop/mobile; полный run 119/119 прошёл без retry.
+- [x] E2E cleanup/runtime: после mutation workflows не остаются Services/Bans/TLS/Administration объекты; active revision возвращается к исходной. Deterministic seed подтверждает Requests, Dashboard, Events и Audit.
+- [x] Runtime compile/apply: сервис с E2E host-map ключами сохраняется и удаляется без nginx `could not build map_hash`; active revision restore проходит после mutation.
+- [x] Browser E2E: disposable management host https://e2e-management.test:10443 открывает /login и все 12 реализованных вкладок; Chromium mapping направляет host на 127.0.0.1.
+- [x] Browser E2E: desktop и mobile suites завершены без зависания; лимит теста 20 минут, результат 58/58 passed на каждом viewport и 115/115 в объединённом reporter run вместе с setup.
+- [x] Dashboard: виджеты, widget picker, Memory/CPU labels, проценты, progress width и detail modal подтверждены E2E на disposable stack.
+- [x] Services: list refresh/search/sort/select-all, editor route, Easy/Raw, settings search, validation и Back подтверждены E2E.
+- [x] Bans: create modal, invalid IP validation и закрытие без записи объекта подтверждены E2E.
+- [ ] Ручная проверка Vivaldi: /login, /dashboard, /services, /bans; Chromium evidence не заменяет конкретный пользовательский браузер.
+- [ ] API/runtime: продолжить mutation/compiler assertions из .work/TASKS.md; текущие 100% относятся только к зарегистрированному browser/read-only набору.
+- [x] API/runtime: disposable Services mutation, compiler/runtime artifact parity, allowlist 200/403 behavior and settings/security-mode roundtrip were verified; helper evidence uses actual Compose container names and runtime-discovered attacker IPs.
+- [x] Settings → General → Language: через UI последовательно сохранить `en`, `ru`, `de`, `sr`, `zh`; после каждого сохранения проверить API `/api/settings/runtime`, reload и выбранное значение, затем восстановить исходную локаль. Desktop/mobile полный suite и stress run 11/11 прошли без retry.
+- [x] Settings language rerender: после смены языка дождаться завершения глобального `app:language-changed` rerender; новая кнопка Save и select должны быть интерактивны, без потери следующего клика из-за замены DOM.
+- [x] Browser coverage: registry показывает 100% зарегистрированного среза для Auth, Dashboard, Services, Requests, Bans, Revisions, Anti-DDoS, OWASP CRS, TLS, Administration, Events, Activity и Settings; Settings = 4/4.
+## 2026-07-23 — E2E этапы 5, 6 и 9
+
+- Bans: вручную проверить filter IP/site/country/module, Extend/Unban cancel и ошибки read-only пользователя; в API проверить, что 403 не меняет denylist.
+- Revisions: вручную проверить bulk Delete others, apply/delete confirmation и видимую ошибку read-only пользователя; в API проверить неизменность active revision после 403.
+- TLS: вручную проверить approval ID, повторную проверку approval, invalid/valid TOTP и ZIP download на desktop/mobile; в API проверить distinct approver, fresh step-up и auto-renew 1..365.
+- Browser infrastructure: проверить, что auth state сохраняется в `e2e/browser/.auth`, а очистка `test-results` не ломает последующие проекты.
+## 2026-07-23 — E2E этап 11 Events
+
+- Events: проверить type/severity/site/date filters и reset, page size и переход на страницу 2 с `aria-current`.
+- Detail: открыть строку мышью, Enter и Space; закрыть Escape, overlay и кнопкой; проверить все related fields/details JSON.
+- API/UI resilience: проверить RFC3339 validation, loading, empty, 503 и malformed payload без разрушения sidebar/shell.
+## 2026-07-23 — E2E этап 12 Activity/Audit
+
+- Activity: проверить presets all time/last hour/last day, category/actor/site/status/date filters и reset.
+- Pagination: выбрать 25, пройти Next/Previous и сверить page info с API total/offset.
+- API resilience: проверить invalid date/status/category/offset, limit clamp 500, loading/empty/503/malformed без разрушения shell.
+- Audit evidence: точечно проверить actions Bans, Revisions, Anti-DDoS, CRS, TLS и Administration.
+## 2026-07-23 — E2E этап 13 Settings
+
+- Storage/Security: проверить retention, indexes streams, login rate ranges, direct-IP/Vault/export toggles, reload и restore; invalid mixed PUT не должен частично сохраняться.
+- Logging/Secrets: проверить file/OpenSearch/ClickHouse routes/migration, masked placeholders и show/hide; masked Vault save не должен делать network write.
+- Management Hosts: проверить enabled-site ownership, invalid/unowned/stale version, add/remove, drift/apply-required и восстановление.
+- Appearance/Updates: проверить login/2FA/healthcheck previews, save/reload и update-check success/disabled/offline.
+
+## 2026-07-23 — E2E этап 14 Cross-module/security
+
+- [x] Settings initial hydration: при открытии любой панели `#settings-page` должен иметь `aria-busy=true` и быть `inert`; после загрузки runtime — `aria-busy=false`, `data-runtime-ready=true`, после чего controls принимают ввод без возврата к дефолтам.
+- [x] Session/RBAC: удалить disposable reader с активной сессией, проверить отзыв сессии и возврат на login с причиной; reader читает разрешённые endpoint, а критические writes получают server-side `403`.
+- [x] Compile/apply/rollback: по отдельности изменить Settings, Services, TLS и Anti-DDoS, скомпилировать candidate, применить, сверить active revision и вернуть исходную; management host и обычный upstream должны оставаться доступны.
+- [x] Runtime reload: после SIGHUP readiness должен подтвердить точный `X-WAF-Runtime-Revision` через новое соединение, не принимая ответ keep-alive старого worker.
+- [x] Resilience/i18n: проверить `429`, `403`, `5xx`, malformed и slow API без разрушения shell; Dashboard, Events, Activity, Settings и modal проверить во всех `ru/en/zh/de/sr`.
+- [x] Security headers: вручную сверить CSP, защитные headers, cookie flags `Secure`/`HttpOnly`/`SameSite` и отсутствие password/session ID в DOM и console.
+- [x] Evidence: cross-module desktop/mobile `11/11`; объединённый этапов 11–14 `41/41` за 5.7 минуты, без retry/flaky/skipped.
+
+## 2026-07-23 — повторный строгий аудит Этапа 0
+
+- [x] Services enable/disable: проверить реальный порядок Easy profile/site, API `enabled`, состояние Toggle и runtime. Подтверждено targeted `2/2`: disabled host возвращает branded 421 с revision header и не достигает upstream; enabled host возвращает реальный upstream HTTP 200.
+- [x] Dashboard CPU/Memory: заголовок должен точно соответствовать текущей локали `en/ru/de/sr/zh`; summary metrics и каждая process row/PID должны совпадать с live `/api/dashboard/stats`. Targeted `3/3` green.
+- [x] Events localization: Dashboard/Events/Activity/Settings chrome и Events detail modal проверены для пяти локалей; динамические audit actions не трактуются как i18n keys. Targeted `2/2` green.
+- [x] Bans: self-seeded 12-IP policy обязан дать 10+2 строки, mouse/Enter/Space detail и cancel без мутации; invalid duration не отправляет `/ban` POST. Targeted оба сценария `2/2` green.
+- [x] TLS export: invalid TOTP обязан вернуть 401, не отправить export POST и не создать download; valid fresh TOTP создаёт ровно один ZIP download. Targeted `2/2` green.
+- [x] Anti-DDoS logs: выбранная реальная security row обязана совпасть по пяти значениям с 11-полевым detail modal. Targeted `2/2` green.
+- [ ] Ручной/UI остаток: после нового full shard run проверить artifacts каждого отдельного Compose project и отсутствие global language/settings/revision drift между shard.
+- [ ] API/runtime остаток: повторить live Events filter/pagination после cache fallback fix; затем выполнить полный API registry evidence и aggregate coverage.
+
+## 2026-07-24 — Stage 0 final strict evidence
+
+- [x] Services → Anti-Bot → Protection order: choose `Anti-bot first`, save, verify `/api/easy-site-profiles/:siteID` returns `security_auth_basic.auth_order=antibot_first`, reload the editor and confirm the same selected option on desktop and mobile. This caught and fixed the missing runtime-hydration mapping on 2026-07-24; fresh strict result `3/3`, no skipped/flaky/retries.
+- [x] Services → Front → incoming mTLS: on a disposable stack upload a trusted client CA through the product API, enable required client-certificate verification, explicitly compile/apply, and verify the live HTTPS WAF rejects a client without a certificate, proxies a client bearing a certificate issued by that CA, then permits the no-certificate client again after disable and a second compile/apply. Fresh tagged evidence: `TestE2EIncomingMTLSClientCertificateRuntime`, `1/1`, JSON `test-results/strict-audit/stage3-incoming-mtls/go-results.json`.
+- [x] Services → every select field: change security/profile/CA, upstream scheme, rate unit, ban scope, Anti-Bot template/challenge/escalation and Authentication mode/order/template/TTL; save, verify the exact Easy Profile and upstream API values, reload, and confirm every selected value again on desktop and mobile. Fresh disposable proof `3/3`, strict JSON `test-results/strict-audit/stage3-selects/results.json`; `r/m` is now a supported persisted value rather than a silent fallback to `100r/s`.
+- [x] Services → runtime behavioral protections: on a fresh stack persist and explicitly apply an Anti-Bot captcha profile using `1r/m`; require redirect, challenge page and verify-cookie behavior through WAF, then check Geo, unknown-host, ACME HTTP-01 and direct-IP runtime responses. Tagged `TestE2EBehavioral` passed `6/6` in 49.643 s; JSON `test-results/strict-audit/stage3-behavioral/go-results.json`.
+- [x] Services → Virtual Patches: add URI/block patch, verify API readback, reload and see the patch, delete it and verify API absence on desktop/mobile. The tagged runtime check must then prove the explicit compile/apply changes the real WAF response from `403` to `200` after removal.
+
+- [x] Dashboard fresh-stack telemetry: before opening Dashboard, append deterministic runtime access-log entries spanning 24 hours and two sites; require non-empty top attacker IP/country/URL/error widgets, then confirm desktop/mobile `dashboard.spec.ts` opens details and preserves all data. The 2026-07-24 disposable proof completed `19/19` with no skipped/flaky/retries; API/runtime proof additionally generated a real anti-bot response from the attacker container and observed it in Dashboard.
+
+- [x] Browser shards are self-contained: Activity creates its own audit mutations and pagination rows; Management Hosts creates and removes its own site/host; resilience pages reuse the authenticated context. Four fresh stacks completed core `119/119`, services `45/45`, platform `51/51`, and settings-cross `29/29` with zero skipped, flaky, retries, or failures.
+- [x] Runtime mutation proof: Services enable/disable, compiler/apply, L7 policy, Bans, Revisions, Events, Activity, Settings, TLS, and RBAC assertions exercised API readback and the real WAF runtime. Auto-start creates a disposable site/upstream, applies the revision, and now requires a real HTTP `429` from the runtime HTTP listener.
+- [x] Direct-IP contract: the behavioral workflow uses an unclaimed loopback Host on the same mapped runtime port, so it verifies the default-server branded `421` response when disabled and a dropped connection when direct-IP blocking is enabled; it cannot accidentally target a site created by another E2E.
+- [x] Fresh onboarding contract: an independent stack without bootstrap admin completes admin bootstrap, service/upstream creation, self-signed certificate binding, compile/apply, and authenticated HTTPS login.
+- [x] Manual follow-up: when validating a deployed environment, verify that an unclaimed direct-IP Host receives the branded `421` page while direct-IP blocking is disabled and is dropped after enabling it; do not use a host currently mapped to a test or production site.

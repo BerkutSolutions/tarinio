@@ -76,11 +76,11 @@ function shouldSkipInternalSite(siteID) {
 function buildPageButtons(totalPages, currentPage, dataAttr) {
   const pages = [];
   for (let page = 1; page <= Math.min(10, totalPages); page += 1) {
-    pages.push(`<button type="button" class="btn ghost btn-sm${page === currentPage ? " active" : ""}" ${dataAttr}="${page}">${page}</button>`);
+    pages.push(`<button type="button" class="btn ghost btn-sm${page === currentPage ? " active" : ""}" ${dataAttr}="${page}"${page === currentPage ? ' aria-current="page"' : ""}>${page}</button>`);
   }
   if (totalPages > 10) {
     pages.push(`<span class="muted">...</span>`);
-    pages.push(`<button type="button" class="btn ghost btn-sm${totalPages === currentPage ? " active" : ""}" ${dataAttr}="${totalPages}">${totalPages}</button>`);
+    pages.push(`<button type="button" class="btn ghost btn-sm${totalPages === currentPage ? " active" : ""}" ${dataAttr}="${totalPages}"${totalPages === currentPage ? ' aria-current="page"' : ""}>${totalPages}</button>`);
   }
   return pages.join("");
 }
@@ -395,4 +395,3 @@ export async function renderEvents(container, ctx) {
     renderRows([], new Map());
   }
 }
-

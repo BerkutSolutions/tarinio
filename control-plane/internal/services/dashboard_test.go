@@ -139,6 +139,26 @@ func TestDashboardService_RuntimeSummaryIsAuthoritativeForAttackWidgets(t *testi
 	}
 }
 
+func TestDashboardObservationWindowMatchesTwentyFourBuckets(t *testing.T) {
+	now := time.Date(2026, time.July, 23, 10, 37, 0, 0, time.UTC)
+	start := dashboardObservationStart(now)
+	if want := time.Date(2026, time.July, 22, 11, 0, 0, 0, time.UTC); !start.Equal(want) {
+		t.Fatalf("observation start=%s want=%s", start, want)
+	}
+	values := map[time.Time]int{start: 3, now.Truncate(time.Hour): 5}
+	series := buildHourlySeries(values, now)
+	if len(series) != 24 {
+		t.Fatalf("hourly buckets=%d want=24", len(series))
+	}
+	total := 0
+	for _, bucket := range series {
+		total += bucket.Count
+	}
+	if total != 8 {
+		t.Fatalf("series total=%d want=8", total)
+	}
+}
+
 func TestDashboardService_StatsExposeCurrentWidgetData(t *testing.T) {
 	now := time.Now().UTC()
 	requests := &fakeDashboardRequestCollector{

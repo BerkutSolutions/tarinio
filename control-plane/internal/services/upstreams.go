@@ -72,6 +72,15 @@ func (s *UpstreamService) Update(ctx context.Context, item upstreams.Upstream) (
 	if err := s.ensureSiteExists(item.SiteID); err != nil {
 		return upstreams.Upstream{}, err
 	}
+	items, err := s.store.List()
+	if err != nil {
+		return upstreams.Upstream{}, err
+	}
+	for _, existing := range items {
+		if existing.ID == item.ID && existing.SiteID != item.SiteID {
+			return upstreams.Upstream{}, fmt.Errorf("upstream %s belongs to site %s", item.ID, existing.SiteID)
+		}
+	}
 	updated, err = s.store.Update(item)
 	if err != nil {
 		return updated, err

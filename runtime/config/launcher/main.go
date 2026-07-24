@@ -23,6 +23,7 @@ const runtimeAuthHeader = "X-WAF-Runtime-Token"
 const legacyRuntimeAuthHeader = "X-WAF-Internal-Token"
 const defaultBootstrapUIUpstream = "http://ui:80"
 const runtimeProxyReadinessPath = "/__waf_runtime/readiness"
+const runtimeProxyRevisionTimeout = 15 * time.Second
 
 func bootstrapUIUpstream() string {
 	if v := strings.TrimSpace(os.Getenv("WAF_BOOTSTRAP_UI_UPSTREAM")); v != "" {
@@ -163,7 +164,7 @@ func (p *runtimeProcess) reloadCurrent() error {
 	// this bounded well below the control-plane request timeout so an invalid
 	// candidate fails and rolls back promptly instead of leaving apply callers
 	// waiting through transport retries.
-	if err := waitForHTTPProxyRevision(pointer.RevisionID, 5*time.Second); err != nil {
+	if err := waitForHTTPProxyRevision(pointer.RevisionID, runtimeProxyRevisionTimeout); err != nil {
 		runtimeProm.recordReload("failed")
 		return err
 	}
@@ -187,7 +188,13 @@ func waitForHTTPProxyRevisionAt(endpoint, revisionID string, timeout time.Durati
 		return errors.New("runtime revision id is required for reload readiness")
 	}
 	deadline := time.Now().Add(timeout)
-	client := &http.Client{Timeout: 500 * time.Millisecond}
+	// Never reuse a readiness connection across reload attempts. An nginx
+	// worker that is draining after SIGHUP may keep an existing keep-alive
+	// connection open and continue returning the previous revision marker even
+	// though new workers already serve the activated revision.
+	transport := &http.Transport{DisableKeepAlives: true}
+	defer transport.CloseIdleConnections()
+	client := &http.Client{Timeout: 500 * time.Millisecond, Transport: transport}
 	var lastErr error
 	for time.Now().Before(deadline) {
 		request, err := http.NewRequest(http.MethodGet, endpoint, nil)
@@ -195,6 +202,7 @@ func waitForHTTPProxyRevisionAt(endpoint, revisionID string, timeout time.Durati
 			return err
 		}
 		request.Host = "runtime-readiness.local"
+		request.Close = true
 		response, err := client.Do(request)
 		if err == nil {
 			_ = response.Body.Close()

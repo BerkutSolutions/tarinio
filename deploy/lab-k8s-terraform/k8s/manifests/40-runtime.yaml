@@ -23,6 +23,9 @@ spec:
       labels:
         app: runtime
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: runtime
           image: tarinio-runtime:lab
@@ -34,6 +37,7 @@ spec:
                 - ALL
               add:
                 - NET_ADMIN
+            readOnlyRootFilesystem: true
           ports:
             - containerPort: 80
             - containerPort: 443
@@ -107,6 +111,10 @@ spec:
               readOnly: true
             - name: waf-request-archive-data
               mountPath: /var/lib/waf-request-archive
+            - name: runtime-state
+              mountPath: /etc/waf
+            - name: runtime-tmp
+              mountPath: /tmp
       volumes:
         - name: waf-runtime-data
           persistentVolumeClaim:
@@ -114,6 +122,10 @@ spec:
         - name: waf-request-archive-data
           persistentVolumeClaim:
             claimName: waf-request-archive-data
+        - name: runtime-state
+          emptyDir: {}
+        - name: runtime-tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

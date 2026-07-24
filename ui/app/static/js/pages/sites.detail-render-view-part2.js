@@ -126,7 +126,10 @@ export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
                             <h3>${escapeHtml(ctx.t("sites.easy.traffic.frame.blacklists"))}</h3>
                             <div class="muted" style="font-size:12px;margin-top:2px;">${escapeHtml(ctx.t("sites.easy.traffic.frame.blacklists.subtitle"))}</div>
                           </div>
-                          <button class="waf-help-icon-btn" type="button" id="service-traffic-blacklist-help-btn" title="${escapeHtml(ctx.t("sites.easy.traffic.blacklist.help.open"))}" aria-label="${escapeHtml(ctx.t("sites.easy.traffic.blacklist.help.open"))}">?</button>
+                          <div class="waf-actions">
+                            <button class="waf-help-icon-btn" type="button" id="service-traffic-blacklist-help-btn" title="${escapeHtml(ctx.t("sites.easy.traffic.blacklist.help.open"))}" aria-label="${escapeHtml(ctx.t("sites.easy.traffic.blacklist.help.open"))}">?</button>
+                            <button class="waf-help-icon-btn" type="button" id="service-traffic-dnsbl-help-btn" title="${escapeHtml(ctx.t("sites.easy.traffic.dnsbl.help.open"))}" aria-label="${escapeHtml(ctx.t("sites.easy.traffic.dnsbl.help.open"))}">?</button>
+                          </div>
                         </div>
                       </div>
                       <div class="waf-card-body">
@@ -160,7 +163,7 @@ export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
                 ${renderTrafficBadBehaviorHelpModal(ctx)}
                 ${renderTrafficLimitsHelpModal(ctx)}
                 ${renderTrafficBlacklistHelpModal(ctx)}
-                ${renderTrafficAllowlistHelpModal(ctx, escapeHtml)}
+                ${renderTrafficDnsblHelpModal(ctx)}
               </section>
 
                             <section class="waf-stack waf-service-compact-section${state.activeTab === "blocking" ? "" : " waf-hidden"}" data-tab-panel="blocking">

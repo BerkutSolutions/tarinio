@@ -1,5 +1,5 @@
 import { confirmAction, setError, setLoading } from "../ui.js";
-import { normalizeArray, go } from "./sites.routing-merge.js";
+import { normalizeArray, go, routeBase } from "./sites.routing-merge.js";
 import {
   applyServiceProfilePresetForMissingFields,
   applyServiceProfilePresetToDraft,
@@ -62,6 +62,8 @@ import {
   validateDraft,
 } from "./sites.stable-resources.js";
 import { downloadBlob } from "./sites.import-pipeline.js";
+import { installUnsavedChangesGuard } from "./sites.unsaved-guard.js";
+import { bindVirtualPatchesEditor } from "./sites.virtual-patches-bindings.js";
 
 export function bindStableDetail(container, state, ctx, deps) {
   const { load, render } = deps;
@@ -107,6 +109,13 @@ export function bindStableDetail(container, state, ctx, deps) {
     upstreamInput,
     computeUpstreamID
   );
+  const unsavedGuard = installUnsavedChangesGuard({
+    container,
+    state,
+    message: ctx.t("sites.confirm.discardChanges"),
+    confirmAction,
+    navigate: () => go(routeBase()),
+  });
 
   bindDetailCore(container, state, ctx, {
     go,
@@ -122,6 +131,7 @@ export function bindStableDetail(container, state, ctx, deps) {
     applyServiceProfilePresetToDraft,
     toggleCertificateImportActions: toggleCertificateImportActionsModule,
     highlightSelector: highlightSelectorModule,
+    back: unsavedGuard.back,
   });
 
   bindDetailBulkDelete(container, state, ctx, { load, deleteServiceWithResources });
@@ -163,6 +173,7 @@ export function bindStableDetail(container, state, ctx, deps) {
     draftToEasyProfile,
     go,
     deleteServiceWithResources,
+    clearUnsavedChanges: unsavedGuard.clear,
   });
 
   bindDetailRuleEvents({
@@ -179,6 +190,8 @@ export function bindStableDetail(container, state, ctx, deps) {
     normalizeBanEscalationStages,
     setError,
   });
+
+  bindVirtualPatchesEditor(container, state, ctx, render);
 
   if (state.highlightedSelector) {
     window.setTimeout(() => highlightSelectorModule(container, state.highlightedSelector), 30);

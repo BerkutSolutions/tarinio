@@ -1,6 +1,6 @@
 import { escapeHtml, formatDate } from "../ui.js";
 
-export function renderUsersTable(users, roles, ctx) {
+export function renderUsersTable(users, roles, ctx, canWrite = true) {
   const roleNames = new Map((Array.isArray(roles) ? roles : []).map((role) => [
     String(role?.id || ""),
     formatRoleLabel(ctx, role)
@@ -20,7 +20,8 @@ export function renderUsersTable(users, roles, ctx) {
         <td>${escapeHtml(user?.is_active === false ? ctx.t("administration.users.status.disabled") : ctx.t("administration.users.status.active"))}</td>
         <td>${escapeHtml(formatDate(user?.last_login_at || ""))}</td>
         <td>
-          <button class="btn ghost btn-sm" type="button" data-user-edit="${escapeHtml(userID)}">${escapeHtml(ctx.t("common.edit"))}</button>
+          ${canWrite ? `<button class="btn ghost btn-sm" type="button" data-user-edit="${escapeHtml(userID)}">${escapeHtml(ctx.t("common.edit"))}</button>` : ""}
+          ${canWrite && !user?.is_builtin ? `<button class="btn danger btn-sm" type="button" data-user-delete="${escapeHtml(userID)}">${escapeHtml(ctx.t("common.delete"))}</button>` : ""}
         </td>
       </tr>
     `;
@@ -46,7 +47,7 @@ export function renderUsersTable(users, roles, ctx) {
   `;
 }
 
-export function renderRolesTable(roles, ctx) {
+export function renderRolesTable(roles, ctx, canWrite = true) {
   const rows = (Array.isArray(roles) ? roles : []).map((role) => {
     const roleID = String(role?.id || "").trim();
     const perms = Array.isArray(role?.permissions) ? role.permissions : [];
@@ -56,7 +57,8 @@ export function renderRolesTable(roles, ctx) {
         <td>${escapeHtml(formatRoleLabel(ctx, role))}</td>
         <td>${escapeHtml(ctx.t("administration.roles.permissionSummary", { count: String(perms.length) }))}</td>
         <td>
-          <button class="btn ghost btn-sm" type="button" data-role-edit="${escapeHtml(roleID)}">${escapeHtml(ctx.t("common.edit"))}</button>
+          ${canWrite ? `<button class="btn ghost btn-sm" type="button" data-role-edit="${escapeHtml(roleID)}">${escapeHtml(ctx.t("common.edit"))}</button>` : ""}
+          ${canWrite && !["admin", "auditor", "manager", "soc"].includes(roleID) ? `<button class="btn danger btn-sm" type="button" data-role-delete="${escapeHtml(roleID)}">${escapeHtml(ctx.t("common.delete"))}</button>` : ""}
         </td>
       </tr>
     `;

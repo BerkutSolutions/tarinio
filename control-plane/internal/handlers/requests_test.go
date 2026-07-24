@@ -102,7 +102,7 @@ func TestRequestsHandler_CountFallsBackToItemsLength(t *testing.T) {
 	}
 }
 
-func TestRequestsHandler_UsesCachedRowsOnCollectorFailure(t *testing.T) {
+func TestRequestsHandler_ReportsCollectorFailureAfterSuccessfulRead(t *testing.T) {
 	collector := &fakeRequestCollector{
 		items: []map[string]any{{"id": "req-1"}},
 	}
@@ -121,8 +121,8 @@ func TestRequestsHandler_UsesCachedRowsOnCollectorFailure(t *testing.T) {
 	secondReq := httptest.NewRequest(http.MethodGet, "/api/requests?limit=5", nil)
 	secondResp := httptest.NewRecorder()
 	handler.ServeHTTP(secondResp, secondReq)
-	if secondResp.Code != http.StatusOK {
-		t.Fatalf("expected cached response 200, got %d", secondResp.Code)
+	if secondResp.Code != http.StatusBadGateway {
+		t.Fatalf("expected backend failure 502, got %d", secondResp.Code)
 	}
 }
 

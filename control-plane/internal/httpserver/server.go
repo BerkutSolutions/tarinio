@@ -102,6 +102,8 @@ func New(
 	certificateExportHandler.SetApprovalRequiredProvider(handlers.CertificateExportApprovalRequired)
 	administrationUsersHandler := handlers.NewAdministrationUsersHandlerWithSessions(userStore, roleStore, sessionStore)
 	administrationRolesHandler := handlers.NewAdministrationRolesHandler(roleStore, userStore)
+	administrationUsersHandler.SetAuditEmitter(auditService)
+	administrationRolesHandler.SetAuditEmitter(auditService)
 	zeroTrustHealthHandler := handlers.NewZeroTrustHealthHandler(userStore, roleStore)
 	detailedHealthHandler := handlers.NewHealthHandler(revisionService, revisionCatalogService, setupService, sessionStore, userStore, roleStore, revisionCompileService, runtimeReadyProbe, runtimeSecurityProbe, runtimeRequestProbe, runtimeCRSService)
 	mux.Handle("/healthz", handlers.NewLivenessHandler())
@@ -143,15 +145,17 @@ func New(
 		http.MethodGet:    {rbac.PermissionSettingsStorageRead},
 		http.MethodDelete: {rbac.PermissionSettingsStorageWrite},
 	}, settingsRuntimeHandler))
+	owaspCRSHandler := handlers.NewOWASPCRSHandler(runtimeCRSService)
+	owaspCRSHandler.SetAuditEmitter(auditService)
 	mux.Handle("/api/owasp-crs/status", withMethodAllPermissions(authService, map[string][]rbac.Permission{
 		http.MethodGet: {rbac.PermissionOWASPCRSRead, rbac.PermissionPoliciesRead},
-	}, handlers.NewOWASPCRSHandler(runtimeCRSService)))
+	}, owaspCRSHandler))
 	mux.Handle("/api/owasp-crs/check-updates", withMethodAllPermissions(authService, map[string][]rbac.Permission{
 		http.MethodPost: {rbac.PermissionOWASPCRSRead, rbac.PermissionPoliciesRead},
-	}, handlers.NewOWASPCRSHandler(runtimeCRSService)))
+	}, owaspCRSHandler))
 	mux.Handle("/api/owasp-crs/update", withMethodAllPermissions(authService, map[string][]rbac.Permission{
 		http.MethodPost: {rbac.PermissionOWASPCRSWrite, rbac.PermissionPoliciesWrite},
-	}, handlers.NewOWASPCRSHandler(runtimeCRSService)))
+	}, owaspCRSHandler))
 	mux.Handle("/api/auth/bootstrap", handlers.NewAuthHandler(authService))
 	mux.Handle("/api/auth/login", handlers.NewAuthHandler(authService))
 	mux.Handle("/api/auth/login/2fa", handlers.NewAuthHandler(authService))
@@ -323,16 +327,18 @@ func New(
 		http.MethodPost: {rbac.PermissionAdministrationWrite, rbac.PermissionAdministrationUsersWrite},
 	}, administrationUsersHandler))
 	mux.Handle("/api/administration/users/", withMethodAllPermissions(authService, map[string][]rbac.Permission{
-		http.MethodGet: {rbac.PermissionAdministrationRead, rbac.PermissionAdministrationUsersRead},
-		http.MethodPut: {rbac.PermissionAdministrationWrite, rbac.PermissionAdministrationUsersWrite},
+		http.MethodGet:    {rbac.PermissionAdministrationRead, rbac.PermissionAdministrationUsersRead},
+		http.MethodPut:    {rbac.PermissionAdministrationWrite, rbac.PermissionAdministrationUsersWrite},
+		http.MethodDelete: {rbac.PermissionAdministrationWrite, rbac.PermissionAdministrationUsersWrite},
 	}, administrationUsersHandler))
 	mux.Handle("/api/administration/roles", withMethodAllPermissions(authService, map[string][]rbac.Permission{
 		http.MethodGet:  {rbac.PermissionAdministrationRead, rbac.PermissionAdministrationRolesRead},
 		http.MethodPost: {rbac.PermissionAdministrationWrite, rbac.PermissionAdministrationRolesWrite},
 	}, administrationRolesHandler))
 	mux.Handle("/api/administration/roles/", withMethodAllPermissions(authService, map[string][]rbac.Permission{
-		http.MethodGet: {rbac.PermissionAdministrationRead, rbac.PermissionAdministrationRolesRead},
-		http.MethodPut: {rbac.PermissionAdministrationWrite, rbac.PermissionAdministrationRolesWrite},
+		http.MethodGet:    {rbac.PermissionAdministrationRead, rbac.PermissionAdministrationRolesRead},
+		http.MethodPut:    {rbac.PermissionAdministrationWrite, rbac.PermissionAdministrationRolesWrite},
+		http.MethodDelete: {rbac.PermissionAdministrationWrite, rbac.PermissionAdministrationRolesWrite},
 	}, administrationRolesHandler))
 	mux.Handle("/api/administration/zero-trust/health", withMethodAllPermissions(authService, map[string][]rbac.Permission{
 		http.MethodGet: {rbac.PermissionHealthcheckRead},

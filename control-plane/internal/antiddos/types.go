@@ -217,6 +217,9 @@ func ValidateSettings(item Settings) error {
 			return fmt.Errorf("anti-ddos ports contains invalid value %d", port)
 		}
 	}
+	if item.UseL4Guard && len(item.Ports) == 0 {
+		return errors.New("anti-ddos ports must contain at least one valid port when l4 guard is enabled")
+	}
 	if item.DestinationIP != "" && net.ParseIP(item.DestinationIP) == nil {
 		return errors.New("anti-ddos destination_ip must be a valid ip address")
 	}
@@ -227,8 +230,8 @@ func ValidateSettings(item Settings) error {
 		if item.L7Burst < 0 {
 			return errors.New("anti-ddos l7_burst must be zero or positive")
 		}
-		if item.L7StatusCode <= 0 {
-			return errors.New("anti-ddos l7_status_code must be positive")
+		if item.L7StatusCode < 100 || item.L7StatusCode > 599 {
+			return errors.New("anti-ddos l7_status_code must be between 100 and 599")
 		}
 	}
 	if item.ModelEnabled {
@@ -342,4 +345,3 @@ func envFloatOrDefault(key string, fallback float64) float64 {
 	}
 	return value
 }
-

@@ -1,0 +1,20 @@
+{
+  "name": "waf-browser-e2e",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "test": "node scripts/run-tests.mjs",
+    "test:strict": "node scripts/run-tests.mjs",
+    "test:smoke": "playwright test tests/smoke.spec.ts",
+    "test:dashboard": "playwright test tests/dashboard.spec.ts",
+    "test:services": "playwright test tests/services.spec.ts",
+    "coverage": "node scripts/coverage.mjs",
+    "test:coverage": "node --test scripts/coverage-lib.test.mjs",
+    "test:strict-results": "node --test scripts/strict-results-lib.test.mjs",
+    "verify:results": "node scripts/verify-results.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.52.0"
+  }
+}

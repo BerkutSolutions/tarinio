@@ -23,6 +23,9 @@ func parseLoggingSettings(raw map[string]any, current loggingconfig.Settings, pe
 	}
 	current = loggingconfig.Normalize(current)
 	incoming = loggingconfig.Normalize(incoming)
+	hasNewVaultSecrets := (strings.TrimSpace(incoming.ClickHouse.Password) != "" && strings.TrimSpace(incoming.ClickHouse.Password) != loggingconfig.MaskedSecretValue) ||
+		(strings.TrimSpace(incoming.OpenSearch.Password) != "" && strings.TrimSpace(incoming.OpenSearch.Password) != loggingconfig.MaskedSecretValue) ||
+		(strings.TrimSpace(incoming.OpenSearch.APIKey) != "" && strings.TrimSpace(incoming.OpenSearch.APIKey) != loggingconfig.MaskedSecretValue)
 	if strings.TrimSpace(current.Vault.Address) != "" &&
 		strings.TrimSpace(current.Vault.Address) != strings.TrimSpace(incoming.Vault.Address) &&
 		strings.TrimSpace(incoming.Vault.Token) == loggingconfig.MaskedSecretValue {
@@ -108,8 +111,8 @@ func parseLoggingSettings(raw map[string]any, current loggingconfig.Settings, pe
 	if incoming.Vault.TLSSkipVerify && !allowInsecureVaultTLS {
 		return loggingconfig.Settings{}, fmt.Errorf("vault tls_skip_verify is disabled by security policy")
 	}
-	if incoming.SecretProvider == loggingconfig.SecretProviderVault && incoming.Vault.Enabled {
-		if err := storeLoggingSecretsInVault(incoming); err != nil {
+	if incoming.SecretProvider == loggingconfig.SecretProviderVault && incoming.Vault.Enabled && hasNewVaultSecrets {
+		if err := storeLoggingSecretsInVault(incoming, pepper); err != nil {
 			return loggingconfig.Settings{}, err
 		}
 		incoming.ClickHouse.PasswordEnc = ""
@@ -122,10 +125,10 @@ func parseLoggingSettings(raw map[string]any, current loggingconfig.Settings, pe
 	return loggingconfig.Normalize(incoming), nil
 }
 
-func storeLoggingSecretsInVault(input loggingconfig.Settings) error {
+func storeLoggingSecretsInVault(input loggingconfig.Settings, pepper string) error {
 	token := strings.TrimSpace(input.Vault.Token)
 	if token == "" && strings.TrimSpace(input.Vault.TokenEnc) != "" {
-		decrypted, err := secretcrypto.Decrypt("waf:logging:vault:token", input.Vault.TokenEnc, strings.TrimSpace(runtimeSettingsState.pepper))
+		decrypted, err := secretcrypto.Decrypt("waf:logging:vault:token", input.Vault.TokenEnc, strings.TrimSpace(pepper))
 		if err != nil {
 			return fmt.Errorf("decrypt vault token: %w", err)
 		}
@@ -133,7 +136,7 @@ func storeLoggingSecretsInVault(input loggingconfig.Settings) error {
 	}
 	clickhousePassword := strings.TrimSpace(input.ClickHouse.Password)
 	if clickhousePassword == "" && strings.TrimSpace(input.ClickHouse.PasswordEnc) != "" {
-		decrypted, err := secretcrypto.Decrypt("waf:logging:clickhouse", input.ClickHouse.PasswordEnc, strings.TrimSpace(runtimeSettingsState.pepper))
+		decrypted, err := secretcrypto.Decrypt("waf:logging:clickhouse", input.ClickHouse.PasswordEnc, strings.TrimSpace(pepper))
 		if err != nil {
 			return fmt.Errorf("decrypt clickhouse password: %w", err)
 		}
@@ -141,7 +144,7 @@ func storeLoggingSecretsInVault(input loggingconfig.Settings) error {
 	}
 	opensearchPassword := strings.TrimSpace(input.OpenSearch.Password)
 	if opensearchPassword == "" && strings.TrimSpace(input.OpenSearch.PasswordEnc) != "" {
-		decrypted, err := secretcrypto.Decrypt("waf:logging:opensearch:password", input.OpenSearch.PasswordEnc, strings.TrimSpace(runtimeSettingsState.pepper))
+		decrypted, err := secretcrypto.Decrypt("waf:logging:opensearch:password", input.OpenSearch.PasswordEnc, strings.TrimSpace(pepper))
 		if err != nil {
 			return fmt.Errorf("decrypt opensearch password: %w", err)
 		}
@@ -149,7 +152,7 @@ func storeLoggingSecretsInVault(input loggingconfig.Settings) error {
 	}
 	opensearchAPIKey := strings.TrimSpace(input.OpenSearch.APIKey)
 	if opensearchAPIKey == "" && strings.TrimSpace(input.OpenSearch.APIKeyEnc) != "" {
-		decrypted, err := secretcrypto.Decrypt("waf:logging:opensearch:api_key", input.OpenSearch.APIKeyEnc, strings.TrimSpace(runtimeSettingsState.pepper))
+		decrypted, err := secretcrypto.Decrypt("waf:logging:opensearch:api_key", input.OpenSearch.APIKeyEnc, strings.TrimSpace(pepper))
 		if err != nil {
 			return fmt.Errorf("decrypt opensearch api key: %w", err)
 		}

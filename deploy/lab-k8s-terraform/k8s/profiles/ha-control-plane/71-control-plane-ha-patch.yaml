@@ -6,8 +6,17 @@ spec:
   replicas: 2
   template:
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: control-plane
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
           env:
             - name: CONTROL_PLANE_HA_ENABLED
               value: "true"
@@ -38,7 +47,11 @@ spec:
             - name: redis-tls
               mountPath: /etc/redis-tls
               readOnly: true
+            - name: control-plane-tmp
+              mountPath: /tmp
       volumes:
         - name: redis-tls
           secret:
             secretName: tarinio-lab-redis-tls
+        - name: control-plane-tmp
+          emptyDir: {}

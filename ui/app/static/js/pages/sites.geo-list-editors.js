@@ -125,7 +125,8 @@ const LIST_FIELD_SET = new Set([
   "blacklist_ja3_urls",
   "blacklist_country",
   "whitelist_country",
-  "modsecurity_crs_plugins"
+  "modsecurity_crs_plugins",
+  "ws_block_patterns"
 ]);
 
 const SETTINGS_SEARCH_INDEX = [
@@ -149,6 +150,7 @@ const SETTINGS_SEARCH_INDEX = [
   { id: "hsts_enabled", tab: "headers", selector: "#service-hsts-enabled", labelKey: "sites.easy.headers.hstsEnabled" },
   { id: "hsts_max_age_seconds", tab: "headers", selector: "#service-hsts-max-age", labelKey: "sites.easy.headers.hstsMaxAge" },
   { id: "content_security_policy", tab: "headers", selector: "#service-content-security-policy", labelKey: "sites.easy.headers.contentSecurityPolicy" },
+  { id: "ws_block_patterns", tab: "websocket", selector: "#list-input-ws_block_patterns", labelKey: "sites.easy.ws.blockPatterns" },
   { id: "permissions_policy", tab: "headers", selector: "#list-input-permissions_policy", labelKey: "sites.easy.headers.permissionsPolicy" },
   { id: "access_allowlist", tab: "traffic", selector: "#list-input-access_allowlist", labelKey: "sites.lists.allowlist" },
   { id: "exceptions_ip", tab: "traffic", selector: "#list-input-exceptions_ip", labelKey: "sites.easy.traffic.exceptions" },

@@ -61,6 +61,18 @@ func TestTLSAutoRenewHandler_BadPayload(t *testing.T) {
 	}
 }
 
+func TestTLSAutoRenewHandler_OutOfRangeDays(t *testing.T) {
+	h := NewTLSAutoRenewHandler(&fakeTLSAutoRenewService{})
+	for _, days := range []string{"0", "366"} {
+		req := httptest.NewRequest(http.MethodPut, "/api/tls/auto-renew", bytes.NewBufferString(`{"enabled":true,"renew_before_days":`+days+`}`))
+		resp := httptest.NewRecorder()
+		h.ServeHTTP(resp, req)
+		if resp.Code != http.StatusBadRequest {
+			t.Fatalf("days=%s: expected 400, got %d", days, resp.Code)
+		}
+	}
+}
+
 func TestTLSAutoRenewHandler_Error(t *testing.T) {
 	h := NewTLSAutoRenewHandler(&fakeTLSAutoRenewService{err: errors.New("boom")})
 	req := httptest.NewRequest(http.MethodGet, "/api/tls/auto-renew", nil)

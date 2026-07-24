@@ -1,3 +1,5 @@
+//go:build e2e
+
 package tests
 
 import (
@@ -11,7 +13,7 @@ import (
 func TestE2EAPIFunctionalDeep(t *testing.T) {
 	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL")), "/")
 	if baseURL == "" {
-		t.Skip("WAF_E2E_BASE_URL is not set; skipping deep functional e2e")
+		t.Fatal("WAF_E2E_BASE_URL is not set; skipping deep functional e2e")
 	}
 
 	client, requestBaseURL, requestHostOverride := newE2EClientAndBase(t, baseURL)

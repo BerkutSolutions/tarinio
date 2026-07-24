@@ -6,8 +6,19 @@ metadata:
 spec:
   template:
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: runtime
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+              add:
+                - NET_ADMIN
+            readOnlyRootFilesystem: true
           env:
             - name: WAF_CLICKHOUSE_ALLOWED_ENDPOINTS
               value: https://clickhouse:8443
@@ -18,6 +29,10 @@ spec:
             - name: clickhouse-tls
               mountPath: /etc/waf/storage-ca/clickhouse
               readOnly: true
+            - name: runtime-state
+              mountPath: /etc/waf
+            - name: runtime-tmp
+              mountPath: /tmp
       volumes:
         - name: opensearch-tls
           secret:
@@ -25,3 +40,7 @@ spec:
         - name: clickhouse-tls
           secret:
             secretName: tarinio-lab-clickhouse-tls
+        - name: runtime-state
+          emptyDir: {}
+        - name: runtime-tmp
+          emptyDir: {}

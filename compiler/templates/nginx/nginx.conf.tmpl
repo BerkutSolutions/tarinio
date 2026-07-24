@@ -8,6 +8,10 @@ events {
 http {
     variables_hash_max_size 65536;
     variables_hash_bucket_size 512;
+    map_hash_max_size 4096;
+    map_hash_bucket_size 128;
+    server_names_hash_max_size 4096;
+    server_names_hash_bucket_size 128;
     proxy_headers_hash_max_size 1024;
     proxy_headers_hash_bucket_size 128;
     include conf.d/*.conf;

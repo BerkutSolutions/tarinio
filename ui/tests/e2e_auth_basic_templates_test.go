@@ -1,3 +1,5 @@
+//go:build e2e
+
 package tests
 
 import (
@@ -16,7 +18,7 @@ import (
 func TestE2EBasicAuthTemplates(t *testing.T) {
 	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL")), "/")
 	if baseURL == "" {
-		t.Skip("WAF_E2E_BASE_URL not set; skipping Basic Auth templates e2e")
+		t.Fatal("WAF_E2E_BASE_URL not set; skipping Basic Auth templates e2e")
 	}
 	client, requestBaseURL, requestHostOverride := newE2EClientAndBase(t, baseURL)
 	loginE2EUser(t, client, requestBaseURL, requestHostOverride)
@@ -92,7 +94,7 @@ func TestE2EBasicAuthTemplates(t *testing.T) {
 
 	runtimeURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_AUTH_BASE_URL")), "/")
 	if runtimeURL == "" {
-		t.Skip("WAF_E2E_AUTH_BASE_URL not set; saved and compiled template but skipping runtime login flow")
+		t.Fatal("WAF_E2E_AUTH_BASE_URL not set; saved and compiled template but skipping runtime login flow")
 	}
 	e2eWaitForMultisiteHost(t, runtimeURL, runtimeHost)
 	runtimeClient := newE2EHTTPClient(runtimeURL, true)

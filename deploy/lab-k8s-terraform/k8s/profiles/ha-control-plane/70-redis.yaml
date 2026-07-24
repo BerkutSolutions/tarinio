@@ -12,10 +12,19 @@ spec:
       labels:
         app: redis
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: redis
           image: redis:7
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
           command:
             - redis-server
             - --port
@@ -48,6 +57,10 @@ spec:
             - name: redis-tls
               mountPath: /etc/redis-tls
               readOnly: true
+            - name: redis-runtime
+              mountPath: /var/run
+            - name: redis-tmp
+              mountPath: /tmp
           readinessProbe:
             tcpSocket:
               port: 6379
@@ -57,6 +70,10 @@ spec:
         - name: redis-tls
           secret:
             secretName: tarinio-lab-redis-tls
+        - name: redis-runtime
+          emptyDir: {}
+        - name: redis-tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

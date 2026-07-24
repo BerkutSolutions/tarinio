@@ -131,6 +131,18 @@ func (f *runtimeIndexFetcher) Fetch(stream string, limit int, offset int) (map[s
 			lastErr = nil
 		}()
 		if lastErr == nil {
+			payload["stream"] = normalizeStorageIndexStream(stream)
+			rootStorageType := strings.TrimSpace(fmt.Sprint(payload["storage_type"]))
+			if items, ok := payload["items"].([]any); ok && rootStorageType != "" {
+				for _, raw := range items {
+					if item, itemOK := raw.(map[string]any); itemOK {
+						storageType, exists := item["storage_type"]
+						if !exists || storageType == nil || strings.TrimSpace(fmt.Sprint(storageType)) == "" {
+							item["storage_type"] = rootStorageType
+						}
+					}
+				}
+			}
 			return payload, nil
 		}
 	}

@@ -27,6 +27,7 @@ export function createRenderRows({
   statusNode,
   listNode,
   pagingState,
+  getFilter,
   getPaginationMeta,
   renderCreateSiteOptions,
   loadSiteBanDurations,
@@ -72,8 +73,10 @@ export function createRenderRows({
       await processExpiredManualBanTimers(ctx, manualBanTimers);
       const manualRows = buildManualBanRows(accessPolicies, canonicalSiteID, manualBanTimers);
       const autoRows = buildAutoBanRows(events, canonicalSiteID, siteBanDurationByID, unbanMarkersBySite);
+      const filter = String(getFilter?.() || "").trim().toLowerCase();
       const rows = mergeBanRows(manualRows, autoRows)
         .filter((row) => !isDismissedBanRow(row.siteID, row.ip))
+        .filter((row) => !filter || [row.ip, row.country, row.siteID, renderModules(row.modules, ctx.t)].some((value) => String(value || "").toLowerCase().includes(filter)))
         .sort((a, b) => {
           const left = a.occurredAt ? a.occurredAt.getTime() : 0;
           const right = b.occurredAt ? b.occurredAt.getTime() : 0;

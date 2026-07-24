@@ -1,3 +1,5 @@
+//go:build e2e
+
 package tests
 
 import (
@@ -25,7 +27,7 @@ type antibotEndpoint struct {
 func TestE2EAntiBot_ProfileCutoffAndCookiePersistence(t *testing.T) {
 	baseURL := strings.TrimRight(strings.TrimSpace(firstNonEmpty(os.Getenv("WAF_E2E_ANTIBOT_BASE_URL"), os.Getenv("WAF_E2E_RUNTIME_HTTPS_URL"), os.Getenv("WAF_E2E_BASE_URL"))), "/")
 	if baseURL == "" {
-		t.Skip("WAF_E2E_ANTIBOT_BASE_URL or WAF_E2E_BASE_URL is not set; skipping antibot e2e test")
+		t.Fatal("WAF_E2E_ANTIBOT_BASE_URL or WAF_E2E_BASE_URL is not set; skipping antibot e2e test")
 	}
 
 	challengeURI := normalizeChallengeURI(strings.TrimSpace(os.Getenv("WAF_E2E_ANTIBOT_CHALLENGE_URI")))

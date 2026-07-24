@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"waf/control-plane/internal/accesspolicies"
@@ -20,19 +21,25 @@ import (
 )
 
 type fakeRevisionMetadataStore struct {
+	mu    sync.Mutex
 	items []revisions.Revision
 }
 
 func (f *fakeRevisionMetadataStore) SavePending(revision revisions.Revision) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.items = append(f.items, revision)
 	return nil
 }
 
 func (f *fakeRevisionMetadataStore) List() ([]revisions.Revision, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	return append([]revisions.Revision(nil), f.items...), nil
 }
 
 type fakeRevisionSnapshotStore struct {
+	mu        sync.Mutex
 	path      string
 	checksum  string
 	snapshot  revisionsnapshots.Snapshot
@@ -40,9 +47,60 @@ type fakeRevisionSnapshotStore struct {
 }
 
 func (f *fakeRevisionSnapshotStore) Save(revisionID string, snapshot revisionsnapshots.Snapshot, materials []revisionsnapshots.MaterialContent) (string, string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.snapshot = snapshot
 	f.materials = append([]revisionsnapshots.MaterialContent(nil), materials...)
 	return f.path, f.checksum, nil
+}
+
+func TestRevisionCompileServiceSerializesConcurrentVersionAllocation(t *testing.T) {
+	revisionStore := &fakeRevisionMetadataStore{}
+	snapshotStore := &fakeRevisionSnapshotStore{path: "snapshot.json", checksum: "checksum"}
+	jobStore, err := jobs.NewStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := NewRevisionCompileService(
+		revisionStore, snapshotStore, jobStore,
+		&fakeSiteStateReader{}, &fakeUpstreamStateReader{}, &fakeCertificateStateReader{},
+		&fakeTLSConfigStateReader{}, &fakeWAFPolicyStateReader{}, &fakeAccessPolicyStateReader{},
+		&fakeRateLimitPolicyStateReader{}, &fakeEasySiteProfileStateReader{}, &fakeAntiDDoSSettingsReader{},
+		nil, &fakeCertificateMaterialReader{}, nil,
+	)
+
+	const count = 8
+	results := make(chan CompileRequestResult, count)
+	errors := make(chan error, count)
+	var group sync.WaitGroup
+	for index := 0; index < count; index++ {
+		group.Add(1)
+		go func() {
+			defer group.Done()
+			result, err := service.Create(context.Background())
+			if err != nil {
+				errors <- err
+				return
+			}
+			results <- result
+		}()
+	}
+	group.Wait()
+	close(results)
+	close(errors)
+	for err := range errors {
+		t.Fatalf("concurrent compile failed: %v", err)
+	}
+	seen := map[string]bool{}
+	for result := range results {
+		if seen[result.Revision.ID] {
+			t.Fatalf("duplicate revision ID allocated: %s", result.Revision.ID)
+		}
+		seen[result.Revision.ID] = true
+	}
+	if len(seen) != count {
+		t.Fatalf("allocated %d unique revisions, want %d", len(seen), count)
+	}
 }
 
 type fakeSiteStateReader struct{ items []sites.Site }

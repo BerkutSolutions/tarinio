@@ -45,6 +45,10 @@ func shouldSkipInternalManagementRequest(item parsedAccess) bool {
 	if path == "" {
 		return false
 	}
+	if path == "/" {
+		host := strings.ToLower(strings.TrimSpace(item.host))
+		return host == "" || isInternalManagementHost(host) || sanitizeSiteID(item.siteID) == ""
+	}
 	if isTarinioAdminAppPath(path) {
 		return true
 	}

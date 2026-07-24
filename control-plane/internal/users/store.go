@@ -240,6 +240,25 @@ func (s *Store) Create(user User) (User, error) {
 	return user, nil
 }
 
+func (s *Store) Delete(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	current, err := s.loadLocked()
+	if err != nil {
+		return err
+	}
+	id = normalizeID(id)
+	for i := range current.Users {
+		if current.Users[i].ID != id {
+			continue
+		}
+		current.Users = append(current.Users[:i], current.Users[i+1:]...)
+		return s.saveLocked(current)
+	}
+	return fmt.Errorf("user %s not found", id)
+}
+
 func (s *Store) Count() (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

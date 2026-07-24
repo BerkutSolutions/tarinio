@@ -71,6 +71,9 @@ func (s *Store) Create(site Site) (Site, error) {
 		if existing.ID == site.ID {
 			return Site{}, fmt.Errorf("site %s already exists", site.ID)
 		}
+		if strings.EqualFold(existing.PrimaryHost, site.PrimaryHost) {
+			return Site{}, fmt.Errorf("site primary_host %s already exists", site.PrimaryHost)
+		}
 	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
@@ -113,6 +116,11 @@ func (s *Store) Update(site Site) (Site, error) {
 	for i := range current.Sites {
 		if current.Sites[i].ID != site.ID {
 			continue
+		}
+		for _, existing := range current.Sites {
+			if existing.ID != site.ID && strings.EqualFold(existing.PrimaryHost, site.PrimaryHost) {
+				return Site{}, fmt.Errorf("site primary_host %s already exists", site.PrimaryHost)
+			}
 		}
 		site.CreatedAt = current.Sites[i].CreatedAt
 		site.UpdatedAt = time.Now().UTC().Format(time.RFC3339)

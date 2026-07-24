@@ -57,6 +57,8 @@ var (
 	skipDirs = map[string]struct{}{
 		".git":         {},
 		".work":        {},
+		"build":        {},
+		"test-results": {},
 		"node_modules": {},
 		"bin":          {},
 	}
@@ -69,6 +71,9 @@ func TestRepositoryTextFilesEncoding(t *testing.T) {
 
 	err := filepath.Walk(repoRoot, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
+			if os.IsNotExist(err) {
+				return nil
+			}
 			return err
 		}
 		if info.IsDir() {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"waf/control-plane/internal/accesspolicies"
@@ -85,6 +86,7 @@ type CompileRequestResult struct {
 }
 
 type RevisionCompileService struct {
+	compileMu         sync.Mutex
 	revisions         RevisionMetadataStore
 	snapshots         RevisionSnapshotStore
 	jobs              JobStore
@@ -153,6 +155,8 @@ func (s *RevisionCompileService) Create(ctx context.Context) (result CompileRequ
 }
 
 func (s *RevisionCompileService) CreateWithTargets(ctx context.Context, targetSiteIDs []string) (result CompileRequestResult, err error) {
+	s.compileMu.Lock()
+	defer s.compileMu.Unlock()
 	if s.coord == nil {
 		s.coord = NewNoopDistributedCoordinator()
 	}
@@ -299,9 +303,25 @@ func (s *RevisionCompileService) buildSnapshot() (revisionsnapshots.Snapshot, []
 		}
 		managementHosts, managementHostsConfigured, blockDirectIPAccess = item.Hosts, item.Migrated, item.BlockDirectIPAccess
 	}
-	materialItems := make([]revisionsnapshots.MaterialContent, 0, len(certificateItems))
+	materialIDs := make(map[string]struct{}, len(certificateItems))
 	for _, certificate := range certificateItems {
-		record, certificatePEM, privateKeyPEM, err := s.materials.Read(certificate.ID)
+		materialIDs[certificate.ID] = struct{}{}
+	}
+	for _, profile := range easySiteProfileItems {
+		for _, ref := range []string{
+			profile.FrontService.MTLSClientCARef,
+			profile.UpstreamRouting.UpstreamMTLSCertRef,
+			profile.UpstreamRouting.UpstreamMTLSKeyRef,
+			profile.UpstreamRouting.UpstreamMTLSCARef,
+		} {
+			if id := certificateMaterialIDFromRef(ref); id != "" {
+				materialIDs[id] = struct{}{}
+			}
+		}
+	}
+	materialItems := make([]revisionsnapshots.MaterialContent, 0, len(materialIDs))
+	for certificateID := range materialIDs {
+		record, certificatePEM, privateKeyPEM, err := s.materials.Read(certificateID)
 		if err != nil {
 			continue
 		}

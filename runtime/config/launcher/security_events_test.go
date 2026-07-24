@@ -168,6 +168,36 @@ func TestSecurityEventSourceSkipsManagementHostSecurityEvents(t *testing.T) {
 	}
 }
 
+func TestSecurityEventSourceEmitsRateLimitForPublicRoot(t *testing.T) {
+	events := readSecurityEventsFromLines(t, []string{mustMarshalAccessLogLine(t, map[string]any{
+		"timestamp":  "2026-07-24T12:34:51+00:00",
+		"request_id": "stage67-public-root-rate-limit",
+		"client_ip":  "172.18.0.4",
+		"host":       "e2e-l4-l7.test",
+		"method":     "GET",
+		"uri":        "/",
+		"status":     429,
+		"site":       "e2e-l4-l7-site",
+		"management": 0,
+	})})
+	if len(events) != 1 {
+		t.Fatalf("expected one public root rate-limit event, got %+v", events)
+	}
+	event := events[0]
+	if event.Type != "security_rate_limit" || event.SiteID != "e2e-l4-l7-site" {
+		t.Fatalf("unexpected public root event: %+v", event)
+	}
+	if got := event.Details["host"]; got != "e2e-l4-l7.test" {
+		t.Fatalf("expected public host in event details, got %#v", got)
+	}
+	if got := event.Details["path"]; got != "/" {
+		t.Fatalf("expected root path in event details, got %#v", got)
+	}
+	if got := event.Details["status"]; got != 429 {
+		t.Fatalf("expected 429 in event details, got %#v", got)
+	}
+}
+
 func TestSecurityEventSourceThreatIntelEmitsReputationEvent(t *testing.T) {
 	root := t.TempDir()
 	feedPath := filepath.Join(root, "threat-intel-feed.txt")

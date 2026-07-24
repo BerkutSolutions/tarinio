@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"net/url"
 	"strings"
 
 	"waf/control-plane/internal/auth"
@@ -13,7 +14,8 @@ func (h *SettingsRuntimeHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	switch r.Method {
 	case http.MethodGet:
 		if r.URL.Path == "/api/settings/runtime/storage-indexes" {
-			writeJSON(w, http.StatusOK, runtimeIndexesFromQuery(r.URL.Query()))
+			values := cloneIndexQuery(r.URL.Query())
+			writeJSON(w, http.StatusOK, runtimeIndexesFromQuery(values))
 			return
 		}
 		indexes := runtimeIndexesFromQuery(r.URL.Query())
@@ -38,6 +40,13 @@ func (h *SettingsRuntimeHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		}
 
 		runtimeSettingsState.mu.Lock()
+		nextUpdateChecksEnabled := runtimeSettingsState.updateChecksEnabled
+		nextLanguage := runtimeSettingsState.language
+		nextLoginAppearance := runtimeSettingsState.loginAppearance
+		nextHealthcheckAppearance := runtimeSettingsState.healthcheckAppearance
+		nextLogging := runtimeSettingsState.logging
+		nextSecurity := runtimeSettingsState.security
+		nextStorage := runtimeSettingsState.storage
 
 		updated := false
 		if raw, exists := body["update_checks_enabled"]; exists {
@@ -47,7 +56,7 @@ func (h *SettingsRuntimeHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "update_checks_enabled must be boolean"})
 				return
 			}
-			runtimeSettingsState.updateChecksEnabled = flag
+			nextUpdateChecksEnabled = flag
 			updated = true
 		}
 		if raw, exists := body["language"]; exists {
@@ -57,7 +66,7 @@ func (h *SettingsRuntimeHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "language must be string"})
 				return
 			}
-			runtimeSettingsState.language = normalizeRuntimeLanguage(value)
+			nextLanguage = normalizeRuntimeLanguage(value)
 			updated = true
 		}
 		if raw, exists := body["login_appearance"]; exists {
@@ -73,7 +82,7 @@ func (h *SettingsRuntimeHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "unknown login_appearance"})
 				return
 			}
-			runtimeSettingsState.loginAppearance = normalized
+			nextLoginAppearance = normalized
 			updated = true
 		}
 		if raw, exists := body["healthcheck_appearance"]; exists {
@@ -89,7 +98,7 @@ func (h *SettingsRuntimeHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "unknown healthcheck_appearance"})
 				return
 			}
-			runtimeSettingsState.healthcheckAppearance = normalized
+			nextHealthcheckAppearance = normalized
 			updated = true
 		}
 		if raw, exists := body["logging"]; exists {
@@ -99,13 +108,13 @@ func (h *SettingsRuntimeHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "logging must be object"})
 				return
 			}
-			next, err := parseLoggingSettings(typed, runtimeSettingsState.logging, runtimeSettingsState.pepper, runtimeSettingsState.security.AllowInsecureVaultTLS)
+			next, err := parseLoggingSettings(typed, nextLogging, runtimeSettingsState.pepper, nextSecurity.AllowInsecureVaultTLS)
 			if err != nil {
 				runtimeSettingsState.mu.Unlock()
 				writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 				return
 			}
-			runtimeSettingsState.logging = next
+			nextLogging = next
 			updated = true
 		}
 		if raw, exists := body["security"]; exists {
@@ -115,15 +124,15 @@ func (h *SettingsRuntimeHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "security must be object"})
 				return
 			}
-			next, err := parseRuntimeSecuritySettings(typed, runtimeSettingsState.security)
+			next, err := parseRuntimeSecuritySettings(typed, nextSecurity)
 			if err != nil {
 				runtimeSettingsState.mu.Unlock()
 				writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 				return
 			}
-			runtimeSettingsState.security = next
-			if !runtimeSettingsState.security.AllowInsecureVaultTLS {
-				runtimeSettingsState.logging.Vault.TLSSkipVerify = false
+			nextSecurity = next
+			if !nextSecurity.AllowInsecureVaultTLS {
+				nextLogging.Vault.TLSSkipVerify = false
 			}
 			updated = true
 		}
@@ -134,16 +143,16 @@ func (h *SettingsRuntimeHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "storage must be object"})
 				return
 			}
-			next, err := parseStorageRetention(typed, runtimeSettingsState.storage)
+			next, err := parseStorageRetention(typed, nextStorage)
 			if err != nil {
 				runtimeSettingsState.mu.Unlock()
 				writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 				return
 			}
-			runtimeSettingsState.storage = next
-			runtimeSettingsState.logging.Retention.HotDays = next.HotIndexDays
-			runtimeSettingsState.logging.Retention.ColdDays = next.ColdIndexDays
-			runtimeSettingsState.logging = loggingconfig.Normalize(runtimeSettingsState.logging)
+			nextStorage = next
+			nextLogging.Retention.HotDays = next.HotIndexDays
+			nextLogging.Retention.ColdDays = next.ColdIndexDays
+			nextLogging = loggingconfig.Normalize(nextLogging)
 			updated = true
 		}
 		if !updated {
@@ -151,6 +160,13 @@ func (h *SettingsRuntimeHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "at least one field must be provided"})
 			return
 		}
+		runtimeSettingsState.updateChecksEnabled = nextUpdateChecksEnabled
+		runtimeSettingsState.language = nextLanguage
+		runtimeSettingsState.loginAppearance = nextLoginAppearance
+		runtimeSettingsState.healthcheckAppearance = nextHealthcheckAppearance
+		runtimeSettingsState.logging = nextLogging
+		runtimeSettingsState.security = nextSecurity
+		runtimeSettingsState.storage = nextStorage
 		savePersistedRuntimeSettingsLocked()
 		payload := responsePayloadWithoutIndexesLocked()
 		runtimeSettingsState.mu.Unlock()
@@ -190,6 +206,26 @@ func (h *SettingsRuntimeHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
+}
+
+func cloneIndexQuery(input url.Values) url.Values {
+	values := make(url.Values, len(input))
+	for key, items := range input {
+		values[key] = append([]string(nil), items...)
+	}
+	if strings.TrimSpace(values.Get("storage_indexes_limit")) == "" {
+		values.Set("storage_indexes_limit", values.Get("limit"))
+	}
+	if strings.TrimSpace(values.Get("storage_indexes_limit")) == "" {
+		values.Set("storage_indexes_limit", "10")
+	}
+	if strings.TrimSpace(values.Get("storage_indexes_offset")) == "" {
+		values.Set("storage_indexes_offset", values.Get("offset"))
+	}
+	if strings.TrimSpace(values.Get("storage_indexes_offset")) == "" {
+		values.Set("storage_indexes_offset", "0")
+	}
+	return values
 }
 
 func canWriteStorageRetention(r *http.Request) bool {

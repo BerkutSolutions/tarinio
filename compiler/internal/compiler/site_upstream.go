@@ -165,7 +165,7 @@ func RenderSiteUpstreamArtifactsWithOptions(sites []SiteInput, upstreams []Upstr
 			UIProxyTarget:             uiProxyTarget(),
 			UpstreamName:              upstreamBlockName(site.ID, upstream.ID),
 			UpstreamAddress:           buildUpstreamAddress(upstream),
-			ProxyPassTarget:           "http://" + upstreamBlockName(site.ID, upstream.ID),
+			ProxyPassTarget:           upstreamProxyPassTarget(site.ID, upstream),
 			PassHostHeader:            upstream.PassHostHeader,
 			RateLimitCookie:           rateLimitCookieName(site.ID),
 			RateLimitEscalationCookie: rateLimitEscalationCookieName(site.ID),
@@ -326,6 +326,14 @@ func upstreamBlockName(siteID, upstreamID string) string {
 
 func buildUpstreamAddress(upstream UpstreamInput) string {
 	return fmt.Sprintf("%s:%d", upstream.Host, upstream.Port)
+}
+
+func upstreamProxyPassTarget(siteID string, upstream UpstreamInput) string {
+	scheme := strings.ToLower(strings.TrimSpace(upstream.Scheme))
+	if scheme != "https" {
+		scheme = "http"
+	}
+	return scheme + "://" + upstreamBlockName(siteID, upstream.ID)
 }
 
 func rateLimitCookieName(siteID string) string {

@@ -1,3 +1,5 @@
+//go:build e2e
+
 package tests
 
 import (
@@ -11,11 +13,22 @@ import (
 func TestE2ERecoveryFlow_BadConfigThenRepair(t *testing.T) {
 	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL")), "/")
 	if baseURL == "" {
-		t.Skip("WAF_E2E_BASE_URL is not set; skipping recovery flow")
+		t.Fatal("WAF_E2E_BASE_URL is not set; skipping recovery flow")
 	}
 	client, requestBaseURL, requestHostOverride := newE2EClientAndBase(t, baseURL)
 	loginE2EUser(t, client, requestBaseURL, requestHostOverride)
 	before := e2eGetAntiDDoSSettings(t, client, requestBaseURL, requestHostOverride)
+	t.Cleanup(func() {
+		resp := requestDeepJSON(t, client, http.MethodPut, requestBaseURL+"/api/anti-ddos/settings", requestHostOverride, before)
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("restore anti-ddos settings: status=%d body=%s", resp.StatusCode, mustReadBody(t, resp.Body))
+			return
+		}
+		_ = resp.Body.Close()
+		if revisionID := e2eCompileAndApply(t, client, requestBaseURL, requestHostOverride); revisionID == "" {
+			t.Error("restore anti-ddos settings did not activate a revision")
+		}
+	})
 
 	t.Run("RejectInvalidAntiDDoSConfig", func(t *testing.T) {
 		invalidResp := requestDeepJSON(t, client, "PUT", requestBaseURL+"/api/anti-ddos/settings", requestHostOverride, map[string]any{

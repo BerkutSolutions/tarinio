@@ -74,3 +74,22 @@ func TestRuntimeIndexFetcherFetchFallsBackFromRuntimeHost(t *testing.T) {
 		t.Fatalf("expected total=1, got %v", got)
 	}
 }
+
+func TestRuntimeIndexFetcherNormalizesStreamAndStorageType(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"items":[{"date":"2026-07-23"}],"storage_type":"archive","total":1,"limit":10,"offset":0}`))
+	}))
+	defer server.Close()
+	payload, err := (&runtimeIndexFetcher{url: server.URL, client: server.Client()}).Fetch("requests", 10, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if payload["stream"] != "requests" {
+		t.Fatalf("expected canonical stream, got %v", payload["stream"])
+	}
+	items := payload["items"].([]any)
+	if items[0].(map[string]any)["storage_type"] != "archive" {
+		t.Fatalf("expected inherited storage type: %+v", items[0])
+	}
+}

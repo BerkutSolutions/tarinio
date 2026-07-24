@@ -76,7 +76,11 @@ func (h *CertificateACMEHandler) issue(w http.ResponseWriter, r *http.Request) {
 		if message == "" {
 			message = "acme issue failed"
 		}
-		writeJSON(w, http.StatusBadRequest, map[string]any{
+		status := http.StatusBadRequest
+		if strings.Contains(strings.ToLower(message), "not found") {
+			status = http.StatusNotFound
+		}
+		writeJSON(w, status, map[string]any{
 			"error": message,
 			"job":   job,
 		})
@@ -135,7 +139,11 @@ func (h *CertificateACMEHandler) renew(w http.ResponseWriter, r *http.Request) {
 		if message == "" {
 			message = "acme renew failed"
 		}
-		writeJSON(w, http.StatusBadRequest, map[string]any{
+		status := http.StatusBadRequest
+		if strings.Contains(strings.ToLower(message), "not found") {
+			status = http.StatusNotFound
+		}
+		writeJSON(w, status, map[string]any{
 			"error": message,
 			"job":   job,
 		})

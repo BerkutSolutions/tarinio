@@ -167,7 +167,7 @@ export async function renderAntiDDoS(container, ctx) {
         return;
       }
       try {
-        const payload = await ctx.api.get("/api/events");
+        const payload = await ctx.api.get("/api/events?limit=500");
         const events = Array.isArray(payload?.events) ? payload.events : [];
         const rows = events
           .filter((item) => ["security_waf", "security_rate_limit", "security_access"].includes(String(item?.type || "")))
@@ -176,7 +176,7 @@ export async function renderAntiDDoS(container, ctx) {
             const right = Date.parse(String(b?.occurred_at || "")) || 0;
             return right - left;
           })
-          .slice(0, 80);
+          .slice(0, 500);
         if (!rows.length) {
           node.innerHTML = `<div class="waf-empty">${escapeHtml(ctx.t("antiddos.model.logs.empty"))}</div>`;
           return;

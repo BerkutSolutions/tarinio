@@ -1,3 +1,5 @@
+//go:build e2e
+
 package tests
 
 import (
@@ -16,7 +18,7 @@ func TestE2ESecurityModesReality(t *testing.T) {
 	requestURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL")), "/")
 	runtimeURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_RUNTIME_URL")), "/")
 	if requestURL == "" || runtimeURL == "" {
-		t.Skip("WAF_E2E_BASE_URL and WAF_E2E_RUNTIME_URL are required; skipping security modes e2e")
+		t.Fatal("WAF_E2E_BASE_URL and WAF_E2E_RUNTIME_URL are required; skipping security modes e2e")
 	}
 
 	client, requestBaseURL, requestHostOverride := newE2EClientAndBase(t, requestURL)

@@ -16,9 +16,10 @@ export function bindDetailCore(container, state, ctx, deps) {
     applyServiceProfilePresetToDraft,
     toggleCertificateImportActions,
     highlightSelector,
+    back: guardedBack,
   } = deps;
   const feedback = container.querySelector("#sites-feedback");
-  const back = () => go(routeBase());
+  const back = guardedBack || (() => go(routeBase()));
   const idInput = container.querySelector("#service-id");
   const hostInput = container.querySelector("#service-host");
   const certificateInput = container.querySelector("#service-certificate-id");

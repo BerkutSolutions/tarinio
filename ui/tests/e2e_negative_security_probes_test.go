@@ -1,3 +1,5 @@
+//go:build e2e
+
 package tests
 
 import (
@@ -21,7 +23,7 @@ func TestE2ENegativeSecurityProbes(t *testing.T) {
 	panelURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL")), "/")
 	runtimeURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_RUNTIME_URL")), "/")
 	if panelURL == "" || runtimeURL == "" {
-		t.Skip("WAF_E2E_BASE_URL and WAF_E2E_RUNTIME_URL are required")
+		t.Fatal("WAF_E2E_BASE_URL and WAF_E2E_RUNTIME_URL are required")
 	}
 	canaryURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_DAST_CANARY_URL")), "/")
 	if canaryURL == "" {

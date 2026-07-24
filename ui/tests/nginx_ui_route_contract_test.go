@@ -13,7 +13,7 @@ func TestNginxContract_UnknownUIPathsReturn404(t *testing.T) {
 		t.Fatalf("read nginx config: %v", err)
 	}
 	config := string(raw)
-	if !strings.Contains(config, "profile)(/.*)?$") {
+	if !strings.Contains(config, "owasp-crs|tls") || !strings.Contains(config, "profile)(/.*)?$") {
 		t.Fatal("known SPA sections must preserve deep-link routing")
 	}
 	if !strings.Contains(config, "try_files $uri $uri/ =404;") {

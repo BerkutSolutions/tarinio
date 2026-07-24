@@ -99,8 +99,8 @@ func TestStore_CreateUpdateGetDelete(t *testing.T) {
 
 	profile := DefaultProfile("site-a")
 	profile.FrontService.ServerName = "WWW.Example.COM"
-	profile.SecurityBehaviorAndLimits.LimitReqRate = "100 r/s"
-	profile.SecurityBehaviorAndLimits.CustomLimitRules = []CustomLimitRule{{Path: "/login", Rate: " 6 r/s "}, {Path: "/login", Rate: "6r/s"}}
+	profile.SecurityBehaviorAndLimits.LimitReqRate = "100 r/m"
+	profile.SecurityBehaviorAndLimits.CustomLimitRules = []CustomLimitRule{{Path: "/login", Rate: " 6 r/m "}, {Path: "/login", Rate: "6r/m"}}
 
 	created, err := store.Create(profile)
 	if err != nil {
@@ -109,13 +109,13 @@ func TestStore_CreateUpdateGetDelete(t *testing.T) {
 	if created.FrontService.ServerName != "www.example.com" {
 		t.Fatalf("expected normalized host, got %s", created.FrontService.ServerName)
 	}
-	if created.SecurityBehaviorAndLimits.LimitReqRate != "100r/s" {
+	if created.SecurityBehaviorAndLimits.LimitReqRate != "100r/m" {
 		t.Fatalf("expected normalized rate, got %s", created.SecurityBehaviorAndLimits.LimitReqRate)
 	}
 	if len(created.SecurityBehaviorAndLimits.CustomLimitRules) != 1 {
 		t.Fatalf("expected duplicate custom limits to collapse, got %+v", created.SecurityBehaviorAndLimits.CustomLimitRules)
 	}
-	if created.SecurityBehaviorAndLimits.CustomLimitRules[0].Rate != "6r/s" {
+	if created.SecurityBehaviorAndLimits.CustomLimitRules[0].Rate != "6r/m" {
 		t.Fatalf("expected normalized custom limit rate, got %+v", created.SecurityBehaviorAndLimits.CustomLimitRules)
 	}
 

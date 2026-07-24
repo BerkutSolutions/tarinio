@@ -1,3 +1,5 @@
+//go:build e2e
+
 package tests
 
 import (
@@ -14,7 +16,7 @@ import (
 func TestE2EManagementModSecuritySafeguardKeepsAppPingAvailable(t *testing.T) {
 	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL")), "/")
 	if baseURL == "" {
-		t.Skip("WAF_E2E_BASE_URL is not set; skipping management ModSecurity safeguard e2e")
+		t.Fatal("WAF_E2E_BASE_URL is not set; skipping management ModSecurity safeguard e2e")
 	}
 
 	client, requestBaseURL, requestHostOverride := newE2EClientAndBase(t, baseURL)
@@ -96,7 +98,7 @@ func e2eManagementSiteID(t *testing.T, client *http.Client, requestBaseURL, requ
 			return strings.TrimSpace(stringValue(site["id"]))
 		}
 	}
-	t.Skip("management site not found; set WAF_E2E_MANAGEMENT_SITE_ID to run safeguard e2e")
+	t.Fatal("management site not found; set WAF_E2E_MANAGEMENT_SITE_ID to run safeguard e2e")
 	return ""
 }
 

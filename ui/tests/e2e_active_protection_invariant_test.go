@@ -1,3 +1,5 @@
+//go:build e2e
+
 package tests
 
 import (
@@ -12,7 +14,7 @@ func TestE2ERecovery_InvalidCandidateDoesNotReplaceActiveProtection(t *testing.T
 	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL")), "/")
 	runtimeURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_RUNTIME_URL")), "/")
 	if baseURL == "" || runtimeURL == "" {
-		t.Skip("E2E control-plane and runtime URLs are required")
+		t.Fatal("E2E control-plane and runtime URLs are required")
 	}
 	client, requestBaseURL, hostOverride := newE2EClientAndBase(t, baseURL)
 	loginE2EUser(t, client, requestBaseURL, hostOverride)

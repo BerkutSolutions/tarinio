@@ -10,6 +10,7 @@ import {
   normalizeWSBlockPatterns,
 } from "./sites.normalize.js";
 import { normalizeAuthBasicUsers, normalizeAuthSessionTTLMinutes } from "./sites.auth-geo.js";
+import { normalizeAuthMode, normalizeAuthOrder } from "./sites.auth-extended-editors.js";
 import {
   BAN_SCOPE_VALUES,
   normalizeBanEscalationStages,
@@ -123,6 +124,8 @@ export function applyEasyProfileToDraft(draft, profile) {
     challenge_escalation_mode: String(antibot.challenge_escalation_mode || draft.challenge_escalation_mode).trim().toLowerCase() || "javascript",
     antibot_challenge_rules: normalizeAntibotChallengeRules(antibot.challenge_rules || draft.antibot_challenge_rules),
     use_auth_basic: Boolean(authBasic.use_auth_basic ?? draft.use_auth_basic),
+    auth_mode: normalizeAuthMode(authBasic.auth_mode || draft.auth_mode),
+    auth_order: normalizeAuthOrder(authBasic.auth_order || draft.auth_order),
     auth_basic_location: authBasic.auth_basic_location || draft.auth_basic_location,
     auth_basic_user: authBasic.auth_basic_user || draft.auth_basic_user,
     auth_basic_password: authBasic.auth_basic_password || draft.auth_basic_password,

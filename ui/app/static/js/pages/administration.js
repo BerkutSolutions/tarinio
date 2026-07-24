@@ -18,13 +18,17 @@ import { bindAdministrationEnterpriseRuntime } from "./administration.enterprise
 
 
 export async function renderAdministration(container, ctx) {
+  const permissions = new Set((Array.isArray(ctx?.currentUser?.permissions) ? ctx.currentUser.permissions : [])
+    .map((item) => String(item || "").trim().toLowerCase()));
+  const canWriteUsers = permissions.has("administration.write") && permissions.has("administration.users.write");
+  const canWriteRoles = permissions.has("administration.write") && permissions.has("administration.roles.write");
   container.innerHTML = `
     <div class="waf-stack">
       <div class="waf-grid two">
         <section class="waf-card">
           <div class="waf-card-head">
             <div><h3>${escapeHtml(ctx.t("administration.users.title"))}</h3><div class="muted">${escapeHtml(ctx.t("administration.users.subtitle"))}</div></div>
-            <div class="waf-actions"><button class="btn primary btn-sm" type="button" id="administration-user-create">${escapeHtml(ctx.t("administration.users.create"))}</button></div>
+            ${canWriteUsers ? `<div class="waf-actions"><button class="btn primary btn-sm" type="button" id="administration-user-create">${escapeHtml(ctx.t("administration.users.create"))}</button></div>` : ""}
           </div>
           <div class="waf-card-body">
             <div id="users-status"></div>
@@ -33,7 +37,7 @@ export async function renderAdministration(container, ctx) {
         <section class="waf-card">
           <div class="waf-card-head">
             <div><h3>${escapeHtml(ctx.t("administration.roles.title"))}</h3><div class="muted">${escapeHtml(ctx.t("administration.roles.subtitle"))}</div></div>
-            <div class="waf-actions"><button class="btn primary btn-sm" type="button" id="administration-role-create">${escapeHtml(ctx.t("administration.roles.create"))}</button></div>
+            ${canWriteRoles ? `<div class="waf-actions"><button class="btn primary btn-sm" type="button" id="administration-role-create" disabled>${escapeHtml(ctx.t("administration.roles.create"))}</button></div>` : ""}
           </div>
           <div class="waf-card-body">
             <div id="roles-status"></div>
@@ -81,11 +85,11 @@ export async function renderAdministration(container, ctx) {
   };
 
   const renderUsers = () => {
-    usersStatus.innerHTML = renderUsersTable(state.users, state.roles, ctx);
+    usersStatus.innerHTML = renderUsersTable(state.users, state.roles, ctx, canWriteUsers);
   };
 
   const renderRoles = () => {
-    rolesStatus.innerHTML = renderRolesTable(state.roles, ctx);
+    rolesStatus.innerHTML = renderRolesTable(state.roles, ctx, canWriteRoles);
   };
 
   const renderEnterprise = () => {
@@ -109,6 +113,7 @@ export async function renderAdministration(container, ctx) {
     state.roles = Array.isArray(payload?.roles) ? payload.roles : [];
     state.availablePermissions = Array.isArray(payload?.available_permissions) ? payload.available_permissions : [];
     renderRoles();
+    container.querySelector("#administration-role-create")?.removeAttribute("disabled");
   };
 
   const loadEnterprise = async () => {

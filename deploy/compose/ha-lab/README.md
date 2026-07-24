@@ -77,7 +77,7 @@ docker compose --profile tools exec toolbox /tools/mini-ddos.sh
 
 - `tenant-01` .. `tenant-20`
 - hosts `tenant-01.ha.local` .. `tenant-20.ha.local`
-- upstreams pointing to `demo-app:80`
+- upstreams pointing to `demo-app:8080`
 - a stricter rate-limit policy on `tenant-01`
 - tuned anti-DDoS settings for repeated local tests
 

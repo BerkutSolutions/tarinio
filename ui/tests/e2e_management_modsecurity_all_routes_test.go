@@ -1,3 +1,5 @@
+//go:build e2e
+
 package tests
 
 import (
@@ -18,7 +20,7 @@ const e2eManagementModSecurityProbeStatus = 418
 func TestE2EAdminPanelModSecurityBypassesEveryAdministrativeRoute(t *testing.T) {
 	runtimeURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_RUNTIME_URL")), "/")
 	if runtimeURL == "" {
-		t.Skip("WAF_E2E_RUNTIME_URL is not set; skipping full management ModSecurity e2e")
+		t.Fatal("WAF_E2E_RUNTIME_URL is not set; skipping full management ModSecurity e2e")
 	}
 	activeRuntimeURL := runtimeURL
 	if httpsURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_RUNTIME_HTTPS_URL")), "/"); httpsURL != "" {

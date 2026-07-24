@@ -210,6 +210,10 @@ services:
       dockerfile: ui/Dockerfile
     container_name: tarinio-ha-ui
     restart: unless-stopped
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
     depends_on:
       api-lb:
         condition: service_started
@@ -283,9 +287,9 @@ services:
     container_name: tarinio-ha-demo-app
     restart: unless-stopped
     expose:
-      - "80"
+      - "8080"
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/healthz || exit 1"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/healthz || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5

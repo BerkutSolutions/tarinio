@@ -16,6 +16,17 @@ export function bindAdministrationUsersRolesRuntime(deps) {
   } = deps;
 
   usersStatus.addEventListener("click", (event) => {
+    const deleteNode = event.target.closest("[data-user-delete]");
+    if (deleteNode) {
+      event.preventDefault();
+      const id = String(deleteNode.getAttribute("data-user-delete") || "");
+      if (!window.confirm(ctx.t("administration.users.deleteConfirm"))) return;
+      ctx.api.delete(`/api/administration/users/${encodeURIComponent(id)}`).then(async () => {
+        await loadUsers();
+        await loadRoles();
+      }).catch((error) => window.alert(error?.message || ctx.t("common.error")));
+      return;
+    }
     const editNode = event.target.closest("[data-user-edit]");
     if (editNode) {
       event.preventDefault();
@@ -37,6 +48,17 @@ export function bindAdministrationUsersRolesRuntime(deps) {
   });
 
   rolesStatus.addEventListener("click", (event) => {
+    const deleteNode = event.target.closest("[data-role-delete]");
+    if (deleteNode) {
+      event.preventDefault();
+      const id = String(deleteNode.getAttribute("data-role-delete") || "");
+      if (!window.confirm(ctx.t("administration.roles.deleteConfirm"))) return;
+      ctx.api.delete(`/api/administration/roles/${encodeURIComponent(id)}`).then(async () => {
+        await loadRoles();
+        await loadUsers();
+      }).catch((error) => window.alert(error?.message || ctx.t("common.error")));
+      return;
+    }
     const editNode = event.target.closest("[data-role-edit]");
     if (editNode) {
       event.preventDefault();

@@ -23,10 +23,19 @@ spec:
       labels:
         app: opensearch
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: opensearch
           image: opensearchproject/opensearch:2.18.0
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
           ports:
             - containerPort: 9200
           env:
@@ -49,6 +58,10 @@ spec:
             - name: opensearch-security-config
               mountPath: /usr/share/opensearch/plugins/opensearch-security/securityconfig
               readOnly: true
+            - name: opensearch-logs
+              mountPath: /usr/share/opensearch/logs
+            - name: opensearch-tmp
+              mountPath: /tmp
           readinessProbe:
             tcpSocket:
               port: 9200
@@ -67,6 +80,10 @@ spec:
         - name: opensearch-security-config
           secret:
             secretName: tarinio-lab-opensearch-security
+        - name: opensearch-logs
+          emptyDir: {}
+        - name: opensearch-tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

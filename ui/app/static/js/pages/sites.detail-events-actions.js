@@ -1,4 +1,5 @@
 import { compileAndApplySiteRevision, siteSaveNoAutoApplyOptions } from "./sites.save-apply.js";
+import { createTLSExportStepUp } from "./tls.export-step-up.js";
 
 export function bindDetailActionEvents(params) {
   const {
@@ -35,7 +36,8 @@ export function bindDetailActionEvents(params) {
     draftToEasyProfile,
     go,
     routeBase,
-    highlightSelector
+    highlightSelector,
+    clearUnsavedChanges
   } = params;
 
   container.querySelector("#services-delete-selected")?.addEventListener("click", async () => {
@@ -100,6 +102,7 @@ export function bindDetailActionEvents(params) {
 
   container.querySelector("#service-ca-server")?.addEventListener("change", toggleCertificateImportActions);
   const certificateArchiveInput = container.querySelector("#service-certificate-archive-file");
+  const exportCertificates = createTLSExportStepUp(container, ctx, downloadBlob);
   container.querySelector("#service-import-certificate-search")?.addEventListener("change", (event) => {
     const selectedID = String(event?.target?.value || "").trim().toLowerCase();
     if (!selectedID) {
@@ -150,31 +153,7 @@ export function bindDetailActionEvents(params) {
       return;
     }
     try {
-      const response = await fetch("/api/certificate-materials/export", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          Accept: "application/zip, application/json",
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ certificate_ids: [certificateID] })
-      });
-      if (!response.ok) {
-        const bodyText = await response.text();
-        let message = `HTTP ${response.status}`;
-        if (bodyText) {
-          try {
-            const payload = JSON.parse(bodyText);
-            message = String(payload?.error || payload?.message || message);
-          } catch {
-            message = bodyText;
-          }
-        }
-        throw new Error(message);
-      }
-      const blob = await response.blob();
-      downloadBlob(`${certificateID}-materials.zip`, blob);
-      ctx.notify(ctx.t("sites.tls.exported"));
+      await exportCertificates([certificateID]);
     } catch (error) {
       setError(feedback, `${ctx.t("sites.tls.exportFailed")}: ${String(error?.message || error)}`);
     }
@@ -226,6 +205,7 @@ export function bindDetailActionEvents(params) {
       await upsertAccessPolicy(draft, ctx, existingAccessPolicy, saveOptions);
       await compileAndApplySiteRevision(ctx, draft?.id ? [draft.id] : []);
       ctx.notify(ctx.t("toast.siteSaved"));
+      clearUnsavedChanges();
       go(`${routeBase()}/${encodeURIComponent(draft.id)}`);
     } catch (error) {
       console.warn("save site failed", error);
@@ -247,6 +227,7 @@ export function bindDetailActionEvents(params) {
         upstreams: state.upstreams
       });
       ctx.notify(ctx.t("toast.siteDeleted"));
+      clearUnsavedChanges();
       back();
     } catch (error) {
       setError(feedback, ctx.t("sites.error.deleteSite"));

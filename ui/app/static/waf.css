@@ -949,7 +949,7 @@ hr.waf-upstream-divider {
 }
 
 .waf-service-compact-section[data-tab-panel="geo"] .waf-form-grid {
-  grid-template-columns: repeat(2, minmax(220px, 360px));
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
 }
 
 .waf-service-compact-section[data-tab-panel="geo"] .waf-field {
@@ -957,7 +957,7 @@ hr.waf-upstream-divider {
 }
 
 .waf-service-compact-section[data-tab-panel="modsec"] .waf-form-grid {
-  grid-template-columns: repeat(3, minmax(220px, 360px));
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
   align-items: start;
 }
 
@@ -1602,6 +1602,10 @@ canvas {
   width: min(860px, 96vw);
 }
 
+#administration-entity-modal {
+  z-index: 1400;
+}
+
 .administration-modal-body.administration-modal-body-wide {
   width: min(1180px, 98vw);
 }
@@ -2001,6 +2005,10 @@ canvas {
     width: 100%;
     min-width: 0;
     max-width: none;
+  }
+
+  .waf-service-compact-section .waf-form-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .administration-role-groups,

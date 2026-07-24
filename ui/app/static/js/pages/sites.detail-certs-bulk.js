@@ -1,5 +1,6 @@
 import { confirmAction, setError, setLoading } from "../ui.js";
 import { normalizeArray, normalizeSiteID } from "./sites.routing-merge.js";
+import { createTLSExportStepUp } from "./tls.export-step-up.js";
 
 export function bindDetailBulkDelete(container, state, ctx, deps) {
   const { load, deleteServiceWithResources } = deps;
@@ -50,6 +51,7 @@ export function bindDetailCertificateActions(container, ctx, deps) {
   const { load, downloadBlob } = deps;
   const feedback = container.querySelector("#sites-feedback");
   const certificateArchiveInput = container.querySelector("#service-certificate-archive-file");
+  const exportCertificates = createTLSExportStepUp(container, ctx, downloadBlob);
 
   container.querySelector("#service-import-certificate-search")?.addEventListener("change", (event) => {
     const selectedID = String(event?.target?.value || "").trim().toLowerCase();
@@ -92,28 +94,7 @@ export function bindDetailCertificateActions(container, ctx, deps) {
       return;
     }
     try {
-      const response = await fetch("/api/certificate-materials/export", {
-        method: "POST",
-        credentials: "include",
-        headers: { Accept: "application/zip, application/json", "Content-Type": "application/json" },
-        body: JSON.stringify({ certificate_ids: [certificateID] })
-      });
-      if (!response.ok) {
-        const bodyText = await response.text();
-        let message = `HTTP ${response.status}`;
-        if (bodyText) {
-          try {
-            const payload = JSON.parse(bodyText);
-            message = String(payload?.error || payload?.message || message);
-          } catch {
-            message = bodyText;
-          }
-        }
-        throw new Error(message);
-      }
-      const blob = await response.blob();
-      downloadBlob(`${certificateID}-materials.zip`, blob);
-      ctx.notify(ctx.t("sites.tls.exported"));
+      await exportCertificates([certificateID]);
     } catch (error) {
       setError(feedback, `${ctx.t("sites.tls.exportFailed")}: ${String(error?.message || error)}`);
     }

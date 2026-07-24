@@ -10,7 +10,7 @@
 #   E2E_RT_HTTPS_PORT host port for runtime HTTPS (default: 10443)
 #   E2E_RT_HLT_PORT   host port for runtime health (default: 18081)
 #   E2E_USER          admin username (default: e2e-admin)
-#   E2E_PASS          admin credential (default: e2e-password-1234)
+#   E2E_PASS          required admin credential (or WAF_E2E_PASSWORD)
 #   E2E_TIMEOUT       seconds to wait for healthcheck (default: 180)
 #   E2E_FILTER        go test -run filter (default: TestE2E)
 #   E2E_FRESH_ONBOARDING set to 1 to verify clean first-run onboarding and HTTPS
@@ -20,6 +20,9 @@
 #   E2E_BUILD_ATTEMPTS docker compose build/start attempts (default: 3)
 #   E2E_BOOTSTRAP_REVISION_TIMEOUT seconds to wait for the initial active revision (default: E2E_TIMEOUT)
 #   E2E_PROJECT      Docker Compose project name (default: waf-e2e)
+#   E2E_BROWSER_ONLY set to 1 to run the Playwright slice instead of Go E2E
+#   E2E_BROWSER_SPECS whitespace-separated Playwright spec paths for this stack
+#   E2E_BROWSER_IMAGE prebuilt Playwright+Go image used by browser E2E
 
 set -eu
 
@@ -29,15 +32,21 @@ COMPOSE_FILE="$E2E_COMPOSE_DIR/docker-compose.yml"
 E2E_PORT="${E2E_PORT:-18080}"
 E2E_RT_PORT="${E2E_RT_PORT:-10080}"
 E2E_RT_HTTPS_PORT="${E2E_RT_HTTPS_PORT:-10443}"
+E2E_MTLS_UPSTREAM_PORT="${E2E_MTLS_UPSTREAM_PORT:-18084}"
 E2E_RT_HLT_PORT="${E2E_RT_HLT_PORT:-18081}"
 E2E_USER="${E2E_USER:-e2e-admin}"
-E2E_PASS="${E2E_PASS:-e2e-password-1234}"
+E2E_PASS="${E2E_PASS:-${WAF_E2E_PASSWORD:-}}"
 E2E_TIMEOUT="${E2E_TIMEOUT:-180}"
 E2E_BOOTSTRAP_REVISION_TIMEOUT="${E2E_BOOTSTRAP_REVISION_TIMEOUT:-$E2E_TIMEOUT}"
 E2E_FILTER="${E2E_FILTER:-TestE2E}"
 E2E_PROJECT="${E2E_PROJECT:-waf-e2e}"
 E2E_FRESH_ONBOARDING="${E2E_FRESH_ONBOARDING:-0}"
 E2E_KEEP_STACK="${E2E_KEEP_STACK:-0}"
+E2E_BROWSER_ONLY="${E2E_BROWSER_ONLY:-0}"
+E2E_BROWSER_SPECS="${E2E_BROWSER_SPECS:-}"
+E2E_BROWSER_IMAGE="${E2E_BROWSER_IMAGE:-tarinio-playwright-e2e:1.61.1}"
+E2E_BROWSER_RUNTIME_FAULT="${E2E_BROWSER_RUNTIME_FAULT:-}"
+E2E_DASHBOARD_SEED="${E2E_DASHBOARD_SEED:-auto}"
 GO_CMD="${GO_CMD:-go}"
 E2E_LOG_DIR="${E2E_LOG_DIR:-$REPO_ROOT/.work/logs}"
 mkdir -p "$E2E_LOG_DIR"
@@ -46,7 +55,9 @@ E2E_EVIDENCE_DIR="${E2E_EVIDENCE_DIR:-$E2E_LOG_DIR}"
 E2E_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 E2E_BUILD_RETRIES=0
 export COMPOSE_PROJECT_NAME="$E2E_PROJECT"
-export E2E_PORT E2E_RT_PORT E2E_RT_HTTPS_PORT E2E_RT_HLT_PORT
+export E2E_PORT E2E_RT_PORT E2E_RT_HTTPS_PORT E2E_RT_HLT_PORT E2E_PASS
+
+[ -n "$E2E_PASS" ] || { echo "[e2e] ERROR: E2E_PASS or WAF_E2E_PASSWORD is required" >&2; exit 1; }
 
 if [ "$E2E_FRESH_ONBOARDING" = "1" ]; then
   export E2E_BOOTSTRAP_ADMIN_ENABLED=false
@@ -263,7 +274,7 @@ ok_marker = "[OK]"
 fail_marker = "[FAIL]"
 skip_marker = "[SKIP]"
 
-cmd = [go_cmd, "test", "-json", "-v", "-count=1", "-timeout", "600s", "-run", flt, "./ui/tests/..."]
+cmd = [go_cmd, "test", "-tags=e2e", "-json", "-v", "-count=1", "-timeout", "600s", "-run", flt, "./ui/tests/..."]
 
 def expectation(name: str) -> str:
     leaf = name.split("/")[-1]
@@ -406,6 +417,7 @@ fi
 E2E_BASE_URL="http://127.0.0.1:${E2E_PORT}"
 E2E_RUNTIME_URL="http://127.0.0.1:${E2E_RT_PORT}"
 E2E_RUNTIME_HTTPS_URL="https://127.0.0.1:${E2E_RT_HTTPS_PORT}"
+WAF_E2E_MTLS_FIXTURE_URL="${WAF_E2E_MTLS_FIXTURE_URL:-http://127.0.0.1:${E2E_MTLS_UPSTREAM_PORT}}"
 E2E_RUNTIME_HEALTH_URL="http://127.0.0.1:${E2E_RT_HLT_PORT}"
 STACK_DOWN_DONE=0
 
@@ -419,7 +431,15 @@ cleanup() {
   [ "$STACK_DOWN_DONE" = "1" ] && return
   step "Removing e2e stack"
   cd "$E2E_COMPOSE_DIR"
-  $COMPOSE_CMD -f docker-compose.yml down --volumes --remove-orphans >>"$E2E_LOG_FILE" 2>&1 || true
+  if ! $COMPOSE_CMD -f docker-compose.yml down --volumes --remove-orphans >>"$E2E_LOG_FILE" 2>&1; then
+    fail_msg "Could not remove isolated stack $E2E_PROJECT"
+    show_log_tail "$E2E_LOG_FILE" 80
+    return 1
+  fi
+  if [ -n "$($COMPOSE_CMD -f docker-compose.yml ps -aq 2>/dev/null)" ]; then
+    fail_msg "Compose resources remain after cleanup for $E2E_PROJECT"
+    return 1
+  fi
   STACK_DOWN_DONE=1
   ok "Stack removed"
 }
@@ -430,7 +450,7 @@ step "Starting e2e stack (control-plane=:$E2E_PORT runtime=:$E2E_RT_PORT)"
 info "Detailed log: $E2E_LOG_FILE"
 info "Isolated Compose project: $E2E_PROJECT"
 cd "$E2E_COMPOSE_DIR"
-$COMPOSE_CMD -f docker-compose.yml down --volumes --remove-orphans >>"$E2E_LOG_FILE" 2>&1 || true
+run_quiet "Remove stale isolated stack" $COMPOSE_CMD -f docker-compose.yml down --volumes --remove-orphans
 run_compose_start
 ok "Containers are up"
 
@@ -529,11 +549,48 @@ if [ -z "$WAF_E2E_ATTACKER_IP" ] || [ -z "$WAF_E2E_L4_ATTACKER_IP" ]; then
   fail_msg "could not resolve isolated E2E attacker IP addresses"
   exit 1
 fi
-export WAF_E2E_BASE_URL WAF_E2E_USERNAME WAF_E2E_PASSWORD WAF_E2E_RUNTIME_URL WAF_E2E_RUNTIME_HTTPS_URL WAF_E2E_RUNTIME_HEALTH_URL WAF_E2E_RUNTIME_API_TOKEN WAF_E2E_COMPOSE_FILE WAF_E2E_MANAGEMENT_HOST WAF_E2E_AUTH_BASE_URL WAF_E2E_ANTIBOT_BASE_URL WAF_E2E_AUTOSTART_SMART WAF_E2E_L4_L7_PROTECTION WAF_E2E_FRESH_ONBOARDING WAF_E2E_RESILIENCE WAF_E2E_VERIFY_DECAY WAF_E2E_DAST_CANARY_URL WAF_E2E_ATTACKER_IP WAF_E2E_L4_ATTACKER_IP WAF_E2E_CONTROL_PLANE_CONTAINER WAF_E2E_RUNTIME_CONTAINER WAF_E2E_ATTACKER_CONTAINER WAF_E2E_L4_ATTACKER_CONTAINER GO_CMD E2E_FILTER
+export WAF_E2E_BASE_URL WAF_E2E_USERNAME WAF_E2E_PASSWORD WAF_E2E_RUNTIME_URL WAF_E2E_RUNTIME_HTTPS_URL WAF_E2E_MTLS_FIXTURE_URL WAF_E2E_RUNTIME_HEALTH_URL WAF_E2E_RUNTIME_API_TOKEN WAF_E2E_COMPOSE_FILE WAF_E2E_MANAGEMENT_HOST WAF_E2E_AUTH_BASE_URL WAF_E2E_ANTIBOT_BASE_URL WAF_E2E_AUTOSTART_SMART WAF_E2E_L4_L7_PROTECTION WAF_E2E_FRESH_ONBOARDING WAF_E2E_RESILIENCE WAF_E2E_VERIFY_DECAY WAF_E2E_DAST_CANARY_URL WAF_E2E_ATTACKER_IP WAF_E2E_L4_ATTACKER_IP WAF_E2E_CONTROL_PLANE_CONTAINER WAF_E2E_RUNTIME_CONTAINER WAF_E2E_ATTACKER_CONTAINER WAF_E2E_L4_ATTACKER_CONTAINER GO_CMD E2E_FILTER
+WAF_E2E_DISPOSABLE=1
+WAF_BROWSER_BASE_URL="https://e2e-management.test:${E2E_RT_HTTPS_PORT}"
+WAF_E2E_RUN_ID="${WAF_E2E_RUN_ID:-${E2E_PROJECT}-$(date +%s)}"
+export WAF_E2E_DISPOSABLE WAF_BROWSER_BASE_URL WAF_E2E_RUN_ID
+if [ "$E2E_BROWSER_ONLY" = "1" ] && { [ "$E2E_DASHBOARD_SEED" = "1" ] || { [ "$E2E_DASHBOARD_SEED" = "auto" ] && printf '%s' "$E2E_BROWSER_SPECS" | grep -Eq '(dashboard|requests-complete)\.spec\.ts'; }; }; then
+  step "Seeding real Dashboard telemetry"
+  sh "$REPO_ROOT/scripts/seed-dashboard-telemetry.sh" "$COMPOSE_FILE" "$E2E_BASE_URL" "$E2E_USER" "$E2E_PASS" >>"$E2E_LOG_FILE" 2>&1
+  ok "Dashboard telemetry is aggregated"
+fi
 TEST_SUMMARY_FILE="$(mktemp)"
-E2E_SUMMARY_OUT="$TEST_SUMMARY_FILE" run_go_e2e_stream || TEST_EXIT=$?
+if [ "$E2E_BROWSER_ONLY" = "1" ]; then
+  [ -n "$E2E_BROWSER_SPECS" ] || { fail_msg "E2E_BROWSER_SPECS is required in browser-only mode"; exit 1; }
+  docker image inspect "$E2E_BROWSER_IMAGE" >/dev/null 2>&1 || { fail_msg "Browser image is missing: $E2E_BROWSER_IMAGE"; exit 1; }
+  if [ "$E2E_BROWSER_RUNTIME_FAULT" = "requests-backend" ]; then
+    step "Authenticating before Requests backend-failure injection"
+    docker run --rm --network host --user "$(id -u):$(id -g)" \
+      -e HOME=/tmp -e CI -e WAF_E2E_DISPOSABLE -e WAF_BROWSER_BASE_URL \
+      -e WAF_E2E_USERNAME -e WAF_E2E_PASSWORD -e WAF_E2E_RUN_ID \
+      -v "$REPO_ROOT:/workspace" -w /workspace/e2e/browser "$E2E_BROWSER_IMAGE" \
+      bash -lc 'npm ci --prefer-offline --no-audit --fund=false && npx playwright test --project=setup' >>"$E2E_LOG_FILE" 2>&1
+    step "Pausing isolated runtime for Requests backend-failure browser evidence"
+    $COMPOSE_CMD -f "$COMPOSE_FILE" pause runtime >>"$E2E_LOG_FILE" 2>&1
+  fi
+  step "Running browser tests on isolated stack: $E2E_BROWSER_SPECS"
+  docker run --rm --network host --user "$(id -u):$(id -g)" \
+    -e HOME=/tmp -e CI -e CI_COMMIT_SHA -e CI_PIPELINE_URL \
+    -e WAF_E2E_DISPOSABLE -e WAF_BROWSER_BASE_URL -e WAF_E2E_RUNTIME_URL \
+    -e WAF_E2E_USERNAME -e WAF_E2E_PASSWORD -e WAF_E2E_RUN_ID \
+    -e WAF_BROWSER_RESULTS_FILE -e WAF_BROWSER_OUTPUT_DIR -e WAF_BROWSER_JUNIT_FILE \
+    -e WAF_BROWSER_WORKERS=1 -e E2E_BROWSER_SPECS -e E2E_BROWSER_RUNTIME_FAULT \
+    -v "$REPO_ROOT:/workspace" -w /workspace/e2e/browser "$E2E_BROWSER_IMAGE" \
+    bash -lc 'npm ci --prefer-offline --no-audit --fund=false && if [ "$E2E_BROWSER_RUNTIME_FAULT" = "requests-backend" ]; then npm test -- --project=desktop --project=mobile --no-deps $E2E_BROWSER_SPECS; else npm test -- $E2E_BROWSER_SPECS; fi' >"$TEST_LOG" 2>&1 || TEST_EXIT=$?
+  TEST_SUMMARY="browser:$E2E_BROWSER_SPECS"
+  if [ "$E2E_BROWSER_RUNTIME_FAULT" = "requests-backend" ]; then
+    $COMPOSE_CMD -f "$COMPOSE_FILE" unpause runtime >>"$E2E_LOG_FILE" 2>&1 || { fail_msg "Could not unpause isolated runtime"; exit 1; }
+  fi
+else
+  E2E_SUMMARY_OUT="$TEST_SUMMARY_FILE" run_go_e2e_stream || TEST_EXIT=$?
+  TEST_SUMMARY="$(cat "$TEST_SUMMARY_FILE" 2>/dev/null || true)"
+fi
 cat "$TEST_LOG" >>"$E2E_LOG_FILE"
-TEST_SUMMARY="$(cat "$TEST_SUMMARY_FILE" 2>/dev/null || true)"
 rm -f "$TEST_SUMMARY_FILE"
 
 redact_e2e_artifacts() {
@@ -577,7 +634,11 @@ capture_e2e_runtime_diagnostics() {
 if [ "$TEST_EXIT" -ne 0 ]; then
   capture_e2e_runtime_diagnostics
   redact_e2e_artifacts
-  python3 "$REPO_ROOT/scripts/write-e2e-evidence-report.py" --log "$TEST_LOG" --runtime-log "$E2E_LOG_FILE" --output-dir "$E2E_EVIDENCE_DIR" --suite "$E2E_FILTER" || true
+  if [ "$E2E_BROWSER_ONLY" = "1" ] && [ -n "${WAF_BROWSER_RESULTS_FILE:-}" ] && [ -f "$REPO_ROOT/e2e/browser/$WAF_BROWSER_RESULTS_FILE" ]; then
+    node "$REPO_ROOT/e2e/browser/scripts/write-evidence.mjs" "$REPO_ROOT/e2e/browser/$WAF_BROWSER_RESULTS_FILE" "$E2E_EVIDENCE_DIR" "$E2E_PROJECT" || true
+  else
+    python3 "$REPO_ROOT/scripts/write-e2e-evidence-report.py" --log "$TEST_LOG" --runtime-log "$E2E_LOG_FILE" --output-dir "$E2E_EVIDENCE_DIR" --suite "$E2E_FILTER" || true
+  fi
   write_e2e_stability failed test
   fail_msg "Tests failed (exit $TEST_EXIT). Expected/actual details from Go output:"
   show_log_tail "$TEST_LOG" 160
@@ -585,7 +646,11 @@ if [ "$TEST_EXIT" -ne 0 ]; then
   exit "$TEST_EXIT"
 fi
 redact_e2e_artifacts
-python3 "$REPO_ROOT/scripts/write-e2e-evidence-report.py" --log "$TEST_LOG" --runtime-log "$E2E_LOG_FILE" --output-dir "$E2E_EVIDENCE_DIR" --suite "$E2E_FILTER"
+if [ "$E2E_BROWSER_ONLY" = "1" ]; then
+  node "$REPO_ROOT/e2e/browser/scripts/write-evidence.mjs" "$REPO_ROOT/e2e/browser/$WAF_BROWSER_RESULTS_FILE" "$E2E_EVIDENCE_DIR" "$E2E_PROJECT"
+else
+  python3 "$REPO_ROOT/scripts/write-e2e-evidence-report.py" --log "$TEST_LOG" --runtime-log "$E2E_LOG_FILE" --output-dir "$E2E_EVIDENCE_DIR" --suite "$E2E_FILTER"
+fi
 write_e2e_stability passed
 rm -f "$TEST_LOG"
 ok "Tests passed: ${TEST_SUMMARY:-$E2E_FILTER}"

@@ -116,7 +116,7 @@ export const LIST_FIELD_SET = new Set([
   "allowed_methods", "ssl_protocols", "permissions_policy", "keep_upstream_headers", "cors_allowed_origins",
   "access_allowlist", "exceptions_ip", "exceptions_uri", "access_denylist", "blacklist_ip", "blacklist_rdns", "blacklist_asn",
   "blacklist_user_agent", "blacklist_uri", "blacklist_ja3", "blacklist_ip_urls", "blacklist_rdns_urls", "blacklist_asn_urls",
-  "blacklist_user_agent_urls", "blacklist_uri_urls", "blacklist_ja3_urls", "blacklist_country", "whitelist_country", "modsecurity_crs_plugins"
+  "blacklist_user_agent_urls", "blacklist_uri_urls", "blacklist_ja3_urls", "blacklist_country", "whitelist_country", "modsecurity_crs_plugins", "ws_block_patterns"
 ]);
 
 export const SETTINGS_SEARCH_INDEX = [
@@ -140,6 +140,7 @@ export const SETTINGS_SEARCH_INDEX = [
   { id: "hsts_enabled", tab: "headers", selector: "#service-hsts-enabled", labelKey: "sites.easy.headers.hstsEnabled" },
   { id: "hsts_max_age_seconds", tab: "headers", selector: "#service-hsts-max-age", labelKey: "sites.easy.headers.hstsMaxAge" },
   { id: "content_security_policy", tab: "headers", selector: "#service-content-security-policy", labelKey: "sites.easy.headers.contentSecurityPolicy" },
+  { id: "ws_block_patterns", tab: "websocket", selector: "#list-input-ws_block_patterns", labelKey: "sites.easy.ws.blockPatterns" },
   { id: "permissions_policy", tab: "headers", selector: "#list-input-permissions_policy", labelKey: "sites.easy.headers.permissionsPolicy" },
   { id: "access_allowlist", tab: "traffic", selector: "#list-input-access_allowlist", labelKey: "sites.lists.allowlist" },
   { id: "exceptions_ip", tab: "traffic", selector: "#list-input-exceptions_ip", labelKey: "sites.easy.traffic.exceptions" },

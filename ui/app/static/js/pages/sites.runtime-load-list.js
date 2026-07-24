@@ -217,13 +217,12 @@ export function bindListRuntime(state, ctx, container, deps = {}) {
       const nextEnabled = !(String(button.dataset.toggleEnabled || "") === "1");
       try {
         setLoading(feedback, ctx.t("sites.editor.saving"));
-        await ctx.api.put(`/api/sites/${encodeURIComponent(siteID)}`, {
-          ...site,
-          enabled: nextEnabled,
-        });
         const easyProfilePath = `/api/easy-site-profiles/${encodeURIComponent(siteID)}`;
         const profile = await ctx.api.get(easyProfilePath).catch((error) => (error?.status === 404 ? null : Promise.reject(error)));
-        if (profile && typeof profile === "object") {
+        const updateProfile = async () => {
+          if (!profile || typeof profile !== "object") {
+            return;
+          }
           const nextProfile = {
             ...profile,
             front_service: {
@@ -232,6 +231,17 @@ export function bindListRuntime(state, ctx, container, deps = {}) {
             },
           };
           await putWithPostFallback(ctx, easyProfilePath, nextProfile, { tolerateAutoApplyError: true });
+        };
+        const updateSite = () => ctx.api.put(`/api/sites/${encodeURIComponent(siteID)}`, {
+          ...site,
+          enabled: nextEnabled,
+        });
+        if (nextEnabled) {
+          await updateProfile();
+          await updateSite();
+        } else {
+          await updateSite();
+          await updateProfile();
         }
         feedback.innerHTML = "";
         ctx.notify(ctx.t(nextEnabled ? "toast.siteEnabled" : "toast.siteDisabled"));

@@ -1,3 +1,5 @@
+//go:build e2e
+
 package tests
 
 import (
@@ -13,7 +15,7 @@ import (
 func TestE2EDashboardAttackPopulationConsistency(t *testing.T) {
 	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL")), "/")
 	if baseURL == "" {
-		t.Skip("WAF_E2E_BASE_URL is not set; skipping dashboard population consistency test")
+		t.Fatal("WAF_E2E_BASE_URL is not set; skipping dashboard population consistency test")
 	}
 	composeFile := strings.TrimSpace(os.Getenv("WAF_E2E_COMPOSE_FILE"))
 	if composeFile == "" {

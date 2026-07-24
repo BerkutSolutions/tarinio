@@ -22,5 +22,10 @@ RUN GOTOOLCHAIN=auto go test ./ui/tests
 FROM nginx:1.27-alpine
 
 COPY ui/nginx.conf /etc/nginx/conf.d/default.conf
+COPY ui/nginx.rootless.conf /etc/nginx/nginx.conf
 COPY ui/app /usr/share/nginx/html
-RUN chmod -R a+rX /usr/share/nginx/html
+RUN chmod -R a+rX /usr/share/nginx/html \
+    && mkdir -p /var/cache/nginx /var/run \
+    && chown -R 101:101 /var/cache/nginx /var/run
+
+USER 101:101

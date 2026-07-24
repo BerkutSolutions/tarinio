@@ -68,7 +68,9 @@ func TestRequestArchiveLatestRespectsLocalDayTimezoneOffset(t *testing.T) {
 	root := t.TempDir()
 	logPath := filepath.Join(root, "access.log")
 	archiveRoot := filepath.Join(root, "requests-archive")
-	source := newRequestStreamSource(logPath, 100, archiveRoot, 30)
+	// The fixture uses a fixed historical UTC boundary to make timezone math
+	// reproducible. Retain it independently of the wall-clock date.
+	source := newRequestStreamSource(logPath, 100, archiveRoot, 3650)
 
 	lines := []byte(
 		"{\"timestamp\":\"2026-06-24T21:30:00Z\",\"request_id\":\"req-local\",\"client_ip\":\"1.1.1.1\",\"method\":\"GET\",\"uri\":\"/early\",\"status\":200,\"site\":\"logs_example_test\",\"host\":\"logs.example.test\"}\n" +

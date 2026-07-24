@@ -1,3 +1,6 @@
+import { installUnsavedChangesGuard } from "./sites.unsaved-guard.js";
+import { bindVirtualPatchesEditor } from "./sites.virtual-patches-bindings.js";
+
 export function bindDetailRuntime(deps) {
   const {
     container,
@@ -113,7 +116,8 @@ export function bindDetailRuntime(deps) {
     normalizeAuthSessionTTLMinutes
   });
 
-  const back = () => go(routeBase());
+  const unsavedGuard = installUnsavedChangesGuard({ container, state, message: ctx.t("sites.confirm.discardChanges"), confirmAction, navigate: () => go(routeBase()) });
+  const back = unsavedGuard.back;
   const toggleCertificateImportActions = () => toggleCertificateImportActionsDep(container);
   const parseRawDraft = () => {
     const rawEnvText = String(container.querySelector("#service-raw-env")?.value || state.rawEnvText || "").trim();
@@ -187,7 +191,8 @@ export function bindDetailRuntime(deps) {
     draftToEasyProfile,
     go,
     routeBase,
-    highlightSelector
+    highlightSelector,
+    clearUnsavedChanges: unsavedGuard.clear
   });
 
   bindDetailSearchAndListEvents({
@@ -225,4 +230,6 @@ export function bindDetailRuntime(deps) {
     normalizeBanEscalationStages,
     setError
   });
+
+  bindVirtualPatchesEditor(container, state, ctx, render);
 }

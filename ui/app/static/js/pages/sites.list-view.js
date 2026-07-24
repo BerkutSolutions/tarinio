@@ -4,6 +4,8 @@ import { normalizeHost, normalizeServiceProfile, formatServiceProfile } from "./
 import { resolvePublicServiceURL } from "./sites.traffic-helpers.js";
 
 export function renderListView(state, ctx, formatCertificateExpiryByLanguage, statusBadge, formatDate) {
+  const permissions = new Set((Array.isArray(ctx?.currentUser?.permissions) ? ctx.currentUser.permissions : []).map((item) => String(item || "").trim().toLowerCase()));
+  const canWrite = permissions.has("sites.write");
   return `
     <div class="waf-page-stack">
       <section class="waf-card waf-services-card">
@@ -13,10 +15,10 @@ export function renderListView(state, ctx, formatCertificateExpiryByLanguage, st
             <div class="muted">${escapeHtml(ctx.t("sites.list.subtitle"))}</div>
           </div>
           <div class="waf-actions">
-            <button class="btn primary btn-sm" type="button" id="services-create">${escapeHtml(ctx.t("sites.action.createSite"))}</button>
-            <button class="btn ghost btn-sm" type="button" id="services-import">${escapeHtml(ctx.t("sites.action.import"))}</button>
+            ${canWrite ? `<button class="btn primary btn-sm" type="button" id="services-create">${escapeHtml(ctx.t("sites.action.createSite"))}</button>` : ""}
+            ${canWrite ? `<button class="btn ghost btn-sm" type="button" id="services-import">${escapeHtml(ctx.t("sites.action.import"))}</button>` : ""}
             <button class="btn ghost btn-sm" type="button" id="services-export">${escapeHtml(ctx.t("sites.action.export"))}</button>
-            <button class="btn ghost btn-sm" type="button" id="services-delete-selected">${escapeHtml(ctx.t("sites.action.deleteSelected"))}</button>
+            ${canWrite ? `<button class="btn ghost btn-sm" type="button" id="services-delete-selected">${escapeHtml(ctx.t("sites.action.deleteSelected"))}</button>` : ""}
             <button class="btn ghost btn-sm" type="button" id="services-refresh">${escapeHtml(ctx.t("common.refresh"))}</button>
           </div>
         </div>
@@ -39,7 +41,7 @@ export function renderListView(state, ctx, formatCertificateExpiryByLanguage, st
           </div>
           <div class="waf-table-wrap">
             <table class="waf-table waf-services-table">
-              <thead><tr><th class="waf-check-col"><input type="checkbox" id="services-select-all"${state.filteredSites.length && state.filteredSites.every((site) => state.selectedSiteIDs.has(site.id)) ? " checked" : ""}></th><th>${escapeHtml(ctx.t("sites.table.name"))}</th><th>${escapeHtml(ctx.t("sites.table.profile"))}</th><th>${escapeHtml(ctx.t("sites.table.upstream"))}</th><th>${escapeHtml(ctx.t("sites.table.tls"))}</th><th>${escapeHtml(ctx.t("sites.table.updated"))}</th><th>${escapeHtml(ctx.t("sites.table.status"))}</th><th>${escapeHtml(ctx.t("sites.table.actions"))}</th></tr></thead>
+              <thead><tr><th class="waf-check-col">${canWrite ? `<input type="checkbox" id="services-select-all"${state.filteredSites.length && state.filteredSites.every((site) => state.selectedSiteIDs.has(site.id)) ? " checked" : ""}>` : ""}</th><th>${escapeHtml(ctx.t("sites.table.name"))}</th><th>${escapeHtml(ctx.t("sites.table.profile"))}</th><th>${escapeHtml(ctx.t("sites.table.upstream"))}</th><th>${escapeHtml(ctx.t("sites.table.tls"))}</th><th>${escapeHtml(ctx.t("sites.table.updated"))}</th><th>${escapeHtml(ctx.t("sites.table.status"))}</th><th>${escapeHtml(ctx.t("sites.table.actions"))}</th></tr></thead>
               <tbody>
                 ${state.filteredSites.length ? state.filteredSites.map((site) => {
                   const easyProfile = state.easyProfilesBySite.get(normalizeSiteID(site.id)) || null;
@@ -58,7 +60,7 @@ export function renderListView(state, ctx, formatCertificateExpiryByLanguage, st
                   const serviceURL = resolvePublicServiceURL(site, tlsState);
                   const tlsBadgeClass = tlsState === "missing" ? "badge-neutral" : (certificateIsExpiring ? "badge-danger" : "badge-success");
                   const tlsBadgeTitle = tlsState === "missing" ? ctx.t("sites.state.tlsMissing") : (certificateTitle || ctx.t("sites.state.tlsManaged"));
-                  return `<tr class="waf-table-row-clickable" data-open-site-edit="${escapeHtml(site.id)}"><td class="waf-check-col"><input type="checkbox" data-select-site="${escapeHtml(site.id)}"${state.selectedSiteIDs.has(site.id) ? " checked" : ""}></td><td><button class="waf-link-button" type="button" data-open-service="${escapeHtml(serviceURL)}" title="${escapeHtml(ctx.t("sites.action.openService"))}">${escapeHtml(site.primary_host || site.id)}</button></td><td>${escapeHtml(formatServiceProfile(serviceProfile, ctx))}</td><td>${upstream ? `${escapeHtml(upstream.host)}:${escapeHtml(String(upstream.port))}` : escapeHtml(ctx.t("common.notSet"))}</td><td><div class="waf-services-tls-cell"><div class="badge ${tlsBadgeClass} waf-services-tls-badge"><div class="waf-services-tls-badge-title">${escapeHtml(tlsBadgeTitle)}</div>${tlsState !== "missing" && certificateTitle ? `<div class="waf-services-tls-badge-expire">${escapeHtml(ctx.t("sites.table.tlsValidTill"))}: ${escapeHtml(certificateExpiry)}</div>` : ""}</div></div></td><td>${escapeHtml(formatDate(site.updated_at || site.created_at))}</td><td>${statusBadge(site.enabled ? "active" : "inactive")}</td><td><div class="waf-actions"><button class="btn ghost btn-sm" type="button" data-open-site="${escapeHtml(site.id)}">${escapeHtml(ctx.t("common.edit"))}</button><button class="btn ghost btn-sm" type="button" data-toggle-site="${escapeHtml(site.id)}" data-toggle-enabled="${site.enabled ? "1" : "0"}">${escapeHtml(ctx.t(site.enabled ? "common.disable" : "common.enable"))}</button></div></td></tr>`;
+                  return `<tr class="waf-table-row-clickable" data-open-site-edit="${escapeHtml(site.id)}"><td class="waf-check-col">${canWrite ? `<input type="checkbox" data-select-site="${escapeHtml(site.id)}"${state.selectedSiteIDs.has(site.id) ? " checked" : ""}>` : ""}</td><td><button class="waf-link-button" type="button" data-open-service="${escapeHtml(serviceURL)}" title="${escapeHtml(ctx.t("sites.action.openService"))}">${escapeHtml(site.primary_host || site.id)}</button></td><td>${escapeHtml(formatServiceProfile(serviceProfile, ctx))}</td><td>${upstream ? `${escapeHtml(upstream.host)}:${escapeHtml(String(upstream.port))}` : escapeHtml(ctx.t("common.notSet"))}</td><td><div class="waf-services-tls-cell"><div class="badge ${tlsBadgeClass} waf-services-tls-badge"><div class="waf-services-tls-badge-title">${escapeHtml(tlsBadgeTitle)}</div>${tlsState !== "missing" && certificateTitle ? `<div class="waf-services-tls-badge-expire">${escapeHtml(ctx.t("sites.table.tlsValidTill"))}: ${escapeHtml(certificateExpiry)}</div>` : ""}</div></div></td><td>${escapeHtml(formatDate(site.updated_at || site.created_at))}</td><td>${statusBadge(site.enabled ? "active" : "inactive")}</td><td><div class="waf-actions"><button class="btn ghost btn-sm" type="button" data-open-site="${escapeHtml(site.id)}">${escapeHtml(ctx.t("common.edit"))}</button>${canWrite ? `<button class="btn ghost btn-sm" type="button" data-toggle-site="${escapeHtml(site.id)}" data-toggle-enabled="${site.enabled ? "1" : "0"}">${escapeHtml(ctx.t(site.enabled ? "common.disable" : "common.enable"))}</button>` : ""}</div></td></tr>`;
                 }).join("") : `<tr><td colspan="8"><div class="waf-empty">${escapeHtml(ctx.t("sites.empty.sites"))}</div></td></tr>`}
               </tbody>
             </table>
@@ -154,12 +156,20 @@ export function bindList(container, state, ctx, deps) {
       const nextEnabled = !(String(button.dataset.toggleEnabled || "") === "1");
       try {
         setLoading(feedback, ctx.t("sites.editor.saving"));
-        await ctx.api.put(`/api/sites/${encodeURIComponent(siteID)}`, { ...site, enabled: nextEnabled });
         const easyProfilePath = `/api/easy-site-profiles/${encodeURIComponent(siteID)}`;
         const profile = await ctx.api.get(easyProfilePath).catch((error) => (error?.status === 404 ? null : Promise.reject(error)));
-        if (profile && typeof profile === "object") {
+        const updateProfile = async () => {
+          if (!profile || typeof profile !== "object") return;
           const nextProfile = { ...profile, front_service: { ...(profile.front_service || {}), enabled: nextEnabled } };
           await putWithPostFallback(ctx, easyProfilePath, nextProfile, { tolerateAutoApplyError: true });
+        };
+        const updateSite = () => ctx.api.put(`/api/sites/${encodeURIComponent(siteID)}`, { ...site, enabled: nextEnabled });
+        if (nextEnabled) {
+          await updateProfile();
+          await updateSite();
+        } else {
+          await updateSite();
+          await updateProfile();
         }
         feedback.innerHTML = "";
         ctx.notify(ctx.t(nextEnabled ? "toast.siteEnabled" : "toast.siteDisabled"));

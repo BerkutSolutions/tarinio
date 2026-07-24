@@ -74,6 +74,7 @@ export async function renderBans(container, ctx) {
         </div>
       </div>
       <div class="waf-card-body waf-stack">
+        <label class="waf-field" for="bans-filter"><span>${escapeHtml(ctx.t("bans.filter"))}</span><input id="bans-filter" type="search" placeholder="${escapeHtml(ctx.t("bans.filter.placeholder"))}"></label>
         <div id="bans-status"></div>
         <div id="bans-list"></div>
       </div>
@@ -196,6 +197,7 @@ export async function renderBans(container, ctx) {
 
   const statusNode = container.querySelector("#bans-status");
   const listNode = container.querySelector("#bans-list");
+  const filterNode = container.querySelector("#bans-filter");
   const createModalNode = container.querySelector("#bans-create-modal");
   const createStatusNode = container.querySelector("#bans-create-status");
   const createSiteNode = container.querySelector("#bans-create-site");
@@ -247,6 +249,7 @@ export async function renderBans(container, ctx) {
     statusNode,
     listNode,
     pagingState,
+    getFilter: () => String(filterNode?.value || ""),
     getPaginationMeta,
     renderCreateSiteOptions: (sites) => renderCreateSiteOptions({
       createSiteNode,
@@ -276,6 +279,7 @@ export async function renderBans(container, ctx) {
     iconPlus: ICON_PLUS,
     iconUnlock: ICON_UNLOCK
   });
+  filterNode?.addEventListener("input", () => { pagingState.page = 1; renderRows(); });
   bindBansPageActions({
     container,
     ctx,

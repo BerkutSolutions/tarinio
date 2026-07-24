@@ -3,7 +3,6 @@ services:
     build:
       context: ../../..
       dockerfile: control-plane/Dockerfile
-    container_name: tarinio-control-plane-auto-start
     restart: unless-stopped
     env_file:
       - .env
@@ -79,7 +78,6 @@ services:
     build:
       context: ../../..
       dockerfile: runtime/image/Dockerfile
-    container_name: tarinio-runtime-auto-start
     restart: unless-stopped
     depends_on:
       ui:
@@ -119,7 +117,6 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: tarinio-redis-auto-start
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -131,7 +128,6 @@ services:
 
   postgres:
     image: postgres:15
-    container_name: tarinio-postgres-auto-start
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-waf}
@@ -152,7 +148,6 @@ services:
     build:
       context: ../../..
       dockerfile: ui/Dockerfile
-    container_name: tarinio-ui-auto-start
     restart: unless-stopped
     depends_on:
       control-plane:
@@ -168,8 +163,11 @@ services:
     build:
       context: ../../..
       dockerfile: deploy/compose/auto-start/ddos-model/Dockerfile
-    container_name: tarinio-sentinel-auto-start
     restart: unless-stopped
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
     environment:
       MODEL_SOURCE_BACKEND: ${MODEL_SOURCE_BACKEND:-file}
       MODEL_LOG_PATH: /logs/access.log
@@ -215,7 +213,6 @@ services:
     build:
       context: ../../..
       dockerfile: cli/Dockerfile
-    container_name: tarinio-cli-auto-start
     profiles:
       - tools
     environment:
@@ -225,21 +222,13 @@ services:
 
 networks:
   waf-net-auto-start:
-    name: waf-net-auto-start
 
 volumes:
   waf-runtime-data-auto-start:
-    name: waf-runtime-data-auto-start
   waf-control-plane-data-auto-start:
-    name: waf-control-plane-data-auto-start
   waf-certificates-data-auto-start:
-    name: waf-certificates-data-auto-start
   waf-postgres-data-auto-start:
-    name: waf-postgres-data-auto-start
   waf-nginx-logs-auto-start:
-    name: waf-nginx-logs-auto-start
   waf-l4-adaptive-auto-start:
-    name: waf-l4-adaptive-auto-start
   waf-ddos-model-state-auto-start:
-    name: waf-ddos-model-state-auto-start
 

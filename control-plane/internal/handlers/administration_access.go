@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"waf/control-plane/internal/audits"
 	"waf/control-plane/internal/auth"
 	"waf/control-plane/internal/rbac"
 	"waf/control-plane/internal/roles"
@@ -18,6 +19,7 @@ type administrationUserStore interface {
 	List() ([]users.User, error)
 	Create(user users.User) (users.User, error)
 	Update(user users.User) (users.User, error)
+	Delete(id string) error
 }
 
 type administrationRoleStore interface {
@@ -32,12 +34,16 @@ type AdministrationUsersHandler struct {
 	users    administrationUserStore
 	roles    administrationRoleStore
 	sessions administrationSessionStore
+	audits   administrationAuditEmitter
 }
 
 type AdministrationRolesHandler struct {
-	roles administrationRoleStore
-	users administrationUserStore
+	roles  administrationRoleStore
+	users  administrationUserStore
+	audits administrationAuditEmitter
 }
+
+type administrationAuditEmitter interface{ Emit(audits.AuditEvent) }
 
 type ZeroTrustHealthHandler struct {
 	users administrationUserStore
@@ -78,6 +84,13 @@ func NewAdministrationRolesHandler(roleStore administrationRoleStore, userStore 
 	return &AdministrationRolesHandler{roles: roleStore, users: userStore}
 }
 
+func (h *AdministrationUsersHandler) SetAuditEmitter(emitter administrationAuditEmitter) {
+	h.audits = emitter
+}
+func (h *AdministrationRolesHandler) SetAuditEmitter(emitter administrationAuditEmitter) {
+	h.audits = emitter
+}
+
 func NewZeroTrustHealthHandler(userStore administrationUserStore, roleStore administrationRoleStore) *ZeroTrustHealthHandler {
 	return &ZeroTrustHealthHandler{users: userStore, roles: roleStore}
 }
@@ -92,6 +105,8 @@ func (h *AdministrationUsersHandler) ServeHTTP(w http.ResponseWriter, r *http.Re
 		h.get(w, r)
 	case strings.HasPrefix(r.URL.Path, "/api/administration/users/") && r.Method == http.MethodPut:
 		h.update(w, r)
+	case strings.HasPrefix(r.URL.Path, "/api/administration/users/") && r.Method == http.MethodDelete:
+		h.delete(w, r)
 	default:
 		w.WriteHeader(http.StatusNotFound)
 	}
@@ -107,6 +122,8 @@ func (h *AdministrationRolesHandler) ServeHTTP(w http.ResponseWriter, r *http.Re
 		h.get(w, r)
 	case strings.HasPrefix(r.URL.Path, "/api/administration/roles/") && r.Method == http.MethodPut:
 		h.update(w, r)
+	case strings.HasPrefix(r.URL.Path, "/api/administration/roles/") && r.Method == http.MethodDelete:
+		h.delete(w, r)
 	default:
 		w.WriteHeader(http.StatusNotFound)
 	}
@@ -319,6 +336,35 @@ func (h *AdministrationUsersHandler) update(w http.ResponseWriter, r *http.Reque
 	writeJSON(w, http.StatusOK, userToView(updated))
 }
 
+func (h *AdministrationUsersHandler) delete(w http.ResponseWriter, r *http.Request) {
+	id := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/administration/users/"), "/")
+	item, ok, err := h.users.Get(id)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		return
+	}
+	if !ok {
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": "user not found"})
+		return
+	}
+	if isBuiltInAdmin(item) {
+		writeJSON(w, http.StatusConflict, map[string]any{"error": "built-in administrator cannot be deleted"})
+		return
+	}
+	if h.sessions != nil {
+		if err := h.sessions.DeleteSessionsByUser(id); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+			return
+		}
+	}
+	if err := h.users.Delete(id); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		return
+	}
+	h.emitDeleteAudit(r, "administration.user.delete", "user", id)
+	writeJSON(w, http.StatusOK, map[string]any{"deleted": true, "id": id})
+}
+
 func (h *AdministrationUsersHandler) normalizeRoleIDs(items []string) ([]string, error) {
 	if len(items) == 0 {
 		return nil, nil
@@ -426,6 +472,52 @@ func (h *AdministrationRolesHandler) update(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	writeJSON(w, http.StatusOK, updated)
+}
+
+func (h *AdministrationRolesHandler) delete(w http.ResponseWriter, r *http.Request) {
+	id := rbac.NormalizeRoleID(strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/administration/roles/"), "/"))
+	if id == "admin" || id == "auditor" || id == "manager" || id == "soc" {
+		writeJSON(w, http.StatusConflict, map[string]any{"error": "built-in role cannot be deleted"})
+		return
+	}
+	items, err := h.users.List()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		return
+	}
+	for _, user := range items {
+		for _, roleID := range user.RoleIDs {
+			if rbac.NormalizeRoleID(roleID) == rbac.NormalizeRoleID(id) {
+				writeJSON(w, http.StatusConflict, map[string]any{"error": "role is assigned to a user"})
+				return
+			}
+		}
+	}
+	if err := h.roles.Delete(id); err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": err.Error()})
+		return
+	}
+	h.emitDeleteAudit(r, "administration.role.delete", "role", id)
+	writeJSON(w, http.StatusOK, map[string]any{"deleted": true, "id": id})
+}
+
+func (h *AdministrationUsersHandler) emitDeleteAudit(r *http.Request, action, resourceType, id string) {
+	if h.audits == nil {
+		return
+	}
+	actor, ip := auditActorFromRequest(r)
+	h.audits.Emit(audits.AuditEvent{ActorUserID: actor, ActorIP: ip, Action: action, ResourceType: resourceType, ResourceID: id, Status: audits.StatusSucceeded, Summary: resourceType + " deleted"})
+}
+func (h *AdministrationRolesHandler) emitDeleteAudit(r *http.Request, action, resourceType, id string) {
+	if h.audits == nil {
+		return
+	}
+	actor, ip := auditActorFromRequest(r)
+	h.audits.Emit(audits.AuditEvent{ActorUserID: actor, ActorIP: ip, Action: action, ResourceType: resourceType, ResourceID: id, Status: audits.StatusSucceeded, Summary: resourceType + " deleted"})
+}
+func auditActorFromRequest(r *http.Request) (string, string) {
+	session, _ := auth.SessionFromContext(r.Context())
+	return session.UserID, audits.ActorIPFromContext(r.Context())
 }
 
 func userToView(item users.User) map[string]any {

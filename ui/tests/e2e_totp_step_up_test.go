@@ -1,3 +1,5 @@
+//go:build e2e
+
 package tests
 
 import (
@@ -18,12 +20,12 @@ import (
 func TestE2ETOTPStepUpProtectsCertificateExportAndLocksFailures(t *testing.T) {
 	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL")), "/")
 	if baseURL == "" {
-		t.Skip("WAF_E2E_BASE_URL is not set; skipping TOTP step-up E2E")
+		t.Fatal("WAF_E2E_BASE_URL is not set; skipping TOTP step-up E2E")
 	}
 	adminClient, requestBaseURL, hostOverride := newE2EClientAndBase(t, baseURL)
 	challengeURI := normalizeChallengeURI(strings.TrimSpace(os.Getenv("WAF_E2E_ANTIBOT_CHALLENGE_URI")))
 	ensureManagementLoginAccess(t, adminClient, requestBaseURL, hostOverride, challengeURI)
-	loginE2EStepUpUser(t, adminClient, requestBaseURL, hostOverride, "e2e-admin", "e2e-password-1234")
+	loginE2EStepUpUser(t, adminClient, requestBaseURL, hostOverride, firstNonEmpty(strings.TrimSpace(os.Getenv("WAF_E2E_USERNAME")), "e2e-admin"), firstNonEmpty(strings.TrimSpace(os.Getenv("WAF_E2E_PASSWORD")), "admin"))
 
 	username := "e2e_stepup_" + strconv.FormatInt(time.Now().UnixNano(), 36)
 	password := "step-up-password-1234"

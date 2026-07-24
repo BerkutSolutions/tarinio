@@ -135,6 +135,10 @@ services:
       dockerfile: ui/Dockerfile
     container_name: tarinio-testpage-ui
     restart: unless-stopped
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
     volumes:
       - ../../../ui/nginx.testpage.conf:/etc/nginx/conf.d/default.conf:ro
       - waf-test-app-control-plane-data:/var/lib/waf/control-plane-app:ro

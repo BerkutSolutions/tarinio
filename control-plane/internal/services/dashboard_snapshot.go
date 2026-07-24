@@ -123,7 +123,7 @@ func (s *DashboardService) refreshSnapshot() error {
 
 func (s *DashboardService) buildSnapshot() (DashboardStats, error) {
 	now := time.Now().UTC()
-	cutoff := now.Add(-24 * time.Hour)
+	cutoff := dashboardObservationStart(now)
 
 	out := DashboardStats{
 		GeneratedAt:            now.Format(time.RFC3339Nano),

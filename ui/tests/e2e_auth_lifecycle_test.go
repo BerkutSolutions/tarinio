@@ -1,3 +1,5 @@
+//go:build e2e
+
 package tests
 
 import (
@@ -14,7 +16,7 @@ func TestE2EBasicAuthLifecycle(t *testing.T) {
 	runtimeURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_RUNTIME_URL")), "/")
 	runtimeHost := strings.TrimSpace(firstNonEmpty(os.Getenv("WAF_E2E_AUTH_HOST"), os.Getenv("WAF_E2E_MANAGEMENT_HOST")))
 	if panelURL == "" || runtimeURL == "" {
-		t.Skip("Basic Auth panel or runtime URL is not configured")
+		t.Fatal("Basic Auth panel or runtime URL is not configured")
 	}
 	t.Logf("Basic Auth lifecycle runtime URL: %s", runtimeURL)
 	adminClient, requestBaseURL, hostOverride := newE2EClientAndBase(t, panelURL)

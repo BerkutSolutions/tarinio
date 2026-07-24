@@ -53,7 +53,10 @@ func (e HTTPReloadExecutor) reloadOnce(endpoint string) (error, bool) {
 		return err, false
 	}
 	setRuntimeAuthHeader(req, strings.TrimSpace(e.Token))
-	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+	// Runtime waits for nginx workers to publish the exact activated revision.
+	// Keep the transport budget above that bounded readiness loop so the
+	// control-plane does not cancel a valid slow reload and start a duplicate.
+	resp, err := (&http.Client{Timeout: 25 * time.Second}).Do(req)
 	if err != nil {
 		return err, false
 	}

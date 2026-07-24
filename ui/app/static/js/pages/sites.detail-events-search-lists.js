@@ -1,6 +1,8 @@
 import { readAntibotExclusionDraftRows } from "./sites.antibot-exclusion-editors.js";
 import { readAuthExclusionDraftRows } from "./sites.auth-extended-editors.js";
 import { readModSecurityExclusionDraftRows } from "./sites.modsec-exclusion-editors.js";
+import { readGeoTimeWindowDraftRows } from "./sites.geo-time-window-draft.js";
+import { normalizeGeoTimeWindows } from "./sites.normalize.js";
 
 export function bindDetailSearchAndListEvents(params) {
   const {
@@ -356,6 +358,22 @@ export function bindDetailSearchAndListEvents(params) {
       }
       current.splice(index, 1);
       state.draft.modsecurity_exclusion_rules = normalizeModSecurityExclusionRules(current, { normalizeArray });
+      render();
+    });
+  });
+
+  container.querySelector("[data-geo-tw-add]")?.addEventListener("click", () => {
+    state.draft.geo_time_windows = [...readGeoTimeWindowDraftRows(container), { countries: [], action: "block", days_of_week: [], hours_start: 9, hours_end: 17 }];
+    render();
+  });
+  container.querySelectorAll("[data-geo-tw-remove]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const index = Number.parseInt(String(button.dataset.geoTwRemove || "-1"), 10);
+      if (!Number.isInteger(index) || index < 0) return;
+      const current = readGeoTimeWindowDraftRows(container);
+      if (index >= current.length) return;
+      current.splice(index, 1);
+      state.draft.geo_time_windows = normalizeGeoTimeWindows(current);
       render();
     });
   });

@@ -5,7 +5,10 @@ param(
   [string]$SecondarySiteID = "dashboard-demo-secondary",
   [int]$Hours = 24,
   [int]$RequestsPerHour = 8,
-  [int]$BlockedPerHour = 3
+  [int]$BlockedPerHour = 3,
+  [string]$VerifyControlPlaneURL = "",
+  [string]$Username = "e2e-admin",
+  [string]$Password = "e2e-password-1234"
 )
 
 $ErrorActionPreference = "Stop"
@@ -101,3 +104,69 @@ $expectedRequests = $Hours * ($RequestsPerHour + $BlockedPerHour)
 $expectedBlocked = $Hours * $BlockedPerHour
 Write-Host "Done. Wait up to 10 seconds, refresh Dashboard, and inspect traffic, attacks, blocked attacks, countries, and the 24-hour chart."
 Write-Host "Deterministic seed: $expectedRequests requests, $expectedBlocked blocked, two sites, five IPs/countries."
+
+if ([string]::IsNullOrWhiteSpace($VerifyControlPlaneURL)) {
+  return
+}
+
+$baseURL = $VerifyControlPlaneURL.TrimEnd('/')
+$session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+$loginBody = @{ username = $Username; password = $Password } | ConvertTo-Json
+Invoke-RestMethod -Uri "$baseURL/api/auth/login" -Method Post -WebSession $session -ContentType "application/json" -Body $loginBody | Out-Null
+
+function Invoke-E2EAPI {
+  param([string]$Path, [string]$Method = "Get", [object]$Body = $null)
+  $arguments = @{ Uri = "$baseURL$Path"; Method = $Method; WebSession = $session; ContentType = "application/json" }
+  if ($null -ne $Body) { $arguments.Body = ($Body | ConvertTo-Json -Depth 12) }
+  Invoke-RestMethod @arguments
+}
+
+function Wait-E2ECondition {
+  param([scriptblock]$Condition, [string]$Description, [int]$TimeoutSeconds = 30)
+  $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+  do {
+    if (& $Condition) { return }
+    Start-Sleep -Milliseconds 500
+  } while ((Get-Date) -lt $deadline)
+  throw "Timed out waiting for $Description"
+}
+
+Wait-E2ECondition -Description "seeded requests" -Condition {
+  $requests = @(Invoke-E2EAPI -Path "/api/requests?limit=500")
+  $count = Invoke-E2EAPI -Path "/api/requests?count=1"
+  $ids = @($requests.entry.request_id | ForEach-Object { [string]$_ })
+  [int]$count.count -ge $expectedRequests -and
+    $ids -contains "dashboard-e2e-request-23-0" -and
+    $ids -contains "dashboard-e2e-attack-23-0"
+}
+Wait-E2ECondition -Description "seeded dashboard aggregation" -Condition {
+  $stats = Invoke-E2EAPI -Path "/api/dashboard/stats"
+  @($stats.requests_series).Count -eq 24 -and @($stats.request_top_sites).Count -ge 2
+}
+
+$catalog = Invoke-E2EAPI -Path "/api/revisions"
+$originalRevision = @($catalog.revisions | Where-Object { $_.is_active } | Select-Object -First 1).id
+if ([string]::IsNullOrWhiteSpace($originalRevision)) { throw "Active revision was not found before observability seed" }
+$compiled = Invoke-E2EAPI -Path "/api/revisions/compile" -Method Post -Body @{}
+$seedRevision = [string]$compiled.revision.id
+if ([string]::IsNullOrWhiteSpace($seedRevision)) { throw "Compile response did not contain revision.id" }
+try {
+  Invoke-E2EAPI -Path "/api/revisions/$seedRevision/apply" -Method Post -Body @{} | Out-Null
+  Wait-E2ECondition -Description "seed revision activation" -TimeoutSeconds 120 -Condition {
+    $current = Invoke-E2EAPI -Path "/api/revisions"
+    [string](@($current.revisions | Where-Object { $_.is_active } | Select-Object -First 1).id) -eq $seedRevision
+  }
+  Wait-E2ECondition -Description "seeded operational event and audit entry" -Condition {
+    $events = Invoke-E2EAPI -Path "/api/events?limit=500"
+    $audit = Invoke-E2EAPI -Path "/api/audit?limit=500"
+    @($events.events | Where-Object { $_.related_revision_id -eq $seedRevision }).Count -gt 0 -and
+      @($audit.items | Where-Object { $_.related_revision_id -eq $seedRevision }).Count -gt 0
+  }
+} finally {
+  Invoke-E2EAPI -Path "/api/revisions/$originalRevision/apply" -Method Post -Body @{} | Out-Null
+  Wait-E2ECondition -Description "original revision restore" -TimeoutSeconds 120 -Condition {
+    $current = Invoke-E2EAPI -Path "/api/revisions"
+    [string](@($current.revisions | Where-Object { $_.is_active } | Select-Object -First 1).id) -eq $originalRevision
+  }
+}
+Write-Host "Verified deterministic Requests, Dashboard, Events and Audit seed; restored active revision $originalRevision."

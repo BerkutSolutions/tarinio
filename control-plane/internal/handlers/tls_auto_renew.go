@@ -56,6 +56,10 @@ func (h *TLSAutoRenewHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "renew_before_days must be integer"})
 			return
 		}
+		if days < 1 || days > 365 {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "renew_before_days must be between 1 and 365"})
+			return
+		}
 		updated, err := h.service.UpdateSettings(services.TLSAutoRenewSettings{
 			Enabled:         enabled,
 			RenewBeforeDays: days,

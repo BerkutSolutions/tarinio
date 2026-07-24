@@ -9,6 +9,7 @@ export function validateDraft(draft, ctx) {
   if (!draft.upstream_id.trim()) return ctx.t("sites.validation.upstreamIdRequired");
   if (!draft.upstream_host.trim()) return ctx.t("sites.validation.upstreamHostRequired");
   if (!Number.isInteger(draft.upstream_port) || draft.upstream_port < 1 || draft.upstream_port > 65535) return ctx.t("sites.validation.portRange");
+  if (!["http", "https"].includes(String(draft.upstream_scheme || "").trim().toLowerCase())) return ctx.t("sites.validation.upstreamScheme");
   if (!normalizeStringArray(draft.allowed_methods).length) return ctx.t("sites.validation.allowedMethodsRequired");
   if (draft.use_bad_behavior && !normalizeArray(draft.bad_behavior_status_codes).length) return ctx.t("sites.validation.badBehaviorStatusCodesRequired");
   if (draft.use_bad_behavior && (!Number.isFinite(draft.bad_behavior_ban_time_seconds) || draft.bad_behavior_ban_time_seconds < 0)) return ctx.t("sites.validation.badBehaviorBanDuration");

@@ -1,3 +1,5 @@
+//go:build e2e
+
 package tests
 
 import (
@@ -20,12 +22,12 @@ import (
 func TestE2EBehavioral(t *testing.T) {
 	baseURL := strings.TrimSpace(os.Getenv("WAF_E2E_RUNTIME_URL"))
 	if baseURL == "" {
-		t.Skip("WAF_E2E_RUNTIME_URL not set; skipping behavioral runtime tests")
+		t.Fatal("WAF_E2E_RUNTIME_URL not set; skipping behavioral runtime tests")
 	}
 	runtimeURL := baseURL
 	requestBaseURLEnv := strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL"))
 	if requestBaseURLEnv == "" {
-		t.Skip("WAF_E2E_BASE_URL not set; skipping behavioral runtime tests")
+		t.Fatal("WAF_E2E_BASE_URL not set; skipping behavioral runtime tests")
 	}
 
 	client, requestBaseURL, requestHostOverride := newE2EClientAndBase(t, requestBaseURLEnv)
@@ -379,14 +381,21 @@ func TestE2EBehavioral(t *testing.T) {
 			}
 		}
 		t.Cleanup(func() { setPolicy(previous.BlockDirectIPAccess) })
+		directClient := &http.Client{
+			CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse },
+			Transport:     &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}},
+		}
 
 		directRequest := func() (*http.Response, error) {
 			req, err := http.NewRequest(http.MethodGet, runtimeURL+"/", nil)
 			if err != nil {
 				return nil, err
 			}
-			req.Host = "127.0.0.1"
-			return (&http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}).Do(req)
+			// Use a loopback address that is not claimed by a site created by an
+			// earlier E2E. It still reaches the same listener but must take the
+			// direct-IP/default-server path.
+			req.Host = "127.0.0.2:" + req.URL.Port()
+			return directClient.Do(req)
 		}
 
 		setPolicy(false)

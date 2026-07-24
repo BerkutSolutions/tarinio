@@ -15,4 +15,6 @@ RUN apt-get update \
 
 COPY --from=builder /out/waf-cli /usr/local/bin/waf-cli
 
+USER 65532:65532
+
 ENTRYPOINT ["/usr/local/bin/waf-cli"]

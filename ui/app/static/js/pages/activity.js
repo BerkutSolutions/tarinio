@@ -247,6 +247,7 @@ export async function renderActivity(container, ctx) {
       params.set("site_id", siteIDsByHost.get(normalizedSite) || query.site_id);
     }
     if (query.status) params.set("status", query.status);
+    if (query.category) params.set("category", query.category);
     if (query.from) params.set("from", query.from);
     if (query.to) params.set("to", query.to);
     params.set("limit", String(query.limit));
@@ -255,7 +256,7 @@ export async function renderActivity(container, ctx) {
     setLoading(results, ctx.t("activity.loading"));
     try {
       const result = await ctx.api.get(`/api/audit?${params.toString()}`);
-      const items = (result.items || []).filter((item) => !query.category || inferCategory(item.action || "") === query.category);
+      const items = result.items || [];
       state.total = Number(result.total || 0);
       renderItems(items);
       syncPager(query.limit);

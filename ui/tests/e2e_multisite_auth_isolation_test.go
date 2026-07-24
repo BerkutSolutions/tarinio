@@ -1,3 +1,5 @@
+//go:build e2e
+
 package tests
 
 import (
@@ -14,7 +16,7 @@ func TestE2EMultisiteBasicAuthIsolation(t *testing.T) {
 	panelURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL")), "/")
 	runtimeURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_RUNTIME_URL")), "/")
 	if panelURL == "" || runtimeURL == "" {
-		t.Skip("panel or runtime URL is not configured")
+		t.Fatal("panel or runtime URL is not configured")
 	}
 	adminClient, requestBaseURL, hostOverride := newE2EClientAndBase(t, panelURL)
 	loginE2EUser(t, adminClient, requestBaseURL, hostOverride)

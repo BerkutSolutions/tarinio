@@ -13,6 +13,7 @@ import (
 
 type fakeCertificateACMEService struct {
 	renewOptions *services.ACMEIssueOptions
+	renewJob     jobs.Job
 }
 
 func (f *fakeCertificateACMEService) Issue(ctx context.Context, certificateID string, commonName string, sanList []string, options *services.ACMEIssueOptions) (jobs.Job, error) {
@@ -21,7 +22,21 @@ func (f *fakeCertificateACMEService) Issue(ctx context.Context, certificateID st
 
 func (f *fakeCertificateACMEService) Renew(ctx context.Context, certificateID string, options *services.ACMEIssueOptions) (jobs.Job, error) {
 	f.renewOptions = options
+	if f.renewJob.Status != "" {
+		return f.renewJob, nil
+	}
 	return jobs.Job{ID: "job-b", Status: jobs.StatusSucceeded}, nil
+}
+
+func TestCertificateACMEHandler_RenewFailedNotFoundJobMaps404(t *testing.T) {
+	service := &fakeCertificateACMEService{renewJob: jobs.Job{ID: "job-missing", Status: jobs.StatusFailed, Result: "certificate missing not found"}}
+	handler := NewCertificateACMEHandler(service, &fakeCertificateACMEService{})
+	req := httptest.NewRequest(http.MethodPost, "/api/certificates/acme/renew/missing", bytes.NewBufferString(`{}`))
+	resp := httptest.NewRecorder()
+	handler.ServeHTTP(resp, req)
+	if resp.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d body=%s", resp.Code, resp.Body.String())
+	}
 }
 
 func TestCertificateACMEHandler_Issue(t *testing.T) {

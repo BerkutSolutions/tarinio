@@ -513,7 +513,7 @@ func (s *DashboardService) collectRequests() ([]map[string]any, error) {
 func (s *DashboardService) collectDashboardRequests() ([]map[string]any, RuntimeRequestDashboardSummary, error) {
 	if collector, ok := s.requests.(runtimeRequestDashboardSummaryCollector); ok {
 		query := make(url.Values)
-		query.Set("since", time.Now().UTC().Add(-24*time.Hour).Format(time.RFC3339))
+		query.Set("since", dashboardObservationStart(time.Now()).Format(time.RFC3339))
 		summary, err := collector.CollectDashboardSummary(query)
 		if err == nil {
 			return nil, summary, nil

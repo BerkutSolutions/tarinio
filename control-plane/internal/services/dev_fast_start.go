@@ -57,6 +57,10 @@ type devFastStartApplyService interface {
 	Apply(ctx context.Context, revisionID string) (jobs.Job, error)
 }
 
+type devFastStartConditionalApplyService interface {
+	ApplyIfNoActiveRevision(ctx context.Context, revisionID string) (jobs.Job, bool, error)
+}
+
 type devFastStartCertificateIssuer interface {
 	Issue(ctx context.Context, certificateID string, commonName string, sanList []string, options *ACMEIssueOptions) (jobs.Job, error)
 }
@@ -174,7 +178,27 @@ func (b *DevFastStartBootstrapper) runUnlocked(ctx context.Context) error {
 
 	var lastErr error
 	for attempt := 1; attempt <= b.cfg.MaxAttempts; attempt++ {
-		applyJob, applyErr := b.apply.Apply(ctx, compileResult.Revision.ID)
+		// Dev fast start runs asynchronously. Never let a snapshot compiled
+		// during bootstrap overwrite a revision applied by an operator or API
+		// request while bootstrap was still compiling.
+		activeRevision, active, activeErr := b.revisions.CurrentActive()
+		if activeErr != nil {
+			return activeErr
+		}
+		if active && activeRevision.ID != compileResult.Revision.ID {
+			return nil
+		}
+		var applyJob jobs.Job
+		var applyErr error
+		if conditional, ok := b.apply.(devFastStartConditionalApplyService); ok {
+			var skipped bool
+			applyJob, skipped, applyErr = conditional.ApplyIfNoActiveRevision(ctx, compileResult.Revision.ID)
+			if skipped {
+				return nil
+			}
+		} else {
+			applyJob, applyErr = b.apply.Apply(ctx, compileResult.Revision.ID)
+		}
 		if applyErr == nil && applyJob.Status == jobs.StatusSucceeded {
 			return nil
 		}
@@ -191,7 +215,7 @@ func (b *DevFastStartBootstrapper) runUnlocked(ctx context.Context) error {
 		// the control plane becomes healthy. If another actor successfully
 		// applies a revision while a bootstrap attempt is retrying, the initial
 		// snapshot is stale and must never overwrite that newer configuration.
-		_, active, activeErr := b.revisions.CurrentActive()
+		_, active, activeErr = b.revisions.CurrentActive()
 		if activeErr != nil {
 			return activeErr
 		}

@@ -1,3 +1,5 @@
+//go:build e2e
+
 package tests
 
 import (
@@ -25,7 +27,7 @@ const (
 // failed connection from the same isolated client container.
 func TestE2EL4L7AdaptiveProtection(t *testing.T) {
 	if strings.TrimSpace(os.Getenv("WAF_E2E_L4_L7_PROTECTION")) != "1" {
-		t.Skip("set WAF_E2E_L4_L7_PROTECTION=1 to run L4/L7 adaptive protection e2e")
+		t.Fatal("set WAF_E2E_L4_L7_PROTECTION=1 to run L4/L7 adaptive protection e2e")
 	}
 	runtimeURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_RUNTIME_URL")), "/")
 	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL")), "/")
@@ -232,6 +234,7 @@ func runProtectionRuntime(t *testing.T, composeFile, command string) string {
 func runProtectionCompose(t *testing.T, composeFile, service, command string) string {
 	t.Helper()
 	cmd := exec.Command("docker", "compose", "-f", filepath.Clean(composeFile), "exec", "-T", service, "sh", "-lc", command)
+	cmd.Env = append(os.Environ(), "E2E_PASS="+os.Getenv("E2E_PASS"), "COMPOSE_PROJECT_NAME="+os.Getenv("COMPOSE_PROJECT_NAME"))
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("docker compose exec %s: %v\n%s", service, err, out)

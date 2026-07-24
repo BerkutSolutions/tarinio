@@ -220,7 +220,7 @@ func TestMarkdownFilesNoMojibake(t *testing.T) {
 	}
 
 	if checked == 0 {
-		t.Skip("markdown files are not present in this build context")
+		t.Fatal("markdown files are required for the encoding contract test")
 	}
 	if len(broken) > 0 {
 		sort.Strings(broken)

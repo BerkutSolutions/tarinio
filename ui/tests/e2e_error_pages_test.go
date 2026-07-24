@@ -1,6 +1,9 @@
+//go:build e2e
+
 package tests
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -22,7 +25,7 @@ import (
 func TestE2EErrorPages(t *testing.T) {
 	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL")), "/")
 	if baseURL == "" {
-		t.Skip("WAF_E2E_BASE_URL not set; skipping error pages e2e")
+		t.Fatal("WAF_E2E_BASE_URL not set; skipping error pages e2e")
 	}
 
 	client, requestBaseURL, requestHostOverride := newE2EClientAndBase(t, baseURL)
@@ -31,7 +34,7 @@ func TestE2EErrorPages(t *testing.T) {
 	// Найдём первый сайт
 	siteID := e2eGetFirstSiteID(t, client, requestBaseURL, requestHostOverride)
 	if siteID == "" {
-		t.Skip("no sites configured; skipping error pages e2e")
+		t.Fatal("no sites configured; skipping error pages e2e")
 	}
 
 	t.Run("PreviewPagesAccessible", func(t *testing.T) {
@@ -59,7 +62,7 @@ func TestE2EErrorPages(t *testing.T) {
 		// Читаем текущий профиль
 		profileResp := getWithAuth(t, client, requestBaseURL+"/api/easy-site-profiles/"+siteID, requestHostOverride)
 		if profileResp.StatusCode != http.StatusOK {
-			t.Skipf("GET easy-site-profiles/%s: status=%d (profile may not exist)", siteID, profileResp.StatusCode)
+			t.Fatalf("GET easy-site-profiles/%s: status=%d (profile may not exist)", siteID, profileResp.StatusCode)
 		}
 		var profile map[string]any
 		if err := json.NewDecoder(profileResp.Body).Decode(&profile); err != nil {
@@ -275,13 +278,17 @@ func e2eWaitForRuntimeRevision(t *testing.T, revisionID string) {
 	var active []byte
 	var err error
 	for time.Now().Before(deadline) {
-		active, err = exec.Command("docker", "exec", runtimeContainer, "cat", "/var/lib/waf/active/current.json").CombinedOutput()
+		commandContext, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		active, err = exec.CommandContext(commandContext, "docker", "exec", runtimeContainer, "cat", "/var/lib/waf/active/current.json").CombinedOutput()
+		cancel()
 		if err == nil && strings.Contains(string(active), revisionID) {
 			return
 		}
 		time.Sleep(250 * time.Millisecond)
 	}
-	logs, _ := exec.Command("docker", "logs", "--tail", "80", runtimeContainer).CombinedOutput()
+	logsContext, cancelLogs := context.WithTimeout(context.Background(), 5*time.Second)
+	logs, _ := exec.CommandContext(logsContext, "docker", "logs", "--tail", "80", runtimeContainer).CombinedOutput()
+	cancelLogs()
 	t.Fatalf("runtime did not activate revision %s within 30s: active=%s err=%v runtime_logs=%s", revisionID, active, err, logs)
 }
 

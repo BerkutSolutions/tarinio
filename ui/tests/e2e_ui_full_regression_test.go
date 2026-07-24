@@ -1,3 +1,5 @@
+//go:build e2e
+
 package tests
 
 import (
@@ -17,7 +19,7 @@ import (
 func TestE2EUIAssetsAndRouting(t *testing.T) {
 	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL")), "/")
 	if baseURL == "" {
-		t.Skip("WAF_E2E_BASE_URL is not set; skipping UI regression")
+		t.Fatal("WAF_E2E_BASE_URL is not set; skipping UI regression")
 	}
 
 	client, requestBaseURL, requestHostOverride := newE2EClientAndBase(t, baseURL)
@@ -55,7 +57,7 @@ func TestE2EUIAssetsAndRouting(t *testing.T) {
 func TestE2EDashboardSessionPingBodylessPOST(t *testing.T) {
 	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL")), "/")
 	if baseURL == "" {
-		t.Skip("WAF_E2E_BASE_URL is not set; skipping dashboard ping regression")
+		t.Fatal("WAF_E2E_BASE_URL is not set; skipping dashboard ping regression")
 	}
 
 	client, requestBaseURL, requestHostOverride := newE2EClientAndBase(t, baseURL)
@@ -93,7 +95,7 @@ func TestE2EDashboardSessionPingBodylessPOST(t *testing.T) {
 func TestE2EServicesModuleNoChallengeAfterLogin(t *testing.T) {
 	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL")), "/")
 	if baseURL == "" {
-		t.Skip("WAF_E2E_BASE_URL is not set; skipping services module regression")
+		t.Fatal("WAF_E2E_BASE_URL is not set; skipping services module regression")
 	}
 
 	client, requestBaseURL, requestHostOverride := newE2EClientAndBase(t, baseURL)

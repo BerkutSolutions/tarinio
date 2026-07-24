@@ -1,3 +1,5 @@
+//go:build e2e
+
 package tests
 
 import (
@@ -15,7 +17,7 @@ func TestE2ECompilerRuntimeAuthContract(t *testing.T) {
 	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL")), "/")
 	runtimeURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_RUNTIME_URL")), "/")
 	if baseURL == "" || runtimeURL == "" {
-		t.Skip("WAF_E2E_BASE_URL and WAF_E2E_RUNTIME_URL are required")
+		t.Fatal("WAF_E2E_BASE_URL and WAF_E2E_RUNTIME_URL are required")
 	}
 	client, requestBaseURL, hostOverride := newE2EClientAndBase(t, baseURL)
 	loginE2EUser(t, client, requestBaseURL, hostOverride)
@@ -57,7 +59,7 @@ func TestE2ECompilerRuntimeAuthContract(t *testing.T) {
 	artifactPath := "nginx/easy-locations/" + siteID + ".conf"
 	controlPlaneContainer := strings.TrimSpace(os.Getenv("WAF_E2E_CONTROL_PLANE_CONTAINER"))
 	if controlPlaneContainer == "" {
-		controlPlaneContainer = "waf-e2e-control-plane"
+		controlPlaneContainer = "e2e-control-plane-1"
 	}
 	artifact, err := exec.Command("docker", "exec", controlPlaneContainer, "cat", "/var/lib/waf/candidates/"+revisionID+"/"+artifactPath).CombinedOutput()
 	if err != nil {

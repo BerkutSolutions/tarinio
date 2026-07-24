@@ -45,6 +45,30 @@ func TestWaitForHTTPProxyRevisionRequiresActiveRevision(t *testing.T) {
 	}
 }
 
+func TestWaitForHTTPProxyRevisionClosesStaleWorkerConnections(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		if !r.Close {
+			w.Header().Set("X-WAF-Runtime-Revision", "rev-stale")
+			return
+		}
+		if requests == 1 {
+			w.Header().Set("X-WAF-Runtime-Revision", "rev-stale")
+			return
+		}
+		w.Header().Set("X-WAF-Runtime-Revision", "rev-next")
+	}))
+	defer server.Close()
+
+	if err := waitForHTTPProxyRevisionAt(server.URL, "rev-next", time.Second); err != nil {
+		t.Fatalf("new readiness connection must observe the activated worker: %v", err)
+	}
+	if requests < 2 {
+		t.Fatalf("expected readiness retry on a fresh connection, got %d request(s)", requests)
+	}
+}
+
 func TestWaitForHTTPProxyRevisionUsesDedicatedLocalRoute(t *testing.T) {
 	if runtimeProxyReadinessPath != "/__waf_runtime/readiness" {
 		t.Fatalf("unexpected runtime readiness path: %q", runtimeProxyReadinessPath)
@@ -60,9 +84,11 @@ func TestNginxCommandArgsKeepRuntimeConfigAndDirective(t *testing.T) {
 }
 
 func TestRuntimeReloadReadinessTimeoutStaysBelowControlPlaneRequestBudget(t *testing.T) {
-	const readinessTimeout = 5 * time.Second
-	if readinessTimeout >= 20*time.Second {
+	if runtimeProxyRevisionTimeout >= 20*time.Second {
 		t.Fatal("reload readiness timeout must leave time for apply to return its rollback result")
+	}
+	if runtimeProxyRevisionTimeout < 10*time.Second {
+		t.Fatal("reload readiness timeout is too short for a draining nginx worker set")
 	}
 }
 

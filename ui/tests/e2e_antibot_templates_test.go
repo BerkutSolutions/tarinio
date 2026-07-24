@@ -1,3 +1,5 @@
+//go:build e2e
+
 package tests
 
 import (
@@ -23,7 +25,7 @@ import (
 func TestE2EAntibotTemplates(t *testing.T) {
 	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL")), "/")
 	if baseURL == "" {
-		t.Skip("WAF_E2E_BASE_URL not set; skipping antibot templates e2e")
+		t.Fatal("WAF_E2E_BASE_URL not set; skipping antibot templates e2e")
 	}
 
 	client, requestBaseURL, requestHostOverride := newE2EClientAndBase(t, baseURL)
@@ -31,13 +33,13 @@ func TestE2EAntibotTemplates(t *testing.T) {
 
 	siteID := e2eGetFirstSiteID(t, client, requestBaseURL, requestHostOverride)
 	if siteID == "" {
-		t.Skip("no sites configured; skipping antibot templates e2e")
+		t.Fatal("no sites configured; skipping antibot templates e2e")
 	}
 
 	// Читаем исходный профиль для восстановления
 	origProfile := e2eGetEasyProfile(t, client, requestBaseURL, requestHostOverride, siteID)
 	if origProfile == nil {
-		t.Skip("no easy profile for site; skipping")
+		t.Fatal("no easy profile for site; skipping")
 	}
 	origTemplate, _ := origProfile["security_antibot"].(map[string]any)
 
@@ -48,7 +50,7 @@ func TestE2EAntibotTemplates(t *testing.T) {
 		probeBody, _ := io.ReadAll(probeResp.Body)
 		_ = probeResp.Body.Close()
 		if probeResp.StatusCode == http.StatusNotFound {
-			t.Skipf("antibot preview endpoint not available on this build (got 404); skipping template preview tests")
+			t.Fatalf("antibot preview endpoint not available on this build (got 404); skipping template preview tests")
 		}
 		for i := 1; i <= 5; i++ {
 			i := i
@@ -86,7 +88,7 @@ func TestE2EAntibotTemplates(t *testing.T) {
 				body, _ := io.ReadAll(resp.Body)
 				_ = resp.Body.Close()
 				if resp.StatusCode != http.StatusOK {
-					t.Skipf("preview %s not available (status=%d)", slug, resp.StatusCode)
+					t.Fatalf("preview %s not available (status=%d)", slug, resp.StatusCode)
 				}
 				content := string(body)
 				if strings.Contains(content, "location.reload()") {
@@ -103,7 +105,7 @@ func TestE2EAntibotTemplates(t *testing.T) {
 		// Меняем шаблон на v3, сохраняем, compile+apply, проверяем что конфиг правильный
 		profile := e2eGetEasyProfile(t, client, requestBaseURL, requestHostOverride, siteID)
 		if profile == nil {
-			t.Skip("no easy profile")
+			t.Fatal("no easy profile")
 		}
 		antibot, _ := profile["security_antibot"].(map[string]any)
 		if antibot == nil {
@@ -163,7 +165,7 @@ func TestE2EAntibotTemplates(t *testing.T) {
 			antibotBaseURL = strings.TrimRight(strings.TrimSpace(os.Getenv("WAF_E2E_BASE_URL")), "/")
 		}
 		if antibotBaseURL == "" {
-			t.Skip("no antibot base URL configured")
+			t.Fatal("no antibot base URL configured")
 		}
 
 		endpoint, err := resolveAntibotEndpoint(antibotBaseURL)
@@ -178,7 +180,7 @@ func TestE2EAntibotTemplates(t *testing.T) {
 		// Шаг 1: запрос на / → должен вернуть 302 или 200 с challenge redirect
 		probeResp, err := clientNoJar.Get(endpoint.requestBaseURL + "/")
 		if err != nil {
-			t.Skipf("target not reachable: %v", err)
+			t.Fatalf("target not reachable: %v", err)
 		}
 		defer probeResp.Body.Close()
 		_, _ = io.ReadAll(probeResp.Body)
@@ -186,7 +188,7 @@ func TestE2EAntibotTemplates(t *testing.T) {
 		// Если antibot не включён — skip
 		mode := probeResp.Header.Get("X-WAF-Antibot-Mode")
 		if mode == "" || mode == "no" {
-			t.Skip("antibot not active on this endpoint (X-WAF-Antibot-Mode=no or absent)")
+			t.Fatal("antibot not active on this endpoint (X-WAF-Antibot-Mode=no or absent)")
 		}
 		t.Logf("antibot mode: %s", mode)
 

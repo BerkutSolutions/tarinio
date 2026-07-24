@@ -15,7 +15,7 @@ func releaseEvidencePython(t *testing.T) string {
 			return command
 		}
 	}
-	t.Skip("python3 or python is required for release evidence tests")
+	t.Fatal("python3 or python is required for release evidence tests")
 	return ""
 }
 
