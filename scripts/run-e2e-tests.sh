@@ -576,7 +576,7 @@ if [ "$E2E_BROWSER_ONLY" = "1" ]; then
     rm -f "$WAF_BROWSER_FAULT_SYNC_FILE".*
     (
       attempt=0
-      while [ ! -f "$WAF_BROWSER_FAULT_SYNC_FILE.desktop.ready" ] || [ ! -f "$WAF_BROWSER_FAULT_SYNC_FILE.mobile.ready" ]; do
+      while [ ! -f "$WAF_BROWSER_FAULT_SYNC_FILE.desktop.ready" ]; do
         attempt=$((attempt + 1))
         [ "$attempt" -lt 90 ] || exit 1
         sleep 1
