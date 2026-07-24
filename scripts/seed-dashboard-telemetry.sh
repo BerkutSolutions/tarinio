@@ -17,7 +17,7 @@ while [ "$hour" -lt 24 ]; do
   hour=$((hour + 1))
 done
 docker compose -f "$compose_file" exec -T runtime sh -c 'cat >> /var/log/nginx/access.log' <"$events_file"
-login_payload=$(printf '{\"username\":\"%s\",\"password\":\"%s\"}' "$username" "$password")
+login_payload=$(printf '{"username":"%s","password":"%s"}' "$username" "$password")
 # The dashboard seed calls the control-plane's direct loopback listener.  It is
 # deliberately not the runtime HTTPS virtual host used by browser E2E, so an
 # e2e-management.test Host header would be rejected by the control-plane host
