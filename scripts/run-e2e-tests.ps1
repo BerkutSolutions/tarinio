@@ -117,7 +117,7 @@ try {
         throw "docker compose is required"
     }
 
-    Invoke-Compose -Arguments @("down", "--volumes", "--remove-orphans")
+    Invoke-Compose -Arguments @("down", "--volumes", "--remove-orphans", "--rmi", "local")
     Invoke-Compose -Arguments @("up", "-d", "--build")
     $stackStarted = $true
 
@@ -292,6 +292,6 @@ try {
     }
 } finally {
     if ($stackStarted -and -not $KeepStack) {
-        Invoke-Compose -Arguments @("down", "--volumes", "--remove-orphans")
+        Invoke-Compose -Arguments @("down", "--volumes", "--remove-orphans", "--rmi", "local")
     }
 }

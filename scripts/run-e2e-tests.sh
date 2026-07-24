@@ -431,7 +431,7 @@ cleanup() {
   [ "$STACK_DOWN_DONE" = "1" ] && return
   step "Removing e2e stack"
   cd "$E2E_COMPOSE_DIR"
-  if ! $COMPOSE_CMD -f docker-compose.yml down --volumes --remove-orphans >>"$E2E_LOG_FILE" 2>&1; then
+  if ! $COMPOSE_CMD -f docker-compose.yml down --volumes --remove-orphans --rmi local >>"$E2E_LOG_FILE" 2>&1; then
     fail_msg "Could not remove isolated stack $E2E_PROJECT"
     show_log_tail "$E2E_LOG_FILE" 80
     return 1
@@ -450,7 +450,7 @@ step "Starting e2e stack (control-plane=:$E2E_PORT runtime=:$E2E_RT_PORT)"
 info "Detailed log: $E2E_LOG_FILE"
 info "Isolated Compose project: $E2E_PROJECT"
 cd "$E2E_COMPOSE_DIR"
-run_quiet "Remove stale isolated stack" $COMPOSE_CMD -f docker-compose.yml down --volumes --remove-orphans
+run_quiet "Remove stale isolated stack" $COMPOSE_CMD -f docker-compose.yml down --volumes --remove-orphans --rmi local
 run_compose_start
 ok "Containers are up"
 
