@@ -122,7 +122,7 @@ run_compose_start() {
       else
         warn "Container build failed; retrying in ${retry_delay}s"
       fi
-      $COMPOSE_CMD -f docker-compose.yml down --volumes --remove-orphans >>"$E2E_LOG_FILE" 2>&1 || true
+      $COMPOSE_CMD -f docker-compose.yml down --volumes --remove-orphans --rmi local >>"$E2E_LOG_FILE" 2>&1 || true
       sleep "$retry_delay"
     fi
     attempt=$((attempt + 1))
@@ -554,9 +554,9 @@ WAF_E2E_DISPOSABLE=1
 WAF_BROWSER_BASE_URL="https://e2e-management.test:${E2E_RT_HTTPS_PORT}"
 WAF_E2E_RUN_ID="${WAF_E2E_RUN_ID:-${E2E_PROJECT}-$(date +%s)}"
 export WAF_E2E_DISPOSABLE WAF_BROWSER_BASE_URL WAF_E2E_RUN_ID
-if [ "$E2E_BROWSER_ONLY" = "1" ] && { [ "$E2E_DASHBOARD_SEED" = "1" ] || { [ "$E2E_DASHBOARD_SEED" = "auto" ] && printf '%s' "$E2E_BROWSER_SPECS" | grep -Eq '(dashboard|requests-complete)\.spec\.ts'; }; }; then
+if [ "$E2E_DASHBOARD_SEED" = "1" ] || { [ "$E2E_BROWSER_ONLY" = "1" ] && [ "$E2E_DASHBOARD_SEED" = "auto" ] && printf '%s' "$E2E_BROWSER_SPECS" | grep -Eq '(dashboard|requests-complete)\.spec\.ts'; }; then
   step "Seeding real Dashboard telemetry"
-  sh "$REPO_ROOT/scripts/seed-dashboard-telemetry.sh" "$COMPOSE_FILE" "$E2E_BASE_URL" "$E2E_USER" "$E2E_PASS" >>"$E2E_LOG_FILE" 2>&1
+  sh "$REPO_ROOT/scripts/seed-dashboard-telemetry.sh" "$COMPOSE_FILE" "$E2E_BASE_URL" "$E2E_USER" "$E2E_PASS" "$WAF_E2E_MANAGEMENT_HOST" >>"$E2E_LOG_FILE" 2>&1
   ok "Dashboard telemetry is aggregated"
 fi
 TEST_SUMMARY_FILE="$(mktemp)"
@@ -570,20 +570,33 @@ if [ "$E2E_BROWSER_ONLY" = "1" ]; then
       -e WAF_E2E_USERNAME -e WAF_E2E_PASSWORD -e WAF_E2E_RUN_ID \
       -v "$REPO_ROOT:/workspace" -w /workspace/e2e/browser "$E2E_BROWSER_IMAGE" \
       bash -lc 'npm ci --prefer-offline --no-audit --fund=false && npx playwright test --project=setup' >>"$E2E_LOG_FILE" 2>&1
-    step "Pausing isolated runtime for Requests backend-failure browser evidence"
-    $COMPOSE_CMD -f "$COMPOSE_FILE" pause runtime >>"$E2E_LOG_FILE" 2>&1
+    WAF_BROWSER_FAULT_SYNC_FILE="$E2E_LOG_DIR/requests-backend-fault"
+    export WAF_BROWSER_FAULT_SYNC_FILE
+    rm -f "$WAF_BROWSER_FAULT_SYNC_FILE".*
+    (
+      attempt=0
+      while [ ! -f "$WAF_BROWSER_FAULT_SYNC_FILE.desktop.ready" ] || [ ! -f "$WAF_BROWSER_FAULT_SYNC_FILE.mobile.ready" ]; do
+        attempt=$((attempt + 1))
+        [ "$attempt" -lt 90 ] || exit 1
+        sleep 1
+      done
+      $COMPOSE_CMD -f "$COMPOSE_FILE" pause runtime >>"$E2E_LOG_FILE" 2>&1
+      : > "$WAF_BROWSER_FAULT_SYNC_FILE.paused"
+    ) &
+    E2E_BROWSER_FAULT_PID=$!
   fi
   step "Running browser tests on isolated stack: $E2E_BROWSER_SPECS"
   docker run --rm --network host --user "$(id -u):$(id -g)" \
     -e HOME=/tmp -e CI -e CI_COMMIT_SHA -e CI_PIPELINE_URL \
     -e WAF_E2E_DISPOSABLE -e WAF_BROWSER_BASE_URL -e WAF_E2E_RUNTIME_URL \
     -e WAF_E2E_USERNAME -e WAF_E2E_PASSWORD -e WAF_E2E_RUN_ID \
-    -e WAF_BROWSER_RESULTS_FILE -e WAF_BROWSER_OUTPUT_DIR -e WAF_BROWSER_JUNIT_FILE \
+    -e WAF_BROWSER_RESULTS_FILE -e WAF_BROWSER_OUTPUT_DIR -e WAF_BROWSER_JUNIT_FILE -e WAF_BROWSER_FAULT_SYNC_FILE \
     -e WAF_BROWSER_WORKERS=1 -e E2E_BROWSER_SPECS -e E2E_BROWSER_RUNTIME_FAULT \
     -v "$REPO_ROOT:/workspace" -w /workspace/e2e/browser "$E2E_BROWSER_IMAGE" \
     bash -lc 'npm ci --prefer-offline --no-audit --fund=false && if [ "$E2E_BROWSER_RUNTIME_FAULT" = "requests-backend" ]; then npm test -- --project=desktop --project=mobile --no-deps $E2E_BROWSER_SPECS; else npm test -- $E2E_BROWSER_SPECS; fi' >"$TEST_LOG" 2>&1 || TEST_EXIT=$?
   TEST_SUMMARY="browser:$E2E_BROWSER_SPECS"
   if [ "$E2E_BROWSER_RUNTIME_FAULT" = "requests-backend" ]; then
+    wait "$E2E_BROWSER_FAULT_PID" || { fail_msg "Could not pause isolated runtime"; exit 1; }
     $COMPOSE_CMD -f "$COMPOSE_FILE" unpause runtime >>"$E2E_LOG_FILE" 2>&1 || { fail_msg "Could not unpause isolated runtime"; exit 1; }
   fi
 else

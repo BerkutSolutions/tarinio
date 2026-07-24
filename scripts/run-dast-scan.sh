@@ -20,7 +20,7 @@ cleanup() {
     docker rm -f "$(cat "$zap_cidfile")" >/dev/null 2>&1 || true
   fi
   rm -f "$zap_cidfile"
-  COMPOSE_PROJECT_NAME="$E2E_PROJECT" docker compose -f "$ROOT/deploy/compose/e2e/docker-compose.yml" down --volumes --remove-orphans >/dev/null 2>&1 || true
+  COMPOSE_PROJECT_NAME="$E2E_PROJECT" docker compose -f "$ROOT/deploy/compose/e2e/docker-compose.yml" down --volumes --remove-orphans --rmi local >/dev/null 2>&1 || true
 }
 trap cleanup EXIT INT TERM
 

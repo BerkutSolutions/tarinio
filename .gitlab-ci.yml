@@ -232,7 +232,7 @@ e2e:api-workflows:
       E2E_PROJECT="ci-${CI_PIPELINE_ID}-api-workflows" E2E_PORT=19480 E2E_RT_PORT=11480 E2E_RT_HTTPS_PORT=24443
       E2E_RT_HLT_PORT=19481 E2E_CONTROL_PLANE_DIRECT_PORT=19482 E2E_DAST_CANARY_PORT=19483 E2E_MTLS_UPSTREAM_PORT=19484
       E2E_FILTER='^(TestE2EAPIFunctionalDeep|TestE2EDashboardComplete|TestE2ERequestStorageParity|TestE2ERequestsBackendFailureIsVisible|TestE2EManagementHostMutationWorkflow|TestE2ESiteSettingsRoundtrip|TestE2EQualityMatrix_MainPagesAndAPIs|TestE2EBansReadContract|TestE2EBansDurationAndUnauthorizedSiteErrors|TestE2ERevisionsValidationDeleteActiveAndMissingErrors|TestE2EEventsAPIFilterPaginationDetailContract|TestE2EActivityAPIFilterPaginationAndCriticalMutations)$'
-      E2E_TIMEOUT=300 E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/api-workflows"
+      E2E_DASHBOARD_SEED=1 E2E_TIMEOUT=300 E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/api-workflows"
       E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/e2e/api-workflows" sh scripts/run-e2e-tests.sh
   artifacts:
     when: always
@@ -398,7 +398,35 @@ e2e:browser:services:
     E2E_BROWSER_CONTROL_PORT: "19082"
     E2E_BROWSER_CANARY_PORT: "19083"
     E2E_BROWSER_MTLS_PORT: "19084"
-    E2E_BROWSER_SPECS: "tests/services.spec.ts tests/services-antibot-preview.spec.ts tests/services-auth.spec.ts tests/services-certificate.spec.ts tests/services-dynamic-controls.spec.ts tests/services-editor-navigation.spec.ts tests/services-error-pages.spec.ts tests/services-help.spec.ts tests/services-import.spec.ts tests/services-mobile-layout.spec.ts tests/services-protection.spec.ts tests/services-rbac.spec.ts tests/services-runtime.spec.ts tests/services-validation.spec.ts tests/services-virtual-patches.spec.ts"
+    E2E_BROWSER_SPECS: "tests/services.spec.ts tests/services-antibot-preview.spec.ts tests/services-auth.spec.ts tests/services-certificate.spec.ts tests/services-dynamic-controls.spec.ts"
+
+e2e:browser:services-editor:
+  extends: .e2e:browser
+  variables:
+    E2E_BROWSER_SLICE: browser-services-editor
+    E2E_BROWSER_PROJECT: ci-browser-services-editor
+    E2E_BROWSER_UI_PORT: "20080"
+    E2E_BROWSER_RUNTIME_PORT: "12080"
+    E2E_BROWSER_HTTPS_PORT: "30443"
+    E2E_BROWSER_HEALTH_PORT: "20081"
+    E2E_BROWSER_CONTROL_PORT: "20082"
+    E2E_BROWSER_CANARY_PORT: "20083"
+    E2E_BROWSER_MTLS_PORT: "20084"
+    E2E_BROWSER_SPECS: "tests/services-editor-navigation.spec.ts tests/services-error-pages.spec.ts tests/services-help.spec.ts tests/services-import.spec.ts tests/services-mobile-layout.spec.ts"
+
+e2e:browser:services-security:
+  extends: .e2e:browser
+  variables:
+    E2E_BROWSER_SLICE: browser-services-security
+    E2E_BROWSER_PROJECT: ci-browser-services-security
+    E2E_BROWSER_UI_PORT: "20180"
+    E2E_BROWSER_RUNTIME_PORT: "12180"
+    E2E_BROWSER_HTTPS_PORT: "31443"
+    E2E_BROWSER_HEALTH_PORT: "20181"
+    E2E_BROWSER_CONTROL_PORT: "20182"
+    E2E_BROWSER_CANARY_PORT: "20183"
+    E2E_BROWSER_MTLS_PORT: "20184"
+    E2E_BROWSER_SPECS: "tests/services-protection.spec.ts tests/services-rbac.spec.ts tests/services-runtime.spec.ts tests/services-validation.spec.ts tests/services-virtual-patches.spec.ts"
 
 e2e:browser:platform:
   extends: .e2e:browser
@@ -451,6 +479,8 @@ e2e:browser:gate:
   dependencies:
     - e2e:browser:core
     - e2e:browser:services
+    - e2e:browser:services-editor
+    - e2e:browser:services-security
     - e2e:browser:platform
     - e2e:browser:settings-cross
     - e2e:browser:requests-backend-failure
@@ -459,6 +489,10 @@ e2e:browser:gate:
     - job: e2e:browser:core
       artifacts: true
     - job: e2e:browser:services
+      artifacts: true
+    - job: e2e:browser:services-editor
+      artifacts: true
+    - job: e2e:browser:services-security
       artifacts: true
     - job: e2e:browser:platform
       artifacts: true
@@ -472,6 +506,8 @@ e2e:browser:gate:
     - cd e2e/browser
     - node scripts/verify-results.mjs ../../build/e2e/browser-core/results.json
     - node scripts/verify-results.mjs ../../build/e2e/browser-services/results.json
+    - node scripts/verify-results.mjs ../../build/e2e/browser-services-editor/results.json
+    - node scripts/verify-results.mjs ../../build/e2e/browser-services-security/results.json
     - node scripts/verify-results.mjs ../../build/e2e/browser-platform/results.json
     - node scripts/verify-results.mjs ../../build/e2e/browser-settings-cross/results.json
     - node scripts/verify-results.mjs ../../build/e2e/browser-requests-backend-failure/results.json
@@ -479,6 +515,8 @@ e2e:browser:gate:
       node scripts/coverage.mjs
       ../../build/e2e/browser-core/results.json
       ../../build/e2e/browser-services/results.json
+      ../../build/e2e/browser-services-editor/results.json
+      ../../build/e2e/browser-services-security/results.json
       ../../build/e2e/browser-platform/results.json
       ../../build/e2e/browser-settings-cross/results.json
       ../../build/e2e/browser-requests-backend-failure/results.json
@@ -489,6 +527,8 @@ e2e:browser:gate:
     paths:
       - build/e2e/browser-core/
       - build/e2e/browser-services/
+      - build/e2e/browser-services-editor/
+      - build/e2e/browser-services-security/
       - build/e2e/browser-platform/
       - build/e2e/browser-settings-cross/
       - build/e2e/browser-requests-backend-failure/
@@ -526,6 +566,10 @@ e2e:failure-evidence:
       artifacts: true
     - job: e2e:browser:services
       artifacts: true
+    - job: e2e:browser:services-editor
+      artifacts: true
+    - job: e2e:browser:services-security
+      artifacts: true
     - job: e2e:browser:platform
       artifacts: true
     - job: e2e:browser:settings-cross
@@ -555,6 +599,9 @@ pre-security:failure-gate:
   timeout: 15m
   when: always
   dependencies: []
+  needs:
+    - job: e2e:failure-evidence
+      artifacts: true
   script:
     - mkdir -p build/pre-security
     - >-
@@ -565,6 +612,7 @@ pre-security:failure-gate:
     - |
       python3 - <<'PY'
       import json
+      import pathlib
       import sys
 
       source_path = "build/pre-security/jobs.json"
@@ -579,8 +627,41 @@ pre-security:failure-gate:
           and job.get("status") == "failed"
       ]
       lines = ["# Pre-security failure summary", ""]
+
+      def browser_skips(root):
+          findings = []
+          for report_path in sorted(root.glob("*/results.json")):
+              try:
+                  report = json.loads(report_path.read_text(encoding="utf-8"))
+              except (OSError, json.JSONDecodeError) as exc:
+                  findings.append(f"{report_path}: unreadable browser result ({exc})")
+                  continue
+              skipped = int(report.get("stats", {}).get("skipped", 0) or 0)
+              if skipped:
+                  findings.append(f"{report_path}: skipped={skipped}")
+          return findings
+
+      def go_skips(root):
+          findings = []
+          for log_path in sorted(root.glob("*/*.log")):
+              for line in log_path.read_text(encoding="utf-8", errors="replace").splitlines():
+                  if "[SKIP]" in line:
+                      findings.append(f"{log_path}: {line.strip()}")
+          return findings
+
+      skipped = browser_skips(pathlib.Path("build/e2e")) + go_skips(pathlib.Path("build/e2e"))
+      if skipped:
+          print("\n" + "=" * 88 + "\nSKIPPED E2E TESTS (forbidden)\n" + "=" * 88)
+          print("\n".join(skipped))
+          lines.extend(["## Skipped E2E tests (forbidden)", "", "```text", *skipped, "```", ""])
       if not failed:
-          lines.append("All validate, unit and E2E jobs passed.")
+          if skipped:
+              lines.append("Security is blocked: skipped E2E executions are not accepted as proof.")
+              print("[pre-security] Skipped E2E executions found; security is blocked.")
+              with open(summary_path, "w", encoding="utf-8") as summary:
+                  summary.write("\n".join(lines) + "\n")
+              sys.exit(1)
+          lines.append("All validate, unit and E2E jobs passed with no skipped executions.")
           print("[pre-security] No failures in validate, unit or E2E stages.")
           with open(summary_path, "w", encoding="utf-8") as summary:
               summary.write("\n".join(lines) + "\n")
@@ -594,8 +675,28 @@ pre-security:failure-gate:
           heading = f"{name} ({status})"
           print(f"\n{'=' * 88}\n{heading}\n{url}\n{'=' * 88}")
           lines.extend([f"## {heading}", "", url, ""])
-          print("Open the job URL above for its complete trace.")
-          lines.extend(["Open the job URL above for its complete trace.", ""])
+          if name.startswith("e2e:") and name != "e2e:browser:gate":
+              directory = name.removeprefix("e2e:").replace("browser:", "browser-")
+              logs = sorted(pathlib.Path("build/e2e", directory).glob("*.log"))
+              if logs:
+                  content = logs[-1].read_text(encoding="utf-8", errors="replace").splitlines()
+                  markers = ("[fail]", "--- fail:", "timeouterror:", "error:", "failed to", "panic:", "fatal:")
+                  positions = [index for index, line in enumerate(content) if any(marker in line.lower() for marker in markers)]
+                  excerpts = []
+                  for index in positions[:8]:
+                      start, end = max(0, index - 10), min(len(content), index + 28)
+                      excerpt = content[start:end]
+                      if excerpt not in excerpts:
+                          excerpts.append(excerpt)
+                  diagnostic = [line for excerpt in excerpts for line in excerpt]
+                  if not diagnostic:
+                      diagnostic = ["No error marker was found in the E2E log."]
+                  print("\n".join(diagnostic))
+                  lines.extend(["```text", *diagnostic, "```", ""])
+                  continue
+          message = "No downloadable E2E log is available for this job; use the job URL above."
+          print(message)
+          lines.extend([message, ""])
       with open(summary_path, "w", encoding="utf-8") as summary:
           summary.write("\n".join(lines) + "\n")
       sys.exit(1)
