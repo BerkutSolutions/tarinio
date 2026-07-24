@@ -97,6 +97,7 @@ func TestE2EEventsAPIFilterPaginationDetailContract(t *testing.T) {
 		modsecurity["use_modsecurity"] = true
 		modsecurity["use_modsecurity_crs_plugins"] = false
 		modsecurity["use_modsecurity_custom_configuration"] = true
+		mapGetOrCreate(profile, "front_service")["security_mode"] = "block"
 		modsecurity["custom_configuration"] = map[string]any{
 			"path":    "modsec/e2e-events-site-filter.conf",
 			"content": `SecRule REQUEST_URI "@streq /events-site-filter" "id:100901,phase:2,deny,status:403,log"`,
