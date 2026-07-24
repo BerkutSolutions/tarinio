@@ -30,3 +30,13 @@ func TestDashboardService_ColdBackgroundRefreshReturnsCompleteSnapshot(t *testin
 		t.Fatalf("attacks series buckets = %d, want 24", got)
 	}
 }
+
+func TestDashboardSnapshotStaleUsesConfiguredRefreshInterval(t *testing.T) {
+	now := time.Now().UTC()
+	if !dashboardSnapshotStale(now.Add(-16*time.Second).Format(time.RFC3339Nano), 15*time.Second) {
+		t.Fatal("snapshot older than refresh interval was considered fresh")
+	}
+	if dashboardSnapshotStale(now.Add(-2*time.Second).Format(time.RFC3339Nano), 15*time.Second) {
+		t.Fatal("recent snapshot was considered stale")
+	}
+}

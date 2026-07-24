@@ -285,6 +285,9 @@ func (s *DashboardService) Stats() (DashboardStats, error) {
 // local dismissals. Cached snapshots deliberately remain unfiltered.
 func (s *DashboardService) StatsForActor(actorID string) (DashboardStats, error) {
 	if cached, ok := s.snapshot(); ok {
+		if dashboardSnapshotStale(cached.GeneratedAt, s.sampler.interval) {
+			go func() { _ = s.refreshSnapshot() }()
+		}
 		return s.filterDismissedServiceErrors(cached, actorID), nil
 	}
 	// The HTTP handler must stay responsive while the first background refresh
@@ -301,6 +304,17 @@ func (s *DashboardService) StatsForActor(actorID string) (DashboardStats, error)
 	}
 	s.storeSnapshot(stats)
 	return s.filterDismissedServiceErrors(stats, actorID), nil
+}
+
+func dashboardSnapshotStale(generatedAt string, interval time.Duration) bool {
+	stamp, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(generatedAt))
+	if err != nil {
+		return true
+	}
+	if interval <= 0 {
+		interval = 15 * time.Second
+	}
+	return time.Since(stamp) >= interval
 }
 
 func (s *DashboardService) Probe(kind string, query url.Values) error {
