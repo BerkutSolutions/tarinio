@@ -2,6 +2,8 @@
 
 ### E2E cleanup (2026-07-24)
 
+- E2E pipeline jobs are grouped into general, API, UI, browser, and reporting stages so failures and duration are visible by test surface. Browser fault synchronization and settings readiness now wait on the actual runtime/UI state.
+
 - Disposable PowerShell, POSIX E2E, and DAST runners now remove their locally built Compose images together with containers, networks, orphan resources, and named volumes, including after a failed build retry. Cleanup remains scoped to the selected E2E Compose project and does not delete shared/base Docker images.
 
 ### E2E re-audit (2026-07-24)

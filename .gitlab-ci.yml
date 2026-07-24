@@ -1,7 +1,10 @@
 stages:
   - validate
   - unit
-  - e2e
+  - e2e-general
+  - e2e-api
+  - e2e-ui
+  - e2e-browser
   - e2e-report
   - pre-security
   - security
@@ -120,7 +123,7 @@ docs:build:
       - build/
 
 e2e:smoke:
-  stage: e2e
+  stage: e2e-general
   allow_failure: true
   timeout: 30m
   dependencies: []
@@ -134,7 +137,7 @@ e2e:smoke:
       - build/e2e/smoke/
 
 e2e:security-invariants:
-  stage: e2e
+  stage: e2e-general
   allow_failure: true
   timeout: 35m
   dependencies: []
@@ -151,7 +154,7 @@ e2e:security-invariants:
       - build/e2e/security-invariants/
 
 e2e:management-rate-limit:
-  stage: e2e
+  stage: e2e-general
   allow_failure: true
   timeout: 30m
   dependencies: []
@@ -165,7 +168,7 @@ e2e:management-rate-limit:
       - build/e2e/management-rate-limit/
 
 e2e:full:
-  stage: e2e
+  stage: e2e-general
   allow_failure: true
   timeout: 45m
   dependencies: []
@@ -179,7 +182,7 @@ e2e:full:
       - build/e2e/full/
 
 e2e:nightly:
-  stage: e2e
+  stage: e2e-general
   allow_failure: true
   timeout: 60m
   dependencies: []
@@ -195,7 +198,7 @@ e2e:nightly:
       - build/e2e/nightly/
 
 validate:generated-nginx-config:
-  stage: e2e
+  stage: e2e-general
   allow_failure: true
   timeout: 15m
   dependencies: []
@@ -203,7 +206,7 @@ validate:generated-nginx-config:
     - go test ./compiler/internal/compiler -run 'TestSyntaxRunner|TestRenderEasyArtifacts|TestRenderSiteUpstreamArtifacts' -count=1
 
 e2e:fresh-onboarding:
-  stage: e2e
+  stage: e2e-general
   allow_failure: true
   timeout: 30m
   dependencies: []
@@ -222,7 +225,7 @@ e2e:fresh-onboarding:
       - build/e2e/fresh-onboarding/
 
 e2e:api-workflows:
-  stage: e2e
+  stage: e2e-api
   allow_failure: true
   timeout: 60m
   dependencies: []
@@ -241,7 +244,7 @@ e2e:api-workflows:
       - build/e2e/api-workflows/
 
 e2e:runtime-mtls:
-  stage: e2e
+  stage: e2e-api
   allow_failure: true
   timeout: 50m
   dependencies: []
@@ -260,7 +263,7 @@ e2e:runtime-mtls:
       - build/e2e/runtime-mtls/
 
 e2e:autostart:
-  stage: e2e
+  stage: e2e-api
   allow_failure: true
   timeout: 45m
   dependencies: []
@@ -279,7 +282,7 @@ e2e:autostart:
       - build/e2e/autostart/
 
 e2e:security-probes:
-  stage: e2e
+  stage: e2e-api
   allow_failure: true
   timeout: 60m
   dependencies: []
@@ -298,7 +301,7 @@ e2e:security-probes:
       - build/e2e/security-probes/
 
 e2e:ui-server-contract:
-  stage: e2e
+  stage: e2e-ui
   allow_failure: true
   timeout: 35m
   dependencies: []
@@ -317,7 +320,7 @@ e2e:ui-server-contract:
       - build/e2e/ui-server-contract/
 
 e2e:api-registry:
-  stage: e2e
+  stage: e2e-api
   allow_failure: true
   timeout: 90m
   dependencies: []
@@ -336,7 +339,7 @@ e2e:api-registry:
       - build/e2e/api-registry/
 
 .e2e:browser:
-  stage: e2e
+  stage: e2e-browser
   allow_failure: true
   timeout: 90m
   dependencies: []
@@ -688,7 +691,7 @@ pre-security:failure-gate:
       with open(source_path, encoding="utf-8") as source:
           jobs = json.load(source)
 
-      watched_stages = {"validate", "unit", "e2e", "e2e-report"}
+      watched_stages = {"validate", "unit", "e2e-general", "e2e-api", "e2e-ui", "e2e-browser", "e2e-report"}
       failed = [
           job for job in jobs
           if job.get("stage") in watched_stages

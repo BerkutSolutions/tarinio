@@ -1,5 +1,6 @@
 import { expect, test } from "../fixtures/auth";
 import { e2eID } from "../support/isolation";
+import { waitForStableDOM } from "../support/waits";
 
 async function api(page: import("@playwright/test").Page, path: string, init: RequestInit = {}) {
   return page.evaluate(async ({ path, init }) => {
@@ -115,6 +116,7 @@ test("settings.appearance-preview-save-reload-restore", async ({ authenticatedPa
     await expect.poll(async () => JSON.parse((await api(page, "/api/settings/runtime")).body).healthcheck_appearance).toBe(health);
     await page.reload({ waitUntil: "domcontentloaded" });
     await expect(page.locator("#settings-page")).toHaveAttribute("data-runtime-ready", "true");
+    await waitForStableDOM(page.locator("#settings-login-appearance"));
     await expect(page.locator("#settings-login-appearance")).toHaveValue(login);
     await expect(page.locator("#settings-healthcheck-appearance")).toHaveValue(health);
   } finally {

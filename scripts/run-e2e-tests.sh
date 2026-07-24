@@ -572,7 +572,7 @@ if [ "$E2E_BROWSER_ONLY" = "1" ]; then
       bash -lc 'npm ci --prefer-offline --no-audit --fund=false && npx playwright test --project=setup' >>"$E2E_LOG_FILE" 2>&1
     WAF_BROWSER_FAULT_SYNC_FILE="$E2E_LOG_DIR/requests-backend-fault"
     WAF_BROWSER_FAULT_SYNC_CONTAINER_FILE="/workspace/build/e2e/$(basename "$E2E_LOG_DIR")/requests-backend-fault"
-    export WAF_BROWSER_FAULT_SYNC_FILE
+    export WAF_BROWSER_FAULT_SYNC_FILE WAF_BROWSER_FAULT_SYNC_CONTAINER_FILE
     rm -f "$WAF_BROWSER_FAULT_SYNC_FILE".*
     (
       attempt=0
