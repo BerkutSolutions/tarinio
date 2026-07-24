@@ -1,8 +1,9 @@
 stages:
   - validate
   - unit
-  - e2e-smoke
   - e2e
+  - e2e-report
+  - pre-security
   - security
   - dast
   - publish
@@ -32,9 +33,11 @@ variables:
   GOMODCACHE: /home/gitlab-runner/.cache/tarinio/go-mod
   NPM_CACHE_DIR: /home/gitlab-runner/.cache/tarinio/npm
   TRIVY_CACHE_DIR: /home/gitlab-runner/.cache/tarinio/trivy
+  BROWSER_E2E_IMAGE: tarinio-playwright-e2e:1.61.1
 
 validate:repository:
   stage: validate
+  allow_failure: true
   timeout: 10m
   script:
     - git diff --check
@@ -43,9 +46,19 @@ validate:repository:
     - test -f go.mod
     - test -f package-lock.json
     - grep -q '^RUN GOTOOLCHAIN=auto go test ./ui/tests$' ui/Dockerfile
+    - >-
+      if grep -REn 'test\.(skip|fixme|only|fail)|describe\.(skip|fixme|only)' e2e/browser/tests; then
+        echo 'Playwright skip/fixme/only/fail is forbidden'; exit 1;
+      fi
+    - >-
+      if grep -REn '\bt\.Skip(f|Now)?\(' ui/tests/e2e_*_test.go; then
+        echo 'Go E2E skips are forbidden'; exit 1;
+      fi
+    - cd e2e/browser && npm ci --prefer-offline --no-audit --fund=false && npm run test:coverage && npm run test:strict-results
 
 warm:e2e-images:
   stage: validate
+  allow_failure: true
   timeout: 20m
   script:
     - |
@@ -61,6 +74,7 @@ warm:e2e-images:
 
 unit:go:
   stage: unit
+  allow_failure: true
   timeout: 35m
   script:
     - mkdir -p .ci-bin .ci-home "$NPM_CACHE_DIR"
@@ -83,6 +97,7 @@ unit:go:
 
 docs:build:
   stage: unit
+  allow_failure: true
   timeout: 30m
   script:
     - mkdir -p "$NPM_CACHE_DIR" .ci-home
@@ -99,12 +114,13 @@ docs:build:
       - build/
 
 e2e:smoke:
-  stage: e2e-smoke
+  stage: e2e
+  allow_failure: true
   timeout: 30m
   dependencies: []
   script:
     - mkdir -p build/e2e/smoke
-    - E2E_PROJECT=ci-smoke E2E_PORT=18080 E2E_RT_PORT=10080 E2E_RT_HTTPS_PORT=10443 E2E_RT_HLT_PORT=18081 E2E_CONTROL_PLANE_DIRECT_PORT=18082 E2E_DAST_CANARY_PORT=18083 E2E_FILTER='TestE2ESmoke_LoginHealthcheckDashboard|TestE2EAntibotChallengePrecedesActiveRateLimitFallback|TestE2EBasicAuthLifecycle|TestE2EModSecurity_EnableDisableReenableWithScopedExclusion|TestE2EDashboardAttackPopulationConsistency' E2E_TIMEOUT=240 E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/smoke" E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/e2e/smoke" sh scripts/run-e2e-tests.sh
+    - E2E_PROJECT="ci-${CI_PIPELINE_ID}-smoke" E2E_PORT=18080 E2E_RT_PORT=10080 E2E_RT_HTTPS_PORT=10443 E2E_RT_HLT_PORT=18081 E2E_CONTROL_PLANE_DIRECT_PORT=18082 E2E_DAST_CANARY_PORT=18083 E2E_MTLS_UPSTREAM_PORT=18084 E2E_FILTER='TestE2ESmoke_LoginHealthcheckDashboard|TestE2EAntibotChallengePrecedesActiveRateLimitFallback|TestE2EBasicAuthLifecycle|TestE2EModSecurity_EnableDisableReenableWithScopedExclusion|TestE2EDashboardAttackPopulationConsistency' E2E_TIMEOUT=240 E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/smoke" E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/e2e/smoke" sh scripts/run-e2e-tests.sh
   artifacts:
     when: always
     expire_in: 14 days
@@ -113,13 +129,14 @@ e2e:smoke:
 
 e2e:security-invariants:
   stage: e2e
+  allow_failure: true
   timeout: 35m
   dependencies: []
   script:
     - mkdir -p build/e2e/security-invariants
     - >-
       E2E_FILTER='TestE2EBasicAuthLifecycle|TestE2EMultisiteBasicAuthIsolation|TestE2ESecurityModesReality|TestE2ERequestStorageParity|TestE2EDashboardAttackPopulationConsistency|TestE2EAntibotChallengePrecedesActiveRateLimitFallback|TestE2EManagementModSecuritySafeguardKeepsAppPingAvailable|TestE2EAdminPanelModSecurityBypassesEveryAdministrativeRoute|TestE2EModSecurity_EnableDisableReenableWithScopedExclusion|TestE2ERecoveryFlow_BadConfigThenRepair|TestE2ERecovery_InvalidCandidateDoesNotReplaceActiveProtection|TestE2ESecurityInvariant_PasswordChangeRevokesOtherSessionAndRecordsLogin|TestE2EServiceEditorParity|TestE2ESecurityAndTLSMatrix/RBACNegativeMatrix$|TestE2ETOTPStepUpProtectsCertificateExportAndLocksFailures|TestE2EBehavioral_CustomErrorPages_GeoAndDirectRuntimeBranches/TrustedProxyIdentityRejectsSpoofedForwardedFor$'
-      E2E_PROJECT=ci-security E2E_PORT=18180 E2E_RT_PORT=10180 E2E_RT_HTTPS_PORT=11443 E2E_RT_HLT_PORT=18181 E2E_CONTROL_PLANE_DIRECT_PORT=18182 E2E_DAST_CANARY_PORT=18183 E2E_TIMEOUT=240 E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/security-invariants"
+      E2E_PROJECT="ci-${CI_PIPELINE_ID}-security" E2E_PORT=18180 E2E_RT_PORT=10180 E2E_RT_HTTPS_PORT=11443 E2E_RT_HLT_PORT=18181 E2E_CONTROL_PLANE_DIRECT_PORT=18182 E2E_DAST_CANARY_PORT=18183 E2E_MTLS_UPSTREAM_PORT=18184 E2E_TIMEOUT=240 E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/security-invariants"
       E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/e2e/security-invariants" sh scripts/run-e2e-tests.sh
   artifacts:
     when: always
@@ -129,13 +146,12 @@ e2e:security-invariants:
 
 e2e:management-rate-limit:
   stage: e2e
+  allow_failure: true
   timeout: 30m
   dependencies: []
-  needs:
-    - e2e:smoke
   script:
     - mkdir -p build/e2e/management-rate-limit
-    - E2E_PROJECT=ci-management E2E_PORT=18280 E2E_RT_PORT=10280 E2E_RT_HTTPS_PORT=12443 E2E_RT_HLT_PORT=18281 E2E_CONTROL_PLANE_DIRECT_PORT=18282 E2E_DAST_CANARY_PORT=18283 E2E_FILTER=TestE2EManagementHostIsExcludedFromGlobalL7RateLimit E2E_TIMEOUT=240 E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/management-rate-limit" E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/e2e/management-rate-limit" sh scripts/run-e2e-tests.sh
+    - E2E_PROJECT="ci-${CI_PIPELINE_ID}-management" E2E_PORT=18280 E2E_RT_PORT=10280 E2E_RT_HTTPS_PORT=12443 E2E_RT_HLT_PORT=18281 E2E_CONTROL_PLANE_DIRECT_PORT=18282 E2E_DAST_CANARY_PORT=18283 E2E_MTLS_UPSTREAM_PORT=18284 E2E_FILTER=TestE2EManagementHostIsExcludedFromGlobalL7RateLimit E2E_TIMEOUT=240 E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/management-rate-limit" E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/e2e/management-rate-limit" sh scripts/run-e2e-tests.sh
   artifacts:
     when: always
     expire_in: 30 days
@@ -144,13 +160,12 @@ e2e:management-rate-limit:
 
 e2e:full:
   stage: e2e
+  allow_failure: true
   timeout: 45m
   dependencies: []
-  needs:
-    - e2e:smoke
   script:
     - mkdir -p build/e2e/full
-    - E2E_PROJECT=ci-full E2E_PORT=18380 E2E_RT_PORT=10380 E2E_RT_HTTPS_PORT=13443 E2E_RT_HLT_PORT=18381 E2E_CONTROL_PLANE_DIRECT_PORT=18382 E2E_DAST_CANARY_PORT=18383 E2E_FILTER='TestE2EAntibotTemplates/(TemplatePreviewRendering|TemplatesContainVerifyURI|TemplateSwitchSavesAndCompiles)$|TestE2EBasicAuthTemplates|TestE2ECompilerRuntimeAuthContract|TestE2EErrorPages|TestE2EBehavioral_CustomErrorPages_GeoAndDirectRuntimeBranches|TestE2EL4L7AdaptiveProtection|TestE2ESecurityAndTLSMatrix|TestE2ERecoveryFlow_BadConfigThenRepair|TestE2EMultisiteBasicAuthIsolation' E2E_TIMEOUT=240 E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/full" E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/e2e/full" sh scripts/run-e2e-tests.sh
+    - E2E_PROJECT="ci-${CI_PIPELINE_ID}-full" E2E_PORT=18380 E2E_RT_PORT=10380 E2E_RT_HTTPS_PORT=13443 E2E_RT_HLT_PORT=18381 E2E_CONTROL_PLANE_DIRECT_PORT=18382 E2E_DAST_CANARY_PORT=18383 E2E_MTLS_UPSTREAM_PORT=18384 E2E_FILTER='TestE2EAntibotTemplates/(TemplatePreviewRendering|TemplatesContainVerifyURI|TemplateSwitchSavesAndCompiles)$|TestE2EBasicAuthTemplates|TestE2ECompilerRuntimeAuthContract|TestE2EErrorPages|TestE2EBehavioral_CustomErrorPages_UpstreamDrivenBranches|TestE2EBehavioral_CustomErrorPages_GeoAndDirectRuntimeBranches|TestE2EL4L7AdaptiveProtection|TestE2ESecurityAndTLSMatrix|TestE2ERecoveryFlow_BadConfigThenRepair|TestE2EMultisiteBasicAuthIsolation' E2E_TIMEOUT=240 E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/full" E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/e2e/full" sh scripts/run-e2e-tests.sh
   artifacts:
     when: always
     expire_in: 30 days
@@ -159,13 +174,14 @@ e2e:full:
 
 e2e:nightly:
   stage: e2e
+  allow_failure: true
   timeout: 60m
   dependencies: []
   rules:
     - when: never
   script:
     - mkdir -p build/e2e/nightly
-    - E2E_PROJECT=ci-nightly E2E_PORT=18480 E2E_RT_PORT=10480 E2E_RT_HTTPS_PORT=14443 E2E_RT_HLT_PORT=18481 E2E_CONTROL_PLANE_DIRECT_PORT=18482 E2E_DAST_CANARY_PORT=18483 WAF_E2E_RESILIENCE=1 WAF_E2E_VERIFY_DECAY=1 E2E_FILTER='TestE2EL4L7AdaptiveProtection|TestE2ESecurityModesReality|TestE2ERecoveryFlow_BadConfigThenRepair|TestE2ENegativeSecurityProbes|TestE2EBurstStability' E2E_TIMEOUT=300 E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/nightly" E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/e2e/nightly" sh scripts/run-e2e-tests.sh
+    - E2E_PROJECT="ci-${CI_PIPELINE_ID}-nightly" E2E_PORT=18480 E2E_RT_PORT=10480 E2E_RT_HTTPS_PORT=14443 E2E_RT_HLT_PORT=18481 E2E_CONTROL_PLANE_DIRECT_PORT=18482 E2E_DAST_CANARY_PORT=18483 E2E_MTLS_UPSTREAM_PORT=18484 WAF_E2E_RESILIENCE=1 WAF_E2E_VERIFY_DECAY=1 E2E_FILTER='TestE2EL4L7AdaptiveProtection|TestE2ESecurityModesReality|TestE2ERecoveryFlow_BadConfigThenRepair|TestE2ENegativeSecurityProbes|TestE2EBurstStability' E2E_TIMEOUT=300 E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/nightly" E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/e2e/nightly" sh scripts/run-e2e-tests.sh
   artifacts:
     when: always
     expire_in: 30 days
@@ -173,7 +189,8 @@ e2e:nightly:
       - build/e2e/nightly/
 
 validate:generated-nginx-config:
-  stage: e2e-smoke
+  stage: e2e
+  allow_failure: true
   timeout: 15m
   dependencies: []
   script:
@@ -181,12 +198,13 @@ validate:generated-nginx-config:
 
 e2e:fresh-onboarding:
   stage: e2e
+  allow_failure: true
   timeout: 30m
   dependencies: []
   script:
     - mkdir -p build/e2e/fresh-onboarding
     - >-
-      E2E_PROJECT=ci-onboarding E2E_PORT=18580 E2E_RT_PORT=10580 E2E_RT_HTTPS_PORT=15443 E2E_RT_HLT_PORT=18581 E2E_CONTROL_PLANE_DIRECT_PORT=18582 E2E_DAST_CANARY_PORT=18583 E2E_FRESH_ONBOARDING=1
+      E2E_PROJECT="ci-${CI_PIPELINE_ID}-onboarding" E2E_PORT=18580 E2E_RT_PORT=10580 E2E_RT_HTTPS_PORT=15443 E2E_RT_HLT_PORT=18581 E2E_CONTROL_PLANE_DIRECT_PORT=18582 E2E_DAST_CANARY_PORT=18583 E2E_MTLS_UPSTREAM_PORT=18584 E2E_FRESH_ONBOARDING=1
       E2E_FILTER=TestFreshOnboardingSelfSignedTLS
       E2E_TIMEOUT=240
       E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/fresh-onboarding"
@@ -196,6 +214,386 @@ e2e:fresh-onboarding:
     expire_in: 14 days
     paths:
       - build/e2e/fresh-onboarding/
+
+e2e:api-workflows:
+  stage: e2e
+  allow_failure: true
+  timeout: 60m
+  dependencies: []
+  script:
+    - mkdir -p build/e2e/api-workflows
+    - >-
+      E2E_PROJECT="ci-${CI_PIPELINE_ID}-api-workflows" E2E_PORT=19480 E2E_RT_PORT=11480 E2E_RT_HTTPS_PORT=24443
+      E2E_RT_HLT_PORT=19481 E2E_CONTROL_PLANE_DIRECT_PORT=19482 E2E_DAST_CANARY_PORT=19483 E2E_MTLS_UPSTREAM_PORT=19484
+      E2E_FILTER='^(TestE2EAPIFunctionalDeep|TestE2EDashboardComplete|TestE2ERequestStorageParity|TestE2ERequestsBackendFailureIsVisible|TestE2EManagementHostMutationWorkflow|TestE2ESiteSettingsRoundtrip|TestE2EQualityMatrix_MainPagesAndAPIs|TestE2EBansReadContract|TestE2EBansDurationAndUnauthorizedSiteErrors|TestE2ERevisionsValidationDeleteActiveAndMissingErrors|TestE2EEventsAPIFilterPaginationDetailContract|TestE2EActivityAPIFilterPaginationAndCriticalMutations)$'
+      E2E_TIMEOUT=300 E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/api-workflows"
+      E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/e2e/api-workflows" sh scripts/run-e2e-tests.sh
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - build/e2e/api-workflows/
+
+e2e:runtime-mtls:
+  stage: e2e
+  allow_failure: true
+  timeout: 50m
+  dependencies: []
+  script:
+    - mkdir -p build/e2e/runtime-mtls
+    - >-
+      E2E_PROJECT="ci-${CI_PIPELINE_ID}-runtime-mtls" E2E_PORT=19580 E2E_RT_PORT=11580 E2E_RT_HTTPS_PORT=25443
+      E2E_RT_HLT_PORT=19581 E2E_CONTROL_PLANE_DIRECT_PORT=19582 E2E_DAST_CANARY_PORT=19583 E2E_MTLS_UPSTREAM_PORT=19584
+      E2E_FILTER='^(TestE2EIncomingMTLSClientCertificateRuntime|TestE2EUpstreamMTLSMaterialUploadCompileApplyRuntime|TestE2ERuntimeReloadReadinessIgnoresUnavailableUpstream|TestE2EVirtualPatchAPICompileApplyRuntime|TestE2EAutoStartSmartRuntime)$'
+      E2E_TIMEOUT=300 E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/runtime-mtls"
+      E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/e2e/runtime-mtls" sh scripts/run-e2e-tests.sh
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - build/e2e/runtime-mtls/
+
+e2e:security-probes:
+  stage: e2e
+  allow_failure: true
+  timeout: 60m
+  dependencies: []
+  script:
+    - mkdir -p build/e2e/security-probes
+    - >-
+      E2E_PROJECT="ci-${CI_PIPELINE_ID}-security-probes" E2E_PORT=19680 E2E_RT_PORT=11680 E2E_RT_HTTPS_PORT=26443
+      E2E_RT_HLT_PORT=19681 E2E_CONTROL_PLANE_DIRECT_PORT=19682 E2E_DAST_CANARY_PORT=19683 E2E_MTLS_UPSTREAM_PORT=19684
+      E2E_FILTER='^(TestE2EAntiBot_ProfileCutoffAndCookiePersistence|TestE2ESecurityModesReality|TestE2ENegativeSecurityProbes|TestE2EBurstStability|TestE2EDASTAuthenticatedControlPlane|TestE2EDASTSecurityHeadersAndSessionCookie|TestE2EDASTAPIInputFuzz)$'
+      E2E_TIMEOUT=300 E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/security-probes"
+      E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/e2e/security-probes" sh scripts/run-e2e-tests.sh
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - build/e2e/security-probes/
+
+e2e:ui-server-contract:
+  stage: e2e
+  allow_failure: true
+  timeout: 35m
+  dependencies: []
+  script:
+    - mkdir -p build/e2e/ui-server-contract
+    - >-
+      E2E_PROJECT="ci-${CI_PIPELINE_ID}-ui-server-contract" E2E_PORT=19780 E2E_RT_PORT=11780 E2E_RT_HTTPS_PORT=27443
+      E2E_RT_HLT_PORT=19781 E2E_CONTROL_PLANE_DIRECT_PORT=19782 E2E_DAST_CANARY_PORT=19783 E2E_MTLS_UPSTREAM_PORT=19784
+      E2E_FILTER='^(TestE2EUIAssetsAndRouting|TestE2EDashboardSessionPingBodylessPOST|TestE2EServicesModuleNoChallengeAfterLogin)$'
+      E2E_TIMEOUT=240 E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/ui-server-contract"
+      E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/e2e/ui-server-contract" sh scripts/run-e2e-tests.sh
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - build/e2e/ui-server-contract/
+
+e2e:api-registry:
+  stage: e2e
+  allow_failure: true
+  timeout: 90m
+  dependencies: []
+  script:
+    - mkdir -p build/e2e/api-registry
+    - >-
+      E2E_PROJECT="ci-${CI_PIPELINE_ID}-api-registry" E2E_PORT=19380 E2E_RT_PORT=11380 E2E_RT_HTTPS_PORT=23443
+      E2E_RT_HLT_PORT=19381 E2E_CONTROL_PLANE_DIRECT_PORT=19382 E2E_DAST_CANARY_PORT=19383 E2E_MTLS_UPSTREAM_PORT=19384
+      E2E_FILTER='^(TestE2EAPIExtendedMatrix|TestE2EOWASPCRSCheckUsesOfficialReleaseDigest|TestE2EAPIEnterpriseMatrix|TestE2EAPISchemaContracts)$'
+      E2E_TIMEOUT=300 E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/api-registry"
+      E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/e2e/api-registry" sh scripts/run-e2e-tests.sh
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - build/e2e/api-registry/
+
+.e2e:browser:
+  stage: e2e
+  allow_failure: true
+  timeout: 90m
+  dependencies: []
+  script:
+    - test -n "${WAF_E2E_PASSWORD:-}" || { echo "WAF_E2E_PASSWORD is required" >&2; exit 1; }
+    - mkdir -p "build/e2e/$E2E_BROWSER_SLICE"
+    - BROWSER_E2E_IMAGE_JOB="${BROWSER_E2E_IMAGE}-${CI_PROJECT_ID}-${CI_PIPELINE_ID}-${E2E_BROWSER_SLICE}"; docker build -t "$BROWSER_E2E_IMAGE_JOB" -f e2e/browser/Dockerfile.ci .
+    - >-
+      E2E_BROWSER_ONLY=1
+      E2E_BROWSER_IMAGE="${BROWSER_E2E_IMAGE}-${CI_PROJECT_ID}-${CI_PIPELINE_ID}-${E2E_BROWSER_SLICE}"
+      E2E_BROWSER_SPECS="$E2E_BROWSER_SPECS"
+      E2E_PROJECT="${E2E_BROWSER_PROJECT}-${CI_PIPELINE_ID}"
+      E2E_PORT="$E2E_BROWSER_UI_PORT"
+      E2E_RT_PORT="$E2E_BROWSER_RUNTIME_PORT"
+      E2E_RT_HTTPS_PORT="$E2E_BROWSER_HTTPS_PORT"
+      E2E_RT_HLT_PORT="$E2E_BROWSER_HEALTH_PORT"
+      E2E_CONTROL_PLANE_DIRECT_PORT="$E2E_BROWSER_CONTROL_PORT"
+      E2E_DAST_CANARY_PORT="$E2E_BROWSER_CANARY_PORT"
+      E2E_MTLS_UPSTREAM_PORT="$E2E_BROWSER_MTLS_PORT"
+      E2E_TIMEOUT=300
+      E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/$E2E_BROWSER_SLICE"
+      E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/e2e/$E2E_BROWSER_SLICE"
+      WAF_BROWSER_RESULTS_FILE="../../build/e2e/$E2E_BROWSER_SLICE/results.json"
+      WAF_BROWSER_OUTPUT_DIR="../../build/e2e/$E2E_BROWSER_SLICE/artifacts"
+      WAF_BROWSER_JUNIT_FILE="../../build/e2e/$E2E_BROWSER_SLICE/junit.xml"
+      WAF_E2E_RUN_ID="$CI_PIPELINE_ID-$E2E_BROWSER_SLICE"
+      sh scripts/run-e2e-tests.sh
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - build/e2e/$E2E_BROWSER_SLICE/
+    reports:
+      junit: build/e2e/$E2E_BROWSER_SLICE/junit.xml
+
+e2e:browser:core:
+  extends: .e2e:browser
+  variables:
+    E2E_BROWSER_SLICE: browser-core
+    E2E_BROWSER_PROJECT: ci-browser-core
+    E2E_BROWSER_UI_PORT: "18980"
+    E2E_BROWSER_RUNTIME_PORT: "10980"
+    E2E_BROWSER_HTTPS_PORT: "19443"
+    E2E_BROWSER_HEALTH_PORT: "18981"
+    E2E_BROWSER_CONTROL_PORT: "18982"
+    E2E_BROWSER_CANARY_PORT: "18983"
+    E2E_BROWSER_MTLS_PORT: "18984"
+    E2E_BROWSER_SPECS: "tests/auth-ui.spec.ts tests/smoke.spec.ts tests/waits.spec.ts tests/dashboard.spec.ts tests/tabs.spec.ts tests/requests-complete.spec.ts tests/events-complete.spec.ts tests/activity-complete.spec.ts"
+
+e2e:browser:services:
+  extends: .e2e:browser
+  variables:
+    E2E_BROWSER_SLICE: browser-services
+    E2E_BROWSER_PROJECT: ci-browser-services
+    E2E_BROWSER_UI_PORT: "19080"
+    E2E_BROWSER_RUNTIME_PORT: "11080"
+    E2E_BROWSER_HTTPS_PORT: "20443"
+    E2E_BROWSER_HEALTH_PORT: "19081"
+    E2E_BROWSER_CONTROL_PORT: "19082"
+    E2E_BROWSER_CANARY_PORT: "19083"
+    E2E_BROWSER_MTLS_PORT: "19084"
+    E2E_BROWSER_SPECS: "tests/services.spec.ts tests/services-antibot-preview.spec.ts tests/services-auth.spec.ts tests/services-certificate.spec.ts tests/services-dynamic-controls.spec.ts tests/services-editor-navigation.spec.ts tests/services-error-pages.spec.ts tests/services-help.spec.ts tests/services-import.spec.ts tests/services-mobile-layout.spec.ts tests/services-protection.spec.ts tests/services-rbac.spec.ts tests/services-runtime.spec.ts tests/services-validation.spec.ts tests/services-virtual-patches.spec.ts"
+
+e2e:browser:platform:
+  extends: .e2e:browser
+  variables:
+    E2E_BROWSER_SLICE: browser-platform
+    E2E_BROWSER_PROJECT: ci-browser-platform
+    E2E_BROWSER_UI_PORT: "19180"
+    E2E_BROWSER_RUNTIME_PORT: "11180"
+    E2E_BROWSER_HTTPS_PORT: "21443"
+    E2E_BROWSER_HEALTH_PORT: "19181"
+    E2E_BROWSER_CONTROL_PORT: "19182"
+    E2E_BROWSER_CANARY_PORT: "19183"
+    E2E_BROWSER_MTLS_PORT: "19184"
+    E2E_BROWSER_SPECS: "tests/bans-mutations.spec.ts tests/bans-rbac.spec.ts tests/revisions-mutations.spec.ts tests/antiddos-mutations.spec.ts tests/owasp-crs-mutations.spec.ts tests/tls-mutations.spec.ts tests/tls-complete.spec.ts tests/administration-mutations.spec.ts"
+
+e2e:browser:settings-cross:
+  extends: .e2e:browser
+  variables:
+    E2E_BROWSER_SLICE: browser-settings-cross
+    E2E_BROWSER_PROJECT: ci-browser-settings-cross
+    E2E_BROWSER_UI_PORT: "19280"
+    E2E_BROWSER_RUNTIME_PORT: "11280"
+    E2E_BROWSER_HTTPS_PORT: "22443"
+    E2E_BROWSER_HEALTH_PORT: "19281"
+    E2E_BROWSER_CONTROL_PORT: "19282"
+    E2E_BROWSER_CANARY_PORT: "19283"
+    E2E_BROWSER_MTLS_PORT: "19284"
+    E2E_BROWSER_SPECS: "tests/settings-mutations.spec.ts tests/settings-storage-security.spec.ts tests/settings-logging-secrets.spec.ts tests/settings-management-appearance.spec.ts tests/cross-security-auth-rbac.spec.ts tests/cross-compile-audit.spec.ts tests/cross-resilience-i18n-security.spec.ts"
+
+e2e:browser:requests-backend-failure:
+  extends: .e2e:browser
+  variables:
+    E2E_BROWSER_SLICE: browser-requests-backend-failure
+    E2E_BROWSER_PROJECT: ci-browser-requests-backend-failure
+    E2E_BROWSER_UI_PORT: "19980"
+    E2E_BROWSER_RUNTIME_PORT: "11980"
+    E2E_BROWSER_HTTPS_PORT: "29443"
+    E2E_BROWSER_HEALTH_PORT: "19981"
+    E2E_BROWSER_CONTROL_PORT: "19982"
+    E2E_BROWSER_CANARY_PORT: "19983"
+    E2E_BROWSER_MTLS_PORT: "19984"
+    E2E_BROWSER_RUNTIME_FAULT: "requests-backend"
+    E2E_BROWSER_SPECS: "tests/requests-backend-error.spec.ts"
+
+e2e:browser:gate:
+  stage: e2e-report
+  allow_failure: true
+  timeout: 15m
+  when: always
+  dependencies:
+    - e2e:browser:core
+    - e2e:browser:services
+    - e2e:browser:platform
+    - e2e:browser:settings-cross
+    - e2e:browser:requests-backend-failure
+    - e2e:api-registry
+  needs:
+    - job: e2e:browser:core
+      artifacts: true
+    - job: e2e:browser:services
+      artifacts: true
+    - job: e2e:browser:platform
+      artifacts: true
+    - job: e2e:browser:settings-cross
+      artifacts: true
+    - job: e2e:browser:requests-backend-failure
+      artifacts: true
+    - job: e2e:api-registry
+      artifacts: true
+  script:
+    - cd e2e/browser
+    - node scripts/verify-results.mjs ../../build/e2e/browser-core/results.json
+    - node scripts/verify-results.mjs ../../build/e2e/browser-services/results.json
+    - node scripts/verify-results.mjs ../../build/e2e/browser-platform/results.json
+    - node scripts/verify-results.mjs ../../build/e2e/browser-settings-cross/results.json
+    - node scripts/verify-results.mjs ../../build/e2e/browser-requests-backend-failure/results.json
+    - >-
+      node scripts/coverage.mjs
+      ../../build/e2e/browser-core/results.json
+      ../../build/e2e/browser-services/results.json
+      ../../build/e2e/browser-platform/results.json
+      ../../build/e2e/browser-settings-cross/results.json
+      ../../build/e2e/browser-requests-backend-failure/results.json
+      --api-evidence ../../build/e2e/api-registry/e2e-evidence.json
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - build/e2e/browser-core/
+      - build/e2e/browser-services/
+      - build/e2e/browser-platform/
+      - build/e2e/browser-settings-cross/
+      - build/e2e/browser-requests-backend-failure/
+
+e2e:failure-evidence:
+  stage: e2e-report
+  timeout: 10m
+  when: always
+  allow_failure: true
+  dependencies: []
+  needs:
+    - job: e2e:smoke
+      artifacts: true
+    - job: e2e:security-invariants
+      artifacts: true
+    - job: e2e:management-rate-limit
+      artifacts: true
+    - job: e2e:full
+      artifacts: true
+    - job: e2e:fresh-onboarding
+      artifacts: true
+    - job: e2e:api-registry
+      artifacts: true
+    - job: e2e:api-workflows
+      artifacts: true
+    - job: e2e:runtime-mtls
+      artifacts: true
+    - job: e2e:security-probes
+      artifacts: true
+    - job: e2e:ui-server-contract
+      artifacts: true
+    - job: e2e:browser:core
+      artifacts: true
+    - job: e2e:browser:services
+      artifacts: true
+    - job: e2e:browser:platform
+      artifacts: true
+    - job: e2e:browser:settings-cross
+      artifacts: true
+    - job: e2e:browser:requests-backend-failure
+      artifacts: true
+    - job: e2e:browser:gate
+      artifacts: true
+  script:
+    - mkdir -p build/e2e/collected-failures
+    - >-
+      find build/e2e -type f \( -name 'e2e-evidence.md' -o -name 'e2e-evidence.json' -o -name 'e2e-stability.json' -o -name 'junit.xml' -o -name 'results.json' -o -name '*.log' \)
+      -print | sort > build/e2e/collected-failures/files.txt
+    - >-
+      { printf '# E2E evidence bundle\n\n'; printf 'Pipeline: %s\n\n' "$CI_PIPELINE_URL"; printf 'Collected files:\n\n'; sed 's#^#- #' build/e2e/collected-failures/files.txt; }
+      > build/e2e/collected-failures/README.md
+    - cp build/e2e/collected-failures/files.txt build/e2e/collected-failures/failure-files.txt
+  artifacts:
+    when: always
+    expire_in: 30 days
+    name: "e2e-evidence-$CI_PIPELINE_ID"
+    paths:
+      - build/e2e/
+
+pre-security:failure-gate:
+  stage: pre-security
+  timeout: 15m
+  when: always
+  dependencies: []
+  script:
+    - mkdir -p build/pre-security
+    - >-
+      curl --fail --silent --show-error
+      --header "JOB-TOKEN: $CI_JOB_TOKEN"
+      "$CI_API_V4_URL/projects/$CI_PROJECT_ID/pipelines/$CI_PIPELINE_ID/jobs?per_page=100&include_retried=true"
+      > build/pre-security/jobs.json
+    - |
+      python3 - <<'PY'
+      import json
+      import os
+      import sys
+      import urllib.request
+
+      source_path = "build/pre-security/jobs.json"
+      summary_path = "build/pre-security/failure-summary.md"
+      with open(source_path, encoding="utf-8") as source:
+          jobs = json.load(source)
+
+      watched_stages = {"validate", "unit", "e2e", "e2e-report"}
+      failed = [
+          job for job in jobs
+          if job.get("stage") in watched_stages
+          and job.get("status") in {"failed", "canceled"}
+      ]
+      lines = ["# Pre-security failure summary", ""]
+      if not failed:
+          lines.append("All validate, unit and E2E jobs passed.")
+          print("[pre-security] No failures in validate, unit or E2E stages.")
+          with open(summary_path, "w", encoding="utf-8") as summary:
+              summary.write("\n".join(lines) + "\n")
+          sys.exit(0)
+
+      token = os.environ["CI_JOB_TOKEN"]
+      api = os.environ["CI_API_V4_URL"]
+      project = os.environ["CI_PROJECT_ID"]
+      print(f"[pre-security] {len(failed)} failed job(s); security is blocked.")
+      for job in failed:
+          name = job.get("name", "unknown")
+          status = job.get("status", "unknown")
+          url = job.get("web_url", "")
+          job_id = job["id"]
+          heading = f"{name} ({status})"
+          print(f"\n{'=' * 88}\n{heading}\n{url}\n{'=' * 88}")
+          lines.extend([f"## {heading}", "", url, ""])
+          request = urllib.request.Request(
+              f"{api}/projects/{project}/jobs/{job_id}/trace",
+              headers={"JOB-TOKEN": token},
+          )
+          try:
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  trace = response.read().decode("utf-8", errors="replace")
+          except Exception as exc:
+              trace = f"Could not retrieve job trace: {exc}"
+          tail = trace.splitlines()[-160:]
+          print("\n".join(tail))
+          lines.extend(["```text", *tail, "```", ""])
+      with open(summary_path, "w", encoding="utf-8") as summary:
+          summary.write("\n".join(lines) + "\n")
+      sys.exit(1)
+      PY
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - build/pre-security/
 
 security:gitleaks:
   stage: security
@@ -359,6 +757,7 @@ publish:github-release:
     - e2e:security-invariants
     - e2e:management-rate-limit
     - e2e:full
+    - e2e:browser:gate
     - dast:baseline
     - dast:negative
   needs:
@@ -369,6 +768,7 @@ publish:github-release:
     - e2e:security-invariants
     - e2e:management-rate-limit
     - e2e:full
+    - e2e:browser:gate
     - dast:baseline
     - dast:negative
   rules:
