@@ -115,8 +115,8 @@ test("settings.appearance-preview-save-reload-restore", async ({ authenticatedPa
     expect(healthSaveResponse.status(), await healthSaveResponse.text()).toBe(200);
     await expect.poll(async () => JSON.parse((await api(page, "/api/settings/runtime")).body).healthcheck_appearance).toBe(health);
     await page.reload({ waitUntil: "domcontentloaded" });
-    await expect(page.locator("#settings-page")).toHaveAttribute("data-runtime-ready", "true");
     await waitForStableDOM(page.locator("#settings-login-appearance"));
+    await expect(page.locator("#settings-page")).toHaveAttribute("data-runtime-ready", "true");
     await expect(page.locator("#settings-login-appearance")).toHaveValue(login);
     await expect(page.locator("#settings-healthcheck-appearance")).toHaveValue(health);
   } finally {

@@ -1,5 +1,6 @@
 import { expect, test } from "../fixtures/auth";
 import { CleanupLedger, e2eID } from "../support/isolation";
+import { openPage } from "../support/waits";
 
 test("services.validation-reference-matrix", async ({ authenticatedPage: page }, testInfo) => {
   const prefix = e2eID(testInfo, "e2e-validation");
@@ -73,8 +74,7 @@ test("services.validation-reference-matrix", async ({ authenticatedPage: page },
     ];
     for (const [label, selector, value] of uiCases) {
       await test.step("UI validation: " + label, async () => {
-        await page.goto("/services/new", { waitUntil: "domcontentloaded", timeout: 60000 });
-        await expect(page.locator("#service-editor-form"), label).toBeVisible({ timeout: 30000 });
+        await openPage(page, "/services/new", page.locator("#service-editor-form"));
         await page.locator("#service-id").fill(uiSite);
         await page.locator("#service-host").fill(uiSite + ".example.test");
         await page.locator('[data-wizard-tab="upstream"]').click();
