@@ -36,7 +36,7 @@ test("services.virtual-patches-api-readback", async ({ authenticatedPage: page }
       const patches = await list(`/api/virtual-patches/${siteID}`);
       return Array.isArray(patches) && patches.some((patch: { pattern?: string; target?: string; action?: string }) => patch.pattern === pattern && patch.target === "uri" && patch.action === "block");
     }).toBe(true);
-    await page.reload({ waitUntil: "domcontentloaded" });
+    await openPage(page, `/services/${siteID}`, page.locator("#service-editor-form"));
     await page.locator('[data-wizard-tab="virtualpatches"]').click();
     await expect(page.locator("#virtual-patches-list")).toContainText(pattern);
     await page.locator("[data-vp-delete]").click();

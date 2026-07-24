@@ -21,10 +21,20 @@ export async function gotoWithNetworkRetry(page: Page, path: string) {
 }
 
 export async function openPage(page: Page, path: string, ready: string | Locator) {
-  await gotoWithNetworkRetry(page, path);
   const target = typeof ready === "string" ? page.locator(ready) : ready;
-  await expect(target).toBeVisible({ timeout: ACTION_TIMEOUT });
-  return target;
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await gotoWithNetworkRetry(page, path);
+    try {
+      await expect(target).toBeVisible({ timeout: ACTION_TIMEOUT });
+      return target;
+    } catch (error) {
+      lastError = error;
+      if (attempt > 0) throw error;
+      await page.waitForTimeout(250);
+    }
+  }
+  throw lastError;
 }
 
 export function waitForAPIResponse(

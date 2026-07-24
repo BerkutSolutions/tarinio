@@ -1,4 +1,5 @@
 import { expect, test } from "../fixtures/auth";
+import { openPage } from "../support/waits";
 
 test("dashboard.widgets", async ({ authenticatedPage: page }) => {
   await page.goto("/dashboard", { waitUntil: "domcontentloaded", timeout: 60000 });
@@ -158,8 +159,7 @@ test("dashboard.resilience-states", async ({ authenticatedPage: page }) => {
       await statePage.route("**/api/dashboard/containers/overview", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ containers: [], total_containers: 0, running_containers: 0 }) }));
       await statePage.route("**/api/requests**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
       await statePage.route("**/api/events**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: '{"events":[]}' }));
-      await statePage.goto(`/dashboard?e2e-state=${state}`, { waitUntil: "domcontentloaded", timeout: 60000 });
-      await expect(statePage.locator("#dashboard-page")).toBeVisible();
+      await openPage(statePage, `/dashboard?e2e-state=${state}`, "#dashboard-page");
       await expect(statePage.locator('[data-widget-id="traffic-summary"]')).toBeVisible();
       if (state === "empty") {
         await expect(statePage.locator('[data-widget-id="traffic-summary"] .dashboard-traffic-value')).toHaveText(["0", "0", "0"]);
@@ -246,7 +246,7 @@ for (const metric of ["memory", "cpu"]) {
           };
           await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(payload) });
         });
-        await edgePage.goto(`/dashboard?e2e-system-edge=${encodeURIComponent(String(value))}`, { waitUntil: "domcontentloaded", timeout: 60000 });
+        await openPage(edgePage, `/dashboard?e2e-system-edge=${encodeURIComponent(String(value))}`, `[data-widget-id="${metric}"]`);
         const edgeWidget = edgePage.locator(`[data-widget-id="${metric}"]`);
         const expected = Math.min(100, value);
         await expect(edgeWidget.locator(".dashboard-system-main")).toHaveText(`${expected.toFixed(1)}%`);
