@@ -402,7 +402,21 @@ e2e:browser:services:
     E2E_BROWSER_CONTROL_PORT: "19082"
     E2E_BROWSER_CANARY_PORT: "19083"
     E2E_BROWSER_MTLS_PORT: "19084"
-    E2E_BROWSER_SPECS: "tests/services.spec.ts tests/services-antibot-preview.spec.ts tests/services-auth.spec.ts tests/services-certificate.spec.ts tests/services-dynamic-controls.spec.ts"
+    E2E_BROWSER_SPECS: "tests/services.spec.ts tests/services-antibot-preview.spec.ts tests/services-auth.spec.ts"
+
+e2e:browser:services-controls:
+  extends: .e2e:browser
+  variables:
+    E2E_BROWSER_SLICE: browser-services-controls
+    E2E_BROWSER_PROJECT: ci-browser-services-controls
+    E2E_BROWSER_UI_PORT: "20280"
+    E2E_BROWSER_RUNTIME_PORT: "12280"
+    E2E_BROWSER_HTTPS_PORT: "32443"
+    E2E_BROWSER_HEALTH_PORT: "20281"
+    E2E_BROWSER_CONTROL_PORT: "20282"
+    E2E_BROWSER_CANARY_PORT: "20283"
+    E2E_BROWSER_MTLS_PORT: "20284"
+    E2E_BROWSER_SPECS: "tests/services-certificate.spec.ts tests/services-dynamic-controls.spec.ts"
 
 e2e:browser:services-editor:
   extends: .e2e:browser
@@ -416,7 +430,21 @@ e2e:browser:services-editor:
     E2E_BROWSER_CONTROL_PORT: "20082"
     E2E_BROWSER_CANARY_PORT: "20083"
     E2E_BROWSER_MTLS_PORT: "20084"
-    E2E_BROWSER_SPECS: "tests/services-editor-navigation.spec.ts tests/services-error-pages.spec.ts tests/services-help.spec.ts tests/services-import.spec.ts tests/services-mobile-layout.spec.ts"
+    E2E_BROWSER_SPECS: "tests/services-editor-navigation.spec.ts tests/services-error-pages.spec.ts tests/services-help.spec.ts"
+
+e2e:browser:services-editor-import:
+  extends: .e2e:browser
+  variables:
+    E2E_BROWSER_SLICE: browser-services-editor-import
+    E2E_BROWSER_PROJECT: ci-browser-services-editor-import
+    E2E_BROWSER_UI_PORT: "20380"
+    E2E_BROWSER_RUNTIME_PORT: "12380"
+    E2E_BROWSER_HTTPS_PORT: "33443"
+    E2E_BROWSER_HEALTH_PORT: "20381"
+    E2E_BROWSER_CONTROL_PORT: "20382"
+    E2E_BROWSER_CANARY_PORT: "20383"
+    E2E_BROWSER_MTLS_PORT: "20384"
+    E2E_BROWSER_SPECS: "tests/services-import.spec.ts tests/services-mobile-layout.spec.ts"
 
 e2e:browser:services-security:
   extends: .e2e:browser
@@ -430,7 +458,21 @@ e2e:browser:services-security:
     E2E_BROWSER_CONTROL_PORT: "20182"
     E2E_BROWSER_CANARY_PORT: "20183"
     E2E_BROWSER_MTLS_PORT: "20184"
-    E2E_BROWSER_SPECS: "tests/services-protection.spec.ts tests/services-rbac.spec.ts tests/services-runtime.spec.ts tests/services-validation.spec.ts tests/services-virtual-patches.spec.ts"
+    E2E_BROWSER_SPECS: "tests/services-protection.spec.ts tests/services-rbac.spec.ts tests/services-runtime.spec.ts"
+
+e2e:browser:services-security-patches:
+  extends: .e2e:browser
+  variables:
+    E2E_BROWSER_SLICE: browser-services-security-patches
+    E2E_BROWSER_PROJECT: ci-browser-services-security-patches
+    E2E_BROWSER_UI_PORT: "20480"
+    E2E_BROWSER_RUNTIME_PORT: "12480"
+    E2E_BROWSER_HTTPS_PORT: "34443"
+    E2E_BROWSER_HEALTH_PORT: "20481"
+    E2E_BROWSER_CONTROL_PORT: "20482"
+    E2E_BROWSER_CANARY_PORT: "20483"
+    E2E_BROWSER_MTLS_PORT: "20484"
+    E2E_BROWSER_SPECS: "tests/services-validation.spec.ts tests/services-virtual-patches.spec.ts"
 
 e2e:browser:platform:
   extends: .e2e:browser
@@ -483,8 +525,11 @@ e2e:browser:gate:
   dependencies:
     - e2e:browser:core
     - e2e:browser:services
+    - e2e:browser:services-controls
     - e2e:browser:services-editor
+    - e2e:browser:services-editor-import
     - e2e:browser:services-security
+    - e2e:browser:services-security-patches
     - e2e:browser:platform
     - e2e:browser:settings-cross
     - e2e:browser:requests-backend-failure
@@ -494,9 +539,15 @@ e2e:browser:gate:
       artifacts: true
     - job: e2e:browser:services
       artifacts: true
+    - job: e2e:browser:services-controls
+      artifacts: true
     - job: e2e:browser:services-editor
       artifacts: true
+    - job: e2e:browser:services-editor-import
+      artifacts: true
     - job: e2e:browser:services-security
+      artifacts: true
+    - job: e2e:browser:services-security-patches
       artifacts: true
     - job: e2e:browser:platform
       artifacts: true
@@ -510,8 +561,11 @@ e2e:browser:gate:
     - cd e2e/browser
     - node scripts/verify-results.mjs ../../build/e2e/browser-core/results.json
     - node scripts/verify-results.mjs ../../build/e2e/browser-services/results.json
+    - node scripts/verify-results.mjs ../../build/e2e/browser-services-controls/results.json
     - node scripts/verify-results.mjs ../../build/e2e/browser-services-editor/results.json
+    - node scripts/verify-results.mjs ../../build/e2e/browser-services-editor-import/results.json
     - node scripts/verify-results.mjs ../../build/e2e/browser-services-security/results.json
+    - node scripts/verify-results.mjs ../../build/e2e/browser-services-security-patches/results.json
     - node scripts/verify-results.mjs ../../build/e2e/browser-platform/results.json
     - node scripts/verify-results.mjs ../../build/e2e/browser-settings-cross/results.json
     - node scripts/verify-results.mjs ../../build/e2e/browser-requests-backend-failure/results.json
@@ -519,8 +573,11 @@ e2e:browser:gate:
       node scripts/coverage.mjs
       ../../build/e2e/browser-core/results.json
       ../../build/e2e/browser-services/results.json
+      ../../build/e2e/browser-services-controls/results.json
       ../../build/e2e/browser-services-editor/results.json
+      ../../build/e2e/browser-services-editor-import/results.json
       ../../build/e2e/browser-services-security/results.json
+      ../../build/e2e/browser-services-security-patches/results.json
       ../../build/e2e/browser-platform/results.json
       ../../build/e2e/browser-settings-cross/results.json
       ../../build/e2e/browser-requests-backend-failure/results.json
@@ -531,8 +588,11 @@ e2e:browser:gate:
     paths:
       - build/e2e/browser-core/
       - build/e2e/browser-services/
+      - build/e2e/browser-services-controls/
       - build/e2e/browser-services-editor/
+      - build/e2e/browser-services-editor-import/
       - build/e2e/browser-services-security/
+      - build/e2e/browser-services-security-patches/
       - build/e2e/browser-platform/
       - build/e2e/browser-settings-cross/
       - build/e2e/browser-requests-backend-failure/
@@ -569,9 +629,15 @@ e2e:failure-evidence:
       artifacts: true
     - job: e2e:browser:services
       artifacts: true
+    - job: e2e:browser:services-controls
+      artifacts: true
     - job: e2e:browser:services-editor
       artifacts: true
+    - job: e2e:browser:services-editor-import
+      artifacts: true
     - job: e2e:browser:services-security
+      artifacts: true
+    - job: e2e:browser:services-security-patches
       artifacts: true
     - job: e2e:browser:platform
       artifacts: true
