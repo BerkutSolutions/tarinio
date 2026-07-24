@@ -22,10 +22,20 @@ login_payload=$(printf '{\"username\":\"%s\",\"password\":\"%s\"}' "$username" "
 # deliberately not the runtime HTTPS virtual host used by browser E2E, so an
 # e2e-management.test Host header would be rejected by the control-plane host
 # guard with HTTP 400 before authentication.
-curl -fsS -c "$cookie_jar" -H 'Content-Type: application/json' -d "$login_payload" "$base_url/api/auth/login" >/dev/null
+login_response="$tmp_dir/login-response.json"
+if ! curl -sS -o "$login_response" -w '%{http_code}' -c "$cookie_jar" -H 'Content-Type: application/json' -d "$login_payload" "$base_url/api/auth/login" | grep -qx '200'; then
+  printf 'Dashboard seed login failed: %s\n' "$(cat "$login_response" 2>/dev/null || true)" >&2
+  exit 1
+fi
 attempt=0
 while [ "$attempt" -lt 30 ]; do
-  stats=$(curl -fsS -b "$cookie_jar" "$base_url/api/dashboard/stats" || true)
+  stats_response="$tmp_dir/dashboard-response.json"
+  stats_status=$(curl -sS -o "$stats_response" -w '%{http_code}' -b "$cookie_jar" "$base_url/api/dashboard/stats" || true)
+  stats=$(cat "$stats_response" 2>/dev/null || true)
+  if [ "$stats_status" != '200' ]; then
+    printf 'Dashboard seed stats status=%s body=%s\n' "$stats_status" "$stats" >&2
+    exit 1
+  fi
   if printf '%s' "$stats" | python3 -c '
 import json
 import sys

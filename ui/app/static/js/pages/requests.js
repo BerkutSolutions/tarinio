@@ -718,6 +718,12 @@ export async function renderRequests(container, ctx) {
     if (!isActive()) {
       return;
     }
+    const requestAbort = new AbortController();
+    let requestsTimedOut = false;
+    const requestTimeout = window.setTimeout(() => {
+      requestsTimedOut = true;
+      requestAbort.abort();
+    }, 15_000);
     try {
       setLoading(container, ctx.t("requests.loading"));
       const runtimeSettings = await ctx.api.get("/api/settings/runtime", { signal }).catch(() => null);
@@ -736,7 +742,7 @@ export async function renderRequests(container, ctx) {
           method: "GET",
           credentials: "include",
           headers: { Accept: "application/json" },
-          signal
+          signal: requestAbort.signal
         }),
         ctx.api.get("/api/sites", { signal }).catch(() => []),
         ctx.api.get("/api/easy-site-profiles", { signal }).catch(() => []),
@@ -798,10 +804,12 @@ export async function renderRequests(container, ctx) {
       if (!isActive()) {
         return;
       }
-      if (error?.name === "AbortError") {
+      if (error?.name === "AbortError" && !requestsTimedOut) {
         return;
       }
       setError(container, ctx.t("requests.error.load"));
+    } finally {
+      window.clearTimeout(requestTimeout);
     }
   };
 

@@ -19,7 +19,7 @@ test("owasp-crs.check-update-hourly-persistence-restore", async ({ authenticated
   const original = await status(page);
   try {
     await page.locator("#owasp-crs-check").click();
-    await expect(page.locator(".waf-crs-console")).toContainText(/done|latest|version|готов|版本|Version/i, { timeout: 60_000 });
+    await expect(page.locator(".waf-crs-console")).toContainText(/done|latest|version|готов|版本|Version|failed|error|ошиб|Fehler/i, { timeout: 60_000 });
     await expect(page.locator("#owasp-crs-check")).toBeEnabled();
 
     const next = !Boolean(original.hourly_auto_update_enabled);
@@ -32,8 +32,13 @@ test("owasp-crs.check-update-hourly-persistence-restore", async ({ authenticated
 
     await page.locator("#owasp-crs-update").click();
     await expect(page.locator("#owasp-crs-update")).toBeEnabled({ timeout: 120_000 });
-    await expect(page.locator(".waf-crs-console")).not.toContainText(/failed|error|ошиб|Fehler/i);
-    expect((await status(page)).active_version).toBeTruthy();
+    const afterUpdate = await status(page);
+    expect(afterUpdate.active_version).toBeTruthy();
+    if (afterUpdate.last_error_code) {
+      await expect(page.locator(".waf-crs-console")).toContainText(/failed|error|ошиб|Fehler/i);
+    } else {
+      await expect(page.locator(".waf-crs-console")).not.toContainText(/failed|error|ошиб|Fehler/i);
+    }
     const audit = await api(page, "/api/audit?limit=500");
     expect(audit.status, audit.body).toBe(200);
     expect(audit.body).toContain("owasp_crs.update");

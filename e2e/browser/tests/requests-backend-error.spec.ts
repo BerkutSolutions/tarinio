@@ -10,7 +10,7 @@ test("requests.real-backend-failure-keeps-shell", async ({ authenticatedPage: pa
   writeFileSync(`${projectSignal}.ready`, "ready", "utf8");
   await expect.poll(() => existsSync(`${syncFile}.paused`), { timeout: 60_000 }).toBe(true);
   await page.locator("#requests-refresh").click();
-  await expect(page.locator(".waf-empty")).toContainText(/error|ошиб|fehler|греш|错误/i, { timeout: 30_000 });
+  await expect(page.locator(".waf-empty")).toContainText(/error|ошиб|fehler|греш|错误/i, { timeout: 45_000 });
   await expect(page.locator("nav")).toBeVisible();
   await expect(page.locator("#app-shell, main, #app").first()).toBeVisible();
 });

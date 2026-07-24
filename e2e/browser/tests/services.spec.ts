@@ -1,5 +1,6 @@
 import { expect, test } from "../fixtures/auth";
 import { CleanupLedger, e2eID } from "../support/isolation";
+import { openPage } from "../support/waits";
 
 test("services.list-load services.search services.sort services.select-all", async ({ authenticatedPage: page }) => {
   await page.goto("/services", { waitUntil: "domcontentloaded", timeout: 60000 });
@@ -72,8 +73,7 @@ test("services.selection-navigation", async ({ authenticatedPage: page }) => {
 });
 
 test("services.editor-modes-search-validation-back", async ({ authenticatedPage: page }) => {
-  await page.goto("/services/new", { waitUntil: "domcontentloaded", timeout: 60000 });
-  await expect(page.locator("#service-editor-form")).toBeVisible({ timeout: 30000 });
+  await openPage(page, "/services/new", "#service-editor-form");
   await expect(page.locator("#service-id")).toBeVisible();
   await expect(page.locator("#service-host")).toBeVisible();
   await page.locator('[data-mode-tab="raw"]').click();

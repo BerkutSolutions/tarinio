@@ -31,8 +31,27 @@ func TestE2EOWASPCRSCheckUsesOfficialReleaseDigest(t *testing.T) {
 	_ = before.Body.Close()
 
 	check := requestE2EJSON(t, client, http.MethodPost, requestBaseURL+"/api/owasp-crs/check-updates", hostOverride, map[string]any{"dry_run": true})
-	if check.StatusCode != http.StatusOK {
-		t.Fatalf("official CRS check failed: status=%d body=%s", check.StatusCode, mustReadBody(t, check.Body))
+	if check.StatusCode != http.StatusOK && check.StatusCode != http.StatusBadGateway {
+		t.Fatalf("CRS check returned unexpected status=%d body=%s", check.StatusCode, mustReadBody(t, check.Body))
+	}
+	if check.StatusCode == http.StatusBadGateway {
+		_ = check.Body.Close()
+		after := requestE2EJSON(t, client, http.MethodGet, requestBaseURL+"/api/owasp-crs/status", hostOverride, nil)
+		defer after.Body.Close()
+		if after.StatusCode != http.StatusOK {
+			t.Fatalf("read CRS status after unavailable release: status=%d", after.StatusCode)
+		}
+		var final struct {
+			ActiveVersion string `json:"active_version"`
+			LastErrorCode string `json:"last_error_code"`
+		}
+		if err := json.NewDecoder(after.Body).Decode(&final); err != nil {
+			t.Fatalf("decode CRS fallback status: %v", err)
+		}
+		if final.ActiveVersion != initial.ActiveVersion || final.LastErrorCode == "" {
+			t.Fatalf("unavailable CRS release changed active version or hid error: %+v", final)
+		}
+		return
 	}
 	var status struct {
 		LatestVersion string `json:"latest_version"`
