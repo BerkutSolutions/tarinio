@@ -108,7 +108,8 @@ docs:build:
   script:
     - mkdir -p "$NPM_CACHE_DIR" .ci-home
     - >-
-      docker run --rm --pull=always --user "$(id -u):$(id -g)"
+      docker image inspect node:24-bookworm >/dev/null
+      && docker run --rm --user "$(id -u):$(id -g)"
       -e HOME=/workspace/.ci-home -e NPM_CONFIG_CACHE=/npm-cache
       -v "$NPM_CACHE_DIR:/npm-cache"
       -v "$CI_PROJECT_DIR:/workspace" -w /workspace node:24-bookworm
