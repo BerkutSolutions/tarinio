@@ -103,7 +103,8 @@ func (osCommandRunner) Run(ctx context.Context, name string, args ...string) ([]
 }
 
 type ContainerRuntimeService struct {
-	runner commandRunner
+	runner         commandRunner
+	composeProject string
 
 	mu                sync.RWMutex
 	cachedOverview    DashboardContainerOverview
@@ -113,7 +114,10 @@ type ContainerRuntimeService struct {
 var safeContainerNamePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}$`)
 
 func NewContainerRuntimeService() *ContainerRuntimeService {
-	return &ContainerRuntimeService{runner: osCommandRunner{}}
+	return &ContainerRuntimeService{
+		runner:         osCommandRunner{},
+		composeProject: strings.TrimSpace(os.Getenv("WAF_DASHBOARD_COMPOSE_PROJECT")),
+	}
 }
 
 func (s *ContainerRuntimeService) Overview() (DashboardContainerOverview, error) {
@@ -128,7 +132,7 @@ func (s *ContainerRuntimeService) Overview() (DashboardContainerOverview, error)
 		}
 		return DashboardContainerOverview{}, err
 	}
-	containers := filterDashboardContainers(parseDockerPS(psOut))
+	containers := filterDashboardContainers(parseDockerPS(psOut), s.composeProject)
 	statsCtx, cancelStats := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancelStats()
 	statsOut, statsErr := s.runner.Run(statsCtx, "docker", "stats", "--no-stream", "--format", "{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.PIDs}}")
@@ -299,7 +303,7 @@ func (s *ContainerRuntimeService) allowedDashboardContainers() (map[string]struc
 	if err != nil {
 		return nil, err
 	}
-	containers := filterDashboardContainers(parseDockerPS(psOut))
+	containers := filterDashboardContainers(parseDockerPS(psOut), s.composeProject)
 	out := make(map[string]struct{}, len(containers))
 	for _, container := range containers {
 		name := strings.TrimSpace(container.Name)
@@ -319,7 +323,7 @@ func (s *ContainerRuntimeService) Issues() (DashboardContainerIssuesSummary, err
 	if err != nil {
 		return DashboardContainerIssuesSummary{}, err
 	}
-	containers := filterDashboardContainers(parseDockerPS(psOut))
+	containers := filterDashboardContainers(parseDockerPS(psOut), s.composeProject)
 	if len(containers) == 0 {
 		return DashboardContainerIssuesSummary{
 			GeneratedAt: time.Now().UTC().Format(time.RFC3339Nano),
@@ -457,7 +461,7 @@ func parseDockerComposeProject(labelsRaw string) string {
 	return ""
 }
 
-func filterDashboardContainers(items []DashboardContainerMetrics) []DashboardContainerMetrics {
+func filterDashboardContainers(items []DashboardContainerMetrics, composeProject string) []DashboardContainerMetrics {
 	if len(items) == 0 {
 		return items
 	}
@@ -473,6 +477,9 @@ func filterDashboardContainers(items []DashboardContainerMetrics) []DashboardCon
 	filtered := make([]DashboardContainerMetrics, 0, composeCount)
 	for _, item := range items {
 		if strings.TrimSpace(item.ComposeProject) == "" {
+			continue
+		}
+		if composeProject != "" && item.ComposeProject != composeProject {
 			continue
 		}
 		filtered = append(filtered, item)

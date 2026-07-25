@@ -17,6 +17,7 @@
 - The pre-security gate now reports compact primary browser failures from Playwright results and the nearby failing log context, excludes report-only aggregate jobs from its failure count, and retains forbidden skipped executions as an explicit blocker.
 - Anti-Bot preview E2E now waits for the real Service editor form and its independently mounted wizard tab before interacting with the preview controls.
 - Browser E2E now waits for the hydrated Services and Dashboard surfaces after navigation, reload, and transient runtime reconnection. Slow Events interception holds a deterministic loading state until the assertion observes it, and certificate-export setup uses the shared transient-navigation recovery.
+- CI browser shards are serialized on the shared shell runner, and Dashboard Docker metrics are scoped to the current Compose project; concurrent disposable stacks can no longer contaminate each other's container rows or exhaust the runner during long UI suites.
 
 ### Конвейер E2E и очистка стендов
 

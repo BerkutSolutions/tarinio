@@ -2,6 +2,8 @@
 
 2026-07-25
 
+- CI isolation: run two browser E2E shards concurrently and verify each Dashboard container overview contains only its own `ci-...` Compose project containers; confirm the GitLab browser resource group queues shards instead of running them together on the shared Docker daemon.
+- Dashboard API/runtime: with `WAF_DASHBOARD_COMPOSE_PROJECT` set, call `/api/dashboard/containers/overview` and verify containers from other Compose projects are absent while aggregate CPU/memory values match the remaining rows.
 - Requests outage state: open Requests on an isolated stack, stop the runtime backend, click Refresh, and verify that the loading placeholder changes to the localized load-error message while navigation and the application shell remain usable.
 - Requests recovery: restore the runtime backend, refresh Requests again, and verify that the normal table or empty state returns without a page reload or stale loading indicator.
 - CI/API: run the browser `requests-backend-failure` job and confirm the pre-security report includes its focused failure excerpt and reports no skipped browser executions.

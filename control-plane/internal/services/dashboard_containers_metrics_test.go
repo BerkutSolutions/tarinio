@@ -46,3 +46,16 @@ func TestContainerOverviewUsesRawCPUAndWeightedMemory(t *testing.T) {
 		t.Fatalf("container CPU rows lost docker values: %#v", overview.Containers)
 	}
 }
+
+func TestFilterDashboardContainersRestrictsConfiguredComposeProject(t *testing.T) {
+	items := []DashboardContainerMetrics{
+		{Name: "current", ComposeProject: "ci-current"},
+		{Name: "other", ComposeProject: "ci-other"},
+		{Name: "unmanaged"},
+	}
+
+	filtered := filterDashboardContainers(items, "ci-current")
+	if len(filtered) != 1 || filtered[0].Name != "current" {
+		t.Fatalf("expected only the configured Compose project, got %#v", filtered)
+	}
+}

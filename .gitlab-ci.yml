@@ -377,6 +377,10 @@ e2e:api-registry:
   stage: e2e
   allow_failure: true
   timeout: 90m
+  # The shell runner shares one Docker daemon. Browser shards are intentionally
+  # serialized so their disposable stacks cannot starve each other (or make
+  # the control-plane Docker metrics endpoint observe a moving host-wide set).
+  resource_group: waf-e2e-browser-runner
   dependencies: []
   script:
     - test -n "${WAF_E2E_PASSWORD:-}" || { echo "WAF_E2E_PASSWORD is required" >&2; exit 1; }

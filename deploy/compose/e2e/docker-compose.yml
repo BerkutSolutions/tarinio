@@ -15,6 +15,9 @@ services:
       CONTROL_PLANE_HTTP_ADDR: 0.0.0.0:8080
       CONTROL_PLANE_STARTUP_SELF_TEST_ENABLED: "false"
       WAF_RUNTIME_ROOT: /var/lib/waf
+      # The Docker socket exposes every concurrent runner stack. Restrict the
+      # dashboard container inventory to this Compose project.
+      WAF_DASHBOARD_COMPOSE_PROJECT: "${COMPOSE_PROJECT_NAME:-waf-e2e}"
       CONTROL_PLANE_SECURITY_PEPPER: e2e-test-pepper-do-not-use-in-prod
       WAF_BOOTSTRAP_UI_UPSTREAM: "http://ui:80"
       WAF_RUNTIME_HEALTH_URL: http://runtime:8081/readyz
