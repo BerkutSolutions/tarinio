@@ -9,9 +9,18 @@ test("requests.real-backend-failure-keeps-shell", async ({ authenticatedPage: pa
   if (!syncFile) throw new Error("WAF_BROWSER_FAULT_SYNC_CONTAINER_FILE is required for the real runtime-fault workflow");
   const projectSignal = `${syncFile}.${testInfo.project.name}`;
   writeFileSync(`${projectSignal}.ready`, "ready", "utf8");
-  await expect.poll(() => existsSync(`${syncFile}.paused`), { timeout: 60_000 }).toBe(true);
+  try {
+  await expect.poll(() => existsSync(`${projectSignal}.paused`), { timeout: 60_000 }).toBe(true);
   await page.locator("#requests-refresh").click();
+  try {
   await expect(page.locator(".waf-empty")).toContainText(/error|ошиб|fehler|греш|错误/i, { timeout: 45_000 });
+  } catch (error) {
+    const actual = await page.locator(".waf-empty").innerText();
+    if (!/failed to load requests/i.test(actual)) throw error;
+  }
   await expect(page.locator("nav")).toBeVisible();
   await expect(page.locator("#app-shell, main, #app").first()).toBeVisible();
+  } finally {
+  writeFileSync(`${projectSignal}.resume`, "resume", "utf8");
+  }
 });

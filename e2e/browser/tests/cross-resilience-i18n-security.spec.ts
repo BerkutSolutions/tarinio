@@ -61,7 +61,7 @@ test("cross-i18n-all-locales-core-labels-errors-and-modals", async ({ authentica
     "/dashboard": "#dashboard-page",
     "/events": "#events-filters",
     "/activity": "#audit-results",
-    "/settings/general": "#settings-language-save",
+    "/settings/general": "#settings-page[data-runtime-ready=\"true\"] #settings-language-save",
   };
   const staticScopeSelectors: Record<string, string> = {
     "/dashboard": ".dashboard-toolbar",

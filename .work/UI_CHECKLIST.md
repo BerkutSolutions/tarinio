@@ -527,3 +527,4 @@
 - [ ] Settings UI: save Storage and Security values, open the same page again, and verify controls render only after `data-runtime-ready=true` with the persisted values intact.
 - [ ] Localization UI: switch each supported language, then open Dashboard, Events, Activity, and General Settings; every page must render its ready control and localized shell without raw translation keys.
 - [ ] API/runtime: after Dashboard telemetry seed, verify `/api/requests?limit=500` contains both `e2e-dashboard-request-*` and `e2e-dashboard-attack-*` rows before testing Requests controls.
+- [ ] Requests fault UI: on desktop and mobile independently pause the disposable runtime, refresh Requests, verify the localized failure state while navigation remains visible, then restore runtime before the next viewport.

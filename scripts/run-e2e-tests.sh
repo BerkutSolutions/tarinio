@@ -575,14 +575,23 @@ if [ "$E2E_BROWSER_ONLY" = "1" ]; then
     export WAF_BROWSER_FAULT_SYNC_FILE WAF_BROWSER_FAULT_SYNC_CONTAINER_FILE
     rm -f "$WAF_BROWSER_FAULT_SYNC_FILE".*
     (
-      attempt=0
-      while [ ! -f "$WAF_BROWSER_FAULT_SYNC_FILE.desktop.ready" ]; do
-        attempt=$((attempt + 1))
-        [ "$attempt" -lt 90 ] || { printf '%s\n' 'browser fault readiness signal timed out' > "$WAF_BROWSER_FAULT_SYNC_FILE.error"; exit 1; }
-        sleep 1
+      for browser_project in desktop mobile; do
+        attempt=0
+        while [ ! -f "$WAF_BROWSER_FAULT_SYNC_FILE.$browser_project.ready" ]; do
+          attempt=$((attempt + 1))
+          [ "$attempt" -lt 90 ] || { printf '%s\n' "browser fault readiness signal timed out for $browser_project" > "$WAF_BROWSER_FAULT_SYNC_FILE.error"; exit 1; }
+          sleep 1
+        done
+        $COMPOSE_CMD -f "$COMPOSE_FILE" pause runtime >>"$E2E_LOG_FILE" 2>&1 || { printf '%s\n' "docker compose pause runtime failed for $browser_project" > "$WAF_BROWSER_FAULT_SYNC_FILE.error"; exit 1; }
+        : > "$WAF_BROWSER_FAULT_SYNC_FILE.$browser_project.paused"
+        attempt=0
+        while [ ! -f "$WAF_BROWSER_FAULT_SYNC_FILE.$browser_project.resume" ]; do
+          attempt=$((attempt + 1))
+          [ "$attempt" -lt 90 ] || { printf '%s\n' "browser fault resume signal timed out for $browser_project" > "$WAF_BROWSER_FAULT_SYNC_FILE.error"; exit 1; }
+          sleep 1
+        done
+        $COMPOSE_CMD -f "$COMPOSE_FILE" unpause runtime >>"$E2E_LOG_FILE" 2>&1 || { printf '%s\n' "docker compose unpause runtime failed for $browser_project" > "$WAF_BROWSER_FAULT_SYNC_FILE.error"; exit 1; }
       done
-      $COMPOSE_CMD -f "$COMPOSE_FILE" pause runtime >>"$E2E_LOG_FILE" 2>&1 || { printf '%s\n' 'docker compose pause runtime failed' > "$WAF_BROWSER_FAULT_SYNC_FILE.error"; exit 1; }
-      : > "$WAF_BROWSER_FAULT_SYNC_FILE.paused"
     ) &
     E2E_BROWSER_FAULT_PID=$!
   fi
@@ -601,8 +610,6 @@ if [ "$E2E_BROWSER_ONLY" = "1" ]; then
       fail_msg "Could not pause isolated runtime"
       [ -f "$WAF_BROWSER_FAULT_SYNC_FILE.error" ] && cat "$WAF_BROWSER_FAULT_SYNC_FILE.error" >&2
       TEST_EXIT="${TEST_EXIT:-1}"
-    elif [ -f "$WAF_BROWSER_FAULT_SYNC_FILE.paused" ]; then
-      $COMPOSE_CMD -f "$COMPOSE_FILE" unpause runtime >>"$E2E_LOG_FILE" 2>&1 || { fail_msg "Could not unpause isolated runtime"; TEST_EXIT="${TEST_EXIT:-1}"; }
     fi
   fi
 else

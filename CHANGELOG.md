@@ -6,6 +6,7 @@
 - Requests now starts the runtime request together with auxiliary API reads and gives every dependency the same bounded abort signal. A paused runtime therefore produces the visible Requests error instead of leaving the UI in a permanent loading state.
 - Dashboard telemetry seeding now waits for the real Requests API to expose both normal and blocked rows before browser E2E starts. Browser navigation assertions also wait for page hydration after settings updates and language changes.
 - CI warms the pinned Node image before unit work and uses that local image for lockfile, documentation, and audit checks, avoiding transient Docker Hub DNS/auth failures during verification.
+- Browser fault evidence now pauses and restores the isolated runtime independently for desktop and mobile; Settings locale evidence waits for runtime hydration rather than a merely visible control.
 
 ### Конвейер E2E и очистка стендов
 
