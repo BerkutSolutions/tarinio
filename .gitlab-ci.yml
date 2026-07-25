@@ -61,7 +61,7 @@ warm:e2e-images:
   script:
     - |
       set -eu
-      for image in postgres:15 hashicorp/vault:1.18 ealen/echo-server:latest ghcr.io/zaproxy/zaproxy:stable golang:1.26.5-bookworm node:24-bookworm debian:13-slim docker:29-cli nginx:1.27-alpine alpine:3.20 mcr.microsoft.com/playwright:v1.61.1-noble; do
+      for image in postgres:15 hashicorp/vault:1.18 opensearchproject/opensearch:2.18.0 ealen/echo-server:latest ghcr.io/zaproxy/zaproxy:stable golang:1.26.5-bookworm node:24-bookworm debian:13-slim docker:29-cli nginx:1.27-alpine alpine:3.20 mcr.microsoft.com/playwright:v1.61.1-noble; do
         if docker image inspect "$image" >/dev/null 2>&1; then
           echo "[ci] E2E base image is cached: $image"
         else
