@@ -23,7 +23,7 @@ cleanup() {
   compose down --volumes --remove-orphans >/dev/null 2>&1 || true
 }
 trap cleanup EXIT INT TERM
-compose up -d --build
+compose up -d --build --pull never
 
 wait_for() {
   label="$1"
