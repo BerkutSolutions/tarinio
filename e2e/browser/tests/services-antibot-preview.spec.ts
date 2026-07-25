@@ -26,7 +26,7 @@ test("services.antibot-template-preview-and-readback", async ({ authenticatedPag
     result = await api("/api/upstreams?auto_apply=false", { method: "POST", body: JSON.stringify({ id: upstreamID, site_id: siteID, scheme: "http", host: "upstream-echo", port: 8888 }) });
     expect([200, 201], result.body).toContain(result.status);
 
-    await openPage(page, `/services/${siteID}`, "#service-editor-form [data-wizard-tab=\"antibot\"]");
+    await openPage(page, `/services/${siteID}`, "#service-editor-form");
     await expect(page.locator('[data-wizard-tab="antibot"]')).toBeEnabled();
     await page.locator('[data-wizard-tab="antibot"]').click();
     await page.locator("#service-antibot-enabled").check();

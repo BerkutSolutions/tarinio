@@ -9,6 +9,8 @@
 - Browser fault evidence now pauses and restores the isolated runtime independently for desktop and mobile; Settings locale evidence waits for runtime hydration rather than a merely visible control.
 - Settings and Services editor browser scenarios now wait for the actual hydrated form before reading or mutating controls, preserving their roundtrip and cancel assertions across desktop and mobile.
 - Browser page navigation now tolerates a bounded sequence of transient runtime reload connections before authentication; strict result validation still rejects skipped, retried, or failed test executions.
+- The pre-security gate now reports compact primary browser failures from Playwright results and the nearby failing log context, excludes report-only aggregate jobs from its failure count, and retains forbidden skipped executions as an explicit blocker.
+- Anti-Bot preview E2E now waits for the real Service editor form and its independently mounted wizard tab before interacting with the preview controls.
 
 ### Конвейер E2E и очистка стендов
 

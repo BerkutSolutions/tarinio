@@ -869,7 +869,7 @@ pre-security:failure-gate:
       with open(source_path, encoding="utf-8") as source:
           jobs = json.load(source)
 
-      watched_stages = {"validate", "unit", "e2e", "e2e-report"}
+      watched_stages = {"validate", "unit", "e2e"}
       failed = [
           job for job in jobs
           if job.get("stage") in watched_stages
@@ -877,17 +877,32 @@ pre-security:failure-gate:
       ]
       lines = ["# Pre-security failure summary", ""]
 
-      def browser_skips(root):
+      def browser_findings(root):
           findings = []
           for report_path in sorted(root.glob("*/results.json")):
               try:
                   report = json.loads(report_path.read_text(encoding="utf-8"))
               except (OSError, json.JSONDecodeError) as exc:
-                  findings.append(f"{report_path}: unreadable browser result ({exc})")
+                  findings.append((report_path.parent.name, f"unreadable results.json: {exc}"))
                   continue
-              skipped = int(report.get("stats", {}).get("skipped", 0) or 0)
-              if skipped:
-                  findings.append(f"{report_path}: skipped={skipped}")
+              def walk(groups):
+                  for group in groups or []:
+                      for spec in group.get("specs", []):
+                          for test in spec.get("tests", []):
+                              status = test.get("status")
+                              if status in {"unexpected", "skipped", "flaky"}:
+                                  label = f"{test.get('projectName', '?')} :: {spec.get('title', '?')}"
+                                  details = []
+                                  for result in test.get("results", []):
+                                      for error in result.get("errors", []):
+                                          details.append(error.get("message") or error.get("stack") or "test error")
+                                  suffix = f" — {details[0].strip()}" if details else ""
+                                  findings.append((report_path.parent.name, f"{status}: {label}{suffix}"))
+                      walk(group.get("suites", []))
+              walk(report.get("suites", []))
+              stats = report.get("stats", {})
+              if int(stats.get("skipped", 0) or 0) and not any(item[0] == report_path.parent.name and "skipped:" in item[1] for item in findings):
+                  findings.append((report_path.parent.name, f"skipped={stats['skipped']} (test details missing from results.json)"))
           return findings
 
       def go_skips(root):
@@ -898,11 +913,18 @@ pre-security:failure-gate:
                       findings.append(f"{log_path}: {line.strip()}")
           return findings
 
-      skipped = browser_skips(pathlib.Path("build/e2e")) + go_skips(pathlib.Path("build/e2e"))
+      browser_failures = browser_findings(pathlib.Path("build/e2e"))
+      skipped = [f"{suite}: {detail}" for suite, detail in browser_failures if "skipped:" in detail or "skipped=" in detail]
+      browser_errors = [f"{suite}: {detail}" for suite, detail in browser_failures if "skipped:" not in detail and "skipped=" not in detail]
+      skipped += go_skips(pathlib.Path("build/e2e"))
       if skipped:
           print("\n" + "=" * 88 + "\nSKIPPED E2E TESTS (forbidden)\n" + "=" * 88)
           print("\n".join(skipped))
           lines.extend(["## Skipped E2E tests (forbidden)", "", "```text", *skipped, "```", ""])
+      if browser_errors:
+          print("\n" + "=" * 88 + "\nBROWSER TEST FAILURES\n" + "=" * 88)
+          print("\n".join(browser_errors))
+          lines.extend(["## Browser test failures", "", "```text", *browser_errors, "```", ""])
       if not failed:
           if skipped:
               lines.append("Security is blocked: skipped E2E executions are not accepted as proof.")
@@ -924,21 +946,21 @@ pre-security:failure-gate:
           heading = f"{name} ({status})"
           print(f"\n{'=' * 88}\n{heading}\n{url}\n{'=' * 88}")
           lines.extend([f"## {heading}", "", url, ""])
-          if name.startswith("e2e:") and name != "e2e:browser:gate":
+          if name.startswith("e2e:"):
               directory = name.removeprefix("e2e:").replace("browser:", "browser-")
               root = pathlib.Path("build/e2e", directory)
               job_log = root / "job.log"
               logs = [job_log] if job_log.exists() else sorted(root.rglob("*.log"))
               if logs:
-                  markers = ("[fail]", "--- fail:", "timeouterror:", "error:", "failed to", "panic:", "fatal:")
+                  markers = ("[fail]", "--- fail:", "timeouterror:", "error:", "failed to", "panic:", "fatal:", "err_connection_", "cannot publish invalid")
                   excerpts = []
                   for log_path in logs:
                       content = log_path.read_text(encoding="utf-8", errors="replace").splitlines()
                       positions = [index for index, line in enumerate(content) if any(marker in line.lower() for marker in markers)]
-                      for index in positions[:2]:
+                      for index in positions[:3]:
                           start, end = max(0, index - 10), min(len(content), index + 28)
                           excerpt = [f"[{log_path.name}]", *content[start:end]]
-                          if excerpt not in excerpts:
+                          if excerpt not in excerpts and not any("Uploading artifacts" in line for line in excerpt):
                               excerpts.append(excerpt)
                   diagnostic = [line for excerpt in excerpts for line in excerpt]
                   if not diagnostic:
@@ -946,7 +968,7 @@ pre-security:failure-gate:
                   print("\n".join(diagnostic))
                   lines.extend(["```text", *diagnostic, "```", ""])
                   continue
-          message = "No downloadable E2E log is available for this job; use the job URL above."
+          message = "No primary failure trace was found in the downloaded artifacts. Check the job's results.json/e2e-evidence.md artifact."
           print(message)
           lines.extend([message, ""])
       with open(summary_path, "w", encoding="utf-8") as summary:
