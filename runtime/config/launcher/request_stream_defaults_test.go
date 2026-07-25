@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"waf/internal/loggingconfig"
 )
@@ -14,7 +15,7 @@ func TestRequestStreamMissingSettingsStaysOnLocalFallback(t *testing.T) {
 	logPath := filepath.Join(root, "access.log")
 	archiveRoot := filepath.Join(root, "requests-archive")
 	settingsPath := filepath.Join(root, "missing-runtime-settings.json")
-	line := `{"timestamp":"2026-06-25T12:00:00Z","request_id":"req-local","client_ip":"203.0.113.10","method":"GET","uri":"/checkout","status":200,"site":"site-a","host":"shop.example.com","upstream_addr":"172.18.0.7:80"}`
+	line := `{"timestamp":"` + time.Now().UTC().Format(time.RFC3339) + `","request_id":"req-local","client_ip":"203.0.113.10","method":"GET","uri":"/checkout","status":200,"site":"site-a","host":"shop.example.com","upstream_addr":"172.18.0.7:80"}`
 	if err := os.WriteFile(logPath, []byte(line+"\n"), 0o644); err != nil {
 		t.Fatalf("write log fixture: %v", err)
 	}

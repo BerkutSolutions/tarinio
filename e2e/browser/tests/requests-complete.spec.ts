@@ -15,8 +15,8 @@ test("requests.real-runtime-filter-pagination-detail", async ({ authenticatedPag
   expect(Array.isArray(response.body)).toBe(true);
   const rows = response.body as RequestRow[];
   expect(rows.length).toBeGreaterThan(25);
-  expect(rows.some((row) => String(row.entry?.request_id || "").startsWith("dashboard-e2e-request-"))).toBe(true);
-  expect(rows.some((row) => String(row.entry?.request_id || "").startsWith("dashboard-e2e-attack-"))).toBe(true);
+  expect(rows.some((row) => String(row.entry?.request_id || "").startsWith("e2e-dashboard-request-"))).toBe(true);
+  expect(rows.some((row) => String(row.entry?.request_id || "").startsWith("e2e-dashboard-attack-"))).toBe(true);
 
   await page.goto("/requests", { waitUntil: "domcontentloaded", timeout: 60_000 });
   await expect(page.locator("#requests-status")).toContainText(/\d+/);

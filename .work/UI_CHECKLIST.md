@@ -5,6 +5,8 @@
 - Requests outage state: open Requests on an isolated stack, stop the runtime backend, click Refresh, and verify that the loading placeholder changes to the localized load-error message while navigation and the application shell remain usable.
 - Requests recovery: restore the runtime backend, refresh Requests again, and verify that the normal table or empty state returns without a page reload or stale loading indicator.
 - CI/API: run the browser `requests-backend-failure` job and confirm the pre-security report includes its focused failure excerpt and reports no skipped browser executions.
+- Dashboard telemetry: in an isolated E2E stack, verify `/api/requests?limit=500` contains both `e2e-dashboard-request-*` and `e2e-dashboard-attack-*` rows before opening Requests or Dashboard.
+- Settings hydration: after saving Storage or Security settings, revisit the route and verify the page has `data-runtime-ready="true"` before controls show persisted values.
 
 2026-07-24 — E2E re-audit stages 12–14
 
@@ -519,3 +521,9 @@
 - [x] Direct-IP contract: the behavioral workflow uses an unclaimed loopback Host on the same mapped runtime port, so it verifies the default-server branded `421` response when disabled and a dropped connection when direct-IP blocking is enabled; it cannot accidentally target a site created by another E2E.
 - [x] Fresh onboarding contract: an independent stack without bootstrap admin completes admin bootstrap, service/upstream creation, self-signed certificate binding, compile/apply, and authenticated HTTPS login.
 - [x] Manual follow-up: when validating a deployed environment, verify that an unclaimed direct-IP Host receives the branded `421` page while direct-IP blocking is disabled and is dropped after enabling it; do not use a host currently mapped to a test or production site.
+
+## 2026-07-25 - Browser E2E stabilization
+
+- [ ] Settings UI: save Storage and Security values, open the same page again, and verify controls render only after `data-runtime-ready=true` with the persisted values intact.
+- [ ] Localization UI: switch each supported language, then open Dashboard, Events, Activity, and General Settings; every page must render its ready control and localized shell without raw translation keys.
+- [ ] API/runtime: after Dashboard telemetry seed, verify `/api/requests?limit=500` contains both `e2e-dashboard-request-*` and `e2e-dashboard-attack-*` rows before testing Requests controls.

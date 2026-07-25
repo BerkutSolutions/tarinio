@@ -554,7 +554,7 @@ WAF_E2E_DISPOSABLE=1
 WAF_BROWSER_BASE_URL="https://e2e-management.test:${E2E_RT_HTTPS_PORT}"
 WAF_E2E_RUN_ID="${WAF_E2E_RUN_ID:-${E2E_PROJECT}-$(date +%s)}"
 export WAF_E2E_DISPOSABLE WAF_BROWSER_BASE_URL WAF_E2E_RUN_ID
-if [ "$E2E_DASHBOARD_SEED" = "1" ] || { [ "$E2E_BROWSER_ONLY" = "1" ] && [ "$E2E_DASHBOARD_SEED" = "auto" ] && printf '%s' "$E2E_BROWSER_SPECS" | grep -Eq '(dashboard|requests-complete)\.spec\.ts'; }; then
+if [ "$E2E_DASHBOARD_SEED" = "1" ] || { [ "$E2E_BROWSER_ONLY" = "1" ] && [ "$E2E_DASHBOARD_SEED" = "auto" ] && printf '%s' "$E2E_BROWSER_SPECS" | grep -Eq '(dashboard|requests-complete|tabs)\.spec\.ts'; }; then
   step "Seeding real Dashboard telemetry"
   sh "$REPO_ROOT/scripts/seed-dashboard-telemetry.sh" "$COMPOSE_FILE" "$E2E_BASE_URL" "$E2E_USER" "$E2E_PASS" >>"$E2E_LOG_FILE" 2>&1
   ok "Dashboard telemetry is aggregated"
@@ -578,10 +578,10 @@ if [ "$E2E_BROWSER_ONLY" = "1" ]; then
       attempt=0
       while [ ! -f "$WAF_BROWSER_FAULT_SYNC_FILE.desktop.ready" ]; do
         attempt=$((attempt + 1))
-        [ "$attempt" -lt 90 ] || exit 1
+        [ "$attempt" -lt 90 ] || { printf '%s\n' 'browser fault readiness signal timed out' > "$WAF_BROWSER_FAULT_SYNC_FILE.error"; exit 1; }
         sleep 1
       done
-      $COMPOSE_CMD -f "$COMPOSE_FILE" pause runtime >>"$E2E_LOG_FILE" 2>&1
+      $COMPOSE_CMD -f "$COMPOSE_FILE" pause runtime >>"$E2E_LOG_FILE" 2>&1 || { printf '%s\n' 'docker compose pause runtime failed' > "$WAF_BROWSER_FAULT_SYNC_FILE.error"; exit 1; }
       : > "$WAF_BROWSER_FAULT_SYNC_FILE.paused"
     ) &
     E2E_BROWSER_FAULT_PID=$!
@@ -597,8 +597,13 @@ if [ "$E2E_BROWSER_ONLY" = "1" ]; then
     bash -lc 'npm ci --prefer-offline --no-audit --fund=false && if [ "$E2E_BROWSER_RUNTIME_FAULT" = "requests-backend" ]; then npm test -- --project=desktop --project=mobile --no-deps $E2E_BROWSER_SPECS; else npm test -- $E2E_BROWSER_SPECS; fi' >"$TEST_LOG" 2>&1 || TEST_EXIT=$?
   TEST_SUMMARY="browser:$E2E_BROWSER_SPECS"
   if [ "$E2E_BROWSER_RUNTIME_FAULT" = "requests-backend" ]; then
-    wait "$E2E_BROWSER_FAULT_PID" || { fail_msg "Could not pause isolated runtime"; exit 1; }
-    $COMPOSE_CMD -f "$COMPOSE_FILE" unpause runtime >>"$E2E_LOG_FILE" 2>&1 || { fail_msg "Could not unpause isolated runtime"; exit 1; }
+    if ! wait "$E2E_BROWSER_FAULT_PID"; then
+      fail_msg "Could not pause isolated runtime"
+      [ -f "$WAF_BROWSER_FAULT_SYNC_FILE.error" ] && cat "$WAF_BROWSER_FAULT_SYNC_FILE.error" >&2
+      TEST_EXIT="${TEST_EXIT:-1}"
+    elif [ -f "$WAF_BROWSER_FAULT_SYNC_FILE.paused" ]; then
+      $COMPOSE_CMD -f "$COMPOSE_FILE" unpause runtime >>"$E2E_LOG_FILE" 2>&1 || { fail_msg "Could not unpause isolated runtime"; TEST_EXIT="${TEST_EXIT:-1}"; }
+    fi
   fi
 else
   E2E_SUMMARY_OUT="$TEST_SUMMARY_FILE" run_go_e2e_stream || TEST_EXIT=$?

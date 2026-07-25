@@ -54,7 +54,23 @@ if len(payload.get("request_top_sites", [])) < 2:
 if not all(payload.get(key) for key in required):
     raise SystemExit(1)
 '; then
-    exit 0
+    requests_response="$tmp_dir/requests-response.json"
+    requests_status=$(curl -sS -o "$requests_response" -w '%{http_code}' -b "$cookie_jar" "$base_url/api/requests?limit=500" || true)
+    if [ "$requests_status" = '200' ] && python3 - "$requests_response" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as source:
+    rows = json.load(source)
+ids = {str((row.get("entry") or {}).get("request_id") or "") for row in rows if isinstance(row, dict)}
+if not any(value.startswith("e2e-dashboard-request-") for value in ids):
+    raise SystemExit(1)
+if not any(value.startswith("e2e-dashboard-attack-") for value in ids):
+    raise SystemExit(1)
+PY
+    then
+      exit 0
+    fi
   fi
   sleep 1
   attempt=$((attempt + 1))

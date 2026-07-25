@@ -1,5 +1,6 @@
 import { expect, test } from "../fixtures/auth";
 import { requiredE2EEnv } from "../support/env";
+import { openPage } from "../support/waits";
 
 async function api(page: import("@playwright/test").Page, path: string, init: RequestInit = {}) {
   for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -73,14 +74,14 @@ test("cross-i18n-all-locales-core-labels-errors-and-modals", async ({ authentica
       const update = await api(page, "/api/settings/runtime", { method: "PUT", body: JSON.stringify({ language }) });
       expect(update.status, update.body).toBe(200);
       for (const path of ["/dashboard", "/events", "/activity", "/settings/general"]) {
-        await page.goto(path, { waitUntil: "domcontentloaded" });
+        await openPage(page, path, page.locator(readySelectors[path]));
         await expect(page.locator(readySelectors[path]), `${language} ${path} must finish rendering`).toBeVisible();
         if (path === "/settings/general") await expect(page.locator("#settings-page")).toHaveAttribute("data-runtime-ready", "true");
         await expect(page.locator("nav")).toBeVisible();
         const visibleText = `${await page.locator("nav").innerText()}\n${await page.locator(staticScopeSelectors[path]).innerText()}`;
         expect(visibleText, `${language} ${path}`).not.toMatch(/\b(?:app|common|events|activity|settings)\.[a-z][a-z0-9_.-]+\b/);
       }
-      await page.goto("/events", { waitUntil: "domcontentloaded" });
+      await openPage(page, "/events", page.locator("#events-filters"));
       const row = page.locator("[data-event-row]").first();
       await expect(row, `${language} requires a real Events row`).toBeVisible();
       await row.click();
