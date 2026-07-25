@@ -449,16 +449,21 @@ function wireClientNavigation() {
 }
 
 function wireLanguageUpdates() {
-  window.addEventListener("app:language-changed", async () => {
+  window.addEventListener("app:language-changed", (event) => {
     if (!currentUser) {
       return;
     }
-    if (notificationCenter && typeof notificationCenter.refresh === "function") {
-      await notificationCenter.refresh().catch(() => {});
+    const update = (async () => {
+      if (notificationCenter && typeof notificationCenter.refresh === "function") {
+        await notificationCenter.refresh().catch(() => {});
+      }
+      renderRBAC(currentUser);
+      await loadMeta();
+      await renderPage();
+    })();
+    if (typeof event.detail?.waitUntil === "function") {
+      event.detail.waitUntil(update);
     }
-    renderRBAC(currentUser);
-    await loadMeta();
-    await renderPage();
   });
 }
 

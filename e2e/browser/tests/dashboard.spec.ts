@@ -184,18 +184,22 @@ for (const metric of ["memory", "cpu"]) {
     const statsResponsePromise = page.waitForResponse((response) =>
       new URL(response.url()).pathname === "/api/dashboard/stats" && response.request().method() === "GET",
     );
-    const overviewResponsePromise = page.waitForResponse((response) =>
-      new URL(response.url()).pathname === "/api/dashboard/containers/overview" && response.request().method() === "GET",
-    );
+    const containerOverview = await page.evaluate(async () => {
+      const response = await fetch("/api/dashboard/containers/overview", { credentials: "include", headers: { Accept: "application/json" } });
+      const body = await response.text();
+      if (!response.ok) throw new Error(`container overview returned ${response.status}: ${body}`);
+      return JSON.parse(body);
+    });
+    await page.route("**/api/dashboard/containers/overview", (route) => route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(containerOverview),
+    }));
     await page.goto("/dashboard", { waitUntil: "domcontentloaded", timeout: 60000 });
     const statsResponse = await statsResponsePromise;
     const statsBody = await statsResponse.text();
     expect(statsResponse.status(), statsBody).toBe(200);
     const realStats = JSON.parse(statsBody);
-    const overviewResponse = await overviewResponsePromise;
-    const overviewBody = await overviewResponse.text();
-    expect(overviewResponse.status(), overviewBody).toBe(200);
-    const containerOverview = JSON.parse(overviewBody);
     const system = realStats?.system || {};
     const widget = page.locator('[data-widget-id="' + metric + '"]');
     await expect(widget).toBeVisible({ timeout: 15000 });

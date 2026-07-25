@@ -2,6 +2,7 @@
 
 2026-07-25
 
+- Locale rerender: switch successively through `en`, `ru`, `de`, `sr`, and `zh`, navigating immediately after each save to Dashboard, Events, Activity, and Settings. The shell and page must finish rerendering before navigation and must contain no raw `app.*`, `common.*`, `events.*`, `activity.*`, or `settings.*` keys.
 - CI isolation: run two browser E2E shards concurrently and verify each Dashboard container overview contains only its own `ci-...` Compose project containers; confirm the GitLab browser resource group queues shards instead of running them together on the shared Docker daemon.
 - Dashboard API/runtime: with `WAF_DASHBOARD_COMPOSE_PROJECT` set, call `/api/dashboard/containers/overview` and verify containers from other Compose projects are absent while aggregate CPU/memory values match the remaining rows.
 - Requests outage state: open Requests on an isolated stack, stop the runtime backend, click Refresh, and verify that the loading placeholder changes to the localized load-error message while navigation and the application shell remain usable.

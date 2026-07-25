@@ -164,7 +164,10 @@ export async function setLanguage(language) {
   persistLanguage(normalized);
   await applyTranslations(normalized);
   if (previous !== normalized) {
-    window.dispatchEvent(new CustomEvent(languageChangedEvent, { detail: { language: normalized } }));
+    const pending = [];
+    const waitUntil = (work) => pending.push(Promise.resolve(work));
+    window.dispatchEvent(new CustomEvent(languageChangedEvent, { detail: { language: normalized, waitUntil } }));
+    await Promise.all(pending);
   }
 }
 
