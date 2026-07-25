@@ -23,6 +23,8 @@
 - Generic browser navigation no longer treats legitimate domain text such as `app.example.com` as an untranslated `app.*` key; strict raw-key detection remains scoped to the dedicated cross-locale assertions.
 - Browser fixture revision restoration now retries transient catalog timeouts during runtime apply/reload instead of aborting the entire test on the first 30-second fetch interruption; the original revision ID must still be restored within 120 seconds.
 - Browser navigation retry also recognizes Playwright's pre-document `page.goto` timeout during a runtime reload, while retaining the existing four-attempt bound and rejecting non-transient navigation errors immediately.
+- Dashboard CPU edge assertions preserve Docker totals above 100% while checking that only the visual progress width is capacity-clamped; Memory percentage remains clamped to the 0–100 display range.
+- GitHub mirror/release publication is explicit opt-in via `PUBLISH_GITHUB=1`; ordinary verified `main` pipelines perform no GitHub or GHCR writes.
 
 ### Конвейер E2E и очистка стендов
 

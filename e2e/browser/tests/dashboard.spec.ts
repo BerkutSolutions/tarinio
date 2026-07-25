@@ -271,9 +271,10 @@ for (const metric of ["memory", "cpu"]) {
         await edgePage.route("**/api/dashboard/containers/overview", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ containers: [{ name: "edge-container", image: "edge", state: "running", status: "Up", cpu_percent: metric === "cpu" ? value : 0, memory_percent: metric === "memory" ? value : 0, pids: 1, memory_usage_bytes: 1024 }], total_containers: 1, running_containers: 1, total_cpu_percent: metric === "cpu" ? value : 0, cpu_capacity_percent: 100, avg_memory_percent: metric === "memory" ? value : 0 }) }));
         await openPage(edgePage, `/dashboard?e2e-system-edge=${encodeURIComponent(String(value))}`, `[data-widget-id="${metric}"]`);
         const edgeWidget = edgePage.locator(`[data-widget-id="${metric}"]`);
-        const expected = Math.min(100, value);
-        await expect(edgeWidget.locator(".dashboard-system-main")).toHaveText(`${expected.toFixed(1)}%`);
-        await expect(edgeWidget.locator(".dashboard-progress span")).toHaveAttribute("style", `width:${expected}%`);
+        const expectedValue = metric === "cpu" ? value : Math.min(100, value);
+        const expectedWidth = Math.min(100, value);
+        await expect(edgeWidget.locator(".dashboard-system-main")).toHaveText(`${expectedValue.toFixed(1)}%`);
+        await expect(edgeWidget.locator(".dashboard-progress span")).toHaveAttribute("style", `width:${expectedWidth}%`);
         await expect(edgeWidget.locator(".dashboard-system-container-row")).toHaveCount(1);
       } finally {
         await edgePage.close();

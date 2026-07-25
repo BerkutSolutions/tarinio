@@ -1153,7 +1153,7 @@ publish:github-mirror:
   timeout: 15m
   dependencies: []
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$PUBLISH_GITHUB == "1" && $CI_COMMIT_BRANCH == "main"'
       allow_failure: false
     - when: never
   script:
@@ -1198,9 +1198,9 @@ publish:github-release:
     - dast:baseline
     - dast:negative
   rules:
-    - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+/'
+    - if: '$PUBLISH_GITHUB == "1" && $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+/'
       allow_failure: false
-    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$PUBLISH_GITHUB == "1" && $CI_COMMIT_BRANCH == "main"'
       allow_failure: false
     - when: never
   script:
