@@ -138,6 +138,23 @@ e2e:smoke:
     paths:
       - build/e2e/smoke/
 
+e2e:stack-healthcheck:
+  stage: e2e
+  allow_failure: true
+  timeout: 35m
+  dependencies: []
+  script:
+    - mkdir -p build/e2e/stack-healthcheck
+    - chmod 700 scripts/check-e2e-stack-health.sh
+    - set -o pipefail
+    - test -n "${WAF_E2E_PASSWORD:-}" || { echo "WAF_E2E_PASSWORD is required" >&2; exit 1; }
+    - E2E_PASS="$WAF_E2E_PASSWORD" PROFILE_DIR="$CI_PROJECT_DIR/deploy/compose/e2e" COMPOSE_PROJECT_NAME="ci-${CI_PIPELINE_ID}-stack-health" WAF_STACK_NAME="ci-${CI_PIPELINE_ID}-stack-health" E2E_HEALTH_TIMEOUT_SECONDS=240 sh scripts/check-e2e-stack-health.sh 2>&1 | tee build/e2e/stack-healthcheck/healthcheck.log
+  artifacts:
+    when: always
+    expire_in: 14 days
+    paths:
+      - build/e2e/stack-healthcheck/
+
 e2e:security-invariants:
   stage: e2e
   allow_failure: true
@@ -768,6 +785,8 @@ e2e:failure-evidence:
   when: always
   allow_failure: true
   needs:
+    - job: e2e:stack-healthcheck
+      artifacts: true
     - job: e2e:smoke
       artifacts: true
     - job: e2e:security-invariants

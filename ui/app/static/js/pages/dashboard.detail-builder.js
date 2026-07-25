@@ -439,22 +439,23 @@ function buildWidgetDetail(action, payload, stats, detailModel, containersOvervi
   }
 
   if (action === "memory" || action === "cpu") {
-    const system  = stats?.system || {};
-    const metrics = action === "cpu"
-      ? [
-          { labelKey: "dashboard.detail.cpuLoad",       value: deps.formatPercent(system.cpu_load_percent || 0) },
-          { labelKey: "dashboard.system.cpuCores",       value: system.cpu_cores  || 0 },
-          { labelKey: "dashboard.system.goroutines",     value: system.goroutines || 0 }
-        ]
-      : [
-          { labelKey: "dashboard.detail.memoryUsedBytes",  value: deps.formatBytes(system.memory_used_bytes  || 0) },
-          { labelKey: "dashboard.detail.memoryFreeBytes",  value: deps.formatBytes(system.memory_free_bytes  || 0) },
-          { labelKey: "dashboard.detail.memoryTotalBytes", value: deps.formatBytes(system.memory_total_bytes || 0) }
-        ];
-    const processList  = action === "cpu"
-      ? (Array.isArray(system?.top_cpu_processes)    ? system.top_cpu_processes    : [])
-      : (Array.isArray(system?.top_memory_processes) ? system.top_memory_processes : []);
-    const processRows  = processList.map((item) => ({ ...item, key: item?.name || item?.command || `pid-${item?.pid || 0}` }));
+    const containerItems = Array.isArray(containersOverview?.containers) ? containersOverview.containers : [];
+    const containerAggregate = action === "cpu" ? Number(containersOverview?.total_cpu_percent || 0) : Number(containersOverview?.avg_memory_percent || 0);
+    const metrics = [{
+      labelKey: action === "cpu" ? "dashboard.containers.cpu" : "dashboard.containers.memory",
+      value: deps.formatPercent(containerAggregate)
+    }];
+    const processRows = containerItems.map((item) => ({
+      ...item,
+      key: item?.name || "-",
+      name: item?.name || "-",
+      threads: item?.pids || 0,
+      state: item?.state || "-",
+      command: item?.image || "-",
+      cpu_percent: item?.cpu_percent || 0,
+      memory_percent: item?.memory_percent || 0,
+      memory_rss_bytes: item?.memory_usage_bytes || 0
+    }));
     const sectionTitle = action === "cpu" ? "dashboard.detail.processesByCPU"  : "dashboard.detail.processesByMemory";
     const countTitle   = action === "cpu" ? "dashboard.detail.cpuPercent"       : "dashboard.detail.memoryUsedBytes";
     return {
@@ -466,7 +467,7 @@ function buildWidgetDetail(action, payload, stats, detailModel, containersOvervi
           renderDetailTable(processRows, ctx, ctx.t("dashboard.detail.process"), ctx.t(countTitle), {
             labelFormatter: (item) => `
               <div><strong>${escapeHtml(String(item?.name || item?.command || "-"))}</strong></div>
-              <div class="muted">PID ${escapeHtml(String(item?.pid || 0))} | ${escapeHtml(ctx.t("dashboard.detail.threads"))}: ${escapeHtml(deps.formatNumber(item?.threads || 0))} | ${escapeHtml(ctx.t("dashboard.detail.state"))}: ${escapeHtml(String(item?.state || "-"))}</div>
+              <div class="muted">${escapeHtml(ctx.t("dashboard.containers.container"))} | ${escapeHtml(ctx.t("dashboard.detail.threads"))}: ${escapeHtml(deps.formatNumber(item?.threads || 0))} | ${escapeHtml(ctx.t("dashboard.detail.state"))}: ${escapeHtml(String(item?.state || "-"))}</div>
               <div class="muted">${escapeHtml(String(item?.command || item?.name || "-"))}</div>
             `,
             countFormatter: (item) => action === "cpu"

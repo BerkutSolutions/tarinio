@@ -2,6 +2,8 @@
 
 ### CI and Requests reliability
 
+- The disposable E2E healthcheck now starts only `deploy/compose/e2e` under a unique Compose project. It verifies control-plane/runtime health, sentinel output publication, and actual sentinel write permissions on its isolated state/output volumes; the production default Compose profile is not part of any E2E path.
+- Dashboard CPU and Memory widgets now consistently use the Docker container overview: the aggregate and every displayed row are container metrics, and their detail views identify the corresponding container rather than mixing in host-process values.
 - Split the longest browser E2E groups into independently isolated Dashboard, Records, Services preview, Platform, Settings, and cross-module jobs. Each slice has its own Compose project and host ports, so the four runner slots can execute safely in parallel while the E2E gate still requires every result with no skips.
 - Requests now starts the runtime request together with auxiliary API reads and gives every dependency the same bounded abort signal. A paused runtime therefore produces the visible Requests error instead of leaving the UI in a permanent loading state.
 - Dashboard telemetry seeding now waits for the real Requests API to expose both normal and blocked rows before browser E2E starts. Browser navigation assertions also wait for page hydration after settings updates and language changes.

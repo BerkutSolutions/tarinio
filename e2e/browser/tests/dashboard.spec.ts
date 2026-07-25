@@ -205,7 +205,14 @@ for (const metric of ["memory", "cpu"]) {
     await expect(widget.locator(".dashboard-frame-header")).toContainText(titles[metric][language]);
     await expect(widget.locator(".dashboard-system-main")).toHaveText(/%/);
     await expect(widget.locator(".dashboard-progress span")).toHaveAttribute("style", /width:/);
-    await expect(widget.locator(".dashboard-system-row")).toHaveCount(3);
+    const containerOverview = await page.evaluate(async () => (await fetch("/api/dashboard/containers/overview", { credentials: "include" })).json());
+    const expectedAggregate = metric === "cpu" ? Number(containerOverview?.total_cpu_percent || 0) : Number(containerOverview?.avg_memory_percent || 0);
+    await expect(widget.locator(".dashboard-system-main")).toHaveText(`${expectedAggregate.toFixed(1)}%`);
+    const systemRows = await widget.locator(".dashboard-system-row").count();
+    expect(systemRows).toBe(Math.min(8, containerOverview?.containers?.length || 0));
+    for (const container of (containerOverview?.containers || []).slice(0, 8)) {
+      await expect(widget.locator(".dashboard-system-container-row").filter({ hasText: String(container.name) })).toContainText(metric === "cpu" ? `${Number(container.cpu_percent || 0).toFixed(1)}%` : `${Number(container.memory_percent || 0).toFixed(1)}%`);
+    }
     await widget.locator('[data-widget-action="' + metric + '"]').click();
     const modal = page.locator("#dashboard-detail-modal");
     await expect(modal).toBeVisible();

@@ -1,30 +1,26 @@
 import { escapeHtml } from "../ui.js";
-import { clamp, formatNumber, formatPercent, formatBytes } from "./dashboard.layout-core.js";
+import { clamp, formatNumber, formatPercent } from "./dashboard.layout-core.js";
 
-function renderSystemMemory(stats, ctx) {
-  const system = stats?.system || {};
-  const usedPercent = clamp(Number(system.memory_used_percent || 0), 0, 100);
+function renderSystemMemory(_stats, ctx, containersOverview) {
+  const usedPercent = clamp(Number(containersOverview?.avg_memory_percent || 0), 0, 100);
+  const containers = Array.isArray(containersOverview?.containers) ? containersOverview.containers.slice(0, 8) : [];
   return `
     <button type="button" class="dashboard-widget-content dashboard-system dashboard-system-clickable" data-widget-action="memory">
       <div class="dashboard-system-main">${escapeHtml(formatPercent(usedPercent))}</div>
       <div class="dashboard-progress"><span style="width:${escapeHtml(String(clamp(usedPercent, 0, 100)))}%"></span></div>
-      <div class="dashboard-system-row"><span>${escapeHtml(ctx.t("dashboard.system.memoryUsed"))}</span><strong>${escapeHtml(formatBytes(system.memory_used_bytes))}</strong></div>
-      <div class="dashboard-system-row"><span>${escapeHtml(ctx.t("dashboard.system.memoryFree"))}</span><strong>${escapeHtml(formatBytes(system.memory_free_bytes))}</strong></div>
-      <div class="dashboard-system-row"><span>${escapeHtml(ctx.t("dashboard.system.memoryTotal"))}</span><strong>${escapeHtml(formatBytes(system.memory_total_bytes))}</strong></div>
+      ${containers.map((item) => `<div class="dashboard-system-row dashboard-system-container-row"><span>${escapeHtml(String(item?.name || "-"))}</span><strong>${escapeHtml(formatPercent(item?.memory_percent || 0))}</strong></div>`).join("")}
     </button>
   `;
 }
 
-function renderSystemCPU(stats, ctx) {
-  const system = stats?.system || {};
-  const load = clamp(Number(system.cpu_load_percent || 0), 0, 100);
+function renderSystemCPU(_stats, ctx, containersOverview) {
+  const load = clamp(Number(containersOverview?.total_cpu_percent || 0), 0, 100);
+  const containers = Array.isArray(containersOverview?.containers) ? containersOverview.containers.slice(0, 8) : [];
   return `
     <button type="button" class="dashboard-widget-content dashboard-system dashboard-system-clickable" data-widget-action="cpu">
       <div class="dashboard-system-main">${escapeHtml(formatPercent(load))}</div>
       <div class="dashboard-progress"><span style="width:${escapeHtml(String(load))}%"></span></div>
-      <div class="dashboard-system-row"><span>${escapeHtml(ctx.t("dashboard.system.cpuCores"))}</span><strong>${escapeHtml(formatNumber(system.cpu_cores || 0))}</strong></div>
-      <div class="dashboard-system-row"><span>${escapeHtml(ctx.t("dashboard.system.goroutines"))}</span><strong>${escapeHtml(formatNumber(system.goroutines || 0))}</strong></div>
-      <div class="dashboard-system-row"><span>${escapeHtml(ctx.t("dashboard.system.heap"))}</span><strong>${escapeHtml(formatNumber(system.control_plane_heap_mb || 0))} MB</strong></div>
+      ${containers.map((item) => `<div class="dashboard-system-row dashboard-system-container-row"><span>${escapeHtml(String(item?.name || "-"))}</span><strong>${escapeHtml(formatPercent(item?.cpu_percent || 0))}</strong></div>`).join("")}
     </button>
   `;
 }

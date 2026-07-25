@@ -524,6 +524,9 @@
 
 ## 2026-07-25 - Browser E2E stabilization
 
+- [ ] Dashboard CPU/Memory UI: confirm the headline aggregate and every listed row match `/api/dashboard/containers/overview`; no host CPU, memory, process, or heap value may be presented as a container metric. Open both detail views and verify that names, image, state, PID count, CPU, and memory belong to the same container.
+- [ ] E2E stack health API/runtime: run `scripts/check-e2e-stack-health.sh` with a unique Compose project and confirm it starts only `deploy/compose/e2e`, publishes sentinel adaptive/suggestions output, proves writable sentinel state/output volumes, and removes its own project resources. The production default stack must remain untouched.
+
 - [ ] Settings UI: save Storage and Security values, open the same page again, and verify controls render only after `data-runtime-ready=true` with the persisted values intact.
 - [ ] Localization UI: switch each supported language, then open Dashboard, Events, Activity, and General Settings; every page must render its ready control and localized shell without raw translation keys.
 - [ ] API/runtime: after Dashboard telemetry seed, verify `/api/requests?limit=500` contains both `e2e-dashboard-request-*` and `e2e-dashboard-attack-*` rows before testing Requests controls.

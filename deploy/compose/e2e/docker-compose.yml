@@ -236,6 +236,8 @@ services:
       MODEL_WEIGHT_EMERGENCY_BOTNET: "6.0"
       MODEL_WEIGHT_EMERGENCY_SINGLE: "4.0"
     depends_on:
+      sentinel-volume-init:
+        condition: service_completed_successfully
       runtime:
         condition: service_started
     volumes:
@@ -245,6 +247,14 @@ services:
       - waf-e2e-l4-adaptive:/out
     networks:
       - waf-e2e-net
+
+  sentinel-volume-init:
+    image: alpine:3.20
+    restart: "no"
+    command: ["sh", "-ec", "mkdir -p /state /out && chown -R 65532:4 /state /out && chmod 0770 /state /out"]
+    volumes:
+      - waf-e2e-sentinel-state:/state
+      - waf-e2e-l4-adaptive:/out
 
   postgres:
     image: postgres:15

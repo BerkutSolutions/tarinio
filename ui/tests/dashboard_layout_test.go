@@ -35,13 +35,18 @@ func TestDashboardPickerAllowsPersistingInitiallyHiddenWidgets(t *testing.T) {
 	}
 }
 
-func TestDashboardMemoryLabelAndProgressUseSameClampedPercent(t *testing.T) {
+func TestDashboardMemoryLabelAndProgressUseSameContainerAggregate(t *testing.T) {
 	body, err := os.ReadFile(filepath.Join("..", "app", "static", "js", "pages", "dashboard.series.js"))
 	if err != nil {
 		t.Fatalf("read dashboard series: %v", err)
 	}
-	if !strings.Contains(string(body), `const usedPercent = clamp(Number(system.memory_used_percent || 0), 0, 100)`) {
-		t.Fatal("memory label and progress must share a clamped percentage")
+	for _, marker := range []string{
+		`const usedPercent = clamp(Number(containersOverview?.avg_memory_percent || 0), 0, 100)`,
+		`dashboard-system-container-row`,
+	} {
+		if !strings.Contains(string(body), marker) {
+			t.Fatalf("memory widget must render container overview marker %q", marker)
+		}
 	}
 }
 
