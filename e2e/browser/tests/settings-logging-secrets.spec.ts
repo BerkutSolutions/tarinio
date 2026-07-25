@@ -1,5 +1,8 @@
 import { expect, test } from "../fixtures/auth";
 import { requiredE2EEnv } from "../support/env";
+import { openPage } from "../support/waits";
+
+const readySettingsPage = (page: import("@playwright/test").Page) => page.locator("#settings-page[data-runtime-ready=\"true\"]");
 
 async function api(page: import("@playwright/test").Page, path: string, init: RequestInit = {}) {
   return page.evaluate(async ({ path, init }) => {
@@ -9,8 +12,7 @@ async function api(page: import("@playwright/test").Page, path: string, init: Re
 }
 
 test("settings.logging-backends-routing-migration-roundtrip", async ({ authenticatedPage: page }) => {
-  await page.goto("/settings/logging", { waitUntil: "domcontentloaded" });
-  await expect(page.locator("#settings-page")).toHaveAttribute("data-runtime-ready", "true");
+  await openPage(page, "/settings/logging", readySettingsPage(page));
   const original = JSON.parse((await api(page, "/api/settings/runtime")).body);
   try {
     await page.locator("#settings-logging-hot-backend").selectOption("file");
@@ -23,8 +25,7 @@ test("settings.logging-backends-routing-migration-roundtrip", async ({ authentic
     const saved = JSON.parse((await api(page, "/api/settings/runtime")).body).logging;
     expect(saved.cold.backend).toBe("file");
     expect(saved.routing).toEqual(expect.objectContaining({ write_requests_to_hot: true, write_requests_to_cold: false, write_events_to_hot: true, write_events_to_cold: false, write_activity_to_hot: true, write_activity_to_cold: false, keep_local_fallback: true }));
-    await page.reload({ waitUntil: "domcontentloaded" });
-    await expect(page.locator("#settings-page")).toHaveAttribute("data-runtime-ready", "true");
+    await openPage(page, "/settings/logging", readySettingsPage(page));
     await expect(page.locator("#settings-logging-hot-backend")).toHaveValue("file");
     await expect(page.locator("#settings-logging-route-events-hot")).toBeChecked();
   } finally {
@@ -34,8 +35,7 @@ test("settings.logging-backends-routing-migration-roundtrip", async ({ authentic
 });
 
 test("settings.secrets-masked-save-and-toggle", async ({ authenticatedPage: page }) => {
-  await page.goto("/settings/secrets", { waitUntil: "domcontentloaded" });
-  await expect(page.locator("#settings-page")).toHaveAttribute("data-runtime-ready", "true");
+  await openPage(page, "/settings/secrets", readySettingsPage(page));
   const original = JSON.parse((await api(page, "/api/settings/runtime")).body);
   const verifyToggles = async (secretFields: ReadonlyArray<readonly [string, string]>) => {
     for (const [field, toggle] of secretFields) {
@@ -56,11 +56,9 @@ test("settings.secrets-masked-save-and-toggle", async ({ authenticatedPage: page
   expect(serialized).not.toContain(requiredE2EEnv("WAF_E2E_PASSWORD"));
   expect(response.logging).toEqual(original.logging);
   for (const key of [response.logging?.vault?.token, response.logging?.opensearch?.password, response.logging?.opensearch?.api_key, response.logging?.clickhouse?.password].filter(Boolean)) expect(key).toBe("********");
-  await page.reload({ waitUntil: "domcontentloaded" });
-  await expect(page.locator("#settings-page")).toHaveAttribute("data-runtime-ready", "true");
+  await openPage(page, "/settings/secrets", readySettingsPage(page));
   await expect(page).toHaveURL(/\/settings\/secrets$/);
   expect(await page.locator("#settings-logging-vault-token").inputValue()).toBe("");
-  await page.goto("/settings/logging", { waitUntil: "domcontentloaded" });
-  await expect(page.locator("#settings-page")).toHaveAttribute("data-runtime-ready", "true");
+  await openPage(page, "/settings/logging", readySettingsPage(page));
   await verifyToggles([["#settings-logging-opensearch-password", "#settings-logging-opensearch-password-toggle"], ["#settings-logging-opensearch-apikey", "#settings-logging-opensearch-apikey-toggle"], ["#settings-logging-password", "#settings-logging-password-toggle"]]);
 });

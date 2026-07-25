@@ -7,6 +7,7 @@
 - Dashboard telemetry seeding now waits for the real Requests API to expose both normal and blocked rows before browser E2E starts. Browser navigation assertions also wait for page hydration after settings updates and language changes.
 - CI warms the pinned Node image before unit work and uses that local image for lockfile, documentation, and audit checks, avoiding transient Docker Hub DNS/auth failures during verification.
 - Browser fault evidence now pauses and restores the isolated runtime independently for desktop and mobile; Settings locale evidence waits for runtime hydration rather than a merely visible control.
+- Settings and Services editor browser scenarios now wait for the actual hydrated form before reading or mutating controls, preserving their roundtrip and cancel assertions across desktop and mobile.
 
 ### Конвейер E2E и очистка стендов
 

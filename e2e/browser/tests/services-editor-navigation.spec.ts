@@ -1,5 +1,9 @@
 import { expect, test } from "../fixtures/auth";
 import { e2eID } from "../support/isolation";
+import { openPage } from "../support/waits";
+
+const openNewServiceEditor = (page: import("@playwright/test").Page) =>
+  openPage(page, "/services/new", page.locator("#service-editor-form #service-host"));
 
 test("services.editor-draft-mode-parity-and-back-cancel", async ({ authenticatedPage: page }, testInfo) => {
   test.setTimeout(3 * 60_000);
@@ -15,7 +19,7 @@ test("services.editor-draft-mode-parity-and-back-cancel", async ({ authenticated
   });
 
   await test.step("preserve draft across Easy and Raw", async () => {
-    await page.goto("/services/new", { waitUntil: "domcontentloaded", timeout: 60_000 });
+    await openNewServiceEditor(page);
     await page.locator("#service-host").fill(`${firstID}.test`);
     await page.locator("#service-id").fill(firstID);
     await expect(page.locator("#service-editor-form")).toHaveAttribute("data-unsaved", "true");
@@ -49,7 +53,7 @@ test("services.editor-draft-mode-parity-and-back-cancel", async ({ authenticated
   });
 
   await test.step("bottom Back cancels without API mutation", async () => {
-    await page.goto("/services/new", { waitUntil: "domcontentloaded", timeout: 60_000 });
+    await openNewServiceEditor(page);
     await page.locator("#service-host").fill(`${secondID}.test`);
     await page.locator("#service-id").fill(secondID);
     await page.locator('[data-wizard-tab="errorpages"]').click();
@@ -61,7 +65,7 @@ test("services.editor-draft-mode-parity-and-back-cancel", async ({ authenticated
 });
 
 test("services.editor-keyboard-labels-and-beforeunload", async ({ authenticatedPage: page }) => {
-  await page.goto("/services/new", { waitUntil: "domcontentloaded", timeout: 60_000 });
+  await openNewServiceEditor(page);
   const host = page.locator("#service-host");
   await page.locator('label[for="service-host"]').click();
   await expect(host).toBeFocused();

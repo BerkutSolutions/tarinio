@@ -26,8 +26,7 @@ test("settings.storage-roundtrip-indexes-and-no-partial-save", async ({ authenti
     for (const [selector, value] of [["#settings-storage-logs", next.logs_days], ["#settings-storage-activity", next.activity_days], ["#settings-storage-events", next.events_days], ["#settings-storage-bans", next.bans_days], ["#settings-storage-hot-index-days", next.hot_index_days], ["#settings-storage-cold-index-days", next.cold_index_days]] as const) await page.locator(selector).fill(String(value));
     await page.locator("#settings-storage-save").click();
     await expect.poll(async () => JSON.parse((await api(page, "/api/settings/runtime")).body).storage).toEqual(expect.objectContaining(next));
-    await openPage(page, "/settings/storage", page.locator("#settings-storage-logs"));
-    await expect(page.locator("#settings-page")).toHaveAttribute("data-runtime-ready", "true");
+    await openPage(page, "/settings/storage", page.locator("#settings-page[data-runtime-ready=\"true\"] #settings-storage-logs"));
     await expect(page.locator("#settings-storage-logs")).toHaveValue(String(next.logs_days));
 
     const beforeInvalid = JSON.parse((await api(page, "/api/settings/runtime")).body);
@@ -79,8 +78,7 @@ test("settings.security-roundtrip-direct-ip-and-validation", async ({ authentica
     await page.locator("#settings-security-block-direct-ip-access").setChecked(Boolean(directOriginal.block_direct_ip_access));
     await page.locator("#settings-security-save").click();
     await expect.poll(async () => JSON.parse((await api(page, "/api/settings/runtime")).body).security).toEqual(expect.objectContaining(next));
-    await openPage(page, "/settings/security", page.locator("#settings-security-login-rate-attempts"));
-    await expect(page.locator("#settings-page")).toHaveAttribute("data-runtime-ready", "true");
+    await openPage(page, "/settings/security", page.locator("#settings-page[data-runtime-ready=\"true\"] #settings-security-login-rate-attempts"));
     await expect(page.locator("#settings-security-login-rate-attempts")).toHaveValue(String(next.login_rate_limit_max_attempts));
     const invalid = await api(page, "/api/settings/runtime", { method: "PUT", body: JSON.stringify({ security: { login_rate_limit_max_attempts: 1 } }) });
     expect(invalid.status, invalid.body).toBe(400);
