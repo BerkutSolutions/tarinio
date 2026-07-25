@@ -25,6 +25,7 @@
 - Browser navigation retry also recognizes Playwright's pre-document `page.goto` timeout during a runtime reload, while retaining the existing four-attempt bound and rejecting non-transient navigation errors immediately.
 - Dashboard CPU edge assertions preserve Docker totals above 100% while checking that only the visual progress width is capacity-clamped; Memory percentage remains clamped to the 0–100 display range.
 - GitHub mirror/release publication is explicit opt-in via `PUBLISH_GITHUB=1`; ordinary verified `main` pipelines perform no GitHub or GHCR writes.
+- Cross-locale settings saves no longer let the server-language metadata refresh re-enter and overwrite the user's next locale during the awaited page rerender; initial metadata synchronization remains unchanged.
 
 ### Конвейер E2E и очистка стендов
 

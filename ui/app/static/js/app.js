@@ -182,6 +182,7 @@ const sectionAccessRules = {
 };
 
 let currentUser = null;
+let languageUpdateInProgress = false;
 let notificationCenter = null;
 let stopNotificationsListener = null;
 let sessionPingTimer = null;
@@ -458,7 +459,12 @@ function wireLanguageUpdates() {
         await notificationCenter.refresh().catch(() => {});
       }
       renderRBAC(currentUser);
-      await loadMeta();
+      languageUpdateInProgress = true;
+      try {
+        await loadMeta();
+      } finally {
+        languageUpdateInProgress = false;
+      }
       await renderPage();
     })();
     if (typeof event.detail?.waitUntil === "function") {
@@ -621,7 +627,7 @@ async function loadMeta() {
   try {
     const meta = await api.get("/api/app/meta");
     const sharedLanguage = String(meta?.ui_language || "").trim().toLowerCase();
-    if (!preferredLanguageForUser(currentUser) && sharedLanguage && sharedLanguage !== getLanguage()) {
+    if (!languageUpdateInProgress && !preferredLanguageForUser(currentUser) && sharedLanguage && sharedLanguage !== getLanguage()) {
       await setLanguage(sharedLanguage);
     }
     if (meta?.app_version) {
