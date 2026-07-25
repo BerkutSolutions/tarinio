@@ -19,9 +19,10 @@
 - Browser E2E now waits for the hydrated Services and Dashboard surfaces after navigation, reload, and transient runtime reconnection. Slow Events interception holds a deterministic loading state until the assertion observes it, and certificate-export setup uses the shared transient-navigation recovery.
 - CI browser shards are serialized on the shared shell runner, and Dashboard Docker metrics are scoped to the current Compose project; concurrent disposable stacks can no longer contaminate each other's container rows or exhaust the runner during long UI suites. The disposable default-profile healthcheck resets the production `.env` dependency, uses internal test credentials, and warms its pinned OpenSearch image before enforcing `--pull never`.
 - Language changes now await the application's asynchronous sidebar, metadata, and page rerender before resolving, preventing overlapping navigation from leaving raw i18n keys in long cross-locale browser suites.
-- Dashboard CPU/Memory browser assertions pin one real container-overview response while checking aggregate and row values, use row-local container-name locators, and mirror the UI's alphabetical detail order; background polling and parent-scoped locators can no longer create false mismatches.
+- Dashboard CPU/Memory browser assertions pin one real container-overview response while checking aggregate and row values, use row-local container-name locators, and validate detail rows by unique container name instead of an unspecified Docker metric order; background polling and locator/order assumptions can no longer create false mismatches.
 - Generic browser navigation no longer treats legitimate domain text such as `app.example.com` as an untranslated `app.*` key; strict raw-key detection remains scoped to the dedicated cross-locale assertions.
 - Browser fixture revision restoration now retries transient catalog timeouts during runtime apply/reload instead of aborting the entire test on the first 30-second fetch interruption; the original revision ID must still be restored within 120 seconds.
+- Browser navigation retry also recognizes Playwright's pre-document `page.goto` timeout during a runtime reload, while retaining the existing four-attempt bound and rejecting non-transient navigation errors immediately.
 
 ### Конвейер E2E и очистка стендов
 

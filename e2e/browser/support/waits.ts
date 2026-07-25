@@ -12,6 +12,7 @@ export async function gotoWithNetworkRetry(page: Page, path: string) {
       lastError = error;
       const message = String((error as Error)?.message || error);
       const transientPreDocumentFailure = /ERR_(TIMED_OUT|TOO_MANY_RETRIES|CONNECTION_RESET|CONNECTION_REFUSED|CONNECTION_CLOSED|NETWORK_CHANGED)/i.test(message) ||
+        /(?:TimeoutError:\s*)?page\.goto: Timeout \d+ms exceeded/i.test(message) ||
         /is interrupted by another navigation to "chrome-error:\/\/chromewebdata\/"/i.test(message);
       if (!transientPreDocumentFailure || attempt === 3) throw error;
       await page.waitForTimeout(250 * (attempt + 1));

@@ -239,13 +239,14 @@ for (const metric of ["memory", "cpu"]) {
     const expectedSummary = [formatPercent(metric === "cpu" ? containerOverview.total_cpu_percent : containerOverview.avg_memory_percent)];
     await expect(modal.locator(".mini-metric-value")).toHaveText(expectedSummary);
     const expectedProcesses = (containerOverview?.containers || [])
-      .map((item: { name?: string; image?: string; pids?: number }) => ({ ...item, command: item.image || "-", threads: item.pids || 0 }))
-      .sort((left, right) => String(left.name || "").localeCompare(String(right.name || ""), undefined, { sensitivity: "base" }));
+      .map((item: { name?: string; image?: string; pids?: number }) => ({ ...item, command: item.image || "-", threads: item.pids || 0 }));
     const processRows = await modal.locator("tbody tr").allTextContents();
     expect(processRows).toHaveLength(expectedProcesses.length);
-    for (const [index, process] of expectedProcesses.entries()) {
-      expect(processRows[index]).toContain(String(process.name || process.command || `pid-${process.pid || 0}`));
-      expect(processRows[index]).toContain(`Threads: ${process.threads || 0}`);
+    for (const process of expectedProcesses) {
+      const name = String(process.name || process.command || `pid-${process.pid || 0}`);
+      const processRow = processRows.find((row) => row.includes(name));
+      expect(processRow, `missing dashboard detail row for ${name}`).toBeTruthy();
+      expect(processRow).toContain(`Threads: ${process.threads || 0}`);
     }
     await modal.press("Escape");
     await expect(modal).toBeHidden();
