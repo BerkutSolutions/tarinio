@@ -1,6 +1,7 @@
 import { expect, test } from "../fixtures/auth";
 import { CleanupLedger, e2eID } from "../support/isolation";
 import { createHmac } from "node:crypto";
+import { gotoWithNetworkRetry, openPage } from "../support/waits";
 
 function totpCode(secret: string) {
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
@@ -50,7 +51,7 @@ test("services.certificate-picker-errors-export-binding", async ({ authenticated
     result = await api("/api/upstreams?auto_apply=false", { method: "POST", body: JSON.stringify({ id: upstreamID, site_id: siteID, scheme: "http", host: "upstream-echo", port: 8888 }) });
     expect([200, 201], result.body).toContain(result.status);
 
-    await page.goto(`/services/${siteID}`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+    await openPage(page, `/services/${siteID}`, "#service-editor-form");
     await page.locator("#service-ca-server").selectOption("import");
     await expect(page.locator("#service-certificate-import-actions")).toBeVisible();
     await page.locator("#service-import-certificate-search").fill(certificateID);
@@ -63,7 +64,7 @@ test("services.certificate-picker-errors-export-binding", async ({ authenticated
     const exporter = await browser.newContext({ ignoreHTTPSErrors: true, acceptDownloads: true });
     const exporterPage = await exporter.newPage();
     try {
-      await exporterPage.goto(`${process.env.WAF_BROWSER_BASE_URL || "https://e2e-management.test:10443"}/login`, { waitUntil: "domcontentloaded" });
+      await gotoWithNetworkRetry(exporterPage, `${process.env.WAF_BROWSER_BASE_URL || "https://e2e-management.test:10443"}/login`);
       let exporterResult = await apiFor(exporterPage, "/api/auth/login", { method: "POST", body: JSON.stringify({ username: exporterID, password: exporterPassword }) });
       expect(exporterResult.status, exporterResult.body).toBe(200);
       exporterResult = await apiFor(exporterPage, "/api/auth/2fa/setup", { method: "POST", body: "{}" });
@@ -71,7 +72,7 @@ test("services.certificate-picker-errors-export-binding", async ({ authenticated
       const setup = JSON.parse(exporterResult.body);
       exporterResult = await apiFor(exporterPage, "/api/auth/2fa/enable", { method: "POST", body: JSON.stringify({ challenge_id: setup.challenge_id, code: totpCode(setup.secret) }) });
       expect(exporterResult.status, exporterResult.body).toBe(200);
-      await exporterPage.goto(`${process.env.WAF_BROWSER_BASE_URL || "https://e2e-management.test:10443"}/services/${siteID}`, { waitUntil: "domcontentloaded" });
+      await openPage(exporterPage, `/services/${siteID}`, "#service-editor-form");
       await exporterPage.locator("#service-ca-server").selectOption("import");
       await exporterPage.locator("#service-import-certificate-search").fill(certificateID);
       await exporterPage.locator("#service-import-certificate-search").dispatchEvent("change");

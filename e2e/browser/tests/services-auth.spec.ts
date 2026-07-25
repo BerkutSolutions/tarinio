@@ -1,5 +1,6 @@
 import { expect, test } from "../fixtures/auth";
 import { CleanupLedger, e2eID } from "../support/isolation";
+import { openPage } from "../support/waits";
 
 test("services.basic-auth-mask-reveal-preview", async ({ authenticatedPage: page }, testInfo) => {
   test.setTimeout(3 * 60_000);
@@ -37,7 +38,7 @@ test("services.basic-auth-mask-reveal-preview", async ({ authenticatedPage: page
     });
 
     await test.step("edit Basic Auth users and settings", async () => {
-      await page.goto(`/services/${siteID}`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+      await openPage(page, `/services/${siteID}`, "#service-editor-form");
       await page.locator('[data-wizard-tab="antibot"]').click();
       await expect(page.locator('[data-tab-panel="antibot"]')).toBeVisible();
       await page.locator("#service-use-auth-basic").check();
@@ -71,7 +72,7 @@ test("services.basic-auth-mask-reveal-preview", async ({ authenticatedPage: page
     });
 
     await test.step("reload mask, reveal and hide", async () => {
-      await page.reload({ waitUntil: "domcontentloaded" });
+      await openPage(page, `/services/${siteID}`, "#service-editor-form");
       await page.locator('[data-wizard-tab="antibot"]').click();
       await expect(page.locator("#service-auth-order")).toHaveValue("antibot_first");
       const passwordInput = page.locator('[data-auth-user-password="0"]');

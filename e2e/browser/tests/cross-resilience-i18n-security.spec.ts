@@ -34,17 +34,27 @@ test("cross-resilience-429-403-5xx-malformed-and-slow-api", async ({ authenticat
   ];
   for (const state of states) {
     const page = await source.context().newPage();
+    let requestStarted: (() => void) | undefined;
+    const requestStartedPromise = new Promise<void>((resolve) => { requestStarted = resolve; });
+    let releaseDelayedResponse: (() => void) | undefined;
+    const delayedResponse = new Promise<void>((resolve) => { releaseDelayedResponse = resolve; });
     try {
       await page.route("**/api/events**", async (route) => {
-        if (state.delay) await new Promise((resolve) => setTimeout(resolve, state.delay));
+        requestStarted?.();
+        if (state.delay) await delayedResponse;
         await route.fulfill({ status: state.status, contentType: "application/json", body: state.body });
       });
-      await page.goto("/events", { waitUntil: "domcontentloaded" });
+      await openPage(page, "/events", "#events-status");
+      if (state.name === "slow") await requestStartedPromise;
       if (state.name === "slow") await expect(page.locator("#events-status")).toContainText(/loading|загруз|laden|učit|加载/i);
+      if (state.name === "slow") releaseDelayedResponse?.();
       await expect(page.locator("#events-status")).not.toBeEmpty();
       await expect(page.locator("nav")).toBeVisible();
       await expect(page.locator("#events-filters")).toBeVisible();
-    } finally { await page.close(); }
+    } finally {
+      releaseDelayedResponse?.();
+      await page.close();
+    }
   }
 });
 

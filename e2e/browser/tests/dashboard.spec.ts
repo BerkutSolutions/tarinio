@@ -78,7 +78,8 @@ test("dashboard.picker-persistence", async ({ authenticatedPage: page }) => {
 });
 
 test("dashboard.layout-reset-resize", async ({ authenticatedPage: page }) => {
-  await page.goto("/dashboard", { waitUntil: "domcontentloaded", timeout: 60000 });
+  await openPage(page, "/dashboard", "#dashboard-page");
+  await expect(page.locator("#dashboard-edit-toggle")).toBeVisible({ timeout: 30_000 });
   await page.locator("#dashboard-edit-toggle").click();
   const frame = page.locator('[data-widget-id="memory"]');
   const handle = frame.locator('[data-resize-dir="se"]');
@@ -105,7 +106,9 @@ test("dashboard.layout-reset-resize", async ({ authenticatedPage: page }) => {
   } else {
     await expect(frame).not.toHaveClass(/dragging/);
   }
-  await page.locator("#dashboard-layout-reset").click();
+  const reset = page.locator("#dashboard-layout-reset");
+  await expect(reset).toBeVisible({ timeout: 30_000 });
+  await reset.click();
   if ((page.viewportSize()?.width || 0) > 900) {
     await expect(frame).toHaveCSS("width", "340px");
     await expect.poll(() => page.evaluate(() => {
