@@ -61,7 +61,7 @@ warm:e2e-images:
   script:
     - |
       set -eu
-      for image in postgres:15 hashicorp/vault:1.18 ealen/echo-server:latest ghcr.io/zaproxy/zaproxy:stable golang:1.26.5-bookworm debian:13-slim docker:29-cli nginx:1.27-alpine alpine:3.20 mcr.microsoft.com/playwright:v1.61.1-noble; do
+      for image in postgres:15 hashicorp/vault:1.18 ealen/echo-server:latest ghcr.io/zaproxy/zaproxy:stable golang:1.26.5-bookworm node:24-bookworm debian:13-slim docker:29-cli nginx:1.27-alpine alpine:3.20 mcr.microsoft.com/playwright:v1.61.1-noble; do
         if docker image inspect "$image" >/dev/null 2>&1; then
           echo "[ci] E2E base image is cached: $image"
         else
@@ -82,6 +82,8 @@ unit:go:
   stage: unit
   allow_failure: true
   timeout: 35m
+  needs:
+    - warm:e2e-images
   script:
     - mkdir -p .ci-bin .ci-home "$NPM_CACHE_DIR"
     - |
@@ -89,7 +91,7 @@ unit:go:
       #!/bin/sh
       set -eu
       repo_dir="$(pwd -P)"
-      exec docker run --rm --pull=always --user "$(id -u):$(id -g)" \
+      exec docker run --rm --pull=never --user "$(id -u):$(id -g)" \
         -e HOME=/workspace/.ci-home -e NPM_CONFIG_CACHE=/npm-cache \
         -v "$NPM_CACHE_DIR:/npm-cache" \
         -v "$repo_dir:/workspace" -w /workspace node:24-bookworm npm "$@"
@@ -105,6 +107,8 @@ docs:build:
   stage: unit
   allow_failure: true
   timeout: 30m
+  needs:
+    - warm:e2e-images
   script:
     - mkdir -p "$NPM_CACHE_DIR" .ci-home
     - >-
@@ -1029,7 +1033,7 @@ security:npm-audit:
   script:
     - mkdir -p "$NPM_CACHE_DIR" .ci-home
     - >-
-      docker run --rm --pull=always --user "$(id -u):$(id -g)"
+      docker run --rm --pull=never --user "$(id -u):$(id -g)"
       -e HOME=/workspace/.ci-home -e NPM_CONFIG_CACHE=/npm-cache
       -v "$NPM_CACHE_DIR:/npm-cache"
       -v "$CI_PROJECT_DIR:/workspace" -w /workspace node:24-bookworm
