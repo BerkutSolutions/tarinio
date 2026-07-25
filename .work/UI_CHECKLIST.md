@@ -526,6 +526,8 @@
 
 - [ ] Dashboard CPU/Memory UI: confirm the headline aggregate and every listed row match `/api/dashboard/containers/overview`; no host CPU, memory, process, or heap value may be presented as a container metric. Open both detail views and verify that names, image, state, PID count, CPU, and memory belong to the same container.
 - [ ] E2E stack health API/runtime: run `scripts/check-e2e-stack-health.sh` with a unique Compose project and confirm it starts only `deploy/compose/e2e`, publishes sentinel adaptive/suggestions output, proves writable sentinel state/output volumes, and removes its own project resources. The production default stack must remain untouched.
+- [ ] Default profile health API/runtime: run `scripts/test-default-compose-health.sh`; it must render and start a temporary copy of `deploy/compose/default` under unique names, verify sentinel health, adaptive/suggestions output and write probes, then remove only its disposable resources. The actual `tarinio-*` containers and default volumes must not change.
+- [ ] Dashboard metrics consistency: compare one rendered Dashboard snapshot with `/api/dashboard/containers/overview`: CPU headline equals `total_cpu_percent`, CPU progress equals `total_cpu_percent / cpu_capacity_percent`, Memory headline equals the usage/limit-weighted aggregate, and all container rows match the same response.
 
 - [ ] Settings UI: save Storage and Security values, open the same page again, and verify controls render only after `data-runtime-ready=true` with the persisted values intact.
 - [ ] Localization UI: switch each supported language, then open Dashboard, Events, Activity, and General Settings; every page must render its ready control and localized shell without raw translation keys.

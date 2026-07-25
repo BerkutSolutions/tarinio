@@ -25,6 +25,7 @@ type DashboardContainerOverview struct {
 	RunningContainers   int                         `json:"running_containers"`
 	Containers          []DashboardContainerMetrics `json:"containers"`
 	TotalCPUPercent     float64                     `json:"total_cpu_percent"`
+	CPUCapacityPercent  float64                     `json:"cpu_capacity_percent"`
 	AvgMemoryPercent    float64                     `json:"avg_memory_percent"`
 	TotalNetworkInB     uint64                      `json:"total_network_in_bytes"`
 	TotalNetworkOutB    uint64                      `json:"total_network_out_bytes"`
@@ -146,16 +147,18 @@ func (s *ContainerRuntimeService) Overview() (DashboardContainerOverview, error)
 		TotalNetworkInText:  "0 B",
 		TotalNetworkOutText: "0 B",
 	}
-	cpuDivisor := float64(runtimeCPUCount())
+	out.CPUCapacityPercent = float64(runtimeCPUCount() * 100)
 
 	var memoryCount int
+	var memoryUsedTotal uint64
+	var memoryLimitTotal uint64
 	for _, base := range containers {
 		item := base
 		if item.State == "running" {
 			out.RunningContainers++
 		}
 		if stats, ok := statsByName[item.Name]; ok {
-			item.CPUPercent = normalizeContainerCPUPercent(stats.CPUPercent, cpuDivisor)
+			item.CPUPercent = round1(stats.CPUPercent)
 			item.MemoryPercent = stats.MemoryPercent
 			item.MemoryUsageText = stats.MemoryUsageText
 			item.MemoryLimitText = stats.MemoryLimitText
@@ -174,9 +177,15 @@ func (s *ContainerRuntimeService) Overview() (DashboardContainerOverview, error)
 			out.AvgMemoryPercent += item.MemoryPercent
 			memoryCount++
 		}
+		if item.MemoryLimitBytes > 0 {
+			memoryUsedTotal += item.MemoryUsageBytes
+			memoryLimitTotal += item.MemoryLimitBytes
+		}
 		out.Containers = append(out.Containers, item)
 	}
-	if memoryCount > 0 {
+	if memoryLimitTotal > 0 {
+		out.AvgMemoryPercent = (float64(memoryUsedTotal) / float64(memoryLimitTotal)) * 100
+	} else if memoryCount > 0 {
 		out.AvgMemoryPercent = out.AvgMemoryPercent / float64(memoryCount)
 	}
 	out.TotalCPUPercent = round1(out.TotalCPUPercent)
@@ -513,20 +522,6 @@ func runtimeCPUCount() int {
 		return 1
 	}
 	return count
-}
-
-func normalizeContainerCPUPercent(value float64, divisor float64) float64 {
-	if divisor <= 0 {
-		divisor = 1
-	}
-	if value <= 0 {
-		return 0
-	}
-	normalized := round1(value / divisor)
-	if normalized < 0 {
-		return 0
-	}
-	return normalized
 }
 
 func parseDockerLogLines(out []byte) []DashboardContainerLogRow {

@@ -1,5 +1,5 @@
 import { expect, test } from "../fixtures/auth";
-import { waitForStableDOM } from "../support/waits";
+import { openPage, waitForStableDOM } from "../support/waits";
 
 const apiByTab: Array<[string, string[]]> = [
   ["dashboard", ["/api/dashboard/stats", "/api/dashboard/containers/overview"]],
@@ -152,13 +152,10 @@ test("activity.read-controls", async ({ authenticatedPage: page }) => {
 });
 
 test("settings.read-controls", async ({ authenticatedPage: page }) => {
-  await page.goto("/settings/general", { waitUntil: "domcontentloaded", timeout: 60000 });
-  await expect(page.locator("#settings-language-save")).toBeVisible();
+  await openPage(page, "/settings/general", "#settings-language-save");
   await expect(page.locator("#settings-runtime-save")).toBeVisible();
-  await page.goto("/settings/security", { waitUntil: "domcontentloaded", timeout: 60000 });
-  await expect(page.locator("#settings-security-save")).toBeVisible();
-  await page.goto("/settings/management-hosts", { waitUntil: "domcontentloaded", timeout: 60000 });
-  await expect(page.locator("#settings-management-hosts")).toBeVisible();
+  await openPage(page, "/settings/security", "#settings-security-save");
+  await openPage(page, "/settings/management-hosts", "#settings-management-hosts");
 });
 
 test("settings.validation-no-partial-save", async ({ authenticatedPage: page }) => {

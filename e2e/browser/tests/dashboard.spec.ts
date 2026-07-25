@@ -159,7 +159,7 @@ test("dashboard.resilience-states", async ({ authenticatedPage: page }) => {
         };
         return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(payload) });
       });
-      await statePage.route("**/api/dashboard/containers/overview", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ containers: [], total_containers: 0, running_containers: 0 }) }));
+      await statePage.route("**/api/dashboard/containers/overview", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(state === "partial" ? { containers: [{ name: "partial-container", cpu_percent: 12.5, memory_percent: 0 }], total_containers: 1, running_containers: 1, total_cpu_percent: 12.5, cpu_capacity_percent: 100, avg_memory_percent: 0 } : { containers: [], total_containers: 0, running_containers: 0 }) }));
       await statePage.route("**/api/requests**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
       await statePage.route("**/api/events**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: '{"events":[]}' }));
       await openPage(statePage, `/dashboard?e2e-state=${state}`, "#dashboard-page");
@@ -184,11 +184,18 @@ for (const metric of ["memory", "cpu"]) {
     const statsResponsePromise = page.waitForResponse((response) =>
       new URL(response.url()).pathname === "/api/dashboard/stats" && response.request().method() === "GET",
     );
+    const overviewResponsePromise = page.waitForResponse((response) =>
+      new URL(response.url()).pathname === "/api/dashboard/containers/overview" && response.request().method() === "GET",
+    );
     await page.goto("/dashboard", { waitUntil: "domcontentloaded", timeout: 60000 });
     const statsResponse = await statsResponsePromise;
     const statsBody = await statsResponse.text();
     expect(statsResponse.status(), statsBody).toBe(200);
     const realStats = JSON.parse(statsBody);
+    const overviewResponse = await overviewResponsePromise;
+    const overviewBody = await overviewResponse.text();
+    expect(overviewResponse.status(), overviewBody).toBe(200);
+    const containerOverview = JSON.parse(overviewBody);
     const system = realStats?.system || {};
     const widget = page.locator('[data-widget-id="' + metric + '"]');
     await expect(widget).toBeVisible({ timeout: 15000 });
@@ -205,13 +212,13 @@ for (const metric of ["memory", "cpu"]) {
     await expect(widget.locator(".dashboard-frame-header")).toContainText(titles[metric][language]);
     await expect(widget.locator(".dashboard-system-main")).toHaveText(/%/);
     await expect(widget.locator(".dashboard-progress span")).toHaveAttribute("style", /width:/);
-    const containerOverview = await page.evaluate(async () => (await fetch("/api/dashboard/containers/overview", { credentials: "include" })).json());
     const expectedAggregate = metric === "cpu" ? Number(containerOverview?.total_cpu_percent || 0) : Number(containerOverview?.avg_memory_percent || 0);
     await expect(widget.locator(".dashboard-system-main")).toHaveText(`${expectedAggregate.toFixed(1)}%`);
     const systemRows = await widget.locator(".dashboard-system-row").count();
     expect(systemRows).toBe(Math.min(8, containerOverview?.containers?.length || 0));
     for (const container of (containerOverview?.containers || []).slice(0, 8)) {
-      await expect(widget.locator(".dashboard-system-container-row").filter({ hasText: String(container.name) })).toContainText(metric === "cpu" ? `${Number(container.cpu_percent || 0).toFixed(1)}%` : `${Number(container.memory_percent || 0).toFixed(1)}%`);
+      const row = widget.locator(".dashboard-system-container-row").filter({ has: widget.getByText(String(container.name), { exact: true }) });
+      await expect(row).toContainText(metric === "cpu" ? `${Number(container.cpu_percent || 0).toFixed(1)}%` : `${Number(container.memory_percent || 0).toFixed(1)}%`);
     }
     await widget.locator('[data-widget-action="' + metric + '"]').click();
     const modal = page.locator("#dashboard-detail-modal");
@@ -225,16 +232,14 @@ for (const metric of ["memory", "cpu"]) {
       while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit += 1; }
       return `${value.toFixed(unit > 1 ? 1 : 0)} ${units[unit]}`;
     };
-    const expectedSummary = metric === "cpu"
-      ? [formatPercent(system.cpu_load_percent), String(system.cpu_cores || 0), String(system.goroutines || 0)]
-      : [formatBytes(system.memory_used_bytes), formatBytes(system.memory_free_bytes), formatBytes(system.memory_total_bytes)];
+    const expectedSummary = [formatPercent(metric === "cpu" ? containerOverview.total_cpu_percent : containerOverview.avg_memory_percent)];
     await expect(modal.locator(".mini-metric-value")).toHaveText(expectedSummary);
-    const expectedProcesses = metric === "cpu" ? (system.top_cpu_processes || []) : (system.top_memory_processes || []);
+    const expectedProcesses = (containerOverview?.containers || []).map((item: { name?: string; image?: string; pids?: number }) => ({ ...item, command: item.image || "-", threads: item.pids || 0 }));
     const processRows = await modal.locator("tbody tr").allTextContents();
     expect(processRows).toHaveLength(expectedProcesses.length);
     for (const [index, process] of expectedProcesses.entries()) {
       expect(processRows[index]).toContain(String(process.name || process.command || `pid-${process.pid || 0}`));
-      expect(processRows[index]).toContain(`PID ${process.pid || 0}`);
+      expect(processRows[index]).toContain(`Threads: ${process.threads || 0}`);
     }
     await modal.press("Escape");
     await expect(modal).toBeHidden();
@@ -256,12 +261,13 @@ for (const metric of ["memory", "cpu"]) {
           };
           await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(payload) });
         });
+        await edgePage.route("**/api/dashboard/containers/overview", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ containers: [{ name: "edge-container", image: "edge", state: "running", status: "Up", cpu_percent: metric === "cpu" ? value : 0, memory_percent: metric === "memory" ? value : 0, pids: 1, memory_usage_bytes: 1024 }], total_containers: 1, running_containers: 1, total_cpu_percent: metric === "cpu" ? value : 0, cpu_capacity_percent: 100, avg_memory_percent: metric === "memory" ? value : 0 }) }));
         await openPage(edgePage, `/dashboard?e2e-system-edge=${encodeURIComponent(String(value))}`, `[data-widget-id="${metric}"]`);
         const edgeWidget = edgePage.locator(`[data-widget-id="${metric}"]`);
         const expected = Math.min(100, value);
         await expect(edgeWidget.locator(".dashboard-system-main")).toHaveText(`${expected.toFixed(1)}%`);
         await expect(edgeWidget.locator(".dashboard-progress span")).toHaveAttribute("style", `width:${expected}%`);
-        await expect(edgeWidget.locator(".dashboard-system-row")).toHaveCount(3);
+        await expect(edgeWidget.locator(".dashboard-system-container-row")).toHaveCount(1);
       } finally {
         await edgePage.close();
       }

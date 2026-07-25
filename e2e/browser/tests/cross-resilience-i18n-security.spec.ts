@@ -81,8 +81,10 @@ test("cross-i18n-all-locales-core-labels-errors-and-modals", async ({ authentica
   };
   try {
     for (const language of ["en", "ru", "de", "sr", "zh"]) {
-      const update = await api(page, "/api/settings/runtime", { method: "PUT", body: JSON.stringify({ language }) });
-      expect(update.status, update.body).toBe(200);
+      await openPage(page, "/settings/general", page.locator("#settings-language-save"));
+      await page.locator("#settings-language-select").selectOption(language);
+      await page.locator("#settings-language-save").click();
+      await expect.poll(() => page.evaluate(() => document.documentElement.lang)).toBe(language);
       for (const path of ["/dashboard", "/events", "/activity", "/settings/general"]) {
         await openPage(page, path, page.locator(readySelectors[path]));
         await expect(page.locator(readySelectors[path]), `${language} ${path} must finish rendering`).toBeVisible();
@@ -103,8 +105,10 @@ test("cross-i18n-all-locales-core-labels-errors-and-modals", async ({ authentica
       await expect(modal).toBeHidden();
     }
   } finally {
-    const restore = await api(page, "/api/settings/runtime", { method: "PUT", body: JSON.stringify({ language: original }) });
-    expect(restore.status, restore.body).toBe(200);
+    await openPage(page, "/settings/general", page.locator("#settings-language-save"));
+    await page.locator("#settings-language-select").selectOption(String(original));
+    await page.locator("#settings-language-save").click();
+    await expect.poll(() => page.evaluate(() => document.documentElement.lang)).toBe(String(original));
   }
 });
 

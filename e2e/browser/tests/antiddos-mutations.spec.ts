@@ -1,11 +1,15 @@
 import { expect, test } from "../fixtures/auth";
 import { e2eID } from "../support/isolation";
 import { runtimeBaseURL } from "../support/env";
+import { openPage } from "../support/waits";
 
 type APIResult = { status: number; body: string };
 
 async function api(page: import("@playwright/test").Page, path: string, init: RequestInit = {}): Promise<APIResult> {
-  return page.evaluate(async ({ path, init }) => {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await page.evaluate(async ({ path, init }) => {
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), 30_000);
     try {
@@ -17,7 +21,14 @@ async function api(page: import("@playwright/test").Page, path: string, init: Re
     } finally {
       window.clearTimeout(timer);
     }
-  }, { path, init });
+      }, { path, init });
+    } catch (error) {
+      lastError = error;
+      if (!/Failed to fetch|Execution context was destroyed|ERR_NETWORK_CHANGED|ERR_CONNECTION_(CLOSED|RESET)/i.test(String(error)) || attempt === 2) throw error;
+      await page.waitForTimeout(250 * (attempt + 1));
+    }
+  }
+  throw lastError;
 }
 
 async function readSettings(page: import("@playwright/test").Page) {
@@ -72,7 +83,7 @@ test("anti-ddos.save-validation-restore", async ({ authenticatedPage: page }) =>
 });
 
 test("anti-ddos.all-groups-roundtrip-restore", async ({ authenticatedPage: page }) => {
-  await page.goto("/anti-ddos", { waitUntil: "domcontentloaded", timeout: 60_000 });
+  await openPage(page, "/anti-ddos", "#antiddos-model-logs");
   await expect(page.locator("#antiddos-form")).toBeVisible({ timeout: 30_000 });
   const original = await readSettings(page);
   const expected = {

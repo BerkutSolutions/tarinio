@@ -27,6 +27,10 @@ export async function openPage(page: Page, path: string, ready: string | Locator
     await gotoWithNetworkRetry(page, path);
     try {
       await expect(target).toBeVisible({ timeout: ACTION_TIMEOUT });
+      await expect.poll(async () => page.evaluate(() => {
+        const text = `${document.querySelector("nav")?.textContent || ""} ${document.querySelector("main")?.textContent || ""}`;
+        return !/\b(?:app|common|events|activity|settings)\.[a-z][a-z0-9_.-]+\b/i.test(text);
+      }), { timeout: ACTION_TIMEOUT }).toBe(true);
       return target;
     } catch (error) {
       lastError = error;

@@ -155,6 +155,22 @@ e2e:stack-healthcheck:
     paths:
       - build/e2e/stack-healthcheck/
 
+e2e:default-stack-healthcheck:
+  stage: e2e
+  allow_failure: true
+  timeout: 35m
+  dependencies: []
+  script:
+    - mkdir -p build/e2e/default-stack-healthcheck
+    - chmod 700 scripts/test-default-compose-health.sh
+    - test -n "${WAF_RUNTIME_API_TOKEN:-}" || { echo "WAF_RUNTIME_API_TOKEN is required" >&2; exit 1; }
+    - DEFAULT_HEALTH_TIMEOUT_SECONDS=240 DEFAULT_COMPOSE_DIR="$CI_PROJECT_DIR/deploy/compose/default" WAF_STACK_NAME="ci-${CI_PIPELINE_ID}-default-health" sh scripts/test-default-compose-health.sh 2>&1 | tee build/e2e/default-stack-healthcheck/healthcheck.log
+  artifacts:
+    when: always
+    expire_in: 14 days
+    paths:
+      - build/e2e/default-stack-healthcheck/
+
 e2e:security-invariants:
   stage: e2e
   allow_failure: true
@@ -786,6 +802,8 @@ e2e:failure-evidence:
   allow_failure: true
   needs:
     - job: e2e:stack-healthcheck
+      artifacts: true
+    - job: e2e:default-stack-healthcheck
       artifacts: true
     - job: e2e:smoke
       artifacts: true

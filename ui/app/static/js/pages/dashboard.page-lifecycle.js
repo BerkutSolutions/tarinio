@@ -37,9 +37,10 @@ function loadDashboardStats(silent, deps) {
   const SYSTEM_SERVICES = new Set(["control-plane", "runtime"]);
   return Promise.all([
     deps.ctx.api.get("/api/dashboard/stats", options),
-    deps.ctx.api.get("/api/sites").catch(() => [])
+    deps.ctx.api.get("/api/sites").catch(() => []),
+    deps.fetchContainersOverview()
   ])
-    .then(([stats, sitesRaw]) => {
+    .then(([stats, sitesRaw, containersOverview]) => {
       const sites = Array.isArray(sitesRaw) ? sitesRaw : [];
       const checkedAt = new Date().toISOString();
       const siteServices = sites.map((site) => ({
@@ -54,6 +55,8 @@ function loadDashboardStats(silent, deps) {
           ...siteServices
         ]
       };
+      deps.pageState.latestContainersOverview = containersOverview || null;
+      deps.refs.latestContainersOverview = containersOverview || null;
       deps.renderAllStats(mergedStats);
       if (!silent) {
         deps.applyAllGeometry(deps.boardNode, deps.layout);
