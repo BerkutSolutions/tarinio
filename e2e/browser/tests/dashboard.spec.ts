@@ -221,7 +221,7 @@ for (const metric of ["memory", "cpu"]) {
     const systemRows = await widget.locator(".dashboard-system-row").count();
     expect(systemRows).toBe(Math.min(8, containerOverview?.containers?.length || 0));
     for (const container of (containerOverview?.containers || []).slice(0, 8)) {
-      const row = widget.locator(".dashboard-system-container-row").filter({ has: widget.getByText(String(container.name), { exact: true }) });
+      const row = widget.locator(".dashboard-system-container-row").filter({ hasText: String(container.name) });
       await expect(row).toContainText(metric === "cpu" ? `${Number(container.cpu_percent || 0).toFixed(1)}%` : `${Number(container.memory_percent || 0).toFixed(1)}%`);
     }
     await widget.locator('[data-widget-action="' + metric + '"]').click();
@@ -238,7 +238,9 @@ for (const metric of ["memory", "cpu"]) {
     };
     const expectedSummary = [formatPercent(metric === "cpu" ? containerOverview.total_cpu_percent : containerOverview.avg_memory_percent)];
     await expect(modal.locator(".mini-metric-value")).toHaveText(expectedSummary);
-    const expectedProcesses = (containerOverview?.containers || []).map((item: { name?: string; image?: string; pids?: number }) => ({ ...item, command: item.image || "-", threads: item.pids || 0 }));
+    const expectedProcesses = (containerOverview?.containers || [])
+      .map((item: { name?: string; image?: string; pids?: number }) => ({ ...item, command: item.image || "-", threads: item.pids || 0 }))
+      .sort((left, right) => String(left.name || "").localeCompare(String(right.name || ""), undefined, { sensitivity: "base" }));
     const processRows = await modal.locator("tbody tr").allTextContents();
     expect(processRows).toHaveLength(expectedProcesses.length);
     for (const [index, process] of expectedProcesses.entries()) {
