@@ -17,6 +17,9 @@ cat >"$TMP_DIR/health-override.yml" <<'YAML'
 services:
   control-plane:
     container_name: ${WAF_STACK_NAME}-control-plane
+    # Production loads deployment secrets from an ignored .env file. This
+    # disposable profile exports its own test values and must not depend on it.
+    env_file: !reset []
   runtime:
     container_name: ${WAF_STACK_NAME}-runtime
     ports: !reset []
