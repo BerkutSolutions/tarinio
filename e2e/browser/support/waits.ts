@@ -5,7 +5,7 @@ const NAVIGATION_TIMEOUT = 60_000;
 
 export async function gotoWithNetworkRetry(page: Page, path: string) {
   let lastError: unknown;
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < 4; attempt++) {
     try {
       return await page.goto(path, { waitUntil: "domcontentloaded", timeout: NAVIGATION_TIMEOUT / 2 });
     } catch (error) {
@@ -13,8 +13,8 @@ export async function gotoWithNetworkRetry(page: Page, path: string) {
       const message = String((error as Error)?.message || error);
       const transientPreDocumentFailure = /ERR_(TIMED_OUT|TOO_MANY_RETRIES|CONNECTION_RESET|CONNECTION_REFUSED|CONNECTION_CLOSED|NETWORK_CHANGED)/i.test(message) ||
         /is interrupted by another navigation to "chrome-error:\/\/chromewebdata\/"/i.test(message);
-      if (!transientPreDocumentFailure || attempt > 0) throw error;
-      await page.waitForTimeout(250);
+      if (!transientPreDocumentFailure || attempt === 3) throw error;
+      await page.waitForTimeout(250 * (attempt + 1));
     }
   }
   throw lastError;

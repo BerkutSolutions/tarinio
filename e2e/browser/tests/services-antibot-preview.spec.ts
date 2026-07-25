@@ -1,5 +1,6 @@
 import { expect, test } from "../fixtures/auth";
 import { CleanupLedger, e2eID } from "../support/isolation";
+import { openPage } from "../support/waits";
 
 test("services.antibot-template-preview-and-readback", async ({ authenticatedPage: page }, testInfo) => {
   test.setTimeout(4 * 60_000);
@@ -25,7 +26,8 @@ test("services.antibot-template-preview-and-readback", async ({ authenticatedPag
     result = await api("/api/upstreams?auto_apply=false", { method: "POST", body: JSON.stringify({ id: upstreamID, site_id: siteID, scheme: "http", host: "upstream-echo", port: 8888 }) });
     expect([200, 201], result.body).toContain(result.status);
 
-    await page.goto(`/services/${siteID}`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+    await openPage(page, `/services/${siteID}`, "#service-editor-form [data-wizard-tab=\"antibot\"]");
+    await expect(page.locator('[data-wizard-tab="antibot"]')).toBeEnabled();
     await page.locator('[data-wizard-tab="antibot"]').click();
     await page.locator("#service-antibot-enabled").check();
     await page.locator("#service-antibot-challenge-template").selectOption("v4");

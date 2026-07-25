@@ -8,6 +8,7 @@
 - CI warms the pinned Node image before unit work and uses that local image for lockfile, documentation, and audit checks, avoiding transient Docker Hub DNS/auth failures during verification.
 - Browser fault evidence now pauses and restores the isolated runtime independently for desktop and mobile; Settings locale evidence waits for runtime hydration rather than a merely visible control.
 - Settings and Services editor browser scenarios now wait for the actual hydrated form before reading or mutating controls, preserving their roundtrip and cancel assertions across desktop and mobile.
+- Browser page navigation now tolerates a bounded sequence of transient runtime reload connections before authentication; strict result validation still rejects skipped, retried, or failed test executions.
 
 ### Конвейер E2E и очистка стендов
 

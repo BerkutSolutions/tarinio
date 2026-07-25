@@ -2,8 +2,7 @@ import { expect, test } from "../fixtures/auth";
 import { openPage, waitForStableDOM } from "../support/waits";
 
 test("settings.runtime-toggle-persistence-restore", async ({ authenticatedPage: page }) => {
-  await openPage(page, "/settings/general", "#settings-runtime-save");
-  await expect(page.locator("#settings-page")).toHaveAttribute("data-runtime-ready", "true");
+  await openPage(page, "/settings/general", "#settings-page[data-runtime-ready=\"true\"] #settings-runtime-save");
   const readRuntime = async () => page.evaluate(async () => {
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), 30000);
@@ -21,11 +20,10 @@ test("settings.runtime-toggle-persistence-restore", async ({ authenticatedPage: 
     await toggle.setChecked(next);
     await page.locator("#settings-runtime-save").click();
     await expect.poll(async () => Boolean(JSON.parse((await readRuntime()).body)?.update_checks_enabled), { timeout: 30000 }).toBe(next);
-    await page.reload({ waitUntil: "domcontentloaded" });
+    await openPage(page, "/settings/general", "#settings-page[data-runtime-ready=\"true\"] #settings-updates-enabled");
     await expect(page.locator("#settings-updates-enabled")).toBeChecked({ checked: next });
   } finally {
-    await openPage(page, "/settings/general", "#settings-runtime-save");
-    await expect(page.locator("#settings-page")).toHaveAttribute("data-runtime-ready", "true");
+    await openPage(page, "/settings/general", "#settings-page[data-runtime-ready=\"true\"] #settings-runtime-save");
     await page.locator("#settings-updates-enabled").setChecked(original);
     await page.locator("#settings-runtime-save").click();
     await expect.poll(async () => Boolean(JSON.parse((await readRuntime()).body)?.update_checks_enabled), { timeout: 30000 }).toBe(original);
@@ -35,10 +33,9 @@ test("settings.runtime-toggle-persistence-restore", async ({ authenticatedPage: 
 test("settings.language-all-locales-persistence-restore", async ({ authenticatedPage: page }) => {
   const languages = ["en", "ru", "de", "sr", "zh"];
   const waitForSettingsDOM = async () => {
-    await waitForStableDOM(page.locator("#settings-language-save"));
+    await waitForStableDOM(page.locator("#settings-page[data-runtime-ready=\"true\"] #settings-language-save"));
   };
-  await openPage(page, "/settings/general", "#settings-language-save");
-  await expect(page.locator("#settings-page")).toHaveAttribute("data-runtime-ready", "true");
+  await openPage(page, "/settings/general", "#settings-page[data-runtime-ready=\"true\"] #settings-language-save");
   await waitForSettingsDOM();
   const readLanguage = async () => page.evaluate(async () => {
     const controller = new AbortController();
@@ -61,15 +58,13 @@ test("settings.language-all-locales-persistence-restore", async ({ authenticated
       await expect(page.locator("#settings-language-select")).toHaveValue(language);
       await page.locator("#settings-language-save").click();
       await expect.poll(async () => String(JSON.parse((await readLanguage()).body)?.language), { timeout: 30000 }).toBe(language);
-      await page.reload({ waitUntil: "domcontentloaded" });
-      await expect(page.locator("#settings-page")).toHaveAttribute("data-runtime-ready", "true");
+      await openPage(page, "/settings/general", "#settings-page[data-runtime-ready=\"true\"] #settings-language-select");
       await expect(page.locator("#settings-language-select")).toHaveValue(language);
     }
   } finally {
     const current = String(JSON.parse((await readLanguage()).body)?.language || "en");
     if (current !== original) {
-      await openPage(page, "/settings/general", "#settings-language-save");
-      await expect(page.locator("#settings-page")).toHaveAttribute("data-runtime-ready", "true");
+      await openPage(page, "/settings/general", "#settings-page[data-runtime-ready=\"true\"] #settings-language-save");
       await waitForSettingsDOM();
       await page.locator("#settings-language-select").selectOption(original);
       await page.locator("#settings-language-save").click();

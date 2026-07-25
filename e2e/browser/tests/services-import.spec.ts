@@ -1,5 +1,6 @@
 import { expect, test } from "../fixtures/auth";
 import { CleanupLedger, e2eID } from "../support/isolation";
+import { openPage } from "../support/waits";
 
 test("services.valid-import-cleanup", async ({ authenticatedPage: page }, testInfo) => {
   const siteID = e2eID(testInfo, "e2e-import");
@@ -35,7 +36,7 @@ test("services.valid-import-cleanup", async ({ authenticatedPage: page }, testIn
     }) });
     expect([200, 201]).toContain(response.status);
 
-    await page.goto("/services", { waitUntil: "domcontentloaded", timeout: 60000 });
+    await openPage(page, "/services", "#services-search");
     await page.locator("#services-search").fill(siteID);
     const selected = page.locator(`[data-select-site="${siteID}"]`);
     await expect(selected).toBeVisible({ timeout: 30000 });
@@ -57,7 +58,7 @@ test("services.valid-import-cleanup", async ({ authenticatedPage: page }, testIn
     expect([200, 204, 404]).toContain(response.status);
     await expect.poll(siteExists).toBe(false);
 
-    await page.reload({ waitUntil: "domcontentloaded" });
+    await openPage(page, "/services", "#services-import");
     const chooserPromise = page.waitForEvent("filechooser");
     await page.locator("#services-import").click();
     const chooser = await chooserPromise;
@@ -69,6 +70,7 @@ test("services.valid-import-cleanup", async ({ authenticatedPage: page }, testIn
     await expect.poll(siteExists, { timeout: 120000 }).toBe(true);
     await expect.poll(upstreamExists, { timeout: 120000 }).toBe(true);
     await expect(page).toHaveURL(new RegExp(`/services/new$`));
+    await expect(page.locator("#service-editor-form #service-id")).toBeVisible();
     await expect(page.locator("#service-id")).toHaveValue(siteID);
   } finally {
     await cleanup.run();
