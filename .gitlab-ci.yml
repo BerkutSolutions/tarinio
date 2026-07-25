@@ -163,7 +163,6 @@ e2e:default-stack-healthcheck:
   script:
     - mkdir -p build/e2e/default-stack-healthcheck
     - chmod 700 scripts/test-default-compose-health.sh
-    - test -n "${WAF_RUNTIME_API_TOKEN:-}" || { echo "WAF_RUNTIME_API_TOKEN is required" >&2; exit 1; }
     - DEFAULT_HEALTH_TIMEOUT_SECONDS=240 DEFAULT_COMPOSE_DIR="$CI_PROJECT_DIR/deploy/compose/default" WAF_STACK_NAME="ci-${CI_PIPELINE_ID}-default-health" sh scripts/test-default-compose-health.sh 2>&1 | tee build/e2e/default-stack-healthcheck/healthcheck.log
   artifacts:
     when: always
