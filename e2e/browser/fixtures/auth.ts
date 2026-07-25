@@ -45,7 +45,7 @@ async function restoreActiveRevision(page: Page, revisionID: string) {
     }
   }, revisionID);
   expect([200, 201], response.body).toContain(response.status);
-  await expect.poll(() => activeRevisionID(page), { timeout: 120_000 }).toBe(revisionID);
+  await expect.poll(() => activeRevisionID(page).catch(() => ""), { timeout: 120_000 }).toBe(revisionID);
 }
 
 export const test = base.extend<Fixtures>({

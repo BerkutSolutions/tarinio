@@ -21,6 +21,7 @@
 - Language changes now await the application's asynchronous sidebar, metadata, and page rerender before resolving, preventing overlapping navigation from leaving raw i18n keys in long cross-locale browser suites.
 - Dashboard CPU/Memory browser assertions pin one real container-overview response while checking aggregate and row values, use row-local container-name locators, and mirror the UI's alphabetical detail order; background polling and parent-scoped locators can no longer create false mismatches.
 - Generic browser navigation no longer treats legitimate domain text such as `app.example.com` as an untranslated `app.*` key; strict raw-key detection remains scoped to the dedicated cross-locale assertions.
+- Browser fixture revision restoration now retries transient catalog timeouts during runtime apply/reload instead of aborting the entire test on the first 30-second fetch interruption; the original revision ID must still be restored within 120 seconds.
 
 ### Конвейер E2E и очистка стендов
 
