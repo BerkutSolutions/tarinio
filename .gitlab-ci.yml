@@ -389,7 +389,35 @@ e2e:browser:core:
     E2E_BROWSER_CONTROL_PORT: "18982"
     E2E_BROWSER_CANARY_PORT: "18983"
     E2E_BROWSER_MTLS_PORT: "18984"
-    E2E_BROWSER_SPECS: "tests/auth-ui.spec.ts tests/smoke.spec.ts tests/waits.spec.ts tests/dashboard.spec.ts tests/tabs.spec.ts tests/requests-complete.spec.ts tests/events-complete.spec.ts tests/activity-complete.spec.ts"
+    E2E_BROWSER_SPECS: "tests/auth-ui.spec.ts tests/smoke.spec.ts tests/waits.spec.ts tests/tabs.spec.ts"
+
+e2e:browser:core-dashboard:
+  extends: .e2e:browser
+  variables:
+    E2E_BROWSER_SLICE: browser-core-dashboard
+    E2E_BROWSER_PROJECT: ci-browser-core-dashboard
+    E2E_BROWSER_UI_PORT: "20580"
+    E2E_BROWSER_RUNTIME_PORT: "12580"
+    E2E_BROWSER_HTTPS_PORT: "35443"
+    E2E_BROWSER_HEALTH_PORT: "20581"
+    E2E_BROWSER_CONTROL_PORT: "20582"
+    E2E_BROWSER_CANARY_PORT: "20583"
+    E2E_BROWSER_MTLS_PORT: "20584"
+    E2E_BROWSER_SPECS: "tests/dashboard.spec.ts"
+
+e2e:browser:core-records:
+  extends: .e2e:browser
+  variables:
+    E2E_BROWSER_SLICE: browser-core-records
+    E2E_BROWSER_PROJECT: ci-browser-core-records
+    E2E_BROWSER_UI_PORT: "20680"
+    E2E_BROWSER_RUNTIME_PORT: "12680"
+    E2E_BROWSER_HTTPS_PORT: "36443"
+    E2E_BROWSER_HEALTH_PORT: "20681"
+    E2E_BROWSER_CONTROL_PORT: "20682"
+    E2E_BROWSER_CANARY_PORT: "20683"
+    E2E_BROWSER_MTLS_PORT: "20684"
+    E2E_BROWSER_SPECS: "tests/requests-complete.spec.ts tests/events-complete.spec.ts tests/activity-complete.spec.ts"
 
 e2e:browser:services:
   extends: .e2e:browser
@@ -403,7 +431,21 @@ e2e:browser:services:
     E2E_BROWSER_CONTROL_PORT: "19082"
     E2E_BROWSER_CANARY_PORT: "19083"
     E2E_BROWSER_MTLS_PORT: "19084"
-    E2E_BROWSER_SPECS: "tests/services.spec.ts tests/services-antibot-preview.spec.ts tests/services-auth.spec.ts"
+    E2E_BROWSER_SPECS: "tests/services.spec.ts"
+
+e2e:browser:services-preview:
+  extends: .e2e:browser
+  variables:
+    E2E_BROWSER_SLICE: browser-services-preview
+    E2E_BROWSER_PROJECT: ci-browser-services-preview
+    E2E_BROWSER_UI_PORT: "20780"
+    E2E_BROWSER_RUNTIME_PORT: "12780"
+    E2E_BROWSER_HTTPS_PORT: "37443"
+    E2E_BROWSER_HEALTH_PORT: "20781"
+    E2E_BROWSER_CONTROL_PORT: "20782"
+    E2E_BROWSER_CANARY_PORT: "20783"
+    E2E_BROWSER_MTLS_PORT: "20784"
+    E2E_BROWSER_SPECS: "tests/services-antibot-preview.spec.ts tests/services-auth.spec.ts"
 
 e2e:browser:services-controls:
   extends: .e2e:browser
@@ -487,7 +529,35 @@ e2e:browser:platform:
     E2E_BROWSER_CONTROL_PORT: "19182"
     E2E_BROWSER_CANARY_PORT: "19183"
     E2E_BROWSER_MTLS_PORT: "19184"
-    E2E_BROWSER_SPECS: "tests/bans-mutations.spec.ts tests/bans-rbac.spec.ts tests/revisions-mutations.spec.ts tests/antiddos-mutations.spec.ts tests/owasp-crs-mutations.spec.ts tests/tls-mutations.spec.ts tests/tls-complete.spec.ts tests/administration-mutations.spec.ts"
+    E2E_BROWSER_SPECS: "tests/bans-mutations.spec.ts tests/bans-rbac.spec.ts tests/revisions-mutations.spec.ts"
+
+e2e:browser:platform-security:
+  extends: .e2e:browser
+  variables:
+    E2E_BROWSER_SLICE: browser-platform-security
+    E2E_BROWSER_PROJECT: ci-browser-platform-security
+    E2E_BROWSER_UI_PORT: "20880"
+    E2E_BROWSER_RUNTIME_PORT: "12880"
+    E2E_BROWSER_HTTPS_PORT: "38443"
+    E2E_BROWSER_HEALTH_PORT: "20881"
+    E2E_BROWSER_CONTROL_PORT: "20882"
+    E2E_BROWSER_CANARY_PORT: "20883"
+    E2E_BROWSER_MTLS_PORT: "20884"
+    E2E_BROWSER_SPECS: "tests/antiddos-mutations.spec.ts tests/owasp-crs-mutations.spec.ts"
+
+e2e:browser:platform-tls-admin:
+  extends: .e2e:browser
+  variables:
+    E2E_BROWSER_SLICE: browser-platform-tls-admin
+    E2E_BROWSER_PROJECT: ci-browser-platform-tls-admin
+    E2E_BROWSER_UI_PORT: "20980"
+    E2E_BROWSER_RUNTIME_PORT: "12980"
+    E2E_BROWSER_HTTPS_PORT: "39443"
+    E2E_BROWSER_HEALTH_PORT: "20981"
+    E2E_BROWSER_CONTROL_PORT: "20982"
+    E2E_BROWSER_CANARY_PORT: "20983"
+    E2E_BROWSER_MTLS_PORT: "20984"
+    E2E_BROWSER_SPECS: "tests/tls-mutations.spec.ts tests/tls-complete.spec.ts tests/administration-mutations.spec.ts"
 
 e2e:browser:settings-cross:
   extends: .e2e:browser
@@ -501,7 +571,49 @@ e2e:browser:settings-cross:
     E2E_BROWSER_CONTROL_PORT: "19282"
     E2E_BROWSER_CANARY_PORT: "19283"
     E2E_BROWSER_MTLS_PORT: "19284"
-    E2E_BROWSER_SPECS: "tests/settings-mutations.spec.ts tests/settings-storage-security.spec.ts tests/settings-logging-secrets.spec.ts tests/settings-management-appearance.spec.ts tests/cross-security-auth-rbac.spec.ts tests/cross-compile-audit.spec.ts tests/cross-resilience-i18n-security.spec.ts"
+    E2E_BROWSER_SPECS: "tests/settings-mutations.spec.ts tests/settings-storage-security.spec.ts"
+
+e2e:browser:settings-management:
+  extends: .e2e:browser
+  variables:
+    E2E_BROWSER_SLICE: browser-settings-management
+    E2E_BROWSER_PROJECT: ci-browser-settings-management
+    E2E_BROWSER_UI_PORT: "21080"
+    E2E_BROWSER_RUNTIME_PORT: "13080"
+    E2E_BROWSER_HTTPS_PORT: "40443"
+    E2E_BROWSER_HEALTH_PORT: "21081"
+    E2E_BROWSER_CONTROL_PORT: "21082"
+    E2E_BROWSER_CANARY_PORT: "21083"
+    E2E_BROWSER_MTLS_PORT: "21084"
+    E2E_BROWSER_SPECS: "tests/settings-logging-secrets.spec.ts tests/settings-management-appearance.spec.ts"
+
+e2e:browser:cross-security:
+  extends: .e2e:browser
+  variables:
+    E2E_BROWSER_SLICE: browser-cross-security
+    E2E_BROWSER_PROJECT: ci-browser-cross-security
+    E2E_BROWSER_UI_PORT: "21180"
+    E2E_BROWSER_RUNTIME_PORT: "13180"
+    E2E_BROWSER_HTTPS_PORT: "41443"
+    E2E_BROWSER_HEALTH_PORT: "21181"
+    E2E_BROWSER_CONTROL_PORT: "21182"
+    E2E_BROWSER_CANARY_PORT: "21183"
+    E2E_BROWSER_MTLS_PORT: "21184"
+    E2E_BROWSER_SPECS: "tests/cross-security-auth-rbac.spec.ts tests/cross-resilience-i18n-security.spec.ts"
+
+e2e:browser:cross-compile-audit:
+  extends: .e2e:browser
+  variables:
+    E2E_BROWSER_SLICE: browser-cross-compile-audit
+    E2E_BROWSER_PROJECT: ci-browser-cross-compile-audit
+    E2E_BROWSER_UI_PORT: "21280"
+    E2E_BROWSER_RUNTIME_PORT: "13280"
+    E2E_BROWSER_HTTPS_PORT: "42443"
+    E2E_BROWSER_HEALTH_PORT: "21281"
+    E2E_BROWSER_CONTROL_PORT: "21282"
+    E2E_BROWSER_CANARY_PORT: "21283"
+    E2E_BROWSER_MTLS_PORT: "21284"
+    E2E_BROWSER_SPECS: "tests/cross-compile-audit.spec.ts"
 
 e2e:browser:requests-backend-failure:
   extends: .e2e:browser
@@ -525,20 +637,34 @@ e2e:browser:gate:
   when: always
   dependencies:
     - e2e:browser:core
+    - e2e:browser:core-dashboard
+    - e2e:browser:core-records
     - e2e:browser:services
+    - e2e:browser:services-preview
     - e2e:browser:services-controls
     - e2e:browser:services-editor
     - e2e:browser:services-editor-import
     - e2e:browser:services-security
     - e2e:browser:services-security-patches
     - e2e:browser:platform
+    - e2e:browser:platform-security
+    - e2e:browser:platform-tls-admin
     - e2e:browser:settings-cross
+    - e2e:browser:settings-management
+    - e2e:browser:cross-security
+    - e2e:browser:cross-compile-audit
     - e2e:browser:requests-backend-failure
     - e2e:api-registry
   needs:
     - job: e2e:browser:core
       artifacts: true
+    - job: e2e:browser:core-dashboard
+      artifacts: true
+    - job: e2e:browser:core-records
+      artifacts: true
     - job: e2e:browser:services
+      artifacts: true
+    - job: e2e:browser:services-preview
       artifacts: true
     - job: e2e:browser:services-controls
       artifacts: true
@@ -552,7 +678,17 @@ e2e:browser:gate:
       artifacts: true
     - job: e2e:browser:platform
       artifacts: true
+    - job: e2e:browser:platform-security
+      artifacts: true
+    - job: e2e:browser:platform-tls-admin
+      artifacts: true
     - job: e2e:browser:settings-cross
+      artifacts: true
+    - job: e2e:browser:settings-management
+      artifacts: true
+    - job: e2e:browser:cross-security
+      artifacts: true
+    - job: e2e:browser:cross-compile-audit
       artifacts: true
     - job: e2e:browser:requests-backend-failure
       artifacts: true
@@ -561,26 +697,42 @@ e2e:browser:gate:
   script:
     - cd e2e/browser
     - node scripts/verify-results.mjs ../../build/e2e/browser-core/results.json
+    - node scripts/verify-results.mjs ../../build/e2e/browser-core-dashboard/results.json
+    - node scripts/verify-results.mjs ../../build/e2e/browser-core-records/results.json
     - node scripts/verify-results.mjs ../../build/e2e/browser-services/results.json
+    - node scripts/verify-results.mjs ../../build/e2e/browser-services-preview/results.json
     - node scripts/verify-results.mjs ../../build/e2e/browser-services-controls/results.json
     - node scripts/verify-results.mjs ../../build/e2e/browser-services-editor/results.json
     - node scripts/verify-results.mjs ../../build/e2e/browser-services-editor-import/results.json
     - node scripts/verify-results.mjs ../../build/e2e/browser-services-security/results.json
     - node scripts/verify-results.mjs ../../build/e2e/browser-services-security-patches/results.json
     - node scripts/verify-results.mjs ../../build/e2e/browser-platform/results.json
+    - node scripts/verify-results.mjs ../../build/e2e/browser-platform-security/results.json
+    - node scripts/verify-results.mjs ../../build/e2e/browser-platform-tls-admin/results.json
     - node scripts/verify-results.mjs ../../build/e2e/browser-settings-cross/results.json
+    - node scripts/verify-results.mjs ../../build/e2e/browser-settings-management/results.json
+    - node scripts/verify-results.mjs ../../build/e2e/browser-cross-security/results.json
+    - node scripts/verify-results.mjs ../../build/e2e/browser-cross-compile-audit/results.json
     - node scripts/verify-results.mjs ../../build/e2e/browser-requests-backend-failure/results.json
     - >-
       node scripts/coverage.mjs
       ../../build/e2e/browser-core/results.json
+      ../../build/e2e/browser-core-dashboard/results.json
+      ../../build/e2e/browser-core-records/results.json
       ../../build/e2e/browser-services/results.json
+      ../../build/e2e/browser-services-preview/results.json
       ../../build/e2e/browser-services-controls/results.json
       ../../build/e2e/browser-services-editor/results.json
       ../../build/e2e/browser-services-editor-import/results.json
       ../../build/e2e/browser-services-security/results.json
       ../../build/e2e/browser-services-security-patches/results.json
       ../../build/e2e/browser-platform/results.json
+      ../../build/e2e/browser-platform-security/results.json
+      ../../build/e2e/browser-platform-tls-admin/results.json
       ../../build/e2e/browser-settings-cross/results.json
+      ../../build/e2e/browser-settings-management/results.json
+      ../../build/e2e/browser-cross-security/results.json
+      ../../build/e2e/browser-cross-compile-audit/results.json
       ../../build/e2e/browser-requests-backend-failure/results.json
       --api-evidence ../../build/e2e/api-registry/e2e-evidence.json
   artifacts:
@@ -588,14 +740,22 @@ e2e:browser:gate:
     expire_in: 30 days
     paths:
       - build/e2e/browser-core/
+      - build/e2e/browser-core-dashboard/
+      - build/e2e/browser-core-records/
       - build/e2e/browser-services/
+      - build/e2e/browser-services-preview/
       - build/e2e/browser-services-controls/
       - build/e2e/browser-services-editor/
       - build/e2e/browser-services-editor-import/
       - build/e2e/browser-services-security/
       - build/e2e/browser-services-security-patches/
       - build/e2e/browser-platform/
+      - build/e2e/browser-platform-security/
+      - build/e2e/browser-platform-tls-admin/
       - build/e2e/browser-settings-cross/
+      - build/e2e/browser-settings-management/
+      - build/e2e/browser-cross-security/
+      - build/e2e/browser-cross-compile-audit/
       - build/e2e/browser-requests-backend-failure/
 
 e2e:failure-evidence:
@@ -628,7 +788,13 @@ e2e:failure-evidence:
       artifacts: true
     - job: e2e:browser:core
       artifacts: true
+    - job: e2e:browser:core-dashboard
+      artifacts: true
+    - job: e2e:browser:core-records
+      artifacts: true
     - job: e2e:browser:services
+      artifacts: true
+    - job: e2e:browser:services-preview
       artifacts: true
     - job: e2e:browser:services-controls
       artifacts: true
@@ -642,7 +808,17 @@ e2e:failure-evidence:
       artifacts: true
     - job: e2e:browser:platform
       artifacts: true
+    - job: e2e:browser:platform-security
+      artifacts: true
+    - job: e2e:browser:platform-tls-admin
+      artifacts: true
     - job: e2e:browser:settings-cross
+      artifacts: true
+    - job: e2e:browser:settings-management
+      artifacts: true
+    - job: e2e:browser:cross-security
+      artifacts: true
+    - job: e2e:browser:cross-compile-audit
       artifacts: true
     - job: e2e:browser:requests-backend-failure
       artifacts: true

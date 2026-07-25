@@ -1,5 +1,11 @@
 2026-07-21
 
+2026-07-25
+
+- Requests outage state: open Requests on an isolated stack, stop the runtime backend, click Refresh, and verify that the loading placeholder changes to the localized load-error message while navigation and the application shell remain usable.
+- Requests recovery: restore the runtime backend, refresh Requests again, and verify that the normal table or empty state returns without a page reload or stale loading indicator.
+- CI/API: run the browser `requests-backend-failure` job and confirm the pre-security report includes its focused failure excerpt and reports no skipped browser executions.
+
 2026-07-24 — E2E re-audit stages 12–14
 
 - [x] Activity/Audit: `audit-stage12` passed 3 real Go API/runtime subtests and 6 desktop/mobile Playwright checks, with no retry or skip.

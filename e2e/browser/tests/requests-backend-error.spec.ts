@@ -4,6 +4,7 @@ import { expect, test } from "../fixtures/auth";
 test("requests.real-backend-failure-keeps-shell", async ({ authenticatedPage: page }, testInfo) => {
   await page.goto("/requests", { waitUntil: "domcontentloaded", timeout: 60_000 });
   await expect(page.locator("#requests-refresh")).toBeVisible();
+  await expect(page.locator(".waf-empty")).not.toContainText(/loading/i, { timeout: 30_000 });
   const syncFile = process.env.WAF_BROWSER_FAULT_SYNC_CONTAINER_FILE;
   if (!syncFile) throw new Error("WAF_BROWSER_FAULT_SYNC_CONTAINER_FILE is required for the real runtime-fault workflow");
   const projectSignal = `${syncFile}.${testInfo.project.name}`;

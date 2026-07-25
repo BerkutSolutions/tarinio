@@ -726,27 +726,31 @@ export async function renderRequests(container, ctx) {
     }, 15_000);
     try {
       setLoading(container, ctx.t("requests.loading"));
-      const runtimeSettings = await ctx.api.get("/api/settings/runtime", { signal }).catch(() => null);
-      const logsDays = Number(runtimeSettings?.storage?.logs_days || 14);
-      if (Number.isFinite(logsDays) && logsDays > 0) {
-        state.storageLogsDays = logsDays;
-      }
-      state.loggingSummary = runtimeSettings?.logging_summary || null;
+      // All page dependencies share the abort signal. Otherwise an unavailable
+      // runtime can leave this page loading before /api/requests returns its
+      // actionable backend error.
+      const runtimeSettingsRequest = ctx.api.get("/api/settings/runtime", { signal }).catch(() => null);
+      const sitesRequest = ctx.api.get("/api/sites", { signal }).catch(() => []);
+      const easyProfilesRequest = ctx.api.get("/api/easy-site-profiles", { signal }).catch(() => []);
       const params = new URLSearchParams();
       params.set("limit", String(state.fetchLimit));
       params.set("day", state.selectedDate || todayDateKeyLocal());
       params.set("retention_days", String(state.storageLogsDays || 14));
       params.set("tz_offset_minutes", currentTimezoneOffsetMinutes());
-      const [response, sites, easyProfiles] = await Promise.all([
-        fetch(`/api/requests?${params.toString()}`, {
-          method: "GET",
-          credentials: "include",
-          headers: { Accept: "application/json" },
-          signal: requestAbort.signal
-        }),
-        ctx.api.get("/api/sites", { signal }).catch(() => []),
-        ctx.api.get("/api/easy-site-profiles", { signal }).catch(() => []),
+      const requestsResponse = fetch(`/api/requests?${params.toString()}`, {
+        method: "GET",
+        credentials: "include",
+        headers: { Accept: "application/json" },
+        signal: requestAbort.signal
+      });
+      const [runtimeSettings, response, sites, easyProfiles] = await Promise.all([
+        runtimeSettingsRequest, requestsResponse, sitesRequest, easyProfilesRequest,
       ]);
+      const logsDays = Number(runtimeSettings?.storage?.logs_days || 14);
+      if (Number.isFinite(logsDays) && logsDays > 0) {
+        state.storageLogsDays = logsDays;
+      }
+      state.loggingSummary = runtimeSettings?.logging_summary || null;
       if (!isActive()) {
         return;
       }

@@ -1,5 +1,10 @@
 ## [1.5.15] - 24.07.2026
 
+### CI and Requests reliability
+
+- Split the longest browser E2E groups into independently isolated Dashboard, Records, Services preview, Platform, Settings, and cross-module jobs. Each slice has its own Compose project and host ports, so the four runner slots can execute safely in parallel while the E2E gate still requires every result with no skips.
+- Requests now starts the runtime request together with auxiliary API reads and gives every dependency the same bounded abort signal. A paused runtime therefore produces the visible Requests error instead of leaving the UI in a permanent loading state.
+
 ### Конвейер E2E и очистка стендов
 
 - Все E2E-job объединены в общий параллельный этап, чтобы четыре слота runner использовались одновременно; отдельным остаётся только этап отчёта. Browser fault-синхронизация, готовность редактора Services и hydration Settings ожидают фактическое состояние runtime/UI.
