@@ -1,5 +1,6 @@
 import { expect, test } from "../fixtures/auth";
 import { CleanupLedger, e2eID } from "../support/isolation";
+import { openPage } from "../support/waits";
 
 test("bans.create-extend-unban-mutation", async ({ authenticatedPage: page }, testInfo) => {
   const suffix = Number.parseInt(e2eID(testInfo, "e2e-ban").replace(/[^0-9]/g, "").slice(-3) || "20", 10);
@@ -104,8 +105,7 @@ test("bans.detail-country-keyboard-pagination-cancel", async ({ authenticatedPag
     expect(createdPolicy.status, createdPolicy.body).toBe(201);
     await expect.poll(async () => (await policy())?.denylist, { timeout: 30_000 }).toEqual(ips);
 
-    await page.goto("/bans", { waitUntil: "domcontentloaded", timeout: 60_000 });
-    await expect(page.locator("#bans-status")).toBeVisible({ timeout: 30_000 });
+    await openPage(page, "/bans", page.locator("#bans-status"));
     await page.locator("#bans-filter").fill(siteID);
     await expect(page.locator("#bans-status")).toContainText("12");
     await expect(page.locator("#bans-page-size")).toHaveValue("10");

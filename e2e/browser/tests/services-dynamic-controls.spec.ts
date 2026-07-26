@@ -133,7 +133,7 @@ test("services.toggles-conditional-fields-dynamic-lists-readback", async ({ auth
     const upstreamResult = await api("/api/upstreams");
     expect(upstreamResult.status, upstreamResult.body).toBe(200);
     expect(JSON.parse(upstreamResult.body)).toEqual(expect.arrayContaining([expect.objectContaining({ id: upstreamID, scheme: "https", host: "mtls-upstream", port: 8443 })]));
-    await page.reload({ waitUntil: "domcontentloaded" });
+    await openPage(page, `/services/${siteID}`, page.locator("#service-editor-form"));
     for (const [selector, value] of Object.entries({
       "#service-security-mode": "monitor", "#service-profile": "api", "#service-ca-server": "custom", "#service-upstream-scheme": "https",
       "#service-limit-req-rate-unit": "r/m", "#service-ban-escalation-scope": "current_site", "#service-antibot-challenge-template": "v5",

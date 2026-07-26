@@ -83,13 +83,8 @@ test("cross-i18n-all-locales-core-labels-errors-and-modals", async ({ authentica
     for (const language of ["en", "ru", "de", "sr", "zh"]) {
       await openPage(page, "/settings/general", page.locator("#settings-language-save"));
       await page.locator("#settings-language-select").selectOption(language);
-      const saveResponsePromise = page.waitForResponse((response) => {
-        if (response.request().method() !== "PUT" || new URL(response.url()).pathname !== "/api/settings/runtime") return false;
-        try { return response.request().postDataJSON()?.language === language; } catch { return false; }
-      }, { timeout: 30_000 });
       await page.locator("#settings-language-save").click();
-      const saveResponse = await saveResponsePromise;
-      expect(saveResponse.status(), await saveResponse.text()).toBe(200);
+      await expect.poll(async () => JSON.parse((await api(page, "/api/settings/runtime")).body).language, { timeout: 30_000 }).toBe(language);
       await expect.poll(() => page.evaluate(() => document.documentElement.lang), { timeout: 30_000 }).toBe(language);
       for (const path of ["/dashboard", "/events", "/activity", "/settings/general"]) {
         await openPage(page, path, page.locator(readySelectors[path]));
@@ -113,13 +108,8 @@ test("cross-i18n-all-locales-core-labels-errors-and-modals", async ({ authentica
   } finally {
     await openPage(page, "/settings/general", page.locator("#settings-language-save"));
     await page.locator("#settings-language-select").selectOption(String(original));
-    const restoreResponsePromise = page.waitForResponse((response) => {
-      if (response.request().method() !== "PUT" || new URL(response.url()).pathname !== "/api/settings/runtime") return false;
-      try { return response.request().postDataJSON()?.language === String(original); } catch { return false; }
-    }, { timeout: 30_000 });
     await page.locator("#settings-language-save").click();
-    const restoreResponse = await restoreResponsePromise;
-    expect(restoreResponse.status(), await restoreResponse.text()).toBe(200);
+    await expect.poll(async () => JSON.parse((await api(page, "/api/settings/runtime")).body).language, { timeout: 30_000 }).toBe(String(original));
     await expect.poll(() => page.evaluate(() => document.documentElement.lang), { timeout: 30_000 }).toBe(String(original));
   }
 });

@@ -1,5 +1,6 @@
 import { expect, test } from "../fixtures/auth";
 import { CleanupLedger, e2eID } from "../support/isolation";
+import { openPage } from "../support/waits";
 
 type Revision = { id: string; is_active?: boolean; status?: string; sites?: unknown[]; checksum?: string };
 
@@ -106,10 +107,8 @@ test("revisions.status-and-delete-confirm-cancel-ui", async ({ authenticatedPage
   const candidateID = String(JSON.parse(compile.body)?.revision?.id || "");
   expect(candidateID).toBeTruthy();
   try {
-    await page.locator("#revisions-refresh").click();
-    await expect(page.locator("#revisions-page")).toBeVisible({ timeout: 30_000 });
     const timeline = page.locator("[data-revision-status-index]").first();
-    await expect(timeline).toBeVisible();
+    await openPage(page, "/revisions", timeline);
     await timeline.click();
     await expect(page.locator("#revisions-status-modal")).toBeVisible();
     await page.locator("#revisions-status-modal").press("Escape");

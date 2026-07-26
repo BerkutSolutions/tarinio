@@ -32,6 +32,9 @@
 - Requests browser coverage now clears the exercised security-reason filter before validating full-dataset pagination, so filtered-result counts are not mistaken for a pagination failure.
 - Cross-locale browser coverage now waits for and verifies each real runtime-settings PUT before asserting the atomic DOM-language commit, including restoration of the original locale.
 - Browser E2E shards now run concurrently in runner-slot-specific host-port ranges while retaining isolated Compose projects, networks, and volumes; their Playwright image is built once per pipeline, and each shard waits for the disposable management HTTPS endpoint before browser setup.
+- Dynamic service-control read-back coverage now waits for the asynchronously hydrated editor after navigation instead of treating the initial HTML shell as a rendered form.
+- Bans and revision timeline browser coverage now waits for page-specific asynchronously rendered anchors after navigation and compile operations.
+- Locale persistence coverage now verifies the stored runtime setting through API read-back instead of depending on a response event across a full language rerender; service navigation similarly waits for the asynchronously restored list after returning from the editor.
 
 ### Конвейер E2E и очистка стендов
 

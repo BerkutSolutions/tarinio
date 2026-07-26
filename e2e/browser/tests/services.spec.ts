@@ -61,6 +61,7 @@ test("services.selection-navigation", async ({ authenticatedPage: page }) => {
   await expect(page).toHaveURL(/\/services$/);
 
   const external = page.locator("[data-open-service]").first();
+  await expect(external).toBeVisible({ timeout: 30_000 });
   const expectedURL = await external.getAttribute("data-open-service");
   if (!expectedURL) throw new Error("service external URL is empty");
   await page.context().route(expectedURL, (route) => route.fulfill({ status: 200, contentType: "text/html", body: "<main id='external-service-ready'>external service</main>" }));
