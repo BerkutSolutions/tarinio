@@ -5,10 +5,20 @@ import { openPage } from "../support/waits";
 const readySettingsPage = (page: import("@playwright/test").Page) => page.locator("#settings-page[data-runtime-ready=\"true\"]");
 
 async function api(page: import("@playwright/test").Page, path: string, init: RequestInit = {}) {
-  return page.evaluate(async ({ path, init }) => {
-    const response = await fetch(path, { ...init, credentials: "include", headers: { Accept: "application/json", "Content-Type": "application/json", ...(init.headers || {}) } });
-    return { status: response.status, body: await response.text() };
-  }, { path, init });
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      return await page.evaluate(async ({ path, init }) => {
+        const response = await fetch(path, { ...init, credentials: "include", headers: { Accept: "application/json", "Content-Type": "application/json", ...(init.headers || {}) } });
+        return { status: response.status, body: await response.text() };
+      }, { path, init });
+    } catch (error) {
+      lastError = error;
+      if (!/Failed to fetch|Execution context was destroyed/i.test(String(error)) || attempt === 3) throw error;
+      await page.waitForTimeout(250 * (attempt + 1));
+    }
+  }
+  throw lastError;
 }
 
 test("settings.logging-backends-routing-migration-roundtrip", async ({ authenticatedPage: page }) => {

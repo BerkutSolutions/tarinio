@@ -41,6 +41,7 @@
 - Cross-locale coverage now waits for the runtime-ready settings contract before clicking Save and tolerates only transient read-back transport gaps inside the bounded persistence assertion.
 - Settings validation coverage now enters the page through its runtime-ready contract before switching tabs and asserting atomic validation behavior.
 - Browser shards are distributed across three independent resource lanes: the 6-vCPU runner keeps three fully isolated stacks active while reserving scheduler and Docker headroom, avoiding the measured load-average-13 starvation seen with four simultaneous stack builds.
+- Logging-settings API assertions now tolerate only bounded transport gaps caused by the same stack's runtime reload while preserving exact persisted-value and restore checks.
 
 ### Конвейер E2E и очистка стендов
 
