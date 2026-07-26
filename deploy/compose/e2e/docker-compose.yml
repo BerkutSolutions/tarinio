@@ -302,7 +302,7 @@ services:
       test: ["CMD-SHELL", "vault status -address=http://127.0.0.1:8200 >/dev/null 2>&1; code=$$?; [ \"$$code\" = \"0\" ]"]
       interval: 5s
       timeout: 5s
-      retries: 20
+      retries: 40
     networks:
       - waf-e2e-net
 

@@ -163,9 +163,9 @@ test("revisions.apply-and-delete-success-ui", async ({ authenticatedPage: page }
     const rollback = await api(page, `/api/revisions/${encodeURIComponent(original!.id)}/apply`, { method: "POST", body: "{}" });
     expect(rollback.status, rollback.body).toBe(201);
     await expect.poll(async () => (await catalog(page)).find((revision) => revision.is_active)?.id, { timeout: 120_000 }).toBe(original!.id);
-    await page.reload({ waitUntil: "domcontentloaded" });
-    await expect(page.locator("#revisions-page")).toBeVisible({ timeout: 30_000 });
-    await page.locator(`[data-revision-site="${siteID}"]`).click();
+    const serviceTile = page.locator(`[data-revision-site="${siteID}"]`);
+    await openPage(page, "/revisions", serviceTile);
+    await serviceTile.click();
     const deleteButton = page.locator(`[data-revision-delete="${candidateID}"]`);
     await expect(deleteButton).toBeEnabled();
     page.once("dialog", (dialog) => dialog.accept());

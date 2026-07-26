@@ -35,6 +35,8 @@
 - Dynamic service-control read-back coverage now waits for the asynchronously hydrated editor after navigation instead of treating the initial HTML shell as a rendered form.
 - Bans and revision timeline browser coverage now waits for page-specific asynchronously rendered anchors after navigation and compile operations.
 - Locale persistence coverage now verifies the stored runtime setting through API read-back instead of depending on a response event across a full language rerender; service navigation similarly waits for the asynchronously restored list after returning from the editor.
+- The disposable E2E Vault healthcheck now allows enough startup time under four concurrent stack builds, avoiding a false unhealthy dependency failure during CPU-heavy runner startup.
+- Revision apply/delete coverage now waits for the target service tile after rollback navigation before opening the revision modal.
 
 ### Конвейер E2E и очистка стендов
 
