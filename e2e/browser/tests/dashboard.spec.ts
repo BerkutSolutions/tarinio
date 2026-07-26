@@ -1,6 +1,21 @@
 import { expect, test } from "../fixtures/auth";
 import { openPage } from "../support/waits";
 
+async function liveDashboardJSON(page: import("@playwright/test").Page, path: string) {
+  return page.evaluate(async (requestPath) => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 30_000);
+    try {
+      const response = await fetch(requestPath, { credentials: "include", signal: controller.signal, headers: { Accept: "application/json" } });
+      const body = await response.text();
+      if (!response.ok) throw new Error(`${requestPath} returned ${response.status}: ${body}`);
+      return JSON.parse(body);
+    } finally {
+      window.clearTimeout(timer);
+    }
+  }, path);
+}
+
 test("dashboard.widgets", async ({ authenticatedPage: page }) => {
   await openPage(page, "/dashboard", page.locator("#dashboard-page"));
   for (const widget of ["services", "traffic-summary", "containers-health", "top-ips", "top-countries", "requests-series", "top-urls", "memory", "cpu"]) {
@@ -176,25 +191,19 @@ test("dashboard.resilience-states", async ({ authenticatedPage: page }) => {
 
 for (const metric of ["memory", "cpu"]) {
   test("dashboard." + metric + "-progress", async ({ authenticatedPage: page }) => {
-    const statsResponsePromise = page.waitForResponse((response) =>
-      new URL(response.url()).pathname === "/api/dashboard/stats" && response.request().method() === "GET",
-    );
-    const containerOverview = await page.evaluate(async () => {
-      const response = await fetch("/api/dashboard/containers/overview", { credentials: "include", headers: { Accept: "application/json" } });
-      const body = await response.text();
-      if (!response.ok) throw new Error(`container overview returned ${response.status}: ${body}`);
-      return JSON.parse(body);
-    });
+    const containerOverview = await liveDashboardJSON(page, "/api/dashboard/containers/overview");
+    const realStats = await liveDashboardJSON(page, "/api/dashboard/stats");
     await page.route("**/api/dashboard/containers/overview", (route) => route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify(containerOverview),
     }));
+    await page.route("**/api/dashboard/stats", (route) => route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(realStats),
+    }));
     await page.goto("/dashboard", { waitUntil: "domcontentloaded", timeout: 60000 });
-    const statsResponse = await statsResponsePromise;
-    const statsBody = await statsResponse.text();
-    expect(statsResponse.status(), statsBody).toBe(200);
-    const realStats = JSON.parse(statsBody);
     const system = realStats?.system || {};
     const widget = page.locator('[data-widget-id="' + metric + '"]');
     await expect(widget).toBeVisible({ timeout: 15000 });
