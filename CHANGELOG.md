@@ -63,6 +63,7 @@
 - Parallel E2E host ports now use disjoint 24000/25000 slot ranges below Linux's ephemeral pool, preventing outbound Docker/registry sockets from colliding with Compose listeners such as the mTLS upstream.
 - Playwright containers now join only their own Compose network, where both browser navigation and direct runtime probes use the project-local `e2e-management.test` DNS alias, so other shards cannot trigger Chrome-wide `ERR_NETWORK_CHANGED` failures and containerized probes never escape through runner host ports.
 - Revisions browser coverage retries only the idempotent catalog read across the brief connection gap caused by runtime activation; apply and delete mutations remain single-attempt operations.
+- OWASP ZAP now scans through its disposable DAST stack's project-local network instead of the runner host namespace, preventing scanner-daemon startup failures during concurrent Docker network activity.
 - Core tab coverage now uses rendered-page readiness contracts for Requests, Bans, Revisions, Anti-DDoS, CRS, Administration, Events, and Activity instead of treating `DOMContentLoaded` as application readiness.
 - The production page-module loader now applies bounded 250/750 ms backoff between transient dynamic-import retries instead of issuing all attempts immediately during a short network interruption.
 - Services list, export, selection, mutation, and editor-entry coverage now waits for the rendered control it actually uses before interacting with the page.

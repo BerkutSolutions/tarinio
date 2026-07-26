@@ -65,3 +65,23 @@ func TestBrowserE2EUsesItsIsolatedComposeNetwork(t *testing.T) {
 		t.Fatal("E2E runtime must expose its management hostname inside the isolated Compose network")
 	}
 }
+
+func TestDASTScannerUsesItsIsolatedComposeNetwork(t *testing.T) {
+	script, err := os.ReadFile(filepath.Join("..", "..", "scripts", "run-dast-scan.sh"))
+	if err != nil {
+		t.Fatalf("read run-dast-scan.sh: %v", err)
+	}
+	source := string(script)
+	for _, marker := range []string{
+		`ZAP_DOCKER_NETWORK="${E2E_PROJECT}_waf-e2e-net"`,
+		`TARGET="${DAST_SCANNER_TARGET_URL:-http://e2e-management.test}"`,
+		`--network "$ZAP_DOCKER_NETWORK"`,
+	} {
+		if !strings.Contains(source, marker) {
+			t.Fatalf("DAST isolation missing marker %q", marker)
+		}
+	}
+	if strings.Contains(source, "--network host") {
+		t.Fatal("DAST scanner must not share the runner host network namespace")
+	}
+}

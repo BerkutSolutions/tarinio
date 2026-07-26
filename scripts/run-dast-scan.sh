@@ -8,10 +8,11 @@ case "$MODE" in baseline|full) ;; *) echo "usage: $0 [baseline|full]" >&2; exit 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="${DAST_OUTPUT_DIR:-$ROOT/build/dast/$MODE}"
 ZAP_IMAGE="${ZAP_IMAGE:-ghcr.io/zaproxy/zaproxy:stable}"
-TARGET="${DAST_TARGET_URL:-http://127.0.0.1:10080}"
+TARGET="${DAST_SCANNER_TARGET_URL:-http://e2e-management.test}"
 HOST="${DAST_TARGET_HOST:-e2e-management.test}"
 E2E_PROJECT="${E2E_PROJECT:-waf-dast-$MODE}"
 mkdir -p "$OUT"
+ZAP_DOCKER_NETWORK="${E2E_PROJECT}_waf-e2e-net"
 zap_cidfile="$OUT/.zap-container-id"
 rm -f "$zap_cidfile"
 
@@ -35,14 +36,14 @@ if [ "$MODE" = "full" ]; then
   scan_timeout="${DAST_SCAN_TIMEOUT_SECONDS:-2700}"
 fi
 
-# The explicit Host replacement reaches the configured WAF virtual host while
-# Docker host networking keeps the scanner isolated from every non-E2E network.
+# The scanner joins only this disposable stack's Compose network. The explicit
+# Host replacement still exercises the configured WAF virtual host.
 zap_user_args=""
 case "$(uname -s)" in
   Linux) zap_user_args="--user $(id -u):$(id -g)" ;;
 esac
 MSYS_NO_PATHCONV=1 timeout --preserve-status -k 30s "${scan_timeout}s" \
-  docker run --rm --cidfile "$zap_cidfile" --network host $zap_user_args -e HOME=/zap/home \
+  docker run --rm --cidfile "$zap_cidfile" --network "$ZAP_DOCKER_NETWORK" $zap_user_args -e HOME=/zap/home \
   -e JAVA_TOOL_OPTIONS=-Djava.util.prefs.userRoot=/tmp/zap-java-prefs -w /zap/wrk \
   -v "$OUT:/zap/wrk:rw" "$ZAP_IMAGE" \
   "$scan" --autooff -t "$TARGET" -m 3 -I \
