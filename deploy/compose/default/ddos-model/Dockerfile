@@ -15,4 +15,6 @@ RUN mkdir -p /state /out \
     && chmod 0755 /usr/local/bin/tarinio-sentinel-entrypoint \
     && printf 'tarinio:x:65532:4:tarinio sentinel:/nonexistent:/sbin/nologin\n' >> /etc/passwd
 
+USER 65532:4
+
 ENTRYPOINT ["/usr/local/bin/tarinio-sentinel-entrypoint"]

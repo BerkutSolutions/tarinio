@@ -4,9 +4,34 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
+
+func TestContainerEntrypointRemainsRootless(t *testing.T) {
+	dockerfile, err := os.ReadFile("Dockerfile")
+	if err != nil {
+		t.Fatalf("read Dockerfile: %v", err)
+	}
+	if !strings.Contains(string(dockerfile), "\nUSER 65532:4\n") {
+		t.Fatal("sentinel image must declare the unprivileged runtime user")
+	}
+
+	entrypoint, err := os.ReadFile("entrypoint.sh")
+	if err != nil {
+		t.Fatalf("read entrypoint: %v", err)
+	}
+	script := string(entrypoint)
+	for _, forbidden := range []string{"chown ", "chmod ", "su "} {
+		if strings.Contains(script, forbidden) {
+			t.Fatalf("entrypoint must not require root operation %q", forbidden)
+		}
+	}
+	if !strings.Contains(script, "exec /usr/local/bin/tarinio-sentinel") {
+		t.Fatal("entrypoint must exec the sentinel directly")
+	}
+}
 
 func TestApplyRuntimeProfile_DisabledModelIsRespected(t *testing.T) {
 	base := modelConfig{

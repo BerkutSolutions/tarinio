@@ -51,6 +51,9 @@
 - CRS busy-state coverage accepts only a successful official release check or the typed `crs_release_unavailable` external-network result, while Basic Auth reveal coverage now waits for and verifies the real password-reveal POST before asserting UI state.
 - Each authenticated browser test now creates its own real server session instead of sharing the setup cookie across dozens of isolated contexts, eliminating cross-test `session_missing` invalidation.
 - Events browser coverage now waits for the rendered page contract before asserting intercepted loading, empty, error, and malformed-response states under concurrent CI load.
+- The browser gate now merges API/runtime evidence from the existing workflow, security, management-rate-limit, full, and registry shards instead of treating the registry-only shard as complete coverage.
+- Sentinel and Playwright CI images now declare unprivileged runtime users; Sentinel prepares its writable named-volume paths at build time and no longer starts as root to change ownership or call `su`.
+- The Trivy image baseline records newly reported Debian 13 upstream-unfixed findings; findings with an available fixed version remain blocking.
 
 ### Конвейер E2E и очистка стендов
 

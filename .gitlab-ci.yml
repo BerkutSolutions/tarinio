@@ -707,6 +707,10 @@ e2e:browser:gate:
     - e2e:browser:cross-compile-audit
     - e2e:browser:requests-backend-failure
     - e2e:api-registry
+    - e2e:api-workflows
+    - e2e:security-invariants
+    - e2e:management-rate-limit
+    - e2e:full
   needs:
     - job: e2e:browser:core
       artifacts: true
@@ -745,6 +749,14 @@ e2e:browser:gate:
     - job: e2e:browser:requests-backend-failure
       artifacts: true
     - job: e2e:api-registry
+      artifacts: true
+    - job: e2e:api-workflows
+      artifacts: true
+    - job: e2e:security-invariants
+      artifacts: true
+    - job: e2e:management-rate-limit
+      artifacts: true
+    - job: e2e:full
       artifacts: true
   script:
     - cd e2e/browser
@@ -787,6 +799,10 @@ e2e:browser:gate:
       ../../build/e2e/browser-cross-compile-audit/results.json
       ../../build/e2e/browser-requests-backend-failure/results.json
       --api-evidence ../../build/e2e/api-registry/e2e-evidence.json
+      --api-evidence ../../build/e2e/api-workflows/e2e-evidence.json
+      --api-evidence ../../build/e2e/security-invariants/e2e-evidence.json
+      --api-evidence ../../build/e2e/management-rate-limit/e2e-evidence.json
+      --api-evidence ../../build/e2e/full/e2e-evidence.json
   artifacts:
     when: always
     expire_in: 30 days

@@ -10,3 +10,5 @@ COPY e2e/browser/package.json e2e/browser/package-lock.json ./
 RUN npm ci --no-audit --fund=false
 
 WORKDIR /workspace/e2e/browser
+
+USER pwuser
