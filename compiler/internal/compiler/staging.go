@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -13,6 +14,50 @@ import (
 // candidate directory without activating it.
 type CandidateStager struct {
 	Root string
+}
+
+func candidateMatchesBundle(candidateRoot string, bundle *RevisionBundle) (bool, error) {
+	fileCount := 0
+	err := filepath.Walk(candidateRoot, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.Mode().IsRegular() {
+			fileCount++
+		}
+		return nil
+	})
+	if err != nil {
+		return false, err
+	}
+	if fileCount != len(bundle.Files) {
+		return false, nil
+	}
+	for _, file := range bundle.Files {
+		raw, err := os.ReadFile(filepath.Join(candidateRoot, filepath.FromSlash(file.Path)))
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return false, nil
+			}
+			return false, err
+		}
+		if !bytes.Equal(raw, file.Content) {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func activeCandidatePath(root string) string {
+	pointer, err := LoadActivePointer(root)
+	if err != nil || pointer == nil {
+		return ""
+	}
+	path := filepath.FromSlash(pointer.CandidatePath)
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(root, path)
+	}
+	return filepath.Clean(path)
 }
 
 func isPathWithinStagingRoot(path, root string) bool {
@@ -48,8 +93,22 @@ func (s CandidateStager) Stage(bundle *RevisionBundle) (string, error) {
 	if !isPathWithinStagingRoot(candidateRoot, filepath.Join(s.Root, "candidates")) {
 		return "", errors.New("candidate path escapes staging root")
 	}
+	if _, err := os.Stat(candidateRoot); err == nil {
+		matches, matchErr := candidateMatchesBundle(candidateRoot, bundle)
+		if matchErr != nil {
+			return "", fmt.Errorf("inspect existing candidate: %w", matchErr)
+		}
+		if matches {
+			return candidateRoot, nil
+		}
+		if filepath.Clean(candidateRoot) == activeCandidatePath(s.Root) {
+			return "", fmt.Errorf("refusing to replace active candidate %s with different contents", bundle.Revision.ID)
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return "", fmt.Errorf("stat candidate directory: %w", err)
+	}
 	if err := os.RemoveAll(candidateRoot); err != nil {
-		return "", fmt.Errorf("reset candidate directory: %w", err)
+		return "", fmt.Errorf("reset inactive candidate directory: %w", err)
 	}
 	if err := os.MkdirAll(candidateRoot, 0o755); err != nil {
 		return "", fmt.Errorf("create candidate directory: %w", err)

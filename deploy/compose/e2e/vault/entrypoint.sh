@@ -55,6 +55,24 @@ status_field() {
   printf '%s\n' "$output" | awk -v key="$field" '$1 == key { print $2; exit }'
 }
 
+wait_for_status_field() {
+  field="$1"
+  first="$2"
+  second="$3"
+  i=0
+  while [ "$i" -lt 60 ]; do
+    value="$(status_field "$field")"
+    if [ "$value" = "$first" ] || [ "$value" = "$second" ]; then
+      printf '%s\n' "$value"
+      return 0
+    fi
+    i=$((i + 1))
+    sleep 1
+  done
+  echo "vault bootstrap: $field status did not become readable" >&2
+  return 1
+}
+
 extract_init_value() {
   key="$1"
   file="$2"
@@ -62,22 +80,31 @@ extract_init_value() {
 }
 
 ensure_initialized() {
-  initialized="$(status_field Initialized)"
-  if [ "$initialized" = "false" ] && [ ! -s "$UNSEAL_FILE" ]; then
+  initialized="$(wait_for_status_field Initialized true false)"
+  if [ "$initialized" = "false" ]; then
     echo "vault bootstrap: initializing storage" >&2
+    rm -f "$INIT_FILE" "$UNSEAL_FILE" "$ROOT_TOKEN_FILE" "$APP_TOKEN_FILE"
     vault operator init -address="$LOCAL_ADDR" -key-shares=1 -key-threshold=1 >"$INIT_FILE"
     extract_init_value "Unseal Key 1" "$INIT_FILE" >"$UNSEAL_FILE"
     extract_init_value "Initial Root Token" "$INIT_FILE" >"$ROOT_TOKEN_FILE"
     chmod 600 "$INIT_FILE" "$UNSEAL_FILE" "$ROOT_TOKEN_FILE"
+    [ "$(wait_for_status_field Initialized true false)" = "true" ] || {
+      echo "vault bootstrap: storage remained uninitialized" >&2
+      return 1
+    }
   fi
 }
 
 ensure_unsealed() {
-  initialized="$(status_field Initialized)"
-  sealed="$(status_field Sealed)"
-  if [ "$initialized" = "true" ] && [ "$sealed" = "true" ] && [ -s "$UNSEAL_FILE" ]; then
+  sealed="$(wait_for_status_field Sealed true false)"
+  if [ "$sealed" = "true" ]; then
+    [ -s "$UNSEAL_FILE" ] || { echo "vault bootstrap: unseal key is missing" >&2; return 1; }
     echo "vault bootstrap: unsealing server" >&2
     vault operator unseal -address="$LOCAL_ADDR" "$(cat "$UNSEAL_FILE")" >/dev/null
+    [ "$(wait_for_status_field Sealed true false)" = "false" ] || {
+      echo "vault bootstrap: server remained sealed" >&2
+      return 1
+    }
   fi
 }
 

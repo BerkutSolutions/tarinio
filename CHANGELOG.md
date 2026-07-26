@@ -42,6 +42,10 @@
 - Settings validation coverage now enters the page through its runtime-ready contract before switching tabs and asserting atomic validation behavior.
 - Browser shards are distributed across three independent resource lanes: the 6-vCPU runner keeps three fully isolated stacks active while reserving scheduler and Docker headroom, avoiding the measured load-average-13 starvation seen with four simultaneous stack builds.
 - Logging-settings API assertions now tolerate only bounded transport gaps caused by the same stack's runtime reload while preserving exact persisted-value and restore checks.
+- Disposable E2E Vault bootstrap now polls readable initialization/seal state and verifies init/unseal transitions, eliminating the one-shot empty-status race that could leave a fresh Vault unhealthy indefinitely.
+- Revision modal and status-clear coverage now waits for the asynchronously rendered revisions page or service tile instead of treating DOMContentLoaded as application readiness.
+- Candidate staging now treats an active revision as immutable: identical reapplies are no-ops and differing content is rejected, preventing runtime symlinks from observing a half-rewritten bundle with missing per-site artifacts.
+- Service list and bulk-delete coverage now waits for hydrated list controls both initially and after fixture creation, preserving cleanup time instead of blocking on an absent shell-era locator.
 
 ### Конвейер E2E и очистка стендов
 

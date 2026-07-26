@@ -185,10 +185,8 @@ test("settings.validation-no-partial-save", async ({ authenticatedPage: page }) 
 });
 
 test("revisions.detail-modal-close", async ({ authenticatedPage: page }) => {
-  await page.goto("/revisions", { waitUntil: "domcontentloaded", timeout: 60000 });
-  await expect(page.locator("#revisions-page")).toBeVisible({ timeout: 30000 });
   const tile = page.locator("[data-revision-site]").first();
-  await expect(tile).toBeVisible({ timeout: 30000 });
+  await openPage(page, "/revisions", tile);
   await tile.click();
   await expect(page.locator("#revisions-detail-modal")).toBeVisible();
   await page.locator("#revisions-detail-modal [data-revisions-modal-close]").last().click();
@@ -196,7 +194,7 @@ test("revisions.detail-modal-close", async ({ authenticatedPage: page }) => {
 });
 
 test("revisions.clear-statuses-control", async ({ authenticatedPage: page }) => {
-  await page.goto("/revisions", { waitUntil: "domcontentloaded", timeout: 60000 });
+  await openPage(page, "/revisions", page.locator("#revisions-page"));
   const before = await page.evaluate(async () => fetch("/api/revisions", { credentials: "include" }).then((response) => response.json()));
   const originalID = String((before?.revisions || []).find((item: { is_active?: boolean }) => item.is_active)?.id || "");
   expect(originalID).toBeTruthy();

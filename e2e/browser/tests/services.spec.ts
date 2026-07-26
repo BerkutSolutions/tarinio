@@ -3,8 +3,7 @@ import { CleanupLedger, e2eID } from "../support/isolation";
 import { openPage } from "../support/waits";
 
 test("services.list-load services.search services.sort services.select-all", async ({ authenticatedPage: page }) => {
-  await page.goto("/services", { waitUntil: "domcontentloaded", timeout: 60000 });
-  await expect(page.locator("#services-refresh")).toBeVisible({ timeout: 15000 });
+  await openPage(page, "/services", page.locator("#services-refresh"));
   const readSites = async () => page.evaluate(async () => {
     const response = await fetch("/api/sites", { credentials: "include", headers: { Accept: "application/json" } });
     if (!response.ok) throw new Error(`sites readback returned ${response.status}`);
@@ -34,7 +33,7 @@ test("services.list-load services.search services.sort services.select-all", asy
 });
 
 test("services.create-route", async ({ authenticatedPage: page }) => {
-  await page.goto("/services", { waitUntil: "domcontentloaded", timeout: 60000 });
+  await openPage(page, "/services", page.locator("#services-search"));
   await expect(page.locator("#services-create")).toBeVisible({ timeout: 15000 });
   await page.locator("#services-create").click();
   await expect(page).toHaveURL(/\/services\/new$/);
@@ -207,7 +206,7 @@ test("services.bulk-delete-confirm-cancel", async ({ authenticatedPage: page }, 
       result = await api("/api/upstreams?auto_apply=false", { method: "POST", body: JSON.stringify({ id: upstreamID, site_id: siteID, name: upstreamID, scheme: "http", host: "upstream-echo", port: 8888, base_path: "/" }) });
       expect([200, 201]).toContain(result.status);
     }
-    await page.reload({ waitUntil: "domcontentloaded" });
+    await openPage(page, "/services", page.locator("#services-search"));
     await page.locator("#services-search").fill(prefix);
     await expect(page.locator("[data-select-site]")).toHaveCount(2);
     await page.locator("#services-select-all").setChecked(true);
