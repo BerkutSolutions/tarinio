@@ -538,6 +538,8 @@
 - [ ] API/runtime: confirm the authenticated session and Dashboard API remain valid while only the static module request is interrupted; no mutation or full test retry should occur.
 - [ ] Session navigation UI: rapidly navigate Events → Activity → Settings on desktop and mobile; a cancelled setup request from the outgoing document must not redirect the current page to Login.
 - [ ] Session navigation API: confirm an aborted `/api/setup/status` request does not issue `POST /api/auth/logout`, while a real `401` from `/api/auth/me` still clears the cookie and requires login.
+- [ ] Critical stylesheet UI: interrupt the first `/static/waf.css` request on a mobile viewport; the app must reload it after bounded backoff before rendering, with a 74 px sidebar and no natural-size logo covering page controls.
+- [ ] Critical stylesheet network: verify a failed critical CSS request is followed by a same-origin request carrying `style_retry`, while two consecutive failures stop bootstrap instead of exposing a partially styled application.
 
 - [ ] Settings UI: save Storage and Security values, open the same page again, and verify controls render only after `data-runtime-ready=true` with the persisted values intact.
 - [ ] Localization UI: switch each supported language, then open Dashboard, Events, Activity, and General Settings; every page must render its ready control and localized shell without raw translation keys.

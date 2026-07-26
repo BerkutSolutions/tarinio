@@ -57,6 +57,7 @@
 - Auto-start E2E stages the Easy Profile with `auto_apply=false` before its single explicit compile/apply, avoiding two overlapping runtime reloads while preserving the generic bounded HTTP client timeout.
 - App entry checks no longer revoke a valid session when an outgoing document's setup request is cancelled by the next navigation; only an authentication 401 triggers forced re-login.
 - Dashboard metric E2E captures bounded live stats and container telemetry before rendering one stable snapshot, eliminating a passive response-listener race and cross-sample comparisons under parallel CI load.
+- The app bootstrap now reloads either critical local stylesheet after bounded 250/750 ms backoff, preventing a transient static-file network change from exposing the legacy unstyled shell and an oversized sidebar logo.
 - Revisions browser coverage retries only the idempotent catalog read across the brief connection gap caused by runtime activation; apply and delete mutations remain single-attempt operations.
 - Core tab coverage now uses rendered-page readiness contracts for Requests, Bans, Revisions, Anti-DDoS, CRS, Administration, Events, and Activity instead of treating `DOMContentLoaded` as application readiness.
 - The production page-module loader now applies bounded 250/750 ms backoff between transient dynamic-import retries instead of issuing all attempts immediately during a short network interruption.

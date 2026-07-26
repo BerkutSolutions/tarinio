@@ -26,8 +26,41 @@ func TestUIContract_DynamicModulesUseBoundedBackoff(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read index.html: %v", err)
 	}
-	if !strings.Contains(string(index), "app.js?v=20260726-entry-race-1") {
+	if !strings.Contains(string(index), "app.js?v=20260726-critical-styles-1") {
 		t.Fatal("index.html must invalidate the cached module loader")
+	}
+}
+
+func TestUIContract_CriticalStylesUseBoundedReload(t *testing.T) {
+	loader, err := os.ReadFile(filepath.Join("..", "app", "static", "js", "app.critical-styles.js"))
+	if err != nil {
+		t.Fatalf("read app.critical-styles.js: %v", err)
+	}
+	source := string(loader)
+	for _, marker := range []string{
+		"const CRITICAL_STYLE_RETRY_DELAYS_MS = [250, 750];",
+		"link?.sheet",
+		"retryURL.searchParams.set(\"style_retry\"",
+		"link[rel=\"stylesheet\"][data-critical-style]",
+	} {
+		if !strings.Contains(source, marker) {
+			t.Fatalf("critical stylesheet loader missing marker %q", marker)
+		}
+	}
+
+	app, err := os.ReadFile(filepath.Join("..", "app", "static", "js", "app.js"))
+	if err != nil {
+		t.Fatalf("read app.js: %v", err)
+	}
+	if !strings.Contains(string(app), "await ensureCriticalStyles();") {
+		t.Fatal("app bootstrap must await critical styles before rendering")
+	}
+	index, err := os.ReadFile(filepath.Join("..", "app", "index.html"))
+	if err != nil {
+		t.Fatalf("read index.html: %v", err)
+	}
+	if strings.Count(string(index), "data-critical-style") != 2 {
+		t.Fatal("both application stylesheets must be marked critical")
 	}
 }
 

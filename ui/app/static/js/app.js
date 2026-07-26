@@ -1,4 +1,5 @@
 import { api } from "./api.js";
+import { ensureCriticalStyles } from "./app.critical-styles.js?v=20260726-critical-styles-1";
 import { applyTranslations, getLanguage, setLanguage, t } from "./i18n.js";
 import { createNotificationCenter } from "./app.notifications.js";
 import { renderSidebarMenu } from "./app.sidebar-menu.js";
@@ -703,6 +704,7 @@ function bindVisibilityLifecycle() {
 }
 
 async function bootstrap() {
+  await ensureCriticalStyles();
   await applyTranslations(getLanguage());
   setVersion("v1.5.15");
 
