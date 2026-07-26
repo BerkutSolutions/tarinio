@@ -129,7 +129,9 @@ services:
       timeout: 5s
       retries: 24
     networks:
-      - waf-e2e-net
+      waf-e2e-net:
+        aliases:
+          - e2e-management.test
 
   ui:
     build:

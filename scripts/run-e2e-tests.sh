@@ -567,9 +567,11 @@ if [ -z "$WAF_E2E_ATTACKER_IP" ] || [ -z "$WAF_E2E_L4_ATTACKER_IP" ]; then
 fi
 export WAF_E2E_BASE_URL WAF_E2E_USERNAME WAF_E2E_PASSWORD WAF_E2E_RUNTIME_URL WAF_E2E_RUNTIME_HTTPS_URL WAF_E2E_MTLS_FIXTURE_URL WAF_E2E_RUNTIME_HEALTH_URL WAF_E2E_RUNTIME_API_TOKEN WAF_E2E_COMPOSE_FILE WAF_E2E_MANAGEMENT_HOST WAF_E2E_AUTH_BASE_URL WAF_E2E_ANTIBOT_BASE_URL WAF_E2E_AUTOSTART_SMART WAF_E2E_L4_L7_PROTECTION WAF_E2E_FRESH_ONBOARDING WAF_E2E_RESILIENCE WAF_E2E_VERIFY_DECAY WAF_E2E_DAST_CANARY_URL WAF_E2E_ATTACKER_IP WAF_E2E_L4_ATTACKER_IP WAF_E2E_CONTROL_PLANE_CONTAINER WAF_E2E_RUNTIME_CONTAINER WAF_E2E_ATTACKER_CONTAINER WAF_E2E_L4_ATTACKER_CONTAINER GO_CMD E2E_FILTER
 WAF_E2E_DISPOSABLE=1
-WAF_BROWSER_BASE_URL="https://e2e-management.test:${E2E_RT_HTTPS_PORT}"
+WAF_BROWSER_DOCKER_NETWORK="${E2E_PROJECT}_waf-e2e-net"
+WAF_BROWSER_BASE_URL="https://e2e-management.test"
+WAF_BROWSER_HOST_RESOLVER_RULES=""
 WAF_E2E_RUN_ID="${WAF_E2E_RUN_ID:-${E2E_PROJECT}-$(date +%s)}"
-export WAF_E2E_DISPOSABLE WAF_BROWSER_BASE_URL WAF_E2E_RUN_ID
+export WAF_E2E_DISPOSABLE WAF_BROWSER_BASE_URL WAF_BROWSER_HOST_RESOLVER_RULES WAF_E2E_RUN_ID
 if [ "$E2E_DASHBOARD_SEED" = "1" ] || { [ "$E2E_BROWSER_ONLY" = "1" ] && [ "$E2E_DASHBOARD_SEED" = "auto" ] && printf '%s' "$E2E_BROWSER_SPECS" | grep -Eq '(dashboard|requests-complete|tabs)\.spec\.ts'; }; then
   step "Seeding real Dashboard telemetry"
   sh "$REPO_ROOT/scripts/seed-dashboard-telemetry.sh" "$COMPOSE_FILE" "$E2E_BASE_URL" "$E2E_USER" "$E2E_PASS" >>"$E2E_LOG_FILE" 2>&1
@@ -581,8 +583,9 @@ if [ "$E2E_BROWSER_ONLY" = "1" ]; then
   docker image inspect "$E2E_BROWSER_IMAGE" >/dev/null 2>&1 || { fail_msg "Browser image is missing: $E2E_BROWSER_IMAGE"; exit 1; }
   if [ "$E2E_BROWSER_RUNTIME_FAULT" = "requests-backend" ]; then
     step "Authenticating before Requests backend-failure injection"
-    docker run --rm --network host --user "$(id -u):$(id -g)" \
+    docker run --rm --network "$WAF_BROWSER_DOCKER_NETWORK" --user "$(id -u):$(id -g)" \
       -e HOME=/tmp -e CI -e WAF_E2E_DISPOSABLE -e WAF_BROWSER_BASE_URL \
+      -e WAF_BROWSER_HOST_RESOLVER_RULES \
       -e WAF_E2E_USERNAME -e WAF_E2E_PASSWORD -e WAF_E2E_RUN_ID \
       -v "$REPO_ROOT:/workspace" -w /workspace/e2e/browser "$E2E_BROWSER_IMAGE" \
       sh -ec 'test -e node_modules || ln -s /opt/waf-browser-deps/node_modules node_modules; exec npx playwright test --project=setup' >>"$E2E_LOG_FILE" 2>&1
@@ -612,12 +615,12 @@ if [ "$E2E_BROWSER_ONLY" = "1" ]; then
     E2E_BROWSER_FAULT_PID=$!
   fi
   step "Running browser tests on isolated stack: $E2E_BROWSER_SPECS"
-  docker run --rm --network host --user "$(id -u):$(id -g)" \
+  docker run --rm --network "$WAF_BROWSER_DOCKER_NETWORK" --user "$(id -u):$(id -g)" \
     -e HOME=/tmp -e CI -e CI_COMMIT_SHA -e CI_PIPELINE_URL \
     -e WAF_E2E_DISPOSABLE -e WAF_BROWSER_BASE_URL -e WAF_E2E_RUNTIME_URL \
     -e WAF_E2E_USERNAME -e WAF_E2E_PASSWORD -e WAF_E2E_RUN_ID \
     -e WAF_BROWSER_RESULTS_FILE -e WAF_BROWSER_OUTPUT_DIR -e WAF_BROWSER_JUNIT_FILE -e WAF_BROWSER_FAULT_SYNC_CONTAINER_FILE \
-    -e WAF_BROWSER_WORKERS="${E2E_BROWSER_WORKERS:-1}" -e E2E_BROWSER_SPECS -e E2E_BROWSER_RUNTIME_FAULT \
+    -e WAF_BROWSER_WORKERS="${E2E_BROWSER_WORKERS:-1}" -e WAF_BROWSER_HOST_RESOLVER_RULES -e E2E_BROWSER_SPECS -e E2E_BROWSER_RUNTIME_FAULT \
     -v "$REPO_ROOT:/workspace" -w /workspace/e2e/browser "$E2E_BROWSER_IMAGE" \
     bash -lc 'test -e node_modules || ln -s /opt/waf-browser-deps/node_modules node_modules; if [ "$E2E_BROWSER_RUNTIME_FAULT" = "requests-backend" ]; then npm test -- --project=desktop --project=mobile --no-deps $E2E_BROWSER_SPECS; else npm test -- $E2E_BROWSER_SPECS; fi' >"$TEST_LOG" 2>&1 || TEST_EXIT=$?
   TEST_SUMMARY="browser:$E2E_BROWSER_SPECS"

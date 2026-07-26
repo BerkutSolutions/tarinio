@@ -60,6 +60,8 @@
 - The app bootstrap now reloads either critical local stylesheet after bounded 250/750 ms backoff, preventing a transient static-file network change from exposing the legacy unstyled shell and an oversized sidebar logo.
 - Activity E2E creates only the audit rows missing from the live config-category total and treats absent partially-created cleanup resources idempotently, avoiding duplicate desktop/mobile mutation floods and preserving the original failure evidence.
 - OWASP CRS busy-state E2E holds and then continues the real check-updates request while asserting both controls atomically, rather than racing two assertions against a fast live response.
+- Parallel E2E host ports now use disjoint 24000/25000 slot ranges below Linux's ephemeral pool, preventing outbound Docker/registry sockets from colliding with Compose listeners such as the mTLS upstream.
+- Playwright containers now join only their own Compose network, where the E2E runtime owns a project-local `e2e-management.test` DNS alias, so other shards creating or removing Docker networks cannot trigger Chrome-wide `ERR_NETWORK_CHANGED` module failures.
 - Revisions browser coverage retries only the idempotent catalog read across the brief connection gap caused by runtime activation; apply and delete mutations remain single-attempt operations.
 - Core tab coverage now uses rendered-page readiness contracts for Requests, Bans, Revisions, Anti-DDoS, CRS, Administration, Events, and Activity instead of treating `DOMContentLoaded` as application readiness.
 - The production page-module loader now applies bounded 250/750 ms backoff between transient dynamic-import retries instead of issuing all attempts immediately during a short network interruption.

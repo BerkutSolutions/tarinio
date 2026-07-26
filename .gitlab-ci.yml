@@ -152,7 +152,9 @@ e2e:stack-healthcheck:
     - test -n "${WAF_E2E_PASSWORD:-}" || { echo "WAF_E2E_PASSWORD is required" >&2; exit 1; }
     - |
       E2E_STACK_SLOT="${CI_CONCURRENT_ID:-0}"
-      E2E_STACK_PORT_BASE=$((42000 + E2E_STACK_SLOT * 100))
+      # Stay below Linux's default ephemeral range (32768-60999), otherwise an
+      # unrelated outbound connection can temporarily own a Compose host port.
+      E2E_STACK_PORT_BASE=$((25000 + E2E_STACK_SLOT * 100))
       E2E_PASS="$WAF_E2E_PASSWORD" PROFILE_DIR="$CI_PROJECT_DIR/deploy/compose/e2e"
       COMPOSE_PROJECT_NAME="ci-${CI_PIPELINE_ID}-stack-health" WAF_STACK_NAME="ci-${CI_PIPELINE_ID}-stack-health"
       E2E_PORT=$((E2E_STACK_PORT_BASE + 0)) E2E_RT_PORT=$((E2E_STACK_PORT_BASE + 1)) E2E_RT_HTTPS_PORT=$((E2E_STACK_PORT_BASE + 2))
@@ -396,7 +398,9 @@ e2e:api-registry:
       BROWSER_E2E_IMAGE_JOB="${BROWSER_E2E_IMAGE}-${CI_PROJECT_ID}-${CI_PIPELINE_ID}"
       docker image inspect "$BROWSER_E2E_IMAGE_JOB" >/dev/null
       E2E_BROWSER_SLOT="${CI_CONCURRENT_ID:-0}"
-      E2E_BROWSER_PORT_BASE=$((43000 + E2E_BROWSER_SLOT * 100))
+      # Four runner slots occupy 24000-24306, below the kernel ephemeral range
+      # and separate from the stack-health range at 25000-25306.
+      E2E_BROWSER_PORT_BASE=$((24000 + E2E_BROWSER_SLOT * 100))
       E2E_BROWSER_ONLY=1
       E2E_BROWSER_IMAGE="$BROWSER_E2E_IMAGE_JOB"
       E2E_BROWSER_SPECS="$E2E_BROWSER_SPECS"

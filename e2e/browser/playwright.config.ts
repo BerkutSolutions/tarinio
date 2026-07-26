@@ -10,6 +10,7 @@ const outputDirectory = path.resolve(process.env.WAF_BROWSER_OUTPUT_DIR || path.
 const resultsFile = path.resolve(process.env.WAF_BROWSER_RESULTS_FILE || path.join(outputDirectory, "results.json"));
 const junitFile = process.env.WAF_BROWSER_JUNIT_FILE ? path.resolve(process.env.WAF_BROWSER_JUNIT_FILE) : "";
 const workers = Number.parseInt(process.env.WAF_BROWSER_WORKERS || "1", 10);
+const hostResolverRules = process.env.WAF_BROWSER_HOST_RESOLVER_RULES ?? "MAP e2e-management.test 127.0.0.1";
 const selectedSpecs = String(process.env.WAF_BROWSER_SPECS || "")
   .split(/\r?\n/)
   .map((value) => value.trim().replace(/\\/g, "/"))
@@ -43,7 +44,7 @@ export default defineConfig({
     screenshot: "only-on-failure",
     video: "retain-on-failure",
     launchOptions: {
-      args: ["--host-resolver-rules=MAP e2e-management.test 127.0.0.1", "--no-first-run", "--no-default-browser-check", "--disable-session-crashed-bubble"],
+      args: [...(hostResolverRules ? [`--host-resolver-rules=${hostResolverRules}`] : []), "--no-first-run", "--no-default-browser-check", "--disable-session-crashed-bubble"],
       ...(executablePath ? { executablePath } : {}),
     },
   },
