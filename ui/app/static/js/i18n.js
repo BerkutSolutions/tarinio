@@ -129,7 +129,7 @@ export function t(key, params = {}) {
   return translateFromDictionary(getLanguage(), key, params);
 }
 
-export async function applyTranslations(language = getLanguage()) {
+export async function applyTranslations(language = getLanguage(), options = {}) {
   const normalized = normalizeLanguage(language);
   await preloadTranslations(normalized);
 
@@ -154,7 +154,9 @@ export async function applyTranslations(language = getLanguage()) {
     switcher.value = normalized;
   }
 
-  document.documentElement.lang = normalized;
+  if (options.updateDocumentLanguage !== false) {
+    document.documentElement.lang = normalized;
+  }
 }
 
 export async function setLanguage(language) {
@@ -162,12 +164,13 @@ export async function setLanguage(language) {
   const previous = getLanguage();
   currentLanguage = normalized;
   persistLanguage(normalized);
-  await applyTranslations(normalized);
+  await applyTranslations(normalized, { updateDocumentLanguage: false });
   if (previous !== normalized) {
     const pending = [];
     const waitUntil = (work) => pending.push(Promise.resolve(work));
     window.dispatchEvent(new CustomEvent(languageChangedEvent, { detail: { language: normalized, waitUntil } }));
     await Promise.all(pending);
   }
+  document.documentElement.lang = normalized;
 }
 
