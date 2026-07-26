@@ -56,8 +56,7 @@ test("settings.storage-roundtrip-indexes-and-no-partial-save", async ({ authenti
 });
 
 test("settings.security-roundtrip-direct-ip-and-validation", async ({ authenticatedPage: page }) => {
-  await page.goto("/settings/security", { waitUntil: "domcontentloaded" });
-  await expect(page.locator("#settings-page")).toHaveAttribute("data-runtime-ready", "true");
+  await openPage(page, "/settings/security", page.locator("#settings-page[data-runtime-ready=\"true\"]"));
   const original = JSON.parse((await api(page, "/api/settings/runtime")).body);
   const directOriginal = JSON.parse((await api(page, "/api/settings/direct-ip-access")).body);
   const next = {

@@ -46,6 +46,7 @@
 - Revision modal and status-clear coverage now waits for the asynchronously rendered revisions page or service tile instead of treating DOMContentLoaded as application readiness.
 - Candidate staging now treats an active revision as immutable: identical reapplies are no-ops and differing content is rejected, preventing runtime symlinks from observing a half-rewritten bundle with missing per-site artifacts.
 - Service list and bulk-delete coverage now waits for hydrated list controls both initially and after fixture creation, preserving cleanup time instead of blocking on an absent shell-era locator.
+- Security-settings roundtrip coverage now waits for the page's runtime-ready contract before reading and mutating direct-IP settings.
 
 ### Конвейер E2E и очистка стендов
 
