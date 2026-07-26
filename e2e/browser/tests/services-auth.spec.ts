@@ -1,6 +1,6 @@
 import { expect, test } from "../fixtures/auth";
 import { CleanupLedger, e2eID } from "../support/isolation";
-import { openPage } from "../support/waits";
+import { openPage, waitForAPIResponse } from "../support/waits";
 
 test("services.basic-auth-mask-reveal-preview", async ({ authenticatedPage: page }, testInfo) => {
   test.setTimeout(3 * 60_000);
@@ -78,7 +78,10 @@ test("services.basic-auth-mask-reveal-preview", async ({ authenticatedPage: page
       const passwordInput = page.locator('[data-auth-user-password="0"]');
       await expect(passwordInput).toHaveAttribute("data-auth-user-password-stored", "true");
       expect((await passwordInput.getAttribute("placeholder"))?.length).toBe(password.length);
+      const revealResponsePromise = waitForAPIResponse(page, "POST", `/api/easy-site-profiles/${siteID}/auth-password/reveal`);
       await page.locator('[data-auth-user-toggle="0"]').click();
+      const revealResponse = await revealResponsePromise;
+      expect(revealResponse.status(), await revealResponse.text()).toBe(200);
       await expect(passwordInput).toHaveAttribute("type", "text");
       await expect(passwordInput).toHaveValue(password);
       await page.locator('[data-auth-user-toggle="0"]').click();

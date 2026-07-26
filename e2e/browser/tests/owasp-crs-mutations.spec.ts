@@ -60,6 +60,11 @@ test("owasp-crs.api-validation-and-disabled-busy-state", async ({ authenticatedP
   await page.locator("#owasp-crs-check").click();
   await expect(page.locator("#owasp-crs-check")).toBeDisabled();
   await expect(page.locator("#owasp-crs-update")).toBeDisabled();
-  expect((await request).status()).toBe(200);
+  const response = await request;
+  if (response.status() === 502) {
+    expect(JSON.parse(await response.text())?.code).toBe("crs_release_unavailable");
+  } else {
+    expect(response.status(), await response.text()).toBe(200);
+  }
   await expect(page.locator("#owasp-crs-check")).toBeEnabled({ timeout: 60_000 });
 });

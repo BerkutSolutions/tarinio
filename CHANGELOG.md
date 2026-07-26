@@ -47,6 +47,8 @@
 - Candidate staging now treats an active revision as immutable: identical reapplies are no-ops and differing content is rejected, preventing runtime symlinks from observing a half-rewritten bundle with missing per-site artifacts.
 - Service list and bulk-delete coverage now waits for hydrated list controls both initially and after fixture creation, preserving cleanup time instead of blocking on an absent shell-era locator.
 - Security-settings roundtrip coverage now waits for the page's runtime-ready contract before reading and mutating direct-IP settings.
+- Dashboard live-navigation coverage now consistently waits for hydrated page/widget anchors after initial entry, persisted-layout reloads, and restoration from intercepted resilience states.
+- CRS busy-state coverage accepts only a successful official release check or the typed `crs_release_unavailable` external-network result, while Basic Auth reveal coverage now waits for and verifies the real password-reveal POST before asserting UI state.
 
 ### Конвейер E2E и очистка стендов
 

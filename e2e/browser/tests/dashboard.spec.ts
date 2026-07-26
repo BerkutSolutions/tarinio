@@ -2,8 +2,7 @@ import { expect, test } from "../fixtures/auth";
 import { openPage } from "../support/waits";
 
 test("dashboard.widgets", async ({ authenticatedPage: page }) => {
-  await page.goto("/dashboard", { waitUntil: "domcontentloaded", timeout: 60000 });
-  await expect(page.locator("#dashboard-page")).toBeVisible({ timeout: 15000 });
+  await openPage(page, "/dashboard", page.locator("#dashboard-page"));
   for (const widget of ["services", "traffic-summary", "containers-health", "top-ips", "top-countries", "requests-series", "top-urls", "memory", "cpu"]) {
     await expect(page.locator('[data-widget-id="' + widget + '"]')).toBeVisible({ timeout: 15000 });
   }
@@ -14,8 +13,7 @@ test("dashboard.widgets", async ({ authenticatedPage: page }) => {
 });
 
 test("dashboard.series-consistency", async ({ authenticatedPage: page }) => {
-  await page.goto("/dashboard", { waitUntil: "domcontentloaded", timeout: 60000 });
-  await expect(page.locator('[data-widget-id="requests-series"]')).toBeVisible({ timeout: 30000 });
+  await openPage(page, "/dashboard", page.locator('[data-widget-id="requests-series"]'));
   const stats = await page.evaluate(async () => (await fetch("/api/dashboard/stats", { credentials: "include" })).json());
   const sum = (rows: Array<{ count?: number }>) => rows.reduce((total, row) => total + Number(row.count || 0), 0);
   for (const field of ["requests_series", "attacks_series", "blocked_series"]) {
@@ -33,7 +31,7 @@ test("dashboard.series-consistency", async ({ authenticatedPage: page }) => {
 });
 
 test("dashboard.top-data", async ({ authenticatedPage: page }) => {
-  await page.goto("/dashboard", { waitUntil: "domcontentloaded", timeout: 60000 });
+  await openPage(page, "/dashboard", page.locator("#dashboard-page"));
   for (const id of ["top-ips", "top-countries", "top-urls"]) {
     await expect(page.locator(`[data-widget-id="${id}"] .dashboard-list-row`).first()).toBeVisible({ timeout: 30000 });
   }
@@ -50,9 +48,8 @@ test("dashboard.top-data", async ({ authenticatedPage: page }) => {
 
 test("dashboard.details", async ({ authenticatedPage: page }) => {
   test.setTimeout(90_000);
-  await page.goto("/dashboard", { waitUntil: "domcontentloaded", timeout: 60000 });
   const board = page.locator("#dashboard-board");
-  await expect(board.locator('[data-widget-action="services"]')).toBeVisible({ timeout: 30000 });
+  await openPage(page, "/dashboard", board.locator('[data-widget-action="services"]'));
   const actions = ["services", "requests-day", "attacks-day", "blocked-attacks", "top-ips", "top-countries", "top-urls", "containers-health"];
   for (const [index, action] of actions.entries()) {
     const target = board.locator(`[data-widget-action="${action}"]`).first();
@@ -68,13 +65,12 @@ test("dashboard.details", async ({ authenticatedPage: page }) => {
 });
 
 test("dashboard.picker-persistence", async ({ authenticatedPage: page }) => {
-  await page.goto("/dashboard", { waitUntil: "domcontentloaded", timeout: 60000 });
+  await openPage(page, "/dashboard", page.locator("#dashboard-page"));
   await page.locator("#dashboard-widgets-toggle").click();
   await page.locator('[data-widget-visibility-id="unique-attackers"]').check();
   await page.locator("#dashboard-widgets-save").click();
   await expect(page.locator('[data-widget-id="unique-attackers"]')).toBeVisible();
-  await page.reload({ waitUntil: "domcontentloaded" });
-  await expect(page.locator('[data-widget-id="unique-attackers"]')).toBeVisible({ timeout: 30000 });
+  await openPage(page, "/dashboard", page.locator('[data-widget-id="unique-attackers"]'));
 });
 
 test("dashboard.layout-reset-resize", async ({ authenticatedPage: page }) => {
@@ -101,7 +97,7 @@ test("dashboard.layout-reset-resize", async ({ authenticatedPage: page }) => {
       const persisted = JSON.parse(localStorage.getItem("waf.dashboard.layout.v1") || "[]");
       return Number(persisted.find((item: { id?: string }) => item.id === "memory")?.width || 0);
     })).toBeGreaterThan(330);
-    await page.reload({ waitUntil: "domcontentloaded" });
+    await openPage(page, "/dashboard", page.locator('[data-widget-id="memory"]'));
     await expect(page.locator('[data-widget-id="memory"]')).toHaveCSS("width", `${Math.round(after?.width || 0)}px`);
   } else {
     await expect(frame).not.toHaveClass(/dragging/);
@@ -140,8 +136,7 @@ test("dashboard.resilience-states", async ({ authenticatedPage: page }) => {
   await page.goto("/dashboard", { waitUntil: "domcontentloaded", timeout: 60000 });
   await expect(page.locator("#dashboard-board .alert")).toContainText("synthetic dashboard outage", { timeout: 30000 });
   await page.unroute("**/api/dashboard/stats");
-  await page.reload({ waitUntil: "domcontentloaded" });
-  await expect(page.locator("#dashboard-page")).toBeVisible({ timeout: 30000 });
+  await openPage(page, "/dashboard", page.locator("#dashboard-page"));
 
   for (const state of ["empty", "partial"] as const) {
     const statePage = await page.context().newPage();
