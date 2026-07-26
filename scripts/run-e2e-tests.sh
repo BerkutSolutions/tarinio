@@ -569,7 +569,7 @@ if [ "$E2E_BROWSER_ONLY" = "1" ]; then
       -e HOME=/tmp -e CI -e WAF_E2E_DISPOSABLE -e WAF_BROWSER_BASE_URL \
       -e WAF_E2E_USERNAME -e WAF_E2E_PASSWORD -e WAF_E2E_RUN_ID \
       -v "$REPO_ROOT:/workspace" -w /workspace/e2e/browser "$E2E_BROWSER_IMAGE" \
-      bash -lc 'npm ci --prefer-offline --no-audit --fund=false && npx playwright test --project=setup' >>"$E2E_LOG_FILE" 2>&1
+      sh -ec 'test -e node_modules || ln -s /opt/waf-browser-deps/node_modules node_modules; exec npx playwright test --project=setup' >>"$E2E_LOG_FILE" 2>&1
     WAF_BROWSER_FAULT_SYNC_FILE="$E2E_LOG_DIR/requests-backend-fault"
     WAF_BROWSER_FAULT_SYNC_CONTAINER_FILE="/workspace/build/e2e/$(basename "$E2E_LOG_DIR")/requests-backend-fault"
     export WAF_BROWSER_FAULT_SYNC_FILE WAF_BROWSER_FAULT_SYNC_CONTAINER_FILE
@@ -603,7 +603,7 @@ if [ "$E2E_BROWSER_ONLY" = "1" ]; then
     -e WAF_BROWSER_RESULTS_FILE -e WAF_BROWSER_OUTPUT_DIR -e WAF_BROWSER_JUNIT_FILE -e WAF_BROWSER_FAULT_SYNC_CONTAINER_FILE \
     -e WAF_BROWSER_WORKERS="${E2E_BROWSER_WORKERS:-1}" -e E2E_BROWSER_SPECS -e E2E_BROWSER_RUNTIME_FAULT \
     -v "$REPO_ROOT:/workspace" -w /workspace/e2e/browser "$E2E_BROWSER_IMAGE" \
-    bash -lc 'npm ci --prefer-offline --no-audit --fund=false && if [ "$E2E_BROWSER_RUNTIME_FAULT" = "requests-backend" ]; then npm test -- --project=desktop --project=mobile --no-deps $E2E_BROWSER_SPECS; else npm test -- $E2E_BROWSER_SPECS; fi' >"$TEST_LOG" 2>&1 || TEST_EXIT=$?
+    bash -lc 'test -e node_modules || ln -s /opt/waf-browser-deps/node_modules node_modules; if [ "$E2E_BROWSER_RUNTIME_FAULT" = "requests-backend" ]; then npm test -- --project=desktop --project=mobile --no-deps $E2E_BROWSER_SPECS; else npm test -- $E2E_BROWSER_SPECS; fi' >"$TEST_LOG" 2>&1 || TEST_EXIT=$?
   TEST_SUMMARY="browser:$E2E_BROWSER_SPECS"
   if [ "$E2E_BROWSER_RUNTIME_FAULT" = "requests-backend" ]; then
     if ! wait "$E2E_BROWSER_FAULT_PID"; then

@@ -5,4 +5,8 @@ FROM mcr.microsoft.com/playwright:v1.61.1-noble
 COPY --from=go /usr/local/go /usr/local/go
 ENV PATH="/usr/local/go/bin:${PATH}"
 
+WORKDIR /opt/waf-browser-deps
+COPY e2e/browser/package.json e2e/browser/package-lock.json ./
+RUN npm ci --no-audit --fund=false
+
 WORKDIR /workspace/e2e/browser
