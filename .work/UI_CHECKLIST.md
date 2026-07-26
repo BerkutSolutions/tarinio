@@ -532,6 +532,11 @@
 - [ ] Default profile health API/runtime: run `scripts/test-default-compose-health.sh`; it must render the default profile through a temporary unique-name override, verify sentinel health, adaptive/suggestions output, write probes and UID `65532`, then remove only its disposable resources. The actual `tarinio-*` containers and default volumes must not change.
 - [ ] Dashboard metrics consistency: compare one rendered Dashboard snapshot with `/api/dashboard/containers/overview`: CPU headline equals `total_cpu_percent`, CPU progress equals `total_cpu_percent / cpu_capacity_percent`, Memory headline equals the usage/limit-weighted aggregate, and all container rows match the same response.
 
+## 2026-07-26 - Dynamic module load resilience
+
+- [ ] UI: while Dashboard is opening, briefly interrupt static-file delivery and confirm the page module loads after bounded 250/750 ms backoff without leaving the module-load error screen.
+- [ ] API/runtime: confirm the authenticated session and Dashboard API remain valid while only the static module request is interrupted; no mutation or full test retry should occur.
+
 - [ ] Settings UI: save Storage and Security values, open the same page again, and verify controls render only after `data-runtime-ready=true` with the persisted values intact.
 - [ ] Localization UI: switch each supported language, then open Dashboard, Events, Activity, and General Settings; every page must render its ready control and localized shell without raw translation keys.
 - [ ] API/runtime: after Dashboard telemetry seed, verify `/api/requests?limit=500` contains both `e2e-dashboard-request-*` and `e2e-dashboard-attack-*` rows before testing Requests controls.

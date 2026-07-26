@@ -10,6 +10,7 @@ import { escapeHtml, notify } from "./ui.js";
 
 let sidebarCollapsed = false;
 const PAGE_MODULE_VERSION = "20260628-16";
+const PAGE_MODULE_RETRY_DELAYS_MS = [250, 750];
 let lastGlobalScriptError = null;
 
 window.addEventListener("error", (event) => {
@@ -75,6 +76,7 @@ async function loadPageModule(name) {
       if (index >= attempts.length - 1 || !shouldRetryModuleLoad(error)) {
         throw error;
       }
+      await new Promise((resolve) => window.setTimeout(resolve, PAGE_MODULE_RETRY_DELAYS_MS[index]));
     }
   }
   throw lastError || new Error(`Failed to load module: ${name}`);

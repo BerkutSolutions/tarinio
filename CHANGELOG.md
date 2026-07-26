@@ -56,6 +56,9 @@
 - The Trivy image baseline records newly reported Debian 13 upstream-unfixed findings; findings with an available fixed version remain blocking.
 - Auto-start E2E keeps a bounded 60-second HTTP budget for real profile persistence under four-stack CI load instead of inheriting the generic 20-second UI request timeout.
 - Revisions browser coverage retries only the idempotent catalog read across the brief connection gap caused by runtime activation; apply and delete mutations remain single-attempt operations.
+- Core tab coverage now uses rendered-page readiness contracts for Requests, Bans, Revisions, Anti-DDoS, CRS, Administration, Events, and Activity instead of treating `DOMContentLoaded` as application readiness.
+- The production page-module loader now applies bounded 250/750 ms backoff between transient dynamic-import retries instead of issuing all attempts immediately during a short network interruption.
+- Services list, export, selection, mutation, and editor-entry coverage now waits for the rendered control it actually uses before interacting with the page.
 
 ### Конвейер E2E и очистка стендов
 

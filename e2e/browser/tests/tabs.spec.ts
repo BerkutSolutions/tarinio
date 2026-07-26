@@ -40,7 +40,7 @@ for (const [tab, endpoints] of apiByTab) {
 }
 
 test("requests.read-controls", async ({ authenticatedPage: page }) => {
-  await page.goto("/requests", { waitUntil: "domcontentloaded", timeout: 60000 });
+  await openPage(page, "/requests", "#requests-refresh");
   await page.locator("#requests-refresh").click();
   await page.locator("#requests-search").fill("unlikely-request-filter");
   await page.locator("#requests-filter-method").selectOption({ index: 0 });
@@ -49,8 +49,7 @@ test("requests.read-controls", async ({ authenticatedPage: page }) => {
 });
 
 test("requests.pagination-sort-detail", async ({ authenticatedPage: page }) => {
-  await page.goto("/requests", { waitUntil: "domcontentloaded", timeout: 60000 });
-  await expect(page.locator("#requests-page-size")).toBeVisible({ timeout: 30000 });
+  await openPage(page, "/requests", "#requests-page-size");
   await page.locator("#requests-page-size").selectOption("25");
   await expect(page.locator("#requests-page-size")).toHaveValue("25");
   const sort = page.locator("[data-sort-col]").first();
@@ -67,7 +66,7 @@ test("requests.pagination-sort-detail", async ({ authenticatedPage: page }) => {
 });
 
 test("bans.read-controls", async ({ authenticatedPage: page }) => {
-  await page.goto("/bans", { waitUntil: "domcontentloaded", timeout: 60000 });
+  await openPage(page, "/bans", "#bans-refresh");
   await page.locator("#bans-refresh").click();
   await expect(page.locator("#bans-status")).toBeVisible({ timeout: 30000 });
   const bansPageSize = page.locator("#bans-page-size");
@@ -80,7 +79,7 @@ test("bans.read-controls", async ({ authenticatedPage: page }) => {
 });
 
 test("bans.create-validation", async ({ authenticatedPage: page }) => {
-  await page.goto("/bans", { waitUntil: "domcontentloaded", timeout: 60000 });
+  await openPage(page, "/bans", "#bans-create");
   await page.locator("#bans-create").click();
   await expect(page.locator("#bans-create-modal")).toBeVisible();
   await page.locator("#bans-create-ip").fill("not-an-ip");
@@ -91,7 +90,7 @@ test("bans.create-validation", async ({ authenticatedPage: page }) => {
 });
 
 test("bans.create-cancel", async ({ authenticatedPage: page }) => {
-  await page.goto("/bans", { waitUntil: "domcontentloaded", timeout: 60000 });
+  await openPage(page, "/bans", "#bans-create");
   await page.locator("#bans-create").click();
   await expect(page.locator("#bans-create-modal")).toBeVisible();
   await page.locator("#bans-create-modal [data-bans-create-close]").last().click();
@@ -99,14 +98,13 @@ test("bans.create-cancel", async ({ authenticatedPage: page }) => {
 });
 
 test("revisions.read-controls", async ({ authenticatedPage: page }) => {
-  await page.goto("/revisions", { waitUntil: "domcontentloaded", timeout: 60000 });
+  await openPage(page, "/revisions", "#revisions-refresh");
   await page.locator("#revisions-refresh").click();
   await expect(page.locator("#revisions-detail-modal")).toBeHidden();
 });
 
 test("anti-ddos.help-modal", async ({ authenticatedPage: page }) => {
-  await page.goto("/anti-ddos", { waitUntil: "domcontentloaded", timeout: 60000 });
-  await expect(page.locator("#antiddos-form")).toBeVisible({ timeout: 10000 });
+  await openPage(page, "/anti-ddos", "#antiddos-form");
   await page.locator("#antiddos-model-help-btn").click();
   await expect(page.locator("#antiddos-model-help-modal")).toBeVisible();
   await page.locator("#antiddos-model-help-modal").press("Escape");
@@ -114,7 +112,7 @@ test("anti-ddos.help-modal", async ({ authenticatedPage: page }) => {
 });
 
 test("owasp-crs.read-controls", async ({ authenticatedPage: page }) => {
-  await page.goto("/owasp-crs", { waitUntil: "domcontentloaded", timeout: 60000 });
+  await openPage(page, "/owasp-crs", "#owasp-crs-check");
   await expect(page.locator("#owasp-crs-check")).toBeVisible();
   await expect(page.locator("#owasp-crs-update")).toBeVisible();
   await expect(page.locator("#owasp-crs-hourly-auto")).toBeVisible();
@@ -129,14 +127,13 @@ test("tls.read-controls", async ({ authenticatedPage: page }) => {
 });
 
 test("administration.read-controls", async ({ authenticatedPage: page }) => {
-  await page.goto("/administration", { waitUntil: "domcontentloaded", timeout: 60000 });
+  await openPage(page, "/administration", "#administration-user-create");
   await expect(page.locator("#administration-user-create")).toBeVisible();
   await expect(page.locator("#administration-role-create")).toBeVisible();
 });
 
 test("events.read-controls", async ({ authenticatedPage: page }) => {
-  await page.goto("/events", { waitUntil: "domcontentloaded", timeout: 60000 });
-  await expect(page.locator("#events-filters")).toBeVisible({ timeout: 30000 });
+  await openPage(page, "/events", "#events-filters");
   const eventsPageSize = page.locator("#events-page-size");
   await expect(eventsPageSize).toBeVisible();
   await eventsPageSize.selectOption({ index: 0 });
@@ -145,7 +142,7 @@ test("events.read-controls", async ({ authenticatedPage: page }) => {
 });
 
 test("activity.read-controls", async ({ authenticatedPage: page }) => {
-  await page.goto("/activity", { waitUntil: "domcontentloaded", timeout: 60000 });
+  await openPage(page, "/activity", "#audit-reset");
   await page.locator("#audit-reset").click();
   await expect(page.locator("#audit-results")).toBeVisible();
   await expect(page.locator("#audit-page-info")).toBeVisible();

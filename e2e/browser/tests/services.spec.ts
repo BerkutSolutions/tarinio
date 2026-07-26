@@ -41,7 +41,7 @@ test("services.create-route", async ({ authenticatedPage: page }) => {
 });
 
 test("services.selection-navigation", async ({ authenticatedPage: page }) => {
-  await page.goto("/services", { waitUntil: "domcontentloaded", timeout: 60000 });
+  await openPage(page, "/services", page.locator("[data-select-site]").first());
   const checkboxes = page.locator("[data-select-site]");
   await expect(checkboxes.first()).toBeVisible({ timeout: 30000 });
   await checkboxes.first().check();
@@ -91,8 +91,7 @@ test("services.editor-modes-search-validation-back", async ({ authenticatedPage:
 });
 
 test("services.export-invalid-import", async ({ authenticatedPage: page }) => {
-  await page.goto("/services", { waitUntil: "domcontentloaded", timeout: 60000 });
-  await expect(page.locator("#services-export")).toBeVisible({ timeout: 30000 });
+  await openPage(page, "/services", "#services-export");
   const downloadPromise = page.waitForEvent("download");
   await page.locator("#services-export").click();
   const download = await downloadPromise;
@@ -117,8 +116,7 @@ test("services.export-invalid-import", async ({ authenticatedPage: page }) => {
 test("services.save-delete-mutation", async ({ authenticatedPage: page }, testInfo) => {
   const siteID = e2eID(testInfo, "e2e-browser");
   const upstreamID = siteID + "-upstream";
-  await page.goto("/services", { waitUntil: "domcontentloaded", timeout: 60000 });
-  await expect(page.locator("#services-refresh")).toBeVisible({ timeout: 30000 });
+  await openPage(page, "/services", "#services-refresh");
   const api = async (path: string, init: RequestInit = {}) => page.evaluate(async ({ path, init }) => {
     const response = await fetch(path, {
       ...init,
@@ -150,8 +148,7 @@ test("services.save-delete-mutation", async ({ authenticatedPage: page }, testIn
     result = await api("/api/upstreams?auto_apply=false", { method: "POST", body: JSON.stringify({ id: upstreamID, site_id: siteID, name: upstreamID, scheme: "http", host: "upstream-echo", port: 8888, base_path: "/" }) });
     expect([200, 201]).toContain(result.status);
 
-    await page.goto("/services/" + encodeURIComponent(siteID), { waitUntil: "domcontentloaded", timeout: 60000 });
-    await expect(page.locator("#service-editor-form")).toBeVisible({ timeout: 30000 });
+    await openPage(page, "/services/" + encodeURIComponent(siteID), "#service-editor-form");
     await expect(page.locator("#service-id")).toHaveValue(siteID);
     await page.locator("#service-host").fill(siteID + ".updated.example.test");
     await page.locator("#service-editor-form button[type=submit]").click();
@@ -197,7 +194,7 @@ test("services.bulk-delete-confirm-cancel", async ({ authenticatedPage: page }, 
     });
     cleanup.add("site " + siteID, () => api("/api/sites/" + encodeURIComponent(siteID) + "?auto_apply=false", { method: "DELETE" }), async () => !(await listIDs()).includes(siteID));
   }
-  await page.goto("/services", { waitUntil: "domcontentloaded", timeout: 60000 });
+  await openPage(page, "/services", "#services-search");
   try {
     for (const siteID of siteIDs) {
       const upstreamID = siteID + "-upstream";
