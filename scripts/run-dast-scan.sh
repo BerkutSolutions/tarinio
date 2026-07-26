@@ -43,7 +43,7 @@ case "$(uname -s)" in
   Linux) zap_user_args="--user $(id -u):$(id -g)" ;;
 esac
 MSYS_NO_PATHCONV=1 timeout --preserve-status -k 30s "${scan_timeout}s" \
-  docker run --rm --cidfile "$zap_cidfile" --network "$ZAP_DOCKER_NETWORK" $zap_user_args -e HOME=/zap/home \
+  docker run --rm --cidfile "$zap_cidfile" --network "$ZAP_DOCKER_NETWORK" $zap_user_args -e HOME=/tmp \
   -e JAVA_TOOL_OPTIONS=-Djava.util.prefs.userRoot=/tmp/zap-java-prefs -w /zap/wrk \
   -v "$OUT:/zap/wrk:rw" "$ZAP_IMAGE" \
   "$scan" --autooff -t "$TARGET" -m 3 -I \

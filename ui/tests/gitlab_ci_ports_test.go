@@ -76,6 +76,7 @@ func TestDASTScannerUsesItsIsolatedComposeNetwork(t *testing.T) {
 		`ZAP_DOCKER_NETWORK="${E2E_PROJECT}_waf-e2e-net"`,
 		`TARGET="${DAST_SCANNER_TARGET_URL:-http://e2e-management.test}"`,
 		`--network "$ZAP_DOCKER_NETWORK"`,
+		`-e HOME=/tmp`,
 	} {
 		if !strings.Contains(source, marker) {
 			t.Fatalf("DAST isolation missing marker %q", marker)
