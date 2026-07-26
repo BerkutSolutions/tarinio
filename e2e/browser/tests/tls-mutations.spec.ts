@@ -1,13 +1,13 @@
 import { expect, test } from "../fixtures/auth";
 import { CleanupLedger, e2eID } from "../support/isolation";
+import { openPage } from "../support/waits";
 
 test("tls.certificate-binding-create-delete", async ({ authenticatedPage: page }, testInfo) => {
   const siteID = e2eID(testInfo, "e2e-tls-site");
   const upstreamID = siteID + "-upstream";
   const certificateID = e2eID(testInfo, "e2e-cert");
   const commonName = siteID + ".example.test";
-  await page.goto("/tls", { waitUntil: "domcontentloaded", timeout: 60000 });
-  await expect(page.locator("#certificate-form")).toBeVisible({ timeout: 30000 });
+  await openPage(page, "/tls", "#certificate-form");
   const api = async (path: string, init: RequestInit = {}) => page.evaluate(async ({ path, init }) => {
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), 30000);

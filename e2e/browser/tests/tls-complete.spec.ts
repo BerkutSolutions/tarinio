@@ -4,6 +4,7 @@ import { execFileSync } from "node:child_process";
 import { createHmac } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
+import { openPage } from "../support/waits";
 
 async function api(page: import("@playwright/test").Page, path: string, init: RequestInit = {}) {
   return page.evaluate(async ({ path, init }) => {
@@ -37,7 +38,7 @@ function totpCode(secret: string) {
 test("tls.self-signed-selection-detail-validation", async ({ authenticatedPage: page }, testInfo) => {
   const id = e2eID(testInfo, "e2e-self-cert");
   const commonName = `${id}.example.test`;
-  await page.goto("/tls", { waitUntil: "domcontentloaded", timeout: 60_000 });
+  await openPage(page, "/tls", "#certificate-form");
   const cleanup = new CleanupLedger();
   cleanup.add("certificate " + id, () => api(page, `/api/certificates/${encodeURIComponent(id)}`, { method: "DELETE" }), async () => !(await list(page, "/api/certificates", ["certificates", "items"])).some((item: { id?: string }) => item.id === id));
   try {
@@ -59,7 +60,7 @@ test("tls.self-signed-selection-detail-validation", async ({ authenticatedPage: 
 });
 
 test("tls.auto-renew-persistence-and-validation", async ({ authenticatedPage: page }) => {
-  await page.goto("/tls", { waitUntil: "domcontentloaded", timeout: 60_000 });
+  await openPage(page, "/tls", "#tls-auto-renew-enabled");
   const originalResult = await api(page, "/api/tls/auto-renew");
   expect(originalResult.status, originalResult.body).toBe(200);
   const original = JSON.parse(originalResult.body);
@@ -70,7 +71,7 @@ test("tls.auto-renew-persistence-and-validation", async ({ authenticatedPage: pa
     await page.locator("#tls-auto-renew-days").fill(String(nextDays));
     await page.locator("#tls-auto-renew-form button[type=submit]").click();
     await expect.poll(async () => JSON.parse((await api(page, "/api/tls/auto-renew")).body).renew_before_days).toBe(nextDays);
-    await page.reload({ waitUntil: "domcontentloaded" });
+    await openPage(page, "/tls", "#tls-auto-renew-enabled");
     await expect(page.locator("#tls-auto-renew-enabled")).toBeChecked({ checked: nextEnabled });
     await expect(page.locator("#tls-auto-renew-days")).toHaveValue(String(nextDays));
     const invalid = await api(page, "/api/tls/auto-renew", { method: "PUT", body: JSON.stringify({ enabled: true, renew_before_days: 0 }) });
@@ -85,7 +86,7 @@ test("tls.acme-conditional-fields-and-disabled-errors", async ({ authenticatedPa
   const acmeID = e2eID(testInfo, "e2e-acme");
   const cleanup = new CleanupLedger();
   cleanup.add("ACME certificate " + acmeID, () => api(page, `/api/certificates/${encodeURIComponent(acmeID)}`, { method: "DELETE" }), async () => !(await list(page, "/api/certificates", ["certificates", "items"])).some((item: { id?: string }) => item.id === acmeID));
-  await page.goto("/tls", { waitUntil: "domcontentloaded", timeout: 60_000 });
+  await openPage(page, "/tls", "#letsencrypt-form");
   await page.locator("#le-ca-server").selectOption("custom");
   await expect(page.locator("[data-acme-visible-for=custom]")).toBeVisible();
   await expect(page.locator("#le-use-staging")).toBeDisabled();
@@ -114,7 +115,7 @@ test("tls.import-export-step-up-errors-and-mobile-layout", async ({ authenticate
   const cleanup = new CleanupLedger();
   cleanup.add("export certificate " + id, () => api(page, `/api/certificates/${encodeURIComponent(id)}`, { method: "DELETE" }), async () => !(await list(page, "/api/certificates", ["certificates", "items"])).some((item: { id?: string }) => item.id === id));
   cleanup.add("export user " + exporterID, () => api(page, `/api/administration/users/${encodeURIComponent(exporterID)}`, { method: "DELETE" }), async () => !(await list(page, "/api/administration/users", ["users", "items"])).some((item: { id?: string }) => item.id === exporterID));
-  await page.goto("/tls", { waitUntil: "domcontentloaded", timeout: 60_000 });
+  await openPage(page, "/tls", "#certificate-refresh");
   try {
     const createExporter = await api(page, "/api/administration/users", { method: "POST", body: JSON.stringify({ id: exporterID, username: exporterID, email: `${exporterID}@example.test`, password: exporterPassword, role_ids: ["admin"] }) });
     expect(createExporter.status, createExporter.body).toBe(201);
@@ -132,7 +133,7 @@ test("tls.import-export-step-up-errors-and-mobile-layout", async ({ authenticate
       const setupBody = JSON.parse(setup.body);
       const enable = await api(exporterPage, "/api/auth/2fa/enable", { method: "POST", body: JSON.stringify({ challenge_id: setupBody.challenge_id, code: totpCode(setupBody.secret) }) });
       expect(enable.status, enable.body).toBe(200);
-      await exporterPage.goto("/tls", { waitUntil: "domcontentloaded" });
+      await openPage(exporterPage, "/tls", `[data-cert-select-id="${id}"]`);
       await exporterPage.locator(`[data-cert-select-id="${id}"]`).check();
       const approvalResponse = exporterPage.waitForResponse((response) => response.url().endsWith("/api/certificate-materials/export-approvals") && response.request().method() === "POST");
       await exporterPage.locator("#tls-certificate-export").click();
@@ -184,7 +185,7 @@ test("tls.upload-and-valid-archive-import", async ({ authenticatedPage: page }, 
   mkdirSync(fixtureDir, { recursive: true });
   const generated = execFileSync("go", ["run", "./support/certfixture", fixtureDir, archiveID], { cwd: resolve("."), encoding: "utf8", windowsHide: true }).trim().split(/\r?\n/);
   const [certPath, keyPath, zipPath] = generated;
-  await page.goto("/tls", { waitUntil: "domcontentloaded", timeout: 60_000 });
+  await openPage(page, "/tls", "#certificate-upload-form");
   const cleanup = new CleanupLedger();
   for (const id of [uploadID, archiveID]) cleanup.add("material certificate " + id, () => api(page, `/api/certificates/${encodeURIComponent(id)}`, { method: "DELETE" }), async () => !(await list(page, "/api/certificates", ["certificates", "items"])).some((item: { id?: string }) => item.id === id));
   try {

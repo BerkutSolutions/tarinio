@@ -1,11 +1,12 @@
 import { expect, test } from "../fixtures/auth";
 import { CleanupLedger, e2eID } from "../support/isolation";
+import { openPage } from "../support/waits";
 
 test("administration.user-create-edit-readback", async ({ authenticatedPage: page }, testInfo) => {
   const username = e2eID(testInfo, "e2e-user");
   const email = username + "@example.test";
   const updatedEmail = "updated-" + email;
-  await page.goto("/administration", { waitUntil: "domcontentloaded", timeout: 60000 });
+  await openPage(page, "/administration", "#administration-user-create");
   await expect(page.locator("#administration-user-create")).toBeVisible({ timeout: 30000 });
   const api = async (path: string, init: RequestInit = {}) => page.evaluate(async ({ path, init }) => {
     const controller = new AbortController();
@@ -70,7 +71,7 @@ test("administration.role-create-edit-readback", async ({ authenticatedPage: pag
   const roleID = e2eID(testInfo, "e2e-role");
   const roleName = "E2E Role " + roleID;
   const updatedName = roleName + " Updated";
-  await page.goto("/administration", { waitUntil: "domcontentloaded", timeout: 60000 });
+  await openPage(page, "/administration", "#administration-role-create");
   await expect(page.locator("#administration-role-create")).toBeVisible({ timeout: 30000 });
   const api = async (path: string, init: RequestInit = {}) => page.evaluate(async ({ path, init }) => {
     const controller = new AbortController();

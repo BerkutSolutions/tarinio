@@ -59,6 +59,8 @@
 - Core tab coverage now uses rendered-page readiness contracts for Requests, Bans, Revisions, Anti-DDoS, CRS, Administration, Events, and Activity instead of treating `DOMContentLoaded` as application readiness.
 - The production page-module loader now applies bounded 250/750 ms backoff between transient dynamic-import retries instead of issuing all attempts immediately during a short network interruption.
 - Services list, export, selection, mutation, and editor-entry coverage now waits for the rendered control it actually uses before interacting with the page.
+- The disposable E2E stack healthcheck now allocates host ports from a dedicated concurrent-slot range instead of concatenating the pipeline ID into ports that eventually collide with smoke E2E.
+- TLS and Administration browser mutations now enter through their real rendered controls, including post-save TLS reload and the secondary exporter session.
 
 ### Конвейер E2E и очистка стендов
 

@@ -150,7 +150,15 @@ e2e:stack-healthcheck:
     - chmod 700 scripts/check-e2e-stack-health.sh
     - set -o pipefail
     - test -n "${WAF_E2E_PASSWORD:-}" || { echo "WAF_E2E_PASSWORD is required" >&2; exit 1; }
-    - E2E_PASS="$WAF_E2E_PASSWORD" PROFILE_DIR="$CI_PROJECT_DIR/deploy/compose/e2e" COMPOSE_PROJECT_NAME="ci-${CI_PIPELINE_ID}-stack-health" WAF_STACK_NAME="ci-${CI_PIPELINE_ID}-stack-health" E2E_PORT="${CI_PIPELINE_ID}80" E2E_RT_PORT="${CI_PIPELINE_ID}81" E2E_RT_HTTPS_PORT="${CI_PIPELINE_ID}82" E2E_RT_HLT_PORT="${CI_PIPELINE_ID}83" E2E_CONTROL_PLANE_DIRECT_PORT="${CI_PIPELINE_ID}84" E2E_MTLS_UPSTREAM_PORT="${CI_PIPELINE_ID}85" E2E_DAST_CANARY_PORT="${CI_PIPELINE_ID}86" E2E_HEALTH_TIMEOUT_SECONDS=240 sh scripts/check-e2e-stack-health.sh 2>&1 | tee build/e2e/stack-healthcheck/healthcheck.log
+    - |
+      E2E_STACK_SLOT="${CI_CONCURRENT_ID:-0}"
+      E2E_STACK_PORT_BASE=$((42000 + E2E_STACK_SLOT * 100))
+      E2E_PASS="$WAF_E2E_PASSWORD" PROFILE_DIR="$CI_PROJECT_DIR/deploy/compose/e2e"
+      COMPOSE_PROJECT_NAME="ci-${CI_PIPELINE_ID}-stack-health" WAF_STACK_NAME="ci-${CI_PIPELINE_ID}-stack-health"
+      E2E_PORT=$((E2E_STACK_PORT_BASE + 0)) E2E_RT_PORT=$((E2E_STACK_PORT_BASE + 1)) E2E_RT_HTTPS_PORT=$((E2E_STACK_PORT_BASE + 2))
+      E2E_RT_HLT_PORT=$((E2E_STACK_PORT_BASE + 3)) E2E_CONTROL_PLANE_DIRECT_PORT=$((E2E_STACK_PORT_BASE + 4))
+      E2E_MTLS_UPSTREAM_PORT=$((E2E_STACK_PORT_BASE + 5)) E2E_DAST_CANARY_PORT=$((E2E_STACK_PORT_BASE + 6))
+      E2E_HEALTH_TIMEOUT_SECONDS=240 sh scripts/check-e2e-stack-health.sh 2>&1 | tee build/e2e/stack-healthcheck/healthcheck.log
   artifacts:
     when: always
     expire_in: 14 days
