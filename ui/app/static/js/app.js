@@ -5,7 +5,7 @@ import { renderSidebarMenu } from "./app.sidebar-menu.js";
 import { refreshSidebarStatus } from "./app.sidebar-status.js";
 import "./webauthn.js";
 
-import { checkEntryAccess } from "./guard.js";
+import { checkEntryAccess } from "./guard.js?v=20260726-entry-race-1";
 import { escapeHtml, notify } from "./ui.js";
 
 let sidebarCollapsed = false;

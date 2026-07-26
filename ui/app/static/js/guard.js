@@ -134,16 +134,11 @@ async function getCurrentUserQuiet() {
 }
 
 export async function checkEntryAccess(mode) {
-  let setup;
-  try {
-    setup = await getSetupStatus();
-  } catch (error) {
-    if (mode === "app") {
-      await forceRelogin("session_check_failed");
-      return { setup: null, user: null, allowed: false };
-    }
-    throw error;
-  }
+  // A transport failure is not authentication evidence. In particular, an
+  // outgoing document can have this request cancelled by the next navigation;
+  // revoking the session here lets that stale document log out the new page.
+  // Reject the bootstrap (fail closed) and reserve logout for a real auth 401.
+  const setup = await getSetupStatus();
   const onboardingRequired = Boolean(setup.needs_bootstrap);
   const onboardingRedirecting = isOnboardingRedirecting();
   let user = null;

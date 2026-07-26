@@ -54,7 +54,8 @@
 - The browser gate now merges API/runtime evidence from the existing workflow, security, management-rate-limit, full, and registry shards instead of treating the registry-only shard as complete coverage.
 - Sentinel and Playwright CI images now declare unprivileged runtime users; Sentinel prepares its writable named-volume paths at build time and no longer starts as root to change ownership or call `su`.
 - The Trivy image baseline records newly reported Debian 13 upstream-unfixed findings; findings with an available fixed version remain blocking.
-- Auto-start E2E keeps a bounded 60-second HTTP budget for real profile persistence under four-stack CI load instead of inheriting the generic 20-second UI request timeout.
+- Auto-start E2E stages the Easy Profile with `auto_apply=false` before its single explicit compile/apply, avoiding two overlapping runtime reloads while preserving the generic bounded HTTP client timeout.
+- App entry checks no longer revoke a valid session when an outgoing document's setup request is cancelled by the next navigation; only an authentication 401 triggers forced re-login.
 - Revisions browser coverage retries only the idempotent catalog read across the brief connection gap caused by runtime activation; apply and delete mutations remain single-attempt operations.
 - Core tab coverage now uses rendered-page readiness contracts for Requests, Bans, Revisions, Anti-DDoS, CRS, Administration, Events, and Activity instead of treating `DOMContentLoaded` as application readiness.
 - The production page-module loader now applies bounded 250/750 ms backoff between transient dynamic-import retries instead of issuing all attempts immediately during a short network interruption.

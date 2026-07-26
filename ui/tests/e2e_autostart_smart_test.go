@@ -80,9 +80,6 @@ func TestE2EAutoStartSmartRuntime(t *testing.T) {
 
 	baseURL := firstNonEmptyAutoStart(strings.TrimSpace(os.Getenv("WAF_E2E_AUTOSTART_BASE_URL")), "http://127.0.0.1:"+uiPort)
 	client, requestBaseURL, requestHostOverride := newE2EClientAndBase(t, baseURL)
-	// Profile persistence performs real compile-side validation. Keep one bounded
-	// request budget that remains valid while the CI runner hosts four E2E stacks.
-	client.Timeout = 60 * time.Second
 	previousUsername, usernameSet := os.LookupEnv("WAF_E2E_USERNAME")
 	previousPassword, passwordSet := os.LookupEnv("WAF_E2E_PASSWORD")
 	_ = os.Setenv("WAF_E2E_USERNAME", "admin")
@@ -151,7 +148,7 @@ func TestE2EAutoStartSmartRuntime(t *testing.T) {
 		limits["use_bad_behavior"] = false
 		profile["security_behavior_and_limits"] = limits
 		profile["site_id"] = siteID
-		profileResp := postJSON(t, client, requestBaseURL+"/api/easy-site-profiles/"+siteID, requestHostOverride, profile)
+		profileResp := postJSON(t, client, requestBaseURL+"/api/easy-site-profiles/"+siteID+"?auto_apply=false", requestHostOverride, profile)
 		assertStatusIn(t, profileResp, "configure site L7 rate limit", http.StatusOK, http.StatusCreated)
 		e2eCompileAndApply(t, client, requestBaseURL, requestHostOverride)
 	})

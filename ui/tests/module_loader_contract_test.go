@@ -26,7 +26,38 @@ func TestUIContract_DynamicModulesUseBoundedBackoff(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read index.html: %v", err)
 	}
-	if !strings.Contains(string(index), "app.js?v=20260726-module-backoff-1") {
+	if !strings.Contains(string(index), "app.js?v=20260726-entry-race-1") {
 		t.Fatal("index.html must invalidate the cached module loader")
+	}
+}
+
+func TestUIContract_EntryTransportFailureDoesNotRevokeSession(t *testing.T) {
+	guard, err := os.ReadFile(filepath.Join("..", "app", "static", "js", "guard.js"))
+	if err != nil {
+		t.Fatalf("read guard.js: %v", err)
+	}
+	source := string(guard)
+	start := strings.Index(source, "export async function checkEntryAccess(mode)")
+	end := strings.Index(source, "const onboardingRequired")
+	if start < 0 || end <= start {
+		t.Fatal("guard.js entry-access contract is missing")
+	}
+	setupCheck := source[start:end]
+	if !strings.Contains(setupCheck, "const setup = await getSetupStatus();") {
+		t.Fatal("entry access must fail closed when the setup request rejects")
+	}
+	if strings.Contains(setupCheck, "forceRelogin") {
+		t.Fatal("a setup transport failure must not revoke an authenticated session")
+	}
+	if !strings.Contains(source, "await forceRelogin(\"session_missing\")") {
+		t.Fatal("a real missing auth session must still force reauthentication")
+	}
+
+	app, err := os.ReadFile(filepath.Join("..", "app", "static", "js", "app.js"))
+	if err != nil {
+		t.Fatalf("read app.js: %v", err)
+	}
+	if !strings.Contains(string(app), "./guard.js?v=20260726-entry-race-1") {
+		t.Fatal("app.js must invalidate the cached entry guard")
 	}
 }
