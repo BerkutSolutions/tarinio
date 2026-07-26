@@ -513,6 +513,22 @@ if [ "$E2E_FRESH_ONBOARDING" != "1" ]; then
     elapsed=$((elapsed + 2))
   done
   ok "Bootstrap runtime revision is ready after ${elapsed}s"
+
+  if [ "$E2E_BROWSER_ONLY" = "1" ]; then
+    step "Waiting for management HTTPS (timeout ${E2E_TIMEOUT}s)"
+    elapsed=0
+    until curl -kfsS --resolve "e2e-management.test:${E2E_RT_HTTPS_PORT}:127.0.0.1" \
+        "https://e2e-management.test:${E2E_RT_HTTPS_PORT}/login" >/dev/null 2>&1; do
+      [ "$elapsed" -ge "$E2E_TIMEOUT" ] && {
+        fail_msg "management HTTPS readiness timeout"
+        $COMPOSE_CMD -f docker-compose.yml logs runtime --tail=100 >&2
+        exit 1
+      }
+      sleep 2
+      elapsed=$((elapsed + 2))
+    done
+    ok "Management HTTPS is ready after ${elapsed}s"
+  fi
 fi
 
 # Run tests.

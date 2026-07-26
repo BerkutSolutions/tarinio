@@ -86,7 +86,7 @@ test("cross-i18n-all-locales-core-labels-errors-and-modals", async ({ authentica
       const saveResponsePromise = page.waitForResponse((response) => {
         if (response.request().method() !== "PUT" || new URL(response.url()).pathname !== "/api/settings/runtime") return false;
         try { return response.request().postDataJSON()?.language === language; } catch { return false; }
-      });
+      }, { timeout: 30_000 });
       await page.locator("#settings-language-save").click();
       const saveResponse = await saveResponsePromise;
       expect(saveResponse.status(), await saveResponse.text()).toBe(200);
@@ -116,7 +116,7 @@ test("cross-i18n-all-locales-core-labels-errors-and-modals", async ({ authentica
     const restoreResponsePromise = page.waitForResponse((response) => {
       if (response.request().method() !== "PUT" || new URL(response.url()).pathname !== "/api/settings/runtime") return false;
       try { return response.request().postDataJSON()?.language === String(original); } catch { return false; }
-    });
+    }, { timeout: 30_000 });
     await page.locator("#settings-language-save").click();
     const restoreResponse = await restoreResponsePromise;
     expect(restoreResponse.status(), await restoreResponse.text()).toBe(200);
