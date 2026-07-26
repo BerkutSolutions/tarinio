@@ -159,8 +159,7 @@ test("settings.read-controls", async ({ authenticatedPage: page }) => {
 });
 
 test("settings.validation-no-partial-save", async ({ authenticatedPage: page }) => {
-  await page.goto("/settings/general", { waitUntil: "domcontentloaded", timeout: 60000 });
-  await expect(page.locator("#settings-page")).toBeVisible({ timeout: 30000 });
+  await openPage(page, "/settings/general", page.locator("#settings-page[data-runtime-ready=\"true\"]"));
   await page.locator("[data-settings-tab-link='security']").click();
   await expect.poll(() => new URL(page.url()).pathname).toBe("/settings/security");
   await expect(page.locator("#settings-security-save")).toBeVisible({ timeout: 30000 });

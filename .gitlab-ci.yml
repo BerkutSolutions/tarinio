@@ -417,8 +417,20 @@ e2e:api-registry:
     reports:
       junit: build/e2e/$E2E_BROWSER_SLICE/junit.xml
 
-e2e:browser:core:
+.e2e:browser:lane-a:
   extends: .e2e:browser
+  resource_group: waf-e2e-browser-lane-a
+
+.e2e:browser:lane-b:
+  extends: .e2e:browser
+  resource_group: waf-e2e-browser-lane-b
+
+.e2e:browser:lane-c:
+  extends: .e2e:browser
+  resource_group: waf-e2e-browser-lane-c
+
+e2e:browser:core:
+  extends: .e2e:browser:lane-a
   variables:
     E2E_BROWSER_SLICE: browser-core
     E2E_BROWSER_PROJECT: ci-browser-core
@@ -432,7 +444,7 @@ e2e:browser:core:
     E2E_BROWSER_SPECS: "tests/auth-ui.spec.ts tests/smoke.spec.ts tests/waits.spec.ts tests/tabs.spec.ts"
 
 e2e:browser:core-dashboard:
-  extends: .e2e:browser
+  extends: .e2e:browser:lane-b
   variables:
     E2E_BROWSER_SLICE: browser-core-dashboard
     E2E_BROWSER_PROJECT: ci-browser-core-dashboard
@@ -446,7 +458,7 @@ e2e:browser:core-dashboard:
     E2E_BROWSER_SPECS: "tests/dashboard.spec.ts"
 
 e2e:browser:core-records:
-  extends: .e2e:browser
+  extends: .e2e:browser:lane-c
   variables:
     E2E_BROWSER_SLICE: browser-core-records
     E2E_BROWSER_PROJECT: ci-browser-core-records
@@ -460,7 +472,7 @@ e2e:browser:core-records:
     E2E_BROWSER_SPECS: "tests/requests-complete.spec.ts tests/events-complete.spec.ts tests/activity-complete.spec.ts"
 
 e2e:browser:services:
-  extends: .e2e:browser
+  extends: .e2e:browser:lane-a
   variables:
     E2E_BROWSER_SLICE: browser-services
     E2E_BROWSER_PROJECT: ci-browser-services
@@ -474,7 +486,7 @@ e2e:browser:services:
     E2E_BROWSER_SPECS: "tests/services.spec.ts"
 
 e2e:browser:services-preview:
-  extends: .e2e:browser
+  extends: .e2e:browser:lane-b
   variables:
     E2E_BROWSER_SLICE: browser-services-preview
     E2E_BROWSER_PROJECT: ci-browser-services-preview
@@ -488,7 +500,7 @@ e2e:browser:services-preview:
     E2E_BROWSER_SPECS: "tests/services-antibot-preview.spec.ts tests/services-auth.spec.ts"
 
 e2e:browser:services-controls:
-  extends: .e2e:browser
+  extends: .e2e:browser:lane-c
   variables:
     E2E_BROWSER_SLICE: browser-services-controls
     E2E_BROWSER_PROJECT: ci-browser-services-controls
@@ -502,7 +514,7 @@ e2e:browser:services-controls:
     E2E_BROWSER_SPECS: "tests/services-certificate.spec.ts tests/services-dynamic-controls.spec.ts"
 
 e2e:browser:services-editor:
-  extends: .e2e:browser
+  extends: .e2e:browser:lane-a
   variables:
     E2E_BROWSER_SLICE: browser-services-editor
     E2E_BROWSER_PROJECT: ci-browser-services-editor
@@ -516,7 +528,7 @@ e2e:browser:services-editor:
     E2E_BROWSER_SPECS: "tests/services-editor-navigation.spec.ts tests/services-error-pages.spec.ts tests/services-help.spec.ts"
 
 e2e:browser:services-editor-import:
-  extends: .e2e:browser
+  extends: .e2e:browser:lane-b
   variables:
     E2E_BROWSER_SLICE: browser-services-editor-import
     E2E_BROWSER_PROJECT: ci-browser-services-editor-import
@@ -530,7 +542,7 @@ e2e:browser:services-editor-import:
     E2E_BROWSER_SPECS: "tests/services-import.spec.ts tests/services-mobile-layout.spec.ts"
 
 e2e:browser:services-security:
-  extends: .e2e:browser
+  extends: .e2e:browser:lane-c
   variables:
     E2E_BROWSER_SLICE: browser-services-security
     E2E_BROWSER_PROJECT: ci-browser-services-security
@@ -544,7 +556,7 @@ e2e:browser:services-security:
     E2E_BROWSER_SPECS: "tests/services-protection.spec.ts tests/services-rbac.spec.ts tests/services-runtime.spec.ts"
 
 e2e:browser:services-security-patches:
-  extends: .e2e:browser
+  extends: .e2e:browser:lane-a
   variables:
     E2E_BROWSER_SLICE: browser-services-security-patches
     E2E_BROWSER_PROJECT: ci-browser-services-security-patches
@@ -558,7 +570,7 @@ e2e:browser:services-security-patches:
     E2E_BROWSER_SPECS: "tests/services-validation.spec.ts tests/services-virtual-patches.spec.ts"
 
 e2e:browser:platform:
-  extends: .e2e:browser
+  extends: .e2e:browser:lane-b
   variables:
     E2E_BROWSER_SLICE: browser-platform
     E2E_BROWSER_PROJECT: ci-browser-platform
@@ -572,7 +584,7 @@ e2e:browser:platform:
     E2E_BROWSER_SPECS: "tests/bans-mutations.spec.ts tests/bans-rbac.spec.ts tests/revisions-mutations.spec.ts"
 
 e2e:browser:platform-security:
-  extends: .e2e:browser
+  extends: .e2e:browser:lane-c
   variables:
     E2E_BROWSER_SLICE: browser-platform-security
     E2E_BROWSER_PROJECT: ci-browser-platform-security
@@ -586,7 +598,7 @@ e2e:browser:platform-security:
     E2E_BROWSER_SPECS: "tests/antiddos-mutations.spec.ts tests/owasp-crs-mutations.spec.ts"
 
 e2e:browser:platform-tls-admin:
-  extends: .e2e:browser
+  extends: .e2e:browser:lane-a
   variables:
     E2E_BROWSER_SLICE: browser-platform-tls-admin
     E2E_BROWSER_PROJECT: ci-browser-platform-tls-admin
@@ -600,7 +612,7 @@ e2e:browser:platform-tls-admin:
     E2E_BROWSER_SPECS: "tests/tls-mutations.spec.ts tests/tls-complete.spec.ts tests/administration-mutations.spec.ts"
 
 e2e:browser:settings-cross:
-  extends: .e2e:browser
+  extends: .e2e:browser:lane-b
   variables:
     E2E_BROWSER_SLICE: browser-settings-cross
     E2E_BROWSER_PROJECT: ci-browser-settings-cross
@@ -614,7 +626,7 @@ e2e:browser:settings-cross:
     E2E_BROWSER_SPECS: "tests/settings-mutations.spec.ts tests/settings-storage-security.spec.ts"
 
 e2e:browser:settings-management:
-  extends: .e2e:browser
+  extends: .e2e:browser:lane-c
   variables:
     E2E_BROWSER_SLICE: browser-settings-management
     E2E_BROWSER_PROJECT: ci-browser-settings-management
@@ -628,7 +640,7 @@ e2e:browser:settings-management:
     E2E_BROWSER_SPECS: "tests/settings-logging-secrets.spec.ts tests/settings-management-appearance.spec.ts"
 
 e2e:browser:cross-security:
-  extends: .e2e:browser
+  extends: .e2e:browser:lane-a
   variables:
     E2E_BROWSER_SLICE: browser-cross-security
     E2E_BROWSER_PROJECT: ci-browser-cross-security
@@ -642,7 +654,7 @@ e2e:browser:cross-security:
     E2E_BROWSER_SPECS: "tests/cross-security-auth-rbac.spec.ts tests/cross-resilience-i18n-security.spec.ts"
 
 e2e:browser:cross-compile-audit:
-  extends: .e2e:browser
+  extends: .e2e:browser:lane-b
   variables:
     E2E_BROWSER_SLICE: browser-cross-compile-audit
     E2E_BROWSER_PROJECT: ci-browser-cross-compile-audit
@@ -656,7 +668,7 @@ e2e:browser:cross-compile-audit:
     E2E_BROWSER_SPECS: "tests/cross-compile-audit.spec.ts"
 
 e2e:browser:requests-backend-failure:
-  extends: .e2e:browser
+  extends: .e2e:browser:lane-c
   variables:
     E2E_BROWSER_SLICE: browser-requests-backend-failure
     E2E_BROWSER_PROJECT: ci-browser-requests-backend-failure

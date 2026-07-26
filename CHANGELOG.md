@@ -35,10 +35,12 @@
 - Dynamic service-control read-back coverage now waits for the asynchronously hydrated editor after navigation instead of treating the initial HTML shell as a rendered form.
 - Bans and revision timeline browser coverage now waits for page-specific asynchronously rendered anchors after navigation and compile operations.
 - Locale persistence coverage now verifies the stored runtime setting through API read-back instead of depending on a response event across a full language rerender; service navigation similarly waits for the asynchronously restored list after returning from the editor.
-- The disposable E2E Vault healthcheck now allows enough startup time under four concurrent stack builds, avoiding a false unhealthy dependency failure during CPU-heavy runner startup.
+- The disposable E2E Vault healthcheck now allows enough startup time under concurrent stack builds, avoiding a false unhealthy dependency failure during CPU-heavy runner startup.
 - Revision apply/delete coverage now waits for the target service tile after rollback navigation before opening the revision modal.
 - Shared browser authentication now polls the real session/login endpoints through short runtime reload gaps, while TLS and responsive-editor coverage waits for page-specific hydrated controls before interaction.
 - Cross-locale coverage now waits for the runtime-ready settings contract before clicking Save and tolerates only transient read-back transport gaps inside the bounded persistence assertion.
+- Settings validation coverage now enters the page through its runtime-ready contract before switching tabs and asserting atomic validation behavior.
+- Browser shards are distributed across three independent resource lanes: the 6-vCPU runner keeps three fully isolated stacks active while reserving scheduler and Docker headroom, avoiding the measured load-average-13 starvation seen with four simultaneous stack builds.
 
 ### Конвейер E2E и очистка стендов
 
