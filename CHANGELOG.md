@@ -30,6 +30,7 @@
 - The document language attribute is now committed only after all asynchronous language-change rerenders finish, making locale switches atomic instead of exposing an early intermediate success signal.
 - The CI browser image now installs the lockfile dependencies at image-build time; individual shards run the baked Playwright toolchain and no longer perform repeated runtime downloads from npm registry.
 - Requests browser coverage now clears the exercised security-reason filter before validating full-dataset pagination, so filtered-result counts are not mistaken for a pagination failure.
+- Cross-locale browser coverage now waits for and verifies each real runtime-settings PUT before asserting the atomic DOM-language commit, including restoration of the original locale.
 
 ### Конвейер E2E и очистка стендов
 
