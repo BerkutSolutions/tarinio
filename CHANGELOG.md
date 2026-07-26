@@ -37,6 +37,8 @@
 - Locale persistence coverage now verifies the stored runtime setting through API read-back instead of depending on a response event across a full language rerender; service navigation similarly waits for the asynchronously restored list after returning from the editor.
 - The disposable E2E Vault healthcheck now allows enough startup time under four concurrent stack builds, avoiding a false unhealthy dependency failure during CPU-heavy runner startup.
 - Revision apply/delete coverage now waits for the target service tile after rollback navigation before opening the revision modal.
+- Shared browser authentication now polls the real session/login endpoints through short runtime reload gaps, while TLS and responsive-editor coverage waits for page-specific hydrated controls before interaction.
+- Cross-locale coverage now waits for the runtime-ready settings contract before clicking Save and tolerates only transient read-back transport gaps inside the bounded persistence assertion.
 
 ### Конвейер E2E и очистка стендов
 

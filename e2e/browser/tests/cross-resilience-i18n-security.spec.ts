@@ -81,10 +81,12 @@ test("cross-i18n-all-locales-core-labels-errors-and-modals", async ({ authentica
   };
   try {
     for (const language of ["en", "ru", "de", "sr", "zh"]) {
-      await openPage(page, "/settings/general", page.locator("#settings-language-save"));
+      await openPage(page, "/settings/general", page.locator(readySelectors["/settings/general"]));
       await page.locator("#settings-language-select").selectOption(language);
       await page.locator("#settings-language-save").click();
-      await expect.poll(async () => JSON.parse((await api(page, "/api/settings/runtime")).body).language, { timeout: 30_000 }).toBe(language);
+      await expect.poll(async () => {
+        try { return JSON.parse((await api(page, "/api/settings/runtime")).body).language; } catch { return ""; }
+      }, { timeout: 30_000 }).toBe(language);
       await expect.poll(() => page.evaluate(() => document.documentElement.lang), { timeout: 30_000 }).toBe(language);
       for (const path of ["/dashboard", "/events", "/activity", "/settings/general"]) {
         await openPage(page, path, page.locator(readySelectors[path]));
@@ -106,10 +108,12 @@ test("cross-i18n-all-locales-core-labels-errors-and-modals", async ({ authentica
       await expect(modal).toBeHidden();
     }
   } finally {
-    await openPage(page, "/settings/general", page.locator("#settings-language-save"));
+    await openPage(page, "/settings/general", page.locator(readySelectors["/settings/general"]));
     await page.locator("#settings-language-select").selectOption(String(original));
     await page.locator("#settings-language-save").click();
-    await expect.poll(async () => JSON.parse((await api(page, "/api/settings/runtime")).body).language, { timeout: 30_000 }).toBe(String(original));
+    await expect.poll(async () => {
+      try { return JSON.parse((await api(page, "/api/settings/runtime")).body).language; } catch { return ""; }
+    }, { timeout: 30_000 }).toBe(String(original));
     await expect.poll(() => page.evaluate(() => document.documentElement.lang), { timeout: 30_000 }).toBe(String(original));
   }
 });

@@ -1,11 +1,11 @@
 import { expect, test } from "../fixtures/auth";
+import { openPage } from "../support/waits";
 
 const tabs = ["front", "upstream", "httpheaders", "traffic", "blocking", "antibot", "geo", "modsec", "websocket", "virtualpatches", "errorpages"];
 
 test("services.editor-all-tabs-responsive-layout", async ({ authenticatedPage: page }) => {
   test.setTimeout(3 * 60_000);
-  await page.goto("/services/new", { waitUntil: "domcontentloaded", timeout: 60_000 });
-  await expect(page.locator("#service-editor-form")).toBeVisible();
+  await openPage(page, "/services/new", page.locator("#service-editor-form"));
   for (const tab of tabs) {
     await page.locator(`[data-wizard-tab="${tab}"]`).click();
     const panel = page.locator(`[data-tab-panel="${tab}"]`);

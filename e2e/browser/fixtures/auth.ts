@@ -21,15 +21,31 @@ async function activeRevisionID(page: Page) {
 }
 
 async function ensureAuthenticated(page: Page) {
-  const status = await page.evaluate(async () => fetch("/api/auth/me", { credentials: "include" }).then((response) => response.status));
+  let status = 0;
+  await expect.poll(async () => {
+    try {
+      status = await page.evaluate(async () => fetch("/api/auth/me", { credentials: "include" }).then((response) => response.status));
+      return status === 200 || status === 401;
+    } catch {
+      return false;
+    }
+  }, { timeout: 30_000 }).toBe(true);
   if (status === 200) return;
   expect(status).toBe(401);
   const username = requiredE2EEnv("WAF_E2E_USERNAME");
   const password = requiredE2EEnv("WAF_E2E_PASSWORD");
-  const login = await page.evaluate(async ({ username, password }) => {
-    const response = await fetch("/api/auth/login", { method: "POST", credentials: "include", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ username, password }) });
-    return { status: response.status, body: await response.text() };
-  }, { username, password });
+  let login = { status: 0, body: "login request did not complete" };
+  await expect.poll(async () => {
+    try {
+      login = await page.evaluate(async ({ username, password }) => {
+        const response = await fetch("/api/auth/login", { method: "POST", credentials: "include", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ username, password }) });
+        return { status: response.status, body: await response.text() };
+      }, { username, password });
+      return login.status;
+    } catch {
+      return 0;
+    }
+  }, { timeout: 30_000 }).toBe(200);
   expect(login.status, login.body).toBe(200);
 }
 

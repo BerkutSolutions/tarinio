@@ -121,7 +121,7 @@ test("owasp-crs.read-controls", async ({ authenticatedPage: page }) => {
 });
 
 test("tls.read-controls", async ({ authenticatedPage: page }) => {
-  await page.goto("/tls", { waitUntil: "domcontentloaded", timeout: 60000 });
+  await openPage(page, "/tls", page.locator("#certificate-refresh"));
   await page.locator("#certificate-refresh").click();
   await page.locator("#tls-config-refresh").click();
   await expect(page.locator("#certificate-form")).toBeVisible();
