@@ -67,6 +67,7 @@ async function restoreActiveRevision(page: Page, revisionID: string) {
 export const test = base.extend<Fixtures>({
   authenticatedPage: async ({ page }, use) => {
     await gotoWithNetworkRetry(page, "/login");
+    await page.context().clearCookies();
     await ensureAuthenticated(page);
     const originalRevisionID = await activeRevisionID(page);
     try {

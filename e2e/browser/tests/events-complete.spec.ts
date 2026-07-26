@@ -1,4 +1,5 @@
 import { expect, test } from "../fixtures/auth";
+import { openPage } from "../support/waits";
 
 async function api(page: import("@playwright/test").Page, path: string) {
   return page.evaluate(async (path) => {
@@ -32,7 +33,7 @@ async function ensureSecondEventsPage(page: import("@playwright/test").Page) {
 }
 
 test("events.api-filter-pagination-detail-contract", async ({ authenticatedPage: page }) => {
-  await page.goto("/events", { waitUntil: "domcontentloaded" });
+  await openPage(page, "/events", "#events-filters");
   const result = await api(page, "/api/events?limit=500&offset=0");
   expect(result.status, result.body).toBe(200);
   const payload = JSON.parse(result.body);
@@ -58,8 +59,7 @@ test("events.api-filter-pagination-detail-contract", async ({ authenticatedPage:
 
 test("events.browser-pagination-detail-keyboard", async ({ authenticatedPage: page }) => {
   await ensureSecondEventsPage(page);
-  await page.goto("/events", { waitUntil: "domcontentloaded" });
-  await expect(page.locator("#events-filters")).toBeVisible();
+  await openPage(page, "/events", "#events-filters");
   const row = page.locator("[data-event-row]").first();
   await expect(row).toBeVisible();
   await row.focus();
@@ -89,7 +89,7 @@ test("events.loading-empty-error-malformed", async ({ authenticatedPage: source 
       if (state === "empty") await page.route("**/api/events**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: '{"events":[],"total":0}' }));
       if (state === "error") await page.route("**/api/events**", (route) => route.fulfill({ status: 503, contentType: "application/json", body: '{"error":"unavailable"}' }));
       if (state === "malformed") await page.route("**/api/events**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: '{"events":"bad"}' }));
-      await page.goto("/events", { waitUntil: "domcontentloaded" });
+      await openPage(page, "/events", "#events-filters");
       if (state === "loading") await expect(page.locator("#events-status")).toContainText(/loading|загруз|laden|učit|加载/i);
       else if (state === "error") await expect(page.locator("#events-status")).not.toBeEmpty();
       else await expect(page.locator("#events-list")).toContainText(/no events|нет событий|событий пока нет|keine|nema|没有/i);
