@@ -26,6 +26,7 @@
 - Dashboard CPU edge assertions preserve Docker totals above 100% while checking that only the visual progress width is capacity-clamped; Memory percentage remains clamped to the 0–100 display range.
 - GitHub mirror/release publication is explicit opt-in via `PUBLISH_GITHUB=1`; ordinary verified `main` pipelines perform no GitHub or GHCR writes.
 - Cross-locale settings saves no longer let the server-language metadata refresh re-enter and overwrite the user's next locale during the awaited page rerender; initial metadata synchronization remains unchanged.
+- Stack healthcheck now uses its own pipeline-derived host port range, preventing its disposable MTLS/DAST services from colliding with parallel E2E jobs on the shared runner.
 
 ### Конвейер E2E и очистка стендов
 
