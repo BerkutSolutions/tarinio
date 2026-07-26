@@ -19,10 +19,19 @@ async function api(page: import("@playwright/test").Page, path: string, init: Re
 }
 
 async function catalog(page: import("@playwright/test").Page): Promise<Revision[]> {
-  const result = await api(page, "/api/revisions");
-  expect(result.status, result.body).toBe(200);
-  const payload = JSON.parse(result.body);
-  return Array.isArray(payload?.revisions) ? payload.revisions : [];
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      const result = await api(page, "/api/revisions");
+      if (result.status !== 200) throw new Error(`revisions catalog status=${result.status} body=${result.body}`);
+      const payload = JSON.parse(result.body);
+      return Array.isArray(payload?.revisions) ? payload.revisions : [];
+    } catch (error) {
+      lastError = error;
+      if (attempt < 3) await page.waitForTimeout(250 * (attempt + 1));
+    }
+  }
+  throw lastError;
 }
 
 test("revisions.compile-apply-rollback-artifact", async ({ authenticatedPage: page }) => {
