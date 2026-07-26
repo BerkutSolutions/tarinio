@@ -56,15 +56,33 @@ test("owasp-crs.api-validation-and-disabled-busy-state", async ({ authenticatedP
   const invalidHourly = await api(page, "/api/owasp-crs/update", { method: "POST", body: JSON.stringify({ enable_hourly_auto_update: 1 }) });
   expect(invalidHourly.status, invalidHourly.body).toBe(400);
 
-  const request = page.waitForResponse((response) => response.url().includes("/api/owasp-crs/check-updates"));
-  await page.locator("#owasp-crs-check").click();
-  await expect(page.locator("#owasp-crs-check")).toBeDisabled();
-  await expect(page.locator("#owasp-crs-update")).toBeDisabled();
-  const response = await request;
-  if (response.status() === 502) {
-    expect(JSON.parse(await response.text())?.code).toBe("crs_release_unavailable");
-  } else {
-    expect(response.status(), await response.text()).toBe(200);
+  let markRequestStarted: (() => void) | undefined;
+  let releaseRequest: (() => void) | undefined;
+  const requestStarted = new Promise<void>((resolve) => { markRequestStarted = resolve; });
+  const requestRelease = new Promise<void>((resolve) => { releaseRequest = resolve; });
+  const requestPattern = "**/api/owasp-crs/check-updates";
+  const holdLiveRequest = async (route: import("@playwright/test").Route) => {
+    markRequestStarted?.();
+    await requestRelease;
+    await route.continue();
+  };
+  await page.route(requestPattern, holdLiveRequest);
+  try {
+    const request = page.waitForResponse((response) => response.url().includes("/api/owasp-crs/check-updates"));
+    await page.locator("#owasp-crs-check").click();
+    await requestStarted;
+    await expect(page.locator("#owasp-crs-check")).toBeDisabled();
+    await expect(page.locator("#owasp-crs-update")).toBeDisabled();
+    releaseRequest?.();
+    const response = await request;
+    if (response.status() === 502) {
+      expect(JSON.parse(await response.text())?.code).toBe("crs_release_unavailable");
+    } else {
+      expect(response.status(), await response.text()).toBe(200);
+    }
+  } finally {
+    releaseRequest?.();
+    await page.unroute(requestPattern, holdLiveRequest);
   }
   await expect(page.locator("#owasp-crs-check")).toBeEnabled({ timeout: 60_000 });
 });

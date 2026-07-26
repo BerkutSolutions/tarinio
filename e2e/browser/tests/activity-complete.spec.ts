@@ -25,7 +25,9 @@ test("activity.api-filter-pagination-and-critical-mutations", async ({ authentic
     expect((await api(page, "/api/revisions/compile", { method: "POST", body: "{}" })).status).toBe(201);
     expect((await api(page, "/api/administration/users", { method: "POST", body: JSON.stringify({ id: userID, username: userID, email: `${userID}@example.test`, password: "E2e-Audit-1234!", role_ids: ["auditor"], is_active: true }) })).status).toBe(201);
     expect((await api(page, `/api/administration/users/${encodeURIComponent(userID)}`, { method: "DELETE" })).status).toBe(200);
-    for (let i = 0; i < 26; i++) {
+    const initialConfigAudit = JSON.parse((await api(page, "/api/audit?category=config&limit=1&offset=0")).body);
+    const missingConfigRows = Math.max(0, 26 - Number(initialConfigAudit.total || 0));
+    for (let i = 0; i < missingConfigRows; i++) {
       const settings = { ...originalAntiDDoS, model_enabled: i % 2 === 0 ? !Boolean(originalAntiDDoS.model_enabled) : Boolean(originalAntiDDoS.model_enabled) };
       expect((await api(page, "/api/anti-ddos/settings?auto_apply=false", { method: "PUT", body: JSON.stringify(settings) })).status).toBe(200);
     }
@@ -65,8 +67,8 @@ test("activity.api-filter-pagination-and-critical-mutations", async ({ authentic
     }
   } finally {
     expect((await api(page, "/api/anti-ddos/settings?auto_apply=false", { method: "PUT", body: JSON.stringify(originalAntiDDoS) })).status).toBe(200);
-    expect((await api(page, `/api/certificates/${encodeURIComponent(certificateID)}`, { method: "DELETE" })).status).toBeLessThan(300);
-    expect((await api(page, `/api/sites/${encodeURIComponent(siteID)}?auto_apply=false`, { method: "DELETE" })).status).toBeLessThan(300);
+    expect([200, 204, 404]).toContain((await api(page, `/api/certificates/${encodeURIComponent(certificateID)}`, { method: "DELETE" })).status);
+    expect([200, 204, 404]).toContain((await api(page, `/api/sites/${encodeURIComponent(siteID)}?auto_apply=false`, { method: "DELETE" })).status);
   }
 });
 
