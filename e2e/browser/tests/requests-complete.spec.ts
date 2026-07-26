@@ -30,6 +30,8 @@ test("requests.real-runtime-filter-pagination-detail", async ({ authenticatedPag
   await reason.selectOption(availableReasons[0]);
   await expect(page.locator("[data-request-row]").first()).toBeVisible();
 
+  await reason.selectOption("");
+  await expect(page.locator("[data-request-row]").first()).toBeVisible();
   await page.locator("#requests-page-size").selectOption("10");
   await expect(page.locator("[data-request-row]")).toHaveCount(10);
   const secondPage = page.locator("[data-requests-page='2']");

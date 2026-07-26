@@ -29,6 +29,7 @@
 - Stack healthcheck now uses its own pipeline-derived host port range, preventing its disposable MTLS/DAST services from colliding with parallel E2E jobs on the shared runner.
 - The document language attribute is now committed only after all asynchronous language-change rerenders finish, making locale switches atomic instead of exposing an early intermediate success signal.
 - The CI browser image now installs the lockfile dependencies at image-build time; individual shards run the baked Playwright toolchain and no longer perform repeated runtime downloads from npm registry.
+- Requests browser coverage now clears the exercised security-reason filter before validating full-dataset pagination, so filtered-result counts are not mistaken for a pagination failure.
 
 ### Конвейер E2E и очистка стендов
 
