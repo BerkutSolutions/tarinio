@@ -41,6 +41,7 @@ func TestBrowserE2EUsesItsIsolatedComposeNetwork(t *testing.T) {
 		`WAF_BROWSER_DOCKER_NETWORK="${E2E_PROJECT}_waf-e2e-net"`,
 		`WAF_BROWSER_BASE_URL="https://e2e-management.test"`,
 		`--network "$WAF_BROWSER_DOCKER_NETWORK"`,
+		`-e WAF_E2E_RUNTIME_URL="$WAF_BROWSER_RUNTIME_URL"`,
 	} {
 		if !strings.Contains(source, marker) {
 			t.Fatalf("browser E2E isolation missing marker %q", marker)
