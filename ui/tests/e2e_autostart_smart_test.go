@@ -80,6 +80,9 @@ func TestE2EAutoStartSmartRuntime(t *testing.T) {
 
 	baseURL := firstNonEmptyAutoStart(strings.TrimSpace(os.Getenv("WAF_E2E_AUTOSTART_BASE_URL")), "http://127.0.0.1:"+uiPort)
 	client, requestBaseURL, requestHostOverride := newE2EClientAndBase(t, baseURL)
+	// Profile persistence performs real compile-side validation. Keep one bounded
+	// request budget that remains valid while the CI runner hosts four E2E stacks.
+	client.Timeout = 60 * time.Second
 	previousUsername, usernameSet := os.LookupEnv("WAF_E2E_USERNAME")
 	previousPassword, passwordSet := os.LookupEnv("WAF_E2E_PASSWORD")
 	_ = os.Setenv("WAF_E2E_USERNAME", "admin")

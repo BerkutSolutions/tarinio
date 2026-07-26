@@ -54,6 +54,7 @@
 - The browser gate now merges API/runtime evidence from the existing workflow, security, management-rate-limit, full, and registry shards instead of treating the registry-only shard as complete coverage.
 - Sentinel and Playwright CI images now declare unprivileged runtime users; Sentinel prepares its writable named-volume paths at build time and no longer starts as root to change ownership or call `su`.
 - The Trivy image baseline records newly reported Debian 13 upstream-unfixed findings; findings with an available fixed version remain blocking.
+- Auto-start E2E keeps a bounded 60-second HTTP budget for real profile persistence under four-stack CI load instead of inheriting the generic 20-second UI request timeout.
 
 ### Конвейер E2E и очистка стендов
 
