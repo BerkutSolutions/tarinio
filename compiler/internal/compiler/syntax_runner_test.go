@@ -2,6 +2,8 @@ package compiler
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -59,6 +61,26 @@ func TestRuntimeSyntaxRunner_ValidatesBundleAndRunsNginxSyntaxCheck(t *testing.T
 	}
 	if len(exec.args) != 5 || exec.args[0] != "-t" || exec.args[1] != "-p" || exec.args[3] != "-c" || exec.args[4] != "nginx.conf" {
 		t.Fatalf("unexpected nginx args: %#v", exec.args)
+	}
+}
+
+func TestMaterializeBundle_RewritesRuntimeAbsoluteReferencesIntoShadowRoot(t *testing.T) {
+	root := t.TempDir()
+	files := []BundleFile{{
+		Path:    "nginx/sites/site-a.conf",
+		Content: []byte("include /etc/waf/nginx/easy/site-a.conf;\n"),
+	}}
+	if err := materializeSyntaxBundle(root, files); err != nil {
+		t.Fatalf("materialize bundle: %v", err)
+	}
+	content, err := os.ReadFile(filepath.Join(root, "nginx", "sites", "site-a.conf"))
+	if err != nil {
+		t.Fatalf("read materialized config: %v", err)
+	}
+	got := string(content)
+	want := "include " + filepath.ToSlash(root) + "/nginx/easy/site-a.conf;"
+	if !strings.Contains(got, want) || strings.Contains(got, "/etc/waf/") {
+		t.Fatalf("runtime reference was not isolated: %q", got)
 	}
 }
 

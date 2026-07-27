@@ -1,11 +1,11 @@
 package compiler
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 )
 
@@ -46,7 +46,7 @@ func (r RuntimeSyntaxRunner) Validate(bundle *RevisionBundle) error {
 	defer os.RemoveAll(tempRoot)
 
 	bundleRoot := filepath.Join(tempRoot, "bundle")
-	if err := materializeBundle(bundleRoot, bundle.Files); err != nil {
+	if err := materializeSyntaxBundle(bundleRoot, bundle.Files); err != nil {
 		return err
 	}
 	if err := validateIncludedFiles(bundleRoot); err != nil {
@@ -79,64 +79,21 @@ func (r RuntimeSyntaxRunner) Validate(bundle *RevisionBundle) error {
 		return nil
 	}
 
-	if runtime.GOOS == "windows" {
-		return run()
-	}
-
-	// CI and developer environments often execute tests as non-root, where
-	// creating /etc/waf symlinks is forbidden. In that case we still run nginx
-	// syntax validation against the materialized bundle root.
-	if os.Geteuid() != 0 {
-		return run()
-	}
-
-	if err := withTemporaryEtcWAF(bundleRoot, run); err != nil {
-		if errors.Is(err, os.ErrPermission) || strings.Contains(strings.ToLower(err.Error()), "permission denied") {
-			return run()
-		}
-		return err
-	}
-
-	return nil
-}
-
-func withTemporaryEtcWAF(bundleRoot string, run func() error) error {
-	const liveEtcWAF = "/etc/waf"
-
-	shadowRoot := bundleRoot
-	backupPath := ""
-	if _, err := os.Lstat(liveEtcWAF); err == nil {
-		backupPath = liveEtcWAF + ".bak"
-		_ = os.RemoveAll(backupPath)
-		if err := os.Rename(liveEtcWAF, backupPath); err != nil {
-			return fmt.Errorf("prepare temporary /etc/waf backup: %w", err)
-		}
-	}
-
-	if err := os.Symlink(shadowRoot, liveEtcWAF); err != nil {
-		if backupPath != "" {
-			_ = os.Rename(backupPath, liveEtcWAF)
-		}
-		return fmt.Errorf("prepare temporary /etc/waf shadow: %w", err)
-	}
-
-	defer func() {
-		_ = os.Remove(liveEtcWAF)
-		if backupPath != "" {
-			_ = os.Rename(backupPath, liveEtcWAF)
-		}
-	}()
-
+	// Syntax validation must never rename or replace the live /etc/waf tree.
+	// Containers commonly mount a writable child such as l4guard-adaptive
+	// beneath it, making a parent rename fail with EXDEV. materializeSyntaxBundle
+	// maps runtime-absolute references into this disposable bundle instead.
 	return run()
 }
 
-func materializeBundle(root string, files []BundleFile) error {
+func materializeSyntaxBundle(root string, files []BundleFile) error {
 	for _, file := range files {
 		targetPath := filepath.Join(root, filepath.FromSlash(file.Path))
 		if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
 			return fmt.Errorf("create bundle directory for %s: %w", file.Path, err)
 		}
-		if err := os.WriteFile(targetPath, file.Content, 0o644); err != nil {
+		content := bytes.ReplaceAll(file.Content, []byte("/etc/waf/"), []byte(filepath.ToSlash(root)+"/"))
+		if err := os.WriteFile(targetPath, content, 0o644); err != nil {
 			return fmt.Errorf("write bundle file %s: %w", file.Path, err)
 		}
 	}

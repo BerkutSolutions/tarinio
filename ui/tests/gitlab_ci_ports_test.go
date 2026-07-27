@@ -23,7 +23,7 @@ func TestGitLabCIE2EPortsStayBelowEphemeralRange(t *testing.T) {
 		"E2E_STACK_PORT_BASE=$((25000 + E2E_STACK_SLOT * 100))",
 		"E2E_CI_RUNNER_ID=\"${CI_RUNNER_ID:-0}\"",
 		"E2E_PROJECT=\"ci-runner-${E2E_CI_RUNNER_ID}-e2e-slot-${CI_CONCURRENT_ID}\"",
-		"COMPOSE_PROJECT_NAME=\"ci-runner-${E2E_STACK_RUNNER_ID}-stack-slot-${E2E_STACK_SLOT}\"",
+		"export COMPOSE_PROJECT_NAME=\"ci-runner-${E2E_STACK_RUNNER_ID}-stack-slot-${E2E_STACK_SLOT}\"",
 		"E2E_DAST_CANARY_PORT=$((E2E_CI_PORT_BASE + 5))",
 	} {
 		if !strings.Contains(source, marker) {
