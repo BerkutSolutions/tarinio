@@ -101,6 +101,7 @@ function bindRequestsChartHover(bodyNode, rows, ctx) {
   const chartWidth = width - padLeft - padRight;
   const nearest = (x) => clamp(Math.round(((x - padLeft) / chartWidth) * (rows.length - 1)), 0, rows.length - 1);
   const show = (event) => {
+    bodyNode.__wafChartPointer = { clientX: event.clientX, clientY: event.clientY };
     const rect = svg.getBoundingClientRect();
     const localX = ((event.clientX - rect.left) / Math.max(rect.width, 1)) * width;
     const row = rows[nearest(localX)];
@@ -127,13 +128,24 @@ function bindRequestsChartHover(bodyNode, rows, ctx) {
     tooltip.style.left = `${Math.round(left)}px`;
     tooltip.style.top = `${Math.round(top)}px`;
   };
-  overlay.addEventListener("mousemove", show);
-  overlay.addEventListener("mouseenter", show);
-  overlay.addEventListener("mouseleave", () => {
+  const hide = () => {
+    delete bodyNode.__wafChartPointer;
     tooltip.hidden = true;
     if (cursor) cursor.hidden = true;
     if (point) point.hidden = true;
-  });
+  };
+  overlay.addEventListener("pointermove", show);
+  overlay.addEventListener("pointerenter", show);
+  overlay.addEventListener("pointerleave", hide);
+  overlay.addEventListener("mousemove", show);
+  overlay.addEventListener("mouseenter", show);
+  overlay.addEventListener("mouseleave", hide);
+  const previousPointer = bodyNode.__wafChartPointer;
+  if (previousPointer && bodyNode.matches(":hover")) {
+    window.requestAnimationFrame(() => {
+      if (bodyNode.isConnected && bodyNode.matches(":hover")) show(previousPointer);
+    });
+  }
 }
 
 export {

@@ -40,6 +40,25 @@ func TestGitLabCIE2EPortsStayBelowEphemeralRange(t *testing.T) {
 	}
 }
 
+func TestGitLabCIBrowserJobsUseAllFourRunnerLanes(t *testing.T) {
+	content, err := os.ReadFile(filepath.Join("..", "..", ".gitlab-ci.yml"))
+	if err != nil {
+		t.Fatalf("read .gitlab-ci.yml: %v", err)
+	}
+	source := string(content)
+	for _, lane := range []string{"a", "b", "c", "d"} {
+		template := ".e2e:browser:lane-" + lane + ":"
+		resourceGroup := "resource_group: waf-e2e-browser-lane-" + lane
+		if !strings.Contains(source, template) || !strings.Contains(source, resourceGroup) {
+			t.Fatalf("GitLab CI missing isolated browser lane %s", lane)
+		}
+		count := strings.Count(source, "extends: .e2e:browser:lane-"+lane)
+		if count < 4 || count > 5 {
+			t.Fatalf("browser lane %s has %d jobs; want a balanced 4-5", lane, count)
+		}
+	}
+}
+
 func TestBrowserE2EUsesItsIsolatedComposeNetwork(t *testing.T) {
 	script, err := os.ReadFile(filepath.Join("..", "..", "scripts", "run-e2e-tests.sh"))
 	if err != nil {

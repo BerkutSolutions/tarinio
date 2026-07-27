@@ -452,6 +452,10 @@ e2e:api-registry:
   extends: .e2e:browser
   resource_group: waf-e2e-browser-lane-c
 
+.e2e:browser:lane-d:
+  extends: .e2e:browser
+  resource_group: waf-e2e-browser-lane-d
+
 e2e:browser:core:
   extends: .e2e:browser:lane-a
   variables:
@@ -481,7 +485,7 @@ e2e:browser:core-dashboard:
     E2E_BROWSER_SPECS: "tests/dashboard.spec.ts"
 
 e2e:browser:core-records:
-  extends: .e2e:browser:lane-c
+  extends: .e2e:browser:lane-d
   variables:
     E2E_BROWSER_SLICE: browser-core-records
     E2E_BROWSER_PROJECT: ci-browser-core-records
@@ -537,7 +541,7 @@ e2e:browser:services-controls:
     E2E_BROWSER_SPECS: "tests/services-certificate.spec.ts tests/services-dynamic-controls.spec.ts"
 
 e2e:browser:services-editor:
-  extends: .e2e:browser:lane-a
+  extends: .e2e:browser:lane-d
   variables:
     E2E_BROWSER_SLICE: browser-services-editor
     E2E_BROWSER_PROJECT: ci-browser-services-editor
@@ -593,7 +597,7 @@ e2e:browser:services-security-patches:
     E2E_BROWSER_SPECS: "tests/services-validation.spec.ts tests/services-virtual-patches.spec.ts"
 
 e2e:browser:platform:
-  extends: .e2e:browser:lane-b
+  extends: .e2e:browser:lane-d
   variables:
     E2E_BROWSER_SLICE: browser-platform
     E2E_BROWSER_PROJECT: ci-browser-platform
@@ -649,7 +653,7 @@ e2e:browser:settings-cross:
     E2E_BROWSER_SPECS: "tests/settings-mutations.spec.ts tests/settings-storage-security.spec.ts"
 
 e2e:browser:settings-management:
-  extends: .e2e:browser:lane-c
+  extends: .e2e:browser:lane-d
   variables:
     E2E_BROWSER_SLICE: browser-settings-management
     E2E_BROWSER_PROJECT: ci-browser-settings-management

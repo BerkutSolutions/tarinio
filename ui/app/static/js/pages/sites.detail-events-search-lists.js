@@ -363,6 +363,7 @@ export function bindDetailSearchAndListEvents(params) {
   });
 
   container.querySelector("[data-geo-tw-add]")?.addEventListener("click", () => {
+    syncStateDraftFromForm();
     state.draft.geo_time_windows = [...readGeoTimeWindowDraftRows(container), { countries: [], action: "block", days_of_week: [], hours_start: 9, hours_end: 17 }];
     render();
   });
@@ -370,6 +371,7 @@ export function bindDetailSearchAndListEvents(params) {
     button.addEventListener("click", () => {
       const index = Number.parseInt(String(button.dataset.geoTwRemove || "-1"), 10);
       if (!Number.isInteger(index) || index < 0) return;
+      syncStateDraftFromForm();
       const current = readGeoTimeWindowDraftRows(container);
       if (index >= current.length) return;
       current.splice(index, 1);

@@ -22,17 +22,20 @@ test("services.allowlist-easy-and-raw-persistence", async ({ authenticatedPage: 
     const payload = JSON.parse(result.body);
     return Array.isArray(payload) ? payload : payload?.items || [];
   };
-  const accessPolicy = async () => (await items("/api/access-policies"))
-    .find((item: { site_id?: string }) => item.site_id === siteID);
+  const accessPolicies = async () => (await items("/api/access-policies"))
+    .filter((item: { site_id?: string }) => item.site_id === siteID);
+  const accessPolicy = async () => (await accessPolicies())[0];
 
   const cleanup = new CleanupLedger();
-  cleanup.add("access policy", async () => {
-    const policy = await accessPolicy();
-    if (policy?.id) await api("/api/access-policies/" + encodeURIComponent(policy.id) + "?auto_apply=false", { method: "DELETE" });
-  }, async () => !(await accessPolicy()));
-  cleanup.add("profile", () => api("/api/easy-site-profiles/" + siteID + "?auto_apply=false", { method: "DELETE" }), async () => !(await items("/api/easy-site-profiles")).some((item: { site_id?: string }) => item.site_id === siteID));
-  cleanup.add("upstream", () => api("/api/upstreams/" + upstreamID + "?auto_apply=false", { method: "DELETE" }), async () => !(await items("/api/upstreams")).some((item: { id?: string }) => item.id === upstreamID));
   cleanup.add("site", () => api("/api/sites/" + siteID + "?auto_apply=false", { method: "DELETE" }), async () => !(await items("/api/sites")).some((item: { id?: string }) => item.id === siteID));
+  cleanup.add("upstream", () => api("/api/upstreams/" + upstreamID + "?auto_apply=false", { method: "DELETE" }), async () => !(await items("/api/upstreams")).some((item: { id?: string }) => item.id === upstreamID));
+  cleanup.add("profile", () => api("/api/easy-site-profiles/" + siteID + "?auto_apply=false", { method: "DELETE" }), async () => !(await items("/api/easy-site-profiles")).some((item: { site_id?: string }) => item.site_id === siteID));
+  cleanup.add("access policies", async () => {
+    for (const policy of await accessPolicies()) {
+      const result = await api("/api/access-policies/" + encodeURIComponent(policy.id) + "?auto_apply=false", { method: "DELETE" });
+      expect([204, 404], result.body).toContain(result.status);
+    }
+  }, async () => (await accessPolicies()).length === 0);
 
   try {
     let result = await api("/api/sites?auto_apply=false", {

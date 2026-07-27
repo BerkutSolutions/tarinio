@@ -568,3 +568,6 @@
 - [ ] Revisions modal: выбрать сервис, затем несколько ревизий в левом фрейме; справа должны меняться метаданные и список изменённых полей, а кнопка «+» отсутствовать.
 - [ ] Anti-DDoS event stream: проверить ограниченную высоту таблицы, page size 10/25/50/100, переход по страницам, открытие detail и флаг страны слева от IP.
 - [ ] Anti-DDoS help: открыть отдельные справки L4 и L7 мышью и клавиатурой, проверить закрытие Escape и полноту описания runtime-эффекта.
+- [ ] Services / Geo draft UI: enable local-IP allowance, add and remove a Geo time window, switch through ModSecurity/WebSocket tabs, save, reopen, and confirm the checkbox stays enabled; API/runtime must retain `security_country_policy.allow_local_ips=true` and the compiled local-network guard.
+- [ ] Dashboard chart UI: hover or point at the requests-series chart during a background stats refresh on desktop and mobile; the tooltip, cursor and point must remain visible and show localized requests/attacks values.
+- [ ] Anti-DDoS log detail UI/API: open a telemetry row with and without a country code and verify the table IP cell and detail Client IP field show the same flag/globe plus exact address; raw event details remain unchanged.

@@ -29,6 +29,9 @@
 - Все E2E/DAST jobs на shell runner теперь привязаны к стабильному Compose project и отдельному блоку портов своего CI_CONCURRENT_ID; прерванный job очищается следующим job того же слота и не может оставить конфликтующий порт для нового pipeline.
 - E2E Compose projects use the numeric GitLab runner ID and concurrent slot, keeping Go, browser, stack-health and DAST names valid and collision-free for Compose, networks, volumes and Docker images.
 - Runtime syntax validation maps `/etc/waf` references into a disposable shadow bundle and never renames the live tree, so nested volume mounts cannot break bootstrap or revision apply.
+- Browser E2E uses four balanced resource lanes matching the four runner slots; each job still receives its own slot-bound Compose project and ports.
+- Geo draft rerenders preserve local-IP policy state, Dashboard chart tooltips survive live refreshes, and Anti-DDoS table/detail views show the same country indicator and client IP.
+- Allowlist E2E cleanup removes every compatibility policy for its disposable site before deleting parent resources.
 
 - Browser E2E выполняются параллельно на полностью раздельных Compose projects, сетях, volumes и диапазонах портов; стеки не разделяют runtime, cookies, Docker-метрики или данные.
 - Добавлены реальные проверки Anti-Bot TTL в сгенерированном nginx, локальных IP в country policy, белых списков в Easy/Raw, diff ревизий и пагинации Anti-DDoS.

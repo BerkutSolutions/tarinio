@@ -77,7 +77,7 @@ export async function renderAntiDDoS(container, ctx) {
       { label: ctx.t("antiddos.model.logs.detail.severity"), value: translateEventSeverity(String(item?.severity || "")) || "-" },
       { label: ctx.t("antiddos.model.logs.detail.site"), value: String(item?.site_name || item?.site_id || "-") },
       { label: ctx.t("antiddos.model.logs.detail.summary"), value: translateEventSummary(item) || "-" },
-      { label: ctx.t("antiddos.model.logs.detail.clientIp"), value: toPrettyString(detailsValue(details, "client_ip", "ip")) },
+      { label: ctx.t("antiddos.model.logs.detail.clientIp"), value: `${countryFlagEmoji(detailsValue(details, "country", "country_code") || item?.country)} ${toPrettyString(detailsValue(details, "client_ip", "ip"))}` },
       { label: ctx.t("antiddos.model.logs.detail.request"), value: requestLine || "-" },
       { label: ctx.t("antiddos.model.logs.detail.status"), value: toPrettyString(status) },
       { label: ctx.t("antiddos.model.logs.detail.rate"), value: toPrettyString(requestsPerSecond) },
