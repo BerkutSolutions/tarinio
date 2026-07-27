@@ -43,6 +43,9 @@ validate:repository:
     - git diff --check
     - sh -n scripts/install-aio.sh
     - sh -n scripts/install-aio-enterprise.sh
+    - sh -n scripts/repair-installation-permissions.sh
+    - sh -n scripts/test-installation-permissions.sh
+    - sh scripts/test-installation-permissions.sh
     - test -f go.mod
     - test -f package-lock.json
     - grep -q '^RUN GOTOOLCHAIN=auto go test ./ui/tests$' ui/Dockerfile
@@ -363,10 +366,12 @@ e2e:ui-server-contract:
   dependencies: []
   script:
     - mkdir -p build/e2e/ui-server-contract
+    - trap 'chmod 0644 ui/nginx.conf ui/nginx.rootless.conf' EXIT
+    - chmod 0600 ui/nginx.conf ui/nginx.rootless.conf
     - >-
       E2E_PROJECT="ci-${CI_PIPELINE_ID}-ui-server-contract" E2E_PORT=19780 E2E_RT_PORT=11780 E2E_RT_HTTPS_PORT=27443
       E2E_RT_HLT_PORT=19781 E2E_CONTROL_PLANE_DIRECT_PORT=19782 E2E_DAST_CANARY_PORT=19783 E2E_MTLS_UPSTREAM_PORT=19784
-      E2E_FILTER='^(TestE2EUIAssetsAndRouting|TestE2EDashboardSessionPingBodylessPOST|TestE2EServicesModuleNoChallengeAfterLogin)$'
+      E2E_FILTER='^(TestE2EUIAssetsAndRouting|TestE2EUIRootlessImageReadsRestrictiveContextConfigs|TestE2EDashboardSessionPingBodylessPOST|TestE2EServicesModuleNoChallengeAfterLogin)$'
       E2E_TIMEOUT=240 E2E_LOG_DIR="$CI_PROJECT_DIR/build/e2e/ui-server-contract"
       E2E_EVIDENCE_DIR="$CI_PROJECT_DIR/build/e2e/ui-server-contract" sh scripts/run-e2e-tests.sh
   artifacts:

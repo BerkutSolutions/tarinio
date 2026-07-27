@@ -35,6 +35,8 @@
 - Dashboard chart pointer handlers are anchored to the stable widget body and rebound without leaks, so SVG replacement during resize or background refresh cannot drop hover interaction.
 - Dashboard series imports its shared `clamp` helper explicitly, preventing pointer calculations from aborting before the tooltip becomes visible.
 - The destructive revision-timeline API workflow restores a real compiled and applied runtime revision before later contracts run, preventing shared-stack test state from leaking between scenarios.
+- Rootless UI images force both nginx configuration files to mode `0644`, so restrictive source permissions from upgrade artifacts cannot make nginx unreadable and cascade into runtime DNS failure.
+- Default and enterprise AIO upgrades repair legacy installation permissions before image builds while preserving `.env`, private-key and certificate confidentiality; an integration fixture verifies the repair contract.
 - Allowlist E2E cleanup removes every compatibility policy for its disposable site before deleting parent resources.
 
 - Browser E2E выполняются параллельно на полностью раздельных Compose projects, сетях, volumes и диапазонах портов; стеки не разделяют runtime, cookies, Docker-метрики или данные.

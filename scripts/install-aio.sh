@@ -660,6 +660,11 @@ else
   fi
 fi
 
+section "Installation Permissions"
+step "Repairing source and build-context permissions from previous installations"
+run_logged sh "$INSTALL_DIR/scripts/repair-installation-permissions.sh" "$INSTALL_DIR"
+ok "installation permissions repaired"
+
 TARGET_VERSION="$(extract_version "$INSTALL_DIR/control-plane/internal/appmeta/meta.go")"
 TARGET_COMMIT="$(git -C "$INSTALL_DIR" rev-parse --short HEAD 2>/dev/null || printf "unknown")"
 TARGET_CHANGELOG_VERSION="$(extract_latest_changelog_version "$INSTALL_DIR/CHANGELOG.md")"
