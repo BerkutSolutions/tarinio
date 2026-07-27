@@ -57,7 +57,7 @@ services:
       - waf-runtime-data-auto-start:/var/lib/waf
       - waf-control-plane-data-auto-start:/var/lib/waf/control-plane
       - waf-certificates-data-auto-start:/var/lib/waf/control-plane/certificate-materials
-      - waf-l4-adaptive-auto-start:/etc/waf/l4guard-adaptive:ro
+      - waf-l4-adaptive-auto-start-v2:/etc/waf/l4guard-adaptive:ro
       - /var/run/docker.sock:/var/run/docker.sock
     expose:
       - "8080"
@@ -100,7 +100,7 @@ services:
       - waf-runtime-data-auto-start:/var/lib/waf:ro
       - waf-control-plane-data-auto-start:/var/lib/waf/control-plane:ro
       - waf-nginx-logs-auto-start:/var/log/nginx
-      - waf-l4-adaptive-auto-start:/etc/waf/l4guard-adaptive:ro
+      - waf-l4-adaptive-auto-start-v2:/etc/waf/l4guard-adaptive:ro
     ports:
       - "${WAF_RUNTIME_HTTP_PORT:-80}:80"
       - "${WAF_RUNTIME_HTTPS_PORT:-443}:443"
@@ -164,10 +164,14 @@ services:
       context: ../../..
       dockerfile: deploy/compose/auto-start/ddos-model/Dockerfile
     restart: unless-stopped
+    user: "65532:4"
     cap_drop:
       - ALL
-    cap_add:
-      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,mode=1777
     environment:
       MODEL_SOURCE_BACKEND: ${MODEL_SOURCE_BACKEND:-file}
       MODEL_LOG_PATH: /logs/access.log
@@ -197,8 +201,8 @@ services:
     volumes:
       - waf-nginx-logs-auto-start:/logs:ro
       - waf-runtime-data-auto-start:/var/lib/waf:ro
-      - waf-ddos-model-state-auto-start:/state
-      - waf-l4-adaptive-auto-start:/out
+      - waf-ddos-model-state-auto-start-v2:/state
+      - waf-l4-adaptive-auto-start-v2:/out
     healthcheck:
       test: ["CMD-SHELL", "test -s /out/adaptive.json || exit 1"]
       interval: 15s
@@ -229,6 +233,6 @@ volumes:
   waf-certificates-data-auto-start:
   waf-postgres-data-auto-start:
   waf-nginx-logs-auto-start:
-  waf-l4-adaptive-auto-start:
-  waf-ddos-model-state-auto-start:
+  waf-l4-adaptive-auto-start-v2:
+  waf-ddos-model-state-auto-start-v2:
 

@@ -28,7 +28,9 @@ COPY --from=builder /out/waf-cli /usr/local/bin/waf-cli
 COPY scripts /src/scripts
 COPY --from=dockercli /usr/local/bin/docker /usr/local/bin/docker
 
-RUN mkdir -p /var/lib/waf/control-plane /var/lib/waf/active /var/lib/waf/candidates \
+RUN mkdir -p /var/lib/waf/control-plane /var/lib/waf/active /var/lib/waf/candidates /etc/waf/l4guard-adaptive \
+    && chown 65532:4 /etc/waf/l4guard-adaptive \
+    && chmod 0770 /etc/waf/l4guard-adaptive \
     && rm -f /etc/nginx/sites-enabled/default /etc/nginx/conf.d/default.conf
 
 ENV CONTROL_PLANE_HTTP_ADDR=0.0.0.0:8080

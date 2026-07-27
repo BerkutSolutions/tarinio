@@ -44,7 +44,7 @@ services:
       - waf-test-mgmt-runtime-data:/var/lib/waf
       - waf-test-mgmt-control-plane-data:/var/lib/waf/control-plane
       - waf-test-mgmt-certificates-data:/var/lib/waf/control-plane/certificate-materials
-      - waf-test-mgmt-l4-adaptive:/etc/waf/l4guard-adaptive:ro
+      - waf-test-mgmt-l4-adaptive-v2:/etc/waf/l4guard-adaptive:ro
       - /var/run/docker.sock:/var/run/docker.sock
     expose:
       - "8080"
@@ -84,7 +84,7 @@ services:
       - waf-test-mgmt-runtime-data:/var/lib/waf
       - waf-test-mgmt-control-plane-data:/var/lib/waf/control-plane:ro
       - waf-test-mgmt-nginx-logs:/var/log/nginx
-      - waf-test-mgmt-l4-adaptive:/etc/waf/l4guard-adaptive:ro
+      - waf-test-mgmt-l4-adaptive-v2:/etc/waf/l4guard-adaptive:ro
     ports:
       - "${MGMT_WAF_HTTPS_PORT:-8080}:443"
     expose:
@@ -191,7 +191,7 @@ services:
       - waf-test-app-runtime-data:/var/lib/waf
       - waf-test-app-control-plane-data:/var/lib/waf/control-plane
       - waf-test-app-certificates-data:/var/lib/waf/control-plane/certificate-materials
-      - waf-test-app-l4-adaptive:/etc/waf/l4guard-adaptive:ro
+      - waf-test-app-l4-adaptive-v2:/etc/waf/l4guard-adaptive:ro
       - /var/run/docker.sock:/var/run/docker.sock
     expose:
       - "8080"
@@ -230,7 +230,7 @@ services:
       - waf-test-app-runtime-data:/var/lib/waf
       - waf-test-app-control-plane-data:/var/lib/waf/control-plane:ro
       - waf-test-app-nginx-logs:/var/log/nginx
-      - waf-test-app-l4-adaptive:/etc/waf/l4guard-adaptive:ro
+      - waf-test-app-l4-adaptive-v2:/etc/waf/l4guard-adaptive:ro
     ports:
       - "${TEST_APP_WAF_HTTPS_PORT:-8081}:443"
     expose:
@@ -305,6 +305,15 @@ services:
       dockerfile: deploy/compose/testpage/ddos-model/Dockerfile
     container_name: tarinio-testpage-sentinel-mgmt
     restart: unless-stopped
+    user: "65532:4"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,mode=1777
+
     environment:
       MODEL_ENABLED: ${DDOS_MODEL_ENABLED:-true}
       MODEL_SOURCE_BACKEND: ${MODEL_SOURCE_BACKEND:-file}
@@ -335,8 +344,8 @@ services:
     volumes:
       - waf-test-mgmt-nginx-logs:/logs:ro
       - waf-test-mgmt-runtime-data:/var/lib/waf:ro
-      - waf-test-mgmt-sentinel-state:/state
-      - waf-test-mgmt-l4-adaptive:/out
+      - waf-test-mgmt-sentinel-state-v2:/state
+      - waf-test-mgmt-l4-adaptive-v2:/out
     networks:
       - waf-test-net
     mem_limit: ${SENTINEL_MEM_LIMIT:-512m}
@@ -348,6 +357,15 @@ services:
       dockerfile: deploy/compose/testpage/ddos-model/Dockerfile
     container_name: tarinio-testpage-sentinel-app
     restart: unless-stopped
+    user: "65532:4"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,mode=1777
+
     environment:
       MODEL_ENABLED: ${DDOS_MODEL_ENABLED:-true}
       MODEL_SOURCE_BACKEND: ${MODEL_SOURCE_BACKEND:-file}
@@ -378,8 +396,8 @@ services:
     volumes:
       - waf-test-app-nginx-logs:/logs:ro
       - waf-test-app-runtime-data:/var/lib/waf:ro
-      - waf-test-app-sentinel-state:/state
-      - waf-test-app-l4-adaptive:/out
+      - waf-test-app-sentinel-state-v2:/state
+      - waf-test-app-l4-adaptive-v2:/out
     networks:
       - waf-test-net
     mem_limit: ${SENTINEL_MEM_LIMIT:-512m}
@@ -407,14 +425,14 @@ volumes:
     name: waf-test-mgmt-nginx-logs
   waf-test-app-nginx-logs:
     name: waf-test-app-nginx-logs
-  waf-test-mgmt-l4-adaptive:
-    name: waf-test-mgmt-l4-adaptive
-  waf-test-app-l4-adaptive:
-    name: waf-test-app-l4-adaptive
-  waf-test-mgmt-sentinel-state:
-    name: waf-test-mgmt-sentinel-state
-  waf-test-app-sentinel-state:
-    name: waf-test-app-sentinel-state
+  waf-test-mgmt-l4-adaptive-v2:
+    name: waf-test-mgmt-l4-adaptive-v2
+  waf-test-app-l4-adaptive-v2:
+    name: waf-test-app-l4-adaptive-v2
+  waf-test-mgmt-sentinel-state-v2:
+    name: waf-test-mgmt-sentinel-state-v2
+  waf-test-app-sentinel-state-v2:
+    name: waf-test-app-sentinel-state-v2
   waf-test-request-archive-data:
     name: waf-test-request-archive-data
   waf-test-app-control-plane-data:

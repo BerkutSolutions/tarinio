@@ -56,7 +56,7 @@ services:
       - waf-ha-runtime-data:/var/lib/waf
       - waf-ha-control-plane-data:/var/lib/waf/control-plane
       - waf-ha-certificates-data:/var/lib/waf/control-plane/certificate-materials
-      - waf-ha-l4-adaptive:/etc/waf/l4guard-adaptive:ro
+      - waf-ha-l4-adaptive-v2:/etc/waf/l4guard-adaptive:ro
       - /var/run/docker.sock:/var/run/docker.sock
     expose:
       - "8080"
@@ -107,7 +107,7 @@ services:
       - waf-ha-runtime-data:/var/lib/waf
       - waf-ha-control-plane-data:/var/lib/waf/control-plane
       - waf-ha-certificates-data:/var/lib/waf/control-plane/certificate-materials
-      - waf-ha-l4-adaptive:/etc/waf/l4guard-adaptive:ro
+      - waf-ha-l4-adaptive-v2:/etc/waf/l4guard-adaptive:ro
       - /var/run/docker.sock:/var/run/docker.sock
     expose:
       - "8080"
@@ -152,7 +152,7 @@ services:
       - waf-ha-runtime-data:/var/lib/waf:ro
       - waf-ha-control-plane-data:/var/lib/waf/control-plane:ro
       - waf-ha-nginx-logs:/var/log/nginx
-      - waf-ha-l4-adaptive:/etc/waf/l4guard-adaptive:ro
+      - waf-ha-l4-adaptive-v2:/etc/waf/l4guard-adaptive:ro
     ports:
       - "${HA_WAF_HTTP_PORT:-18085}:80"
       - "${HA_WAF_HTTPS_PORT:-18443}:443"
@@ -232,6 +232,15 @@ services:
       dockerfile: deploy/compose/default/ddos-model/Dockerfile
     container_name: tarinio-ha-sentinel
     restart: unless-stopped
+    user: "65532:4"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,mode=1777
+
     environment:
       MODEL_ENABLED: ${DDOS_MODEL_ENABLED:-true}
       MODEL_SOURCE_BACKEND: ${MODEL_SOURCE_BACKEND:-file}
@@ -268,8 +277,8 @@ services:
     volumes:
       - waf-ha-nginx-logs:/logs:ro
       - waf-ha-runtime-data:/var/lib/waf:ro
-      - waf-ha-sentinel-state:/state
-      - waf-ha-l4-adaptive:/out
+      - waf-ha-sentinel-state-v2:/state
+      - waf-ha-l4-adaptive-v2:/out
     healthcheck:
       test: ["CMD-SHELL", "test -s /out/adaptive.json || exit 1"]
       interval: 15s
@@ -432,10 +441,10 @@ volumes:
     name: waf-ha-postgres-data
   waf-ha-nginx-logs:
     name: waf-ha-nginx-logs
-  waf-ha-l4-adaptive:
-    name: waf-ha-l4-adaptive
-  waf-ha-sentinel-state:
-    name: waf-ha-sentinel-state
+  waf-ha-l4-adaptive-v2:
+    name: waf-ha-l4-adaptive-v2
+  waf-ha-sentinel-state-v2:
+    name: waf-ha-sentinel-state-v2
   waf-ha-prometheus-data:
     name: waf-ha-prometheus-data
   waf-ha-grafana-data:

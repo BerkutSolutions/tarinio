@@ -73,7 +73,7 @@ services:
       - waf-ha-runtime-data:/var/lib/waf
       - waf-ha-control-plane-data:/var/lib/waf/control-plane
       - waf-ha-certificates-data:/var/lib/waf/control-plane/certificate-materials
-      - waf-ha-l4-adaptive:/etc/waf/l4guard-adaptive:ro
+      - waf-ha-l4-adaptive-v2:/etc/waf/l4guard-adaptive:ro
       - waf-ha-vault-app-token-data:/var/run/waf-app-token:ro
       - ${CLICKHOUSE_TLS_DIR:-./storage/clickhouse/tls}:/etc/waf/storage/clickhouse:ro
       - ${OPENSEARCH_TLS_DIR:-./storage/opensearch/tls}:/etc/waf/storage/opensearch:ro
@@ -150,7 +150,7 @@ services:
       - waf-ha-runtime-data:/var/lib/waf
       - waf-ha-control-plane-data:/var/lib/waf/control-plane
       - waf-ha-certificates-data:/var/lib/waf/control-plane/certificate-materials
-      - waf-ha-l4-adaptive:/etc/waf/l4guard-adaptive:ro
+      - waf-ha-l4-adaptive-v2:/etc/waf/l4guard-adaptive:ro
       - waf-ha-vault-app-token-data:/var/run/waf-app-token:ro
       - ${CLICKHOUSE_TLS_DIR:-./storage/clickhouse/tls}:/etc/waf/storage/clickhouse:ro
       - ${OPENSEARCH_TLS_DIR:-./storage/opensearch/tls}:/etc/waf/storage/opensearch:ro
@@ -224,7 +224,7 @@ services:
       - waf-ha-request-archive-data:/var/lib/waf-request-archive
       - waf-ha-control-plane-data:/var/lib/waf/control-plane:ro
       - waf-ha-nginx-logs:/var/log/nginx
-      - waf-ha-l4-adaptive:/etc/waf/l4guard-adaptive:ro
+      - waf-ha-l4-adaptive-v2:/etc/waf/l4guard-adaptive:ro
       - waf-ha-vault-app-token-data:/var/run/waf-app-token:ro
       - ${CLICKHOUSE_TLS_DIR:-./storage/clickhouse/tls}:/etc/waf/storage/clickhouse:ro
       - ${OPENSEARCH_TLS_DIR:-./storage/opensearch/tls}:/etc/waf/storage/opensearch:ro
@@ -392,6 +392,15 @@ services:
       dockerfile: deploy/compose/default/ddos-model/Dockerfile
     container_name: tarinio-ha-sentinel
     restart: unless-stopped
+    user: "65532:4"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,mode=1777
+
     environment:
       MODEL_ENABLED: ${DDOS_MODEL_ENABLED:-true}
       MODEL_SOURCE_BACKEND: ${MODEL_SOURCE_BACKEND:-file}
@@ -422,8 +431,8 @@ services:
     volumes:
       - waf-ha-nginx-logs:/logs:ro
       - waf-ha-runtime-data:/var/lib/waf:ro
-      - waf-ha-ddos-model-state:/state
-      - waf-ha-l4-adaptive:/out
+      - waf-ha-ddos-model-state-v2:/state
+      - waf-ha-l4-adaptive-v2:/out
     healthcheck:
       test: ["CMD-SHELL", "test -s /out/adaptive.json || exit 1"]
       interval: 15s
@@ -588,10 +597,10 @@ volumes:
     name: waf-ha-nginx-logs
   waf-ha-request-archive-data:
     name: waf-ha-request-archive-data
-  waf-ha-l4-adaptive:
-    name: waf-ha-l4-adaptive
-  waf-ha-ddos-model-state:
-    name: waf-ha-ddos-model-state
+  waf-ha-l4-adaptive-v2:
+    name: waf-ha-l4-adaptive-v2
+  waf-ha-ddos-model-state-v2:
+    name: waf-ha-ddos-model-state-v2
   waf-ha-clickhouse-data:
     name: waf-ha-clickhouse-data
   waf-ha-opensearch-data:

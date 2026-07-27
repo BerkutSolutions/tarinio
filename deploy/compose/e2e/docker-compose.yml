@@ -108,7 +108,7 @@ services:
       - waf-e2e-control-plane-data:/var/lib/waf/control-plane:ro
       - waf-e2e-certificates-data:/var/lib/waf/control-plane/certificate-materials:ro
       - waf-e2e-nginx-logs:/var/log/nginx
-      - waf-e2e-l4-adaptive:/etc/waf/l4guard-adaptive:ro
+      - waf-e2e-l4-adaptive-v2:/etc/waf/l4guard-adaptive:ro
       - waf-e2e-vault-app-token:/var/run/waf-app-token:ro
     ports:
       - "${E2E_RT_PORT:-10080}:80"
@@ -218,6 +218,15 @@ services:
       context: ../../..
       dockerfile: deploy/compose/auto-start/ddos-model/Dockerfile
     restart: "no"
+    user: "65532:4"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,mode=1777
+
     environment:
       MODEL_SOURCE_BACKEND: file
       MODEL_LOG_PATH: /logs/access.log
@@ -241,25 +250,15 @@ services:
       MODEL_WEIGHT_EMERGENCY_BOTNET: "6.0"
       MODEL_WEIGHT_EMERGENCY_SINGLE: "4.0"
     depends_on:
-      sentinel-volume-init:
-        condition: service_completed_successfully
       runtime:
         condition: service_started
     volumes:
       - waf-e2e-nginx-logs:/logs:ro
       - waf-e2e-runtime-data:/var/lib/waf:ro
-      - waf-e2e-sentinel-state:/state
-      - waf-e2e-l4-adaptive:/out
+      - waf-e2e-sentinel-state-v2:/state
+      - waf-e2e-l4-adaptive-v2:/out
     networks:
       - waf-e2e-net
-
-  sentinel-volume-init:
-    image: alpine:3.20
-    restart: "no"
-    command: ["sh", "-ec", "mkdir -p /state /out && chown -R 65532:4 /state /out && chmod 0770 /state /out"]
-    volumes:
-      - waf-e2e-sentinel-state:/state
-      - waf-e2e-l4-adaptive:/out
 
   postgres:
     image: postgres:15
@@ -321,5 +320,5 @@ volumes:
   waf-e2e-vault-app-token:
   waf-e2e-nginx-logs:
   waf-e2e-request-archive-data:
-  waf-e2e-l4-adaptive:
-  waf-e2e-sentinel-state:
+  waf-e2e-l4-adaptive-v2:
+  waf-e2e-sentinel-state-v2:
