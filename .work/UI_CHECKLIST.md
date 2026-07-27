@@ -570,4 +570,5 @@
 - [ ] Anti-DDoS help: открыть отдельные справки L4 и L7 мышью и клавиатурой, проверить закрытие Escape и полноту описания runtime-эффекта.
 - [ ] Services / Geo draft UI: enable local-IP allowance, add and remove a Geo time window, switch through ModSecurity/WebSocket tabs, save, reopen, and confirm the checkbox stays enabled; API/runtime must retain `security_country_policy.allow_local_ips=true` and the compiled local-network guard.
 - [ ] Dashboard chart UI: hover or point at the requests-series chart during a background stats refresh on desktop and mobile; the tooltip, cursor and point must remain visible and show localized requests/attacks values.
+- [ ] Dashboard chart hit target: verify the entire transparent requests-series plot area accepts pointer hover on desktop and mobile, including empty space between the rendered lines; the tooltip must appear without clicking.
 - [ ] Anti-DDoS log detail UI/API: open a telemetry row with and without a country code and verify the table IP cell and detail Client IP field show the same flag/globe plus exact address; raw event details remain unchanged.

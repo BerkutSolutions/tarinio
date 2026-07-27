@@ -31,6 +31,7 @@
 - Runtime syntax validation maps `/etc/waf` references into a disposable shadow bundle and never renames the live tree, so nested volume mounts cannot break bootstrap or revision apply.
 - Browser E2E uses four balanced resource lanes matching the four runner slots; each job still receives its own slot-bound Compose project and ports.
 - Geo draft rerenders preserve local-IP policy state, Dashboard chart tooltips survive live refreshes, and Anti-DDoS table/detail views show the same country indicator and client IP.
+- Dashboard chart overlays explicitly accept pointer events across the transparent plot area, so desktop and mobile tooltips open reliably in Chromium.
 - Allowlist E2E cleanup removes every compatibility policy for its disposable site before deleting parent resources.
 
 - Browser E2E выполняются параллельно на полностью раздельных Compose projects, сетях, volumes и диапазонах портов; стеки не разделяют runtime, cookies, Docker-метрики или данные.

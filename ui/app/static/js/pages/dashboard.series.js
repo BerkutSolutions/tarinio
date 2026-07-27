@@ -77,7 +77,7 @@ function renderRequestsSeries(rows, ctx, chartWidthPx) {
           }).join("")}
           <line data-chart-cursor="true" x1="0" x2="0" y1="${pad.top}" y2="${pad.top + chartHeight}" stroke="rgba(148, 163, 184, 0.8)" stroke-width="1" stroke-dasharray="3 5" hidden></line>
           <circle data-chart-point="true" cx="0" cy="0" r="4" fill="#12181f" stroke="#f17322" stroke-width="2" hidden></circle>
-          <rect x="${pad.left}" y="${pad.top}" width="${chartWidth}" height="${chartHeight}" fill="transparent" data-chart-overlay="true"></rect>
+          <rect x="${pad.left}" y="${pad.top}" width="${chartWidth}" height="${chartHeight}" fill="transparent" pointer-events="all" data-chart-overlay="true"></rect>
         </svg>
         <div class="dashboard-chart-tooltip" data-chart-tooltip="true" hidden></div>
       </div>
