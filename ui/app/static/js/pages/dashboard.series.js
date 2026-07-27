@@ -134,12 +134,18 @@ function bindRequestsChartHover(bodyNode, rows, ctx) {
     if (cursor) cursor.hidden = true;
     if (point) point.hidden = true;
   };
-  overlay.addEventListener("pointermove", show);
-  overlay.addEventListener("pointerenter", show);
-  overlay.addEventListener("pointerleave", hide);
-  overlay.addEventListener("mousemove", show);
-  overlay.addEventListener("mouseenter", show);
-  overlay.addEventListener("mouseleave", hide);
+  const previousHandlers = bodyNode.__wafChartHandlers;
+  if (previousHandlers) {
+    bodyNode.removeEventListener("pointermove", previousHandlers.show);
+    bodyNode.removeEventListener("pointerleave", previousHandlers.hide);
+    bodyNode.removeEventListener("mousemove", previousHandlers.show);
+    bodyNode.removeEventListener("mouseleave", previousHandlers.hide);
+  }
+  bodyNode.__wafChartHandlers = { show, hide };
+  bodyNode.addEventListener("pointermove", show);
+  bodyNode.addEventListener("pointerleave", hide);
+  bodyNode.addEventListener("mousemove", show);
+  bodyNode.addEventListener("mouseleave", hide);
   const previousPointer = bodyNode.__wafChartPointer;
   if (previousPointer && bodyNode.matches(":hover")) {
     window.requestAnimationFrame(() => {

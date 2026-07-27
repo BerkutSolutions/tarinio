@@ -39,7 +39,8 @@ func TestDashboardChartUsesPersistentPointerInteractions(t *testing.T) {
 	for _, marker := range []string{
 		`pointer-events="all" data-chart-overlay="true"`,
 		`bodyNode.__wafChartPointer = { clientX: event.clientX, clientY: event.clientY }`,
-		`overlay.addEventListener("pointermove", show)`,
+		`bodyNode.removeEventListener("pointermove", previousHandlers.show)`,
+		`bodyNode.addEventListener("pointermove", show)`,
 		`window.requestAnimationFrame(() =>`,
 		`bodyNode.matches(":hover")`,
 	} {
