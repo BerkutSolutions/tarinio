@@ -1,6 +1,7 @@
 ## [1.5.15] - 27.07.2026
 
 - UI image clean builds now include every repository contract fixture and Python required by `go test ./ui/tests`, preventing AIO upgrades from failing on hosts without a matching Docker cache.
+- Rootless nginx configuration permissions are applied with a portable `RUN chmod` step, keeping the UI image compatible with both BuildKit and legacy `docker-compose` builders.
 
 ### Интерфейс и управление сервисами
 

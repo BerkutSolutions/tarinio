@@ -15,13 +15,17 @@ func TestUIContainerNormalizesStaticAssetPermissions(t *testing.T) {
 	}
 	source := string(raw)
 	for _, marker := range []string{
-		"COPY --chmod=0644 ui/nginx.conf /etc/nginx/conf.d/default.conf",
-		"COPY --chmod=0644 ui/nginx.rootless.conf /etc/nginx/nginx.conf",
-		"RUN chmod -R a+rX /usr/share/nginx/html",
+		"COPY ui/nginx.conf /etc/nginx/conf.d/default.conf",
+		"COPY ui/nginx.rootless.conf /etc/nginx/nginx.conf",
+		"RUN chmod 0644 /etc/nginx/conf.d/default.conf /etc/nginx/nginx.conf",
+		"&& chmod -R a+rX /usr/share/nginx/html",
 	} {
 		if !strings.Contains(source, marker) {
 			t.Fatalf("ui image must normalize rootless-readable permissions with %q", marker)
 		}
+	}
+	if strings.Contains(source, "COPY --chmod=") {
+		t.Fatal("ui image must remain compatible with the legacy Docker builder")
 	}
 }
 
