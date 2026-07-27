@@ -21,8 +21,9 @@ func TestGitLabCIE2EPortsStayBelowEphemeralRange(t *testing.T) {
 	for _, marker := range []string{
 		"E2E_CI_PORT_BASE=$((22000 + CI_CONCURRENT_ID * 100))",
 		"E2E_STACK_PORT_BASE=$((25000 + E2E_STACK_SLOT * 100))",
-		"E2E_PROJECT=\"ci-${CI_RUNNER_SHORT_TOKEN:-runner}-e2e-slot-${CI_CONCURRENT_ID}\"",
-		"COMPOSE_PROJECT_NAME=\"ci-${CI_RUNNER_SHORT_TOKEN:-runner}-stack-slot-${E2E_STACK_SLOT}\"",
+		"tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9_-' '-'",
+		"E2E_PROJECT=\"ci-${E2E_CI_RUNNER_TOKEN}-e2e-slot-${CI_CONCURRENT_ID}\"",
+		"COMPOSE_PROJECT_NAME=\"ci-${E2E_STACK_RUNNER_TOKEN}-stack-slot-${E2E_STACK_SLOT}\"",
 		"E2E_DAST_CANARY_PORT=$((E2E_CI_PORT_BASE + 5))",
 	} {
 		if !strings.Contains(source, marker) {

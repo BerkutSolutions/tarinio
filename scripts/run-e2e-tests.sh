@@ -39,8 +39,9 @@ if [ -n "${CI_CONCURRENT_ID:-}" ]; then
     *[!0-9]*|'') echo "[e2e] ERROR: CI_CONCURRENT_ID must be numeric" >&2; exit 1 ;;
   esac
   [ "$CI_CONCURRENT_ID" -le 31 ] || { echo "[e2e] ERROR: CI_CONCURRENT_ID is outside the reserved port range" >&2; exit 1; }
+  E2E_CI_RUNNER_TOKEN="$(printf '%s' "${CI_RUNNER_SHORT_TOKEN:-runner}" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9_-' '-')"
   E2E_CI_PORT_BASE=$((22000 + CI_CONCURRENT_ID * 100))
-  E2E_PROJECT="ci-${CI_RUNNER_SHORT_TOKEN:-runner}-e2e-slot-${CI_CONCURRENT_ID}"
+  E2E_PROJECT="ci-${E2E_CI_RUNNER_TOKEN}-e2e-slot-${CI_CONCURRENT_ID}"
   E2E_PORT=$((E2E_CI_PORT_BASE + 0))
   E2E_RT_PORT=$((E2E_CI_PORT_BASE + 1))
   E2E_RT_HTTPS_PORT=$((E2E_CI_PORT_BASE + 2))
