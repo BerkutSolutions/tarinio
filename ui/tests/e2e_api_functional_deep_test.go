@@ -172,6 +172,9 @@ func TestE2EAPIFunctionalDeep(t *testing.T) {
 		if cleared, _ := payload["cleared"].(bool); !cleared {
 			t.Fatalf("expected cleared=true, got %#v", payload)
 		}
+		if revisionID := e2eCompileAndApply(t, client, requestBaseURL, requestHostOverride); revisionID == "" {
+			t.Fatal("revision timeline clear cleanup did not restore an active runtime revision")
+		}
 	})
 }
 

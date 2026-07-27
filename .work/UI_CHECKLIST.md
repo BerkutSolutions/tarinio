@@ -572,4 +572,5 @@
 - [ ] Dashboard chart UI: hover or point at the requests-series chart during a background stats refresh on desktop and mobile; the tooltip, cursor and point must remain visible and show localized requests/attacks values.
 - [ ] Dashboard chart hit target: verify the entire transparent requests-series plot area accepts pointer hover on desktop and mobile, including empty space between the rendered lines; the tooltip must appear without clicking.
 - [ ] Dashboard chart refresh binding: keep the pointer over the requests-series plot while ResizeObserver and background refresh replace the SVG; tooltip, cursor and point must remain visible without moving the pointer again.
+- [ ] Dashboard chart calculation: hover the left, middle and right of the requests-series plot and verify each position opens a tooltip without console `ReferenceError`, with localized request and attack values for the nearest bucket.
 - [ ] Anti-DDoS log detail UI/API: open a telemetry row with and without a country code and verify the table IP cell and detail Client IP field show the same flag/globe plus exact address; raw event details remain unchanged.

@@ -37,6 +37,7 @@ func TestDashboardChartUsesPersistentPointerInteractions(t *testing.T) {
 	}
 	source := string(content)
 	for _, marker := range []string{
+		`import { clamp, formatNumber } from "./dashboard.layout-core.js"`,
 		`pointer-events="all" data-chart-overlay="true"`,
 		`bodyNode.__wafChartPointer = { clientX: event.clientX, clientY: event.clientY }`,
 		`bodyNode.removeEventListener("pointermove", previousHandlers.show)`,

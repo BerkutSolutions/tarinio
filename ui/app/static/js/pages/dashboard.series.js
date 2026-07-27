@@ -1,5 +1,5 @@
 import { escapeHtml } from "../ui.js";
-import { formatNumber, formatPercent } from "./dashboard.layout-core.js";
+import { clamp, formatNumber } from "./dashboard.layout-core.js";
 
 function prepareSeriesRows(stats) {
   const attacks = Array.isArray(stats?.attacks_series) ? stats.attacks_series : [];
