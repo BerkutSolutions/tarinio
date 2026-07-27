@@ -1,5 +1,7 @@
 ## [1.5.15] - 27.07.2026
 
+- UI image clean builds now include every repository contract fixture and Python required by `go test ./ui/tests`, preventing AIO upgrades from failing on hosts without a matching Docker cache.
+
 ### Интерфейс и управление сервисами
 
 - Удалены отдельные виджеты загрузки CPU и использования памяти с Dashboard; состояние контейнеров и их фактические метрики остаются в виджете здоровья контейнеров.

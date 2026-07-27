@@ -2,14 +2,18 @@ FROM golang:1.25-alpine AS ui-tests
 
 WORKDIR /src
 
-RUN apk add --no-cache nodejs npm
+RUN apk add --no-cache nodejs npm python3
 
 COPY go.mod go.sum ./
 COPY CHANGELOG.md README.md README.en.md ./
+COPY .gitlab-ci.yml ./
 COPY package.json package-lock.json ./
-COPY scripts/check-docs-lockfile.js ./scripts/check-docs-lockfile.js
+COPY scripts ./scripts
+COPY deploy/compose ./deploy/compose
+COPY control-plane/Dockerfile ./control-plane/Dockerfile
 COPY control-plane/internal/appmeta ./control-plane/internal/appmeta
 COPY control-plane/apiroutes ./control-plane/apiroutes
+COPY runtime/image/Dockerfile ./runtime/image/Dockerfile
 COPY docs ./docs
 COPY ui/app ./ui/app
 COPY ui/nginx.conf ./ui/nginx.conf
