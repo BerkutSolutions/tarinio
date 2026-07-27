@@ -11,6 +11,12 @@ ZAP_IMAGE="${ZAP_IMAGE:-ghcr.io/zaproxy/zaproxy:stable}"
 TARGET="${DAST_SCANNER_TARGET_URL:-http://e2e-management.test}"
 HOST="${DAST_TARGET_HOST:-e2e-management.test}"
 E2E_PROJECT="${E2E_PROJECT:-waf-dast-$MODE}"
+if [ -n "${CI_CONCURRENT_ID:-}" ]; then
+  case "$CI_CONCURRENT_ID" in
+    *[!0-9]*|'') echo "[dast] ERROR: CI_CONCURRENT_ID must be numeric" >&2; exit 1 ;;
+  esac
+  E2E_PROJECT="ci-${CI_RUNNER_SHORT_TOKEN:-runner}-e2e-slot-${CI_CONCURRENT_ID}"
+fi
 mkdir -p "$OUT"
 ZAP_DOCKER_NETWORK="${E2E_PROJECT}_waf-e2e-net"
 zap_cidfile="$OUT/.zap-container-id"

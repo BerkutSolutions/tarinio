@@ -13,9 +13,17 @@ func TestGitLabCIE2EPortsStayBelowEphemeralRange(t *testing.T) {
 		t.Fatalf("read .gitlab-ci.yml: %v", err)
 	}
 	source := string(content)
+	runnerScript, err := os.ReadFile(filepath.Join("..", "..", "scripts", "run-e2e-tests.sh"))
+	if err != nil {
+		t.Fatalf("read run-e2e-tests.sh: %v", err)
+	}
+	source += string(runnerScript)
 	for _, marker := range []string{
-		"E2E_BROWSER_PORT_BASE=$((24000 + E2E_BROWSER_SLOT * 100))",
+		"E2E_CI_PORT_BASE=$((22000 + CI_CONCURRENT_ID * 100))",
 		"E2E_STACK_PORT_BASE=$((25000 + E2E_STACK_SLOT * 100))",
+		"E2E_PROJECT=\"ci-${CI_RUNNER_SHORT_TOKEN:-runner}-e2e-slot-${CI_CONCURRENT_ID}\"",
+		"COMPOSE_PROJECT_NAME=\"ci-${CI_RUNNER_SHORT_TOKEN:-runner}-stack-slot-${E2E_STACK_SLOT}\"",
+		"E2E_DAST_CANARY_PORT=$((E2E_CI_PORT_BASE + 5))",
 	} {
 		if !strings.Contains(source, marker) {
 			t.Fatalf("GitLab CI missing safe E2E port marker %q", marker)

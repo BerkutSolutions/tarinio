@@ -156,7 +156,7 @@ e2e:stack-healthcheck:
       # unrelated outbound connection can temporarily own a Compose host port.
       E2E_STACK_PORT_BASE=$((25000 + E2E_STACK_SLOT * 100))
       E2E_PASS="$WAF_E2E_PASSWORD" PROFILE_DIR="$CI_PROJECT_DIR/deploy/compose/e2e"
-      COMPOSE_PROJECT_NAME="ci-${CI_PIPELINE_ID}-stack-health" WAF_STACK_NAME="ci-${CI_PIPELINE_ID}-stack-health"
+      COMPOSE_PROJECT_NAME="ci-${CI_RUNNER_SHORT_TOKEN:-runner}-stack-slot-${E2E_STACK_SLOT}" WAF_STACK_NAME="ci-${CI_RUNNER_SHORT_TOKEN:-runner}-stack-slot-${E2E_STACK_SLOT}"
       E2E_PORT=$((E2E_STACK_PORT_BASE + 0)) E2E_RT_PORT=$((E2E_STACK_PORT_BASE + 1)) E2E_RT_HTTPS_PORT=$((E2E_STACK_PORT_BASE + 2))
       E2E_RT_HLT_PORT=$((E2E_STACK_PORT_BASE + 3)) E2E_CONTROL_PLANE_DIRECT_PORT=$((E2E_STACK_PORT_BASE + 4))
       E2E_MTLS_UPSTREAM_PORT=$((E2E_STACK_PORT_BASE + 5)) E2E_DAST_CANARY_PORT=$((E2E_STACK_PORT_BASE + 6))
@@ -398,13 +398,13 @@ e2e:api-registry:
       BROWSER_E2E_IMAGE_JOB="${BROWSER_E2E_IMAGE}-${CI_PROJECT_ID}-${CI_PIPELINE_ID}"
       docker image inspect "$BROWSER_E2E_IMAGE_JOB" >/dev/null
       E2E_BROWSER_SLOT="${CI_CONCURRENT_ID:-0}"
-      # Four runner slots occupy 24000-24306, below the kernel ephemeral range
-      # and separate from the stack-health range at 25000-25306.
-      E2E_BROWSER_PORT_BASE=$((24000 + E2E_BROWSER_SLOT * 100))
+      # Every shell-runner slot owns one stable E2E Compose project and port block.
+      # run-e2e-tests.sh enforces the same values for Go, browser and DAST jobs.
+      E2E_BROWSER_PORT_BASE=$((22000 + E2E_BROWSER_SLOT * 100))
       E2E_BROWSER_ONLY=1
       E2E_BROWSER_IMAGE="$BROWSER_E2E_IMAGE_JOB"
       E2E_BROWSER_SPECS="$E2E_BROWSER_SPECS"
-      E2E_PROJECT="${E2E_BROWSER_PROJECT}-${CI_PIPELINE_ID}-${CI_JOB_ID}"
+      E2E_PROJECT="ci-${CI_RUNNER_SHORT_TOKEN:-runner}-e2e-slot-${E2E_BROWSER_SLOT}"
       E2E_PORT=$((E2E_BROWSER_PORT_BASE + 0))
       E2E_RT_PORT=$((E2E_BROWSER_PORT_BASE + 1))
       E2E_RT_HTTPS_PORT=$((E2E_BROWSER_PORT_BASE + 2))

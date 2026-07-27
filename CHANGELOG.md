@@ -26,6 +26,8 @@
 
 ### E2E и CI
 
+- Все E2E/DAST jobs на shell runner теперь привязаны к стабильному Compose project и отдельному блоку портов своего CI_CONCURRENT_ID; прерванный job очищается следующим job того же слота и не может оставить конфликтующий порт для нового pipeline.
+
 - Browser E2E выполняются параллельно на полностью раздельных Compose projects, сетях, volumes и диапазонах портов; стеки не разделяют runtime, cookies, Docker-метрики или данные.
 - Добавлены реальные проверки Anti-Bot TTL в сгенерированном nginx, локальных IP в country policy, белых списков в Easy/Raw, diff ревизий и пагинации Anti-DDoS.
 - Длинные browser-наборы разделены на независимые shards с единым строгим gate: запрещены skip, retry, fixme и скрытый успешный fallback.

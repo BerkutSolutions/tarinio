@@ -29,6 +29,26 @@ set -eu
 REPO_ROOT="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
 E2E_COMPOSE_DIR="$REPO_ROOT/deploy/compose/e2e"
 COMPOSE_FILE="$E2E_COMPOSE_DIR/docker-compose.yml"
+
+# GitLab shell jobs share one Docker daemon. Bind every concurrent runner slot to
+# a stable Compose project and a private host-port block. A later job assigned
+# to the same slot can therefore remove an interrupted predecessor before it
+# starts, while jobs in other slots cannot bind the same ports.
+if [ -n "${CI_CONCURRENT_ID:-}" ]; then
+  case "$CI_CONCURRENT_ID" in
+    *[!0-9]*|'') echo "[e2e] ERROR: CI_CONCURRENT_ID must be numeric" >&2; exit 1 ;;
+  esac
+  [ "$CI_CONCURRENT_ID" -le 31 ] || { echo "[e2e] ERROR: CI_CONCURRENT_ID is outside the reserved port range" >&2; exit 1; }
+  E2E_CI_PORT_BASE=$((22000 + CI_CONCURRENT_ID * 100))
+  E2E_PROJECT="ci-${CI_RUNNER_SHORT_TOKEN:-runner}-e2e-slot-${CI_CONCURRENT_ID}"
+  E2E_PORT=$((E2E_CI_PORT_BASE + 0))
+  E2E_RT_PORT=$((E2E_CI_PORT_BASE + 1))
+  E2E_RT_HTTPS_PORT=$((E2E_CI_PORT_BASE + 2))
+  E2E_RT_HLT_PORT=$((E2E_CI_PORT_BASE + 3))
+  E2E_CONTROL_PLANE_DIRECT_PORT=$((E2E_CI_PORT_BASE + 4))
+  E2E_DAST_CANARY_PORT=$((E2E_CI_PORT_BASE + 5))
+  E2E_MTLS_UPSTREAM_PORT=$((E2E_CI_PORT_BASE + 6))
+fi
 E2E_PORT="${E2E_PORT:-18080}"
 E2E_RT_PORT="${E2E_RT_PORT:-10080}"
 E2E_RT_HTTPS_PORT="${E2E_RT_HTTPS_PORT:-10443}"
@@ -55,7 +75,7 @@ E2E_EVIDENCE_DIR="${E2E_EVIDENCE_DIR:-$E2E_LOG_DIR}"
 E2E_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 E2E_BUILD_RETRIES=0
 export COMPOSE_PROJECT_NAME="$E2E_PROJECT"
-export E2E_PORT E2E_RT_PORT E2E_RT_HTTPS_PORT E2E_RT_HLT_PORT E2E_PASS
+export E2E_PORT E2E_RT_PORT E2E_RT_HTTPS_PORT E2E_RT_HLT_PORT E2E_CONTROL_PLANE_DIRECT_PORT E2E_DAST_CANARY_PORT E2E_MTLS_UPSTREAM_PORT E2E_PASS
 
 [ -n "$E2E_PASS" ] || { echo "[e2e] ERROR: E2E_PASS or WAF_E2E_PASSWORD is required" >&2; exit 1; }
 
