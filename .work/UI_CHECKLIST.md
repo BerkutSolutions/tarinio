@@ -552,3 +552,19 @@
 - [ ] Services UI: after saving Basic Auth, reopen the same service on desktop and mobile, wait for the hydrated editor, then verify the Anti-Bot tab and masked-password reveal action remain usable across a runtime reload.
 - [ ] Dashboard and Events UI: on mobile, open Dashboard and reset its layout only after widgets are rendered; inject a delayed Events response and verify the visible loading state appears before the response resolves.
 - [ ] Certificate export UI: open a disposable exporter session during a transient runtime reload, then complete 2FA setup, export approval and download without losing the Services editor form.
+## 2026-07-27 — Dashboard без CPU/Memory-виджетов
+
+- [ ] Dashboard UI: открыть экран и убедиться, что отдельные виджеты CPU и Memory отсутствуют в сетке, picker и сохранённой раскладке; остальные виджеты корректно занимают освободившееся место.
+- [ ] Dashboard layout: изменить размер виджета Services, перезагрузить страницу, проверить сохранение размера и затем сброс раскладки.
+- [ ] Dashboard API/runtime: убедиться, что /api/dashboard/containers/overview по-прежнему доступен и данные CPU/Memory контейнеров отображаются внутри Containers Health и его detail modal.
+## 2026-07-27 — Services, Revisions и Anti-DDoS
+
+- [ ] Services / Anti-Bot: убедиться, что полей «Расположение basic auth» и «Текст auth» нет ни в форме, ни в help; выбрать разные сроки Anti-Bot-сессии, сохранить и проверить точный session_inactivity_minutes в security_antibot.
+- [ ] Services / runtime: после compile/apply открыть nginx/easy-locations/<site>.conf и проверить, что Anti-Bot cookie получает Max-Age, равный выбранным минутам × 60.
+- [ ] Services / Geo: включить разрешение локальных IP, сохранить и проверить allow_local_ips в API и локальный guard в активном nginx-конфиге.
+- [ ] Services / allowlist: включить белый список, добавить CIDR, сохранить, перезагрузить Easy-редактор и проверить access policy; затем сохранить тот же сервис из Raw-режима и подтвердить, что CIDR не исчез.
+- [ ] Services / полный контракт: изменить поля на каждой вкладке, сохранить, повторно открыть редактор и сравнить API easy-site-profile, access policy и активные runtime artifacts.
+- [ ] Revisions: после сохранения сервиса проверить, что sidebar сразу показывает новый revision ID без перезагрузки.
+- [ ] Revisions modal: выбрать сервис, затем несколько ревизий в левом фрейме; справа должны меняться метаданные и список изменённых полей, а кнопка «+» отсутствовать.
+- [ ] Anti-DDoS event stream: проверить ограниченную высоту таблицы, page size 10/25/50/100, переход по страницам, открытие detail и флаг страны слева от IP.
+- [ ] Anti-DDoS help: открыть отдельные справки L4 и L7 мышью и клавиатурой, проверить закрытие Escape и полноту описания runtime-эффекта.

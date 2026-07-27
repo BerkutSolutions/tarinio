@@ -193,6 +193,9 @@ if ($waf_blacklist_uri_guard ~* "^0:.*{{ . }}") { return 403; }
 
 {{- if .WhitelistCountryGuardPattern }}
 set $waf_country_guard "$waf_easy_exception_guard:$waf_country_code";
+{{- if .AllowLocalCountryIPs }}
+if ($waf_client_is_local = 1) { set $waf_country_guard "1:$waf_country_code"; }
+{{- end }}
 add_header X-WAF-Country-Code "$waf_country_code" always;
 add_header X-WAF-Country-Guard "$waf_country_guard" always;
 {{- if and .ShowGeoBlockPage (not (sliceContains .DisabledErrorPages "geo_block")) }}
@@ -204,6 +207,9 @@ if ($waf_country_guard !~ "{{ .WhitelistCountryGuardPattern }}") { return 403; }
 
 {{- if .BlacklistCountryGuardPattern }}
 set $waf_country_guard "$waf_easy_exception_guard:$waf_country_code";
+{{- if .AllowLocalCountryIPs }}
+if ($waf_client_is_local = 1) { set $waf_country_guard "1:$waf_country_code"; }
+{{- end }}
 add_header X-WAF-Country-Code "$waf_country_code" always;
 add_header X-WAF-Country-Guard "$waf_country_guard" always;
 {{- if and .ShowGeoBlockPage (not (sliceContains .DisabledErrorPages "geo_block")) }}

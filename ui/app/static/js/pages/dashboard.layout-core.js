@@ -10,7 +10,7 @@ const DASHBOARD_WIDGETS_STORAGE_KEY = "waf.dashboard.widgets.v1";
 // Row 1: services(340) | traffic-summary(320) | containers-health(340) | top-ips(360, tall)
 //        top-countries under top-ips
 // Row 2: requests-series (width = 1040, one grid step narrower than the previous layout)
-// Row 3: memory | cpu
+// Row 3: hidden-by-default analytical widgets
 // Hidden by default: popular-errors, unique-attackers
 const WIDGETS = [
   { id: "services",          titleKey: "dashboard.widget.services",        width: 340,  height: 600, x: 20,   y: 20   },
@@ -20,10 +20,8 @@ const WIDGETS = [
   { id: "top-countries",     titleKey: "dashboard.widget.topCountries",    width: 360,  height: 300, x: 1080, y: 340  },
   { id: "requests-series",   titleKey: "dashboard.widget.requestsSeries",  width: 1040, height: 340, x: 20,   y: 640  },
   { id: "top-urls",          titleKey: "dashboard.widget.topURLs",         width: 360,  height: 240, x: 1080, y: 660  },
-  { id: "memory",            titleKey: "dashboard.widget.memory",          width: 330,  height: 260, x: 20,   y: 1000 },
-  { id: "cpu",               titleKey: "dashboard.widget.cpu",             width: 330,  height: 260, x: 370,  y: 1000 },
-  { id: "popular-errors",    titleKey: "dashboard.widget.popularErrors",   width: 360,  height: 260, x: 720,  y: 1000 },
-  { id: "unique-attackers",  titleKey: "dashboard.widget.uniqueAttackers", width: 360,  height: 260, x: 1100, y: 1000 },
+  { id: "popular-errors",    titleKey: "dashboard.widget.popularErrors",   width: 360,  height: 260, x: 20,  y: 1000 },
+  { id: "unique-attackers",  titleKey: "dashboard.widget.uniqueAttackers", width: 360,  height: 260, x: 400, y: 1000 },
 ];
 
 function clamp(value, min, max) {

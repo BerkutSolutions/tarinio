@@ -1,31 +1,5 @@
 import { escapeHtml } from "../ui.js";
-import { clamp, formatNumber, formatPercent } from "./dashboard.layout-core.js";
-
-function renderSystemMemory(_stats, ctx, containersOverview) {
-  const usedPercent = clamp(Number(containersOverview?.avg_memory_percent || 0), 0, 100);
-  const containers = Array.isArray(containersOverview?.containers) ? containersOverview.containers.slice(0, 8) : [];
-  return `
-    <button type="button" class="dashboard-widget-content dashboard-system dashboard-system-clickable" data-widget-action="memory">
-      <div class="dashboard-system-main">${escapeHtml(formatPercent(usedPercent))}</div>
-      <div class="dashboard-progress"><span style="width:${escapeHtml(String(usedPercent))}%"></span></div>
-      ${containers.map((item) => `<div class="dashboard-system-row dashboard-system-container-row"><span>${escapeHtml(String(item?.name || "-"))}</span><strong>${escapeHtml(formatPercent(item?.memory_percent || 0))}</strong></div>`).join("")}
-    </button>
-  `;
-}
-
-function renderSystemCPU(_stats, ctx, containersOverview) {
-  const total = Math.max(0, Number(containersOverview?.total_cpu_percent || 0));
-  const capacity = Math.max(1, Number(containersOverview?.cpu_capacity_percent || 100));
-  const load = Math.min(100, (total / capacity) * 100);
-  const containers = Array.isArray(containersOverview?.containers) ? containersOverview.containers.slice(0, 8) : [];
-  return `
-    <button type="button" class="dashboard-widget-content dashboard-system dashboard-system-clickable" data-widget-action="cpu">
-      <div class="dashboard-system-main">${escapeHtml(formatPercent(total))}</div>
-      <div class="dashboard-progress"><span style="width:${escapeHtml(String(load))}%"></span></div>
-      ${containers.map((item) => `<div class="dashboard-system-row dashboard-system-container-row"><span>${escapeHtml(String(item?.name || "-"))}</span><strong>${escapeHtml(formatPercent(item?.cpu_percent || 0))}</strong></div>`).join("")}
-    </button>
-  `;
-}
+import { formatNumber, formatPercent } from "./dashboard.layout-core.js";
 
 function prepareSeriesRows(stats) {
   const attacks = Array.isArray(stats?.attacks_series) ? stats.attacks_series : [];
@@ -163,8 +137,6 @@ function bindRequestsChartHover(bodyNode, rows, ctx) {
 }
 
 export {
-  renderSystemMemory,
-  renderSystemCPU,
   prepareSeriesRows,
   renderRequestsSeries,
   bindRequestsChartHover

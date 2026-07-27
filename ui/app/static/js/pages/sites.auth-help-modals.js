@@ -6,8 +6,6 @@ export function renderAuthHelpModal(ctx, deps = {}) {
     { labelKey: "sites.easy.antibot.useAuthBasic", helpKey: "sites.easy.auth.help.enable" },
     { labelKey: "sites.easy.auth.mode", helpKey: "sites.easy.auth.help.mode" },
     { labelKey: "sites.easy.auth.order", helpKey: "sites.easy.auth.help.order" },
-    { labelKey: "sites.easy.antibot.authBasicLocation", helpKey: "sites.easy.auth.help.location" },
-    { labelKey: "sites.easy.antibot.authText", helpKey: "sites.easy.auth.help.text" },
     { labelKey: "sites.easy.auth.template", helpKey: "sites.easy.auth.help.template" },
     { labelKey: "sites.easy.antibot.authSessionTtl", helpKey: "sites.easy.auth.help.sessionTtl" },
     { labelKey: "sites.easy.auth.exclusionRules", helpKey: "sites.easy.auth.help.exclusions" },
@@ -30,6 +28,7 @@ export function renderAntibotHelpModal(ctx, deps = {}) {
   const rows = [
     { labelKey: "sites.easy.antibot.challenge", helpKey: "sites.easy.antibot.help.challenge" },
     { labelKey: "sites.easy.antibot.url", helpKey: "sites.easy.antibot.help.url" },
+    { labelKey: "sites.easy.antibot.sessionTtl", helpKey: "sites.easy.antibot.help.sessionTtl" },
     { labelKey: "sites.easy.antibot.scannerAutoBanEnabled", helpKey: "sites.easy.antibot.help.scanner" },
     { labelKey: "sites.easy.antibot.recaptchaScore", helpKey: "sites.easy.antibot.help.recaptchaScore" },
     { labelKey: "sites.easy.antibot.recaptchaSitekey", helpKey: "sites.easy.antibot.help.providerKeys" },

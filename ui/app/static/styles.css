@@ -13110,3 +13110,103 @@ body.auth-locked #main-screen {
     grid-template-columns: 1fr;
   }
 }
+.revisions-modal-split {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(420px, 1.4fr);
+  gap: 16px;
+  min-height: 460px;
+}
+
+.revisions-modal-list-frame,
+.revisions-modal-detail-frame {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid rgba(112, 145, 221, 0.24);
+  border-radius: 14px;
+  background: rgba(13, 22, 37, 0.95);
+}
+
+.revisions-modal-list-frame .revisions-modal-list {
+  max-height: 62vh;
+  overflow: auto;
+}
+
+.revisions-modal-list-item {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid rgba(112, 145, 221, 0.24);
+  border-radius: 12px;
+}
+
+.revisions-modal-list-item.is-selected {
+  border-color: rgba(144, 182, 255, 0.72);
+  box-shadow: 0 0 0 1px rgba(144, 182, 255, 0.72);
+}
+
+.revisions-modal-list-select {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+}
+
+.revisions-modal-list-actions,
+.revisions-modal-detail-head,
+.revisions-change-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.revisions-change-frame {
+  margin: 14px 0;
+}
+
+.revisions-change-card {
+  padding: 12px;
+  border: 1px solid rgba(112, 145, 221, 0.24);
+  border-radius: 10px;
+  background: rgba(17, 28, 48, 0.82);
+}
+
+.revisions-change-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.revisions-change-fields code {
+  padding: 4px 7px;
+  border-radius: 6px;
+  background: rgba(13, 22, 37, 0.95);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 900px) {
+  .revisions-modal-split {
+    grid-template-columns: 1fr;
+  }
+}
+.waf-antiddos-live-feed-card #antiddos-model-logs .waf-table-wrap {
+  max-height: 420px;
+  overflow: auto;
+}
+
+.antiddos-log-pager {
+  margin-top: 12px;
+}
+
+.antiddos-country-flag {
+  display: inline-block;
+  min-width: 1.5em;
+  font-size: 1.1em;
+}

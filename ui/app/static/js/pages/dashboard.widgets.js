@@ -302,8 +302,6 @@ function mergeWidgetData(stats, detailModel, containersOverview, ctx, deps) {
         }
       }, deps
     ),
-    memory: deps.renderSystemMemory(stats, ctx, containersOverview),
-    cpu:    deps.renderSystemCPU(stats, ctx, containersOverview),
     "containers-health": renderContainersHealthWidget(containersOverview, ctx, deps)
   };
 }

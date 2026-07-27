@@ -32,3 +32,8 @@ volumes:
     name: ${WAF_STACK_NAME:-waf}-k3s-data
   waf-k3s-output:
     name: ${WAF_STACK_NAME:-waf}-k3s-output
+
+networks:
+  waf-net:
+    name: ${WAF_STACK_NAME:-waf}-k8s-lab-net
+    driver: bridge

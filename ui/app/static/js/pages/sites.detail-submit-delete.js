@@ -53,6 +53,20 @@ export function bindDetailSubmitDelete(container, state, ctx, deps) {
       const easyProfilePath = `/api/easy-site-profiles/${encodeURIComponent(draft.id)}`;
       await putWithPostFallback(ctx, easyProfilePath, draftToEasyProfile(draft), saveOptions);
       await upsertAccessPolicy(draft, ctx, existingAccessPolicy, saveOptions);
+      const accessPolicyID = normalizeSiteID(draft.id);
+      const accessAllowlist = Array.isArray(draft.access_allowlist) ? [...draft.access_allowlist] : [];
+      const accessDenylist = Array.isArray(draft.access_denylist) ? [...draft.access_denylist] : [];
+      if (accessAllowlist.length || accessDenylist.length) {
+        state.accessBySite.set(accessPolicyID, {
+          id: existingAccessPolicy?.id || `${accessPolicyID}-access`,
+          site_id: accessPolicyID,
+          enabled: true,
+          allowlist: accessAllowlist,
+          denylist: accessDenylist,
+        });
+      } else {
+        state.accessBySite.delete(accessPolicyID);
+      }
       await compileAndApplySiteRevision(ctx, draft?.id ? [draft.id] : []);
       ctx.notify(ctx.t("toast.siteSaved"));
       clearUnsavedChanges();

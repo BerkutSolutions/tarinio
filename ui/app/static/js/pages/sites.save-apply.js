@@ -20,5 +20,8 @@ export async function compileAndApplySiteRevision(ctx, targetSiteIDs) {
   if (String(applyResponse?.status || "").trim().toLowerCase() === "failed") {
     throw new Error(String(applyResponse?.result || "").trim() || "site revision apply failed");
   }
+  const sidebarRevision = document.getElementById("sidebar-revision");
+  if (sidebarRevision) sidebarRevision.textContent = revisionID;
+  window.dispatchEvent(new CustomEvent("waf:revision-applied", { detail: { revisionID } }));
   return revisionID;
 }

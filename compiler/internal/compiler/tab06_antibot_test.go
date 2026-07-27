@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -66,13 +67,13 @@ func TestAntibot_Javascript_RedirectURI(t *testing.T) {
 
 func TestAntibot_Recaptcha_ChallengeVar(t *testing.T) {
 	conf := mustRenderSiteConf(t, "ab-rc", EasyProfileInput{
-		SiteID:               "ab-rc",
-		SecurityMode:         "block",
-		AllowedMethods:       []string{"GET"},
-		MaxClientSize:        "10m",
-		AntibotChallenge:     "recaptcha",
-		AntibotURI:           "/challenge",
-		AntibotRecaptchaKey:  "test-recaptcha-key",
+		SiteID:                "ab-rc",
+		SecurityMode:          "block",
+		AllowedMethods:        []string{"GET"},
+		MaxClientSize:         "10m",
+		AntibotChallenge:      "recaptcha",
+		AntibotURI:            "/challenge",
+		AntibotRecaptchaKey:   "test-recaptcha-key",
 		AntibotRecaptchaScore: 0.5,
 	})
 	if !strings.Contains(conf, `"recaptcha"`) {
@@ -84,12 +85,12 @@ func TestAntibot_Recaptcha_ChallengeVar(t *testing.T) {
 
 func TestAntibot_Hcaptcha_ChallengeVar(t *testing.T) {
 	conf := mustRenderSiteConf(t, "ab-hc", EasyProfileInput{
-		SiteID:           "ab-hc",
-		SecurityMode:     "block",
-		AllowedMethods:   []string{"GET"},
-		MaxClientSize:    "10m",
-		AntibotChallenge: "hcaptcha",
-		AntibotURI:       "/challenge",
+		SiteID:             "ab-hc",
+		SecurityMode:       "block",
+		AllowedMethods:     []string{"GET"},
+		MaxClientSize:      "10m",
+		AntibotChallenge:   "hcaptcha",
+		AntibotURI:         "/challenge",
 		AntibotHcaptchaKey: "test-hcaptcha-key",
 	})
 	if !strings.Contains(conf, `"hcaptcha"`) {
@@ -101,12 +102,12 @@ func TestAntibot_Hcaptcha_ChallengeVar(t *testing.T) {
 
 func TestAntibot_Turnstile_ChallengeVar(t *testing.T) {
 	conf := mustRenderSiteConf(t, "ab-ts", EasyProfileInput{
-		SiteID:             "ab-ts",
-		SecurityMode:       "block",
-		AllowedMethods:     []string{"GET"},
-		MaxClientSize:      "10m",
-		AntibotChallenge:   "turnstile",
-		AntibotURI:         "/challenge",
+		SiteID:              "ab-ts",
+		SecurityMode:        "block",
+		AllowedMethods:      []string{"GET"},
+		MaxClientSize:       "10m",
+		AntibotChallenge:    "turnstile",
+		AntibotURI:          "/challenge",
 		AntibotTurnstileKey: "test-turnstile-key",
 	})
 	if !strings.Contains(conf, `"turnstile"`) {
@@ -269,5 +270,39 @@ func TestAntibot_DebugHeader_Present(t *testing.T) {
 	})
 	if !strings.Contains(conf, "X-WAF-Antibot-Mode") {
 		t.Fatalf("expected X-WAF-Antibot-Mode debug header in config, got:\n%s", conf)
+	}
+}
+func TestAntibot_SessionTTLMinutesAreRenderedAsExactSeconds(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		minutes int
+		seconds int
+	}{
+		{name: "five-minutes", minutes: 5, seconds: 300},
+		{name: "one-hour", minutes: 60, seconds: 3600},
+		{name: "one-day", minutes: 1440, seconds: 86400},
+		{name: "unlimited", minutes: -1, seconds: 2147483647},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			site := SiteInput{ID: "ab-session-ttl", Enabled: true, PrimaryHost: "ab-session-ttl.example.com", ListenHTTP: true, DefaultUpstreamID: "ab-session-ttl-upstream"}
+			profile := EasyProfileInput{
+				SiteID: "ab-session-ttl", SecurityMode: "block", AllowedMethods: []string{"GET"},
+				MaxClientSize: "10m", AntibotChallenge: "cookie", AntibotURI: "/challenge",
+				AntibotSessionTTLMin: tc.minutes,
+			}
+			artifacts, err := RenderEasyRateLimitArtifacts(
+				[]SiteInput{site},
+				[]UpstreamInput{{ID: "ab-session-ttl-upstream", SiteID: site.ID, Scheme: "http", Host: "upstream", Port: 8080, BasePath: "/", PassHostHeader: true}},
+				[]EasyProfileInput{profile},
+			)
+			if err != nil {
+				t.Fatalf("RenderEasyRateLimitArtifacts: %v", err)
+			}
+			locations := string(artifactsByPath(artifacts)["nginx/easy-locations/ab-session-ttl.conf"].Content)
+			want := fmt.Sprintf("Max-Age=%d; Path=/", tc.seconds)
+			if !strings.Contains(locations, want) {
+				t.Fatalf("expected exact anti-bot cookie TTL %q, got:\n%s", want, locations)
+			}
+		})
 	}
 }

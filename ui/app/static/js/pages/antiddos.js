@@ -1,4 +1,5 @@
 import { escapeHtml, formatDate, setError } from "../ui.js";
+import { bindProtectionHelpModals, renderProtectionHelpModals } from "./antiddos.help-modals.js";
 
 export async function renderAntiDDoS(container, ctx) {
   const upsertWithPostFallback = async (payload) => {
@@ -106,6 +107,20 @@ export async function renderAntiDDoS(container, ctx) {
   let logsTimer = null;
   let logsVisibilityHandler = null;
   let logsRefreshPromise = null;
+  let logsPageSize = 10;
+  let logsPage = 1;
+  const countryFlagEmoji = (value) => {
+    const code = String(value || "").trim().toUpperCase();
+    if (!/^[A-Z]{2}$/.test(code)) return "🌐";
+    return String.fromCodePoint(...Array.from(code).map((char) => 127397 + char.charCodeAt(0)));
+  };
+  const buildLogPageButtons = (totalPages) => {
+    const firstPage = Math.max(1, Math.min(logsPage - 4, totalPages - 9));
+    return Array.from({ length: Math.min(10, totalPages) }, (_item, index) => firstPage + index)
+
+    .map((page) => `<button type="button" class="btn ghost btn-sm${page === logsPage ? " active" : ""}" data-antiddos-log-page="${page}">${page}</button>`)
+      .join("");
+  };
   const helpRows = [
     { labelKey: "antiddos.model.enabled", defaultValue: "true", hintKey: "antiddos.help.modelEnabled" },
     { labelKey: "antiddos.model.poll", defaultValue: "2", hintKey: "antiddos.help.modelPoll" },
@@ -177,6 +192,10 @@ export async function renderAntiDDoS(container, ctx) {
             return right - left;
           })
           .slice(0, 500);
+        const totalPages = Math.max(1, Math.ceil(rows.length / logsPageSize));
+        logsPage = Math.min(Math.max(1, logsPage), totalPages);
+        const pageStart = (logsPage - 1) * logsPageSize;
+        const pageRows = rows.slice(pageStart, pageStart + logsPageSize);
         if (!rows.length) {
           node.innerHTML = `<div class="waf-empty">${escapeHtml(ctx.t("antiddos.model.logs.empty"))}</div>`;
           return;
@@ -194,19 +213,40 @@ export async function renderAntiDDoS(container, ctx) {
                 </tr>
               </thead>
               <tbody>
-                ${rows.map((item, index) => `
+                ${pageRows.map((item, index) => `
                   <tr class="waf-table-row-clickable" data-log-index="${index}" tabindex="0" role="button">
                     <td>${escapeHtml(formatDate(String(item?.occurred_at || "")))}</td>
                     <td>${escapeHtml(translateEventType(String(item?.type || "")))}</td>
                     <td>${escapeHtml(String(item?.site_name || item?.site_id || "-"))}</td>
                     <td>${escapeHtml(translateEventSummary(item) || "-")}</td>
-                    <td>${escapeHtml(String(item?.details?.client_ip || item?.details?.ip || "-"))}</td>
+                    <td><span class="antiddos-country-flag">${escapeHtml(countryFlagEmoji(item?.details?.country || item?.details?.country_code || item?.country))}</span> ${escapeHtml(String(item?.details?.client_ip || item?.details?.ip || "-"))}</td>
                   </tr>
                 `).join("")}
               </tbody>
             </table>
           </div>
+          <div class="waf-pager antiddos-log-pager">
+            <label for="antiddos-log-page-size">${escapeHtml(ctx.t("activity.filter.pageSize"))}</label>
+            <select id="antiddos-log-page-size" class="select select-compact">
+              ${[10, 25, 50, 100].map((size) => `<option value="${size}"${size === logsPageSize ? " selected" : ""}>${size}</option>`).join("")}
+            </select>
+            <span class="muted">${escapeHtml(ctx.t("antiddos.model.logs.page", { page: String(logsPage), total: String(totalPages) }))}</span>
+            <div class="waf-actions">
+              <button type="button" class="btn ghost btn-sm" data-antiddos-log-page="${logsPage - 1}"${logsPage <= 1 ? " disabled" : ""} aria-label="${escapeHtml(ctx.t("common.previous"))}">&lsaquo;</button>
+              ${buildLogPageButtons(totalPages)}
+              <button type="button" class="btn ghost btn-sm" data-antiddos-log-page="${logsPage + 1}"${logsPage >= totalPages ? " disabled" : ""} aria-label="${escapeHtml(ctx.t("common.next"))}">&rsaquo;</button>
+            </div>
+          </div>
         `;
+        node.querySelector("#antiddos-log-page-size")?.addEventListener("change", (event) => {
+          logsPageSize = Number.parseInt(String(event.target?.value || "10"), 10) || 10;
+          logsPage = 1;
+          renderLogs().catch(() => {});
+        });
+        node.querySelectorAll("[data-antiddos-log-page]").forEach((button) => button.addEventListener("click", () => {
+          logsPage = Number.parseInt(String(button.dataset.antiddosLogPage || "1"), 10) || 1;
+          renderLogs().catch(() => {});
+        }));
         const modalNode = container.querySelector("#antiddos-model-log-detail-modal");
         const modalBody = container.querySelector("#antiddos-model-log-detail-content");
         const openDetails = (item) => {
@@ -223,10 +263,10 @@ export async function renderAntiDDoS(container, ctx) {
             return;
           }
           const index = Number(rowNode.dataset.logIndex || "-1");
-          if (index < 0 || index >= rows.length) {
+          if (index < 0 || index >= pageRows.length) {
             return;
           }
-          openDetails(rows[index]);
+          openDetails(pageRows[index]);
         };
         const bodyNode = node.querySelector("tbody");
         bodyNode?.addEventListener("click", (event) => {
@@ -277,7 +317,7 @@ export async function renderAntiDDoS(container, ctx) {
         <div class="waf-card-body waf-stack">
           <form id="antiddos-form" class="waf-form">
             <div class="waf-subcard waf-stack waf-antiddos-frame">
-              <div class="waf-list-title">${escapeHtml(ctx.t("antiddos.scope.l4.title"))}</div>
+              <div class="waf-antiddos-title-row"><div class="waf-list-title">${escapeHtml(ctx.t("antiddos.scope.l4.title"))}</div><button class="waf-help-icon-btn" type="button" id="antiddos-l4-help-btn" aria-label="${escapeHtml(ctx.t("antiddos.help.open"))}">?</button></div>
               <div class="muted">${escapeHtml(ctx.t("antiddos.scope.l4.desc"))}</div>
               <div class="waf-form-grid waf-antiddos-grid">
                 <label class="waf-checkbox"><input id="antiddos-use-l4" type="checkbox"${settings.use_l4_guard ? " checked" : ""}> ${escapeHtml(ctx.t("antiddos.field.useL4"))}</label>
@@ -316,7 +356,7 @@ export async function renderAntiDDoS(container, ctx) {
               </div>
             </div>
             <div class="waf-subcard waf-stack waf-antiddos-frame">
-              <div class="waf-list-title">${escapeHtml(ctx.t("antiddos.scope.l7.title"))}</div>
+              <div class="waf-antiddos-title-row"><div class="waf-list-title">${escapeHtml(ctx.t("antiddos.scope.l7.title"))}</div><button class="waf-help-icon-btn" type="button" id="antiddos-l7-help-btn" aria-label="${escapeHtml(ctx.t("antiddos.help.open"))}">?</button></div>
               <div class="muted">${escapeHtml(ctx.t("antiddos.scope.l7.desc"))}</div>
               <div class="waf-form-grid waf-antiddos-grid">
                 <label class="waf-checkbox"><input id="antiddos-enforce-l7" type="checkbox"${settings.enforce_l7_rate_limit ? " checked" : ""}> ${escapeHtml(ctx.t("antiddos.field.enforceL7"))}</label>
@@ -429,6 +469,7 @@ export async function renderAntiDDoS(container, ctx) {
           <div id="antiddos-model-logs"><div class="waf-empty">${escapeHtml(ctx.t("common.loading"))}</div></div>
         </div>
       </section>
+      ${renderProtectionHelpModals(ctx, escapeHtml)}
       <div class="waf-modal waf-hidden" id="antiddos-model-log-detail-modal" role="dialog" aria-modal="true" aria-labelledby="antiddos-model-log-detail-title" tabindex="-1">
         <button class="waf-modal-overlay" type="button" data-log-detail-close="true" aria-label="${escapeHtml(ctx.t("ui.close"))}"></button>
         <div class="waf-modal-card">
@@ -531,6 +572,7 @@ export async function renderAntiDDoS(container, ctx) {
     };
     const closeModal = () => modalNode?.classList.add("waf-hidden");
     container.querySelector("#antiddos-model-help-btn")?.addEventListener("click", openModal);
+    bindProtectionHelpModals(container);
     modalNode?.querySelectorAll("[data-modal-close='true']").forEach((node) => {
       node.addEventListener("click", closeModal);
     });

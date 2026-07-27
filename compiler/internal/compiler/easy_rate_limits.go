@@ -44,6 +44,7 @@ type easyLocationData struct {
 	AntibotStage1CookieValue string
 	AntibotCookieName        string
 	AntibotCookieValue       string
+	AntibotCookieTTL         int
 	AuthEnabled              bool
 	AuthBasicEnabled         bool
 	AuthTokenEnabled         bool
@@ -148,6 +149,7 @@ func RenderEasyRateLimitArtifacts(sites []SiteInput, upstreams []UpstreamInput, 
 			AntibotStage1CookieValue: antibotStage1CookieValue(site.ID, profile),
 			AntibotCookieName:        antibotCookieName(site.ID),
 			AntibotCookieValue:       antibotCookieValue(site.ID, profile),
+			AntibotCookieTTL:         antibotCookieTTLSeconds(profile),
 			AuthEnabled:              authEnabled,
 			AuthBasicEnabled:         authBasicEnabled,
 			AuthTokenEnabled:         authTokenEnabled,

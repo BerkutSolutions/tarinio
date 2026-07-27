@@ -578,10 +578,8 @@ func startupSelfTestCreateProfile(siteID, host string) easysiteprofiles.EasySite
 	profile.SecurityAntibot.AntibotTurnstileSitekey = "turnstile-sitekey-a"
 	profile.SecurityAntibot.AntibotTurnstileSecret = "turnstile-secret-a"
 	profile.SecurityAuthBasic.UseAuthBasic = true
-	profile.SecurityAuthBasic.AuthBasicLocation = easysiteprofiles.AuthBasicLocationSitewide
 	profile.SecurityAuthBasic.AuthBasicUser = "admin"
 	profile.SecurityAuthBasic.AuthBasicPassword = "password-a"
-	profile.SecurityAuthBasic.AuthBasicText = "Restricted area"
 	profile.SecurityAuthBasic.Users = []easysiteprofiles.SecurityAuthUser{{Username: "admin", Password: "password-a", Enabled: true}}
 
 	// 8) Country policy.

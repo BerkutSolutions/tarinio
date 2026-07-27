@@ -259,6 +259,12 @@ export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
                           <label for="service-antibot-uri">${escapeHtml(ctx.t("sites.easy.antibot.url"))}</label>
                           <input id="service-antibot-uri" value="${escapeHtml(draft.antibot_uri)}"${draft.antibot_challenge === "no" ? " disabled" : ""}>
                         </div>
+                        <div class="waf-field">
+                          <label for="service-antibot-session-ttl">${escapeHtml(ctx.t("sites.easy.antibot.sessionTtl"))}</label>
+                          <select id="service-antibot-session-ttl"${draft.antibot_challenge === "no" ? " disabled" : ""}>
+                            ${renderAuthSessionTtlOptions(draft.antibot_session_inactivity_minutes, ctx)}
+                          </select>
+                        </div>
                         <label class="waf-checkbox waf-field full">
                           <input id="service-antibot-scanner-auto-ban-enabled" type="checkbox"${draft.antibot_scanner_auto_ban_enabled ? " checked" : ""}${draft.antibot_challenge === "no" ? " disabled" : ""}>
                           <span>${escapeHtml(ctx.t("sites.easy.antibot.scannerAutoBanEnabled"))}</span>
@@ -335,14 +341,6 @@ export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
                             <option value="antibot_first"${draft.auth_order === "antibot_first" ? " selected" : ""}>${escapeHtml(ctx.t("sites.easy.auth.order.antibotFirst"))}</option>
                           </select>
                         </div>
-                        <div class="waf-field">
-                          <label for="service-auth-basic-location">${escapeHtml(ctx.t("sites.easy.antibot.authBasicLocation"))}</label>
-                          <input id="service-auth-basic-location" value="${escapeHtml("sitewide")}" readonly>
-                        </div>
-                        <div class="waf-field">
-                          <label for="service-auth-basic-text">${escapeHtml(ctx.t("sites.easy.antibot.authText"))}</label>
-                          <input id="service-auth-basic-text" value="${escapeHtml(draft.auth_basic_text)}">
-                        </div>
                         <div class="waf-field full" style="display:flex;align-items:center;gap:8px;">
                           <div style="flex:1;min-width:0;">
                             <label for="service-auth-basic-template">${escapeHtml(ctx.t("sites.easy.auth.template"))}</label>
@@ -385,6 +383,10 @@ export function renderDetailViewRuntimeTail(state, ctx, deps, draft, isNew) {
                   <label class="waf-checkbox full">
                     <input id="service-show-geo-block-page" type="checkbox"${draft.show_geo_block_page ? " checked" : ""}>
                     <span>${escapeHtml(ctx.t("sites.easy.geo.showGeoBlockPage"))}</span>
+                  </label>
+                  <label class="waf-checkbox full">
+                    <input id="service-allow-local-country-ips" type="checkbox"${draft.allow_local_country_ips ? " checked" : ""}>
+                    <span>${escapeHtml(ctx.t("sites.easy.geo.allowLocalIPs"))}</span>
                   </label>
                   ${renderCountryEditor("blacklist_country", ctx.t("sites.easy.geo.countryBlacklist"), draft.blacklist_country, state.geoCatalog, { full: false, emptyLabel: ctx.t("sites.easy.noValues"), search: state.countryFilters.blacklist_country, ctx })}
                   ${renderCountryEditor("whitelist_country", ctx.t("sites.easy.geo.countryWhitelist"), draft.whitelist_country, state.geoCatalog, { full: false, emptyLabel: ctx.t("sites.easy.noValues"), search: state.countryFilters.whitelist_country, ctx })}

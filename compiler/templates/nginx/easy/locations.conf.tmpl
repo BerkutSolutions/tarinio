@@ -33,7 +33,7 @@ location = {{ .AntibotURI }} {
     default_type text/html;
     alias /etc/waf/errors/{{ .SiteID }}/antibot.html;
 {{- else }}
-    add_header Set-Cookie "{{ .AntibotCookieName }}={{ .AntibotCookieValue }}; Max-Age=600; Path=/; SameSite=Lax; Secure; HttpOnly" always;
+    add_header Set-Cookie "{{ .AntibotCookieName }}={{ .AntibotCookieValue }}; Max-Age={{ .AntibotCookieTTL }}; Path=/; SameSite=Lax; Secure; HttpOnly" always;
     return 204;
 {{- end }}
 }
@@ -41,7 +41,7 @@ location = {{ .AntibotVerifyURI }} {
     proxy_intercept_errors off;
     modsecurity off;
     add_header Cache-Control "no-store" always;
-    add_header Set-Cookie "{{ .AntibotCookieName }}={{ .AntibotCookieValue }}; Max-Age=600; Path=/; SameSite=Lax; Secure; HttpOnly" always;
+    add_header Set-Cookie "{{ .AntibotCookieName }}={{ .AntibotCookieValue }}; Max-Age={{ .AntibotCookieTTL }}; Path=/; SameSite=Lax; Secure; HttpOnly" always;
 {{- if .AntibotUsesInterstitial }}
     return 204;
 {{- else }}

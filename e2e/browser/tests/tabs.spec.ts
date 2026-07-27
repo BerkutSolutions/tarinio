@@ -109,6 +109,14 @@ test("anti-ddos.help-modal", async ({ authenticatedPage: page }) => {
   await expect(page.locator("#antiddos-model-help-modal")).toBeVisible();
   await page.locator("#antiddos-model-help-modal").press("Escape");
   await expect(page.locator("#antiddos-model-help-modal")).toBeHidden();
+  for (const layer of ["l4", "l7"]) {
+    await page.locator("#antiddos-" + layer + "-help-btn").click();
+    const modal = page.locator("#antiddos-" + layer + "-help-modal");
+    await expect(modal).toBeVisible();
+    await expect(modal.locator(".waf-note")).not.toBeEmpty();
+    await modal.press("Escape");
+    await expect(modal).toBeHidden();
+  }
 });
 
 test("owasp-crs.read-controls", async ({ authenticatedPage: page }) => {

@@ -126,6 +126,12 @@ test("revisions.status-and-delete-confirm-cancel-ui", async ({ authenticatedPage
     await expect(tile).toBeVisible();
     await tile.click();
     await expect(page.locator("#revisions-detail-modal")).toBeVisible();
+    await expect(page.locator(".revisions-modal-split")).toBeVisible();
+    await expect(page.locator(".revisions-modal-list-frame")).toBeVisible();
+    await expect(page.locator(".revisions-modal-detail-frame")).toBeVisible();
+    await expect(page.locator("[data-revision-toggle]")).toHaveCount(0);
+    await page.locator('[data-revision-select="' + candidateID + '"]').click();
+    await expect(page.locator(".revisions-modal-detail-frame")).toContainText(candidateID);
     const deleteOthers = page.locator("#revisions-delete-others");
     await expect(deleteOthers).toBeEnabled();
     page.once("dialog", (dialog) => dialog.dismiss());

@@ -69,6 +69,7 @@ type easySiteData struct {
 	AntibotStage1CookieValue string
 	AntibotCookieName        string
 	AntibotCookieValue       string
+	AntibotCookieTTL         int
 	AntibotRecaptchaHint     string
 	AntibotHcaptchaHint      string
 	AntibotTurnstileHint     string
@@ -85,6 +86,7 @@ type easySiteData struct {
 
 	BlacklistCountryGuardPattern string
 	WhitelistCountryGuardPattern string
+	AllowLocalCountryIPs         bool
 	ShowGeoBlockPage             bool
 	GeoTimeWindowSnippet         string // server-context if-guards
 	WSInspectionSnippet          string // server-context WS inspection Lua block

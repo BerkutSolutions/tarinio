@@ -187,7 +187,14 @@ def main():
     copy_source_evidence(output, args.dast_root, "dast-evidence.json", "dast")
     shutil.make_archive(str(output / "release-evidence-source"), "zip", output / "source-evidence")
 
-    report = {"schema_version": 2, "version": args.version, "commit": args.commit, "generated_at": datetime.now(timezone.utc).isoformat(), "status": "passed", "e2e": e2e, "e2e_stability": stability, "dast": dast}
+    test_matrix = {
+        "e2e_suites": len(e2e),
+        "e2e_tests_passed": sum(item["passed"] for item in e2e),
+        "dast_suites": len(dast),
+        "stability_reports": len(stability),
+        "security_scan_sources": len(trivy),
+    }
+    report = {"schema_version": 2, "version": args.version, "commit": args.commit, "generated_at": datetime.now(timezone.utc).isoformat(), "status": "passed", "test_matrix": test_matrix, "e2e": e2e, "e2e_stability": stability, "dast": dast}
     (output / "release-evidence.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (output / "release-trivy-summary.json").write_text(json.dumps({"version": args.version, "commit": args.commit, "trivy": trivy}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     e2e_rows = "\n".join(f"| `{x['job']}` | {x['description']} | {x['passed']} | {x['failed']} | {x['skipped']} |" for x in e2e)
@@ -200,7 +207,13 @@ def main():
     (output / "release-trivy-summary.md").write_text(trivy_section, encoding="utf-8")
     stability_rows = "\n".join(f"| `{item['job']}` | {item['test_attempts']} | {item['build_retries']} | {'да' if item['flaky'] else 'нет'} |" for item in stability)
     stability_section = "" if not stability else f"""\n| Стабильность E2E | Попыток теста | Повторов сборки | Инфраструктурная нестабильность |\n| --- | ---: | ---: | --- |\n{stability_rows}\n"""
-    summary = f"""### Результаты проверки WAF\n\nE2E-наборы разворачивают одноразовый стенд с control-plane, runtime, базой данных, Vault и тестовыми upstream-сервисами. Они подтверждают цепочку: настройка через API -> compile/apply revision -> активная runtime-конфигурация -> фактический HTTP-результат.\n\n| E2E-набор | Что подтверждает | Пройдено | Ошибок | Пропусков |\n| --- | --- | ---: | ---: | ---: |\n{e2e_rows}\n\n| DAST-набор | Что подтверждает | Высокий | Критический | Статус |\n| --- | --- | ---: | ---: | ---: |\n{dast_rows}\n{stability_section}\nВсе E2E-наборы пройдены без ошибок и пропусков. DAST не выявил блокирующих уязвимостей уровней «Высокий» и «Критический». Полные машиночитаемые доказательства приложены к релизу.\n"""
+    matrix_rows = "\n".join([
+        f"| E2E suites | {test_matrix['e2e_suites']} | {test_matrix['e2e_tests_passed']} проверок пройдено |",
+        f"| DAST suites | {test_matrix['dast_suites']} | блокирующих High/Critical: 0 |",
+        f"| Stability reports | {test_matrix['stability_reports']} | retry и flaky публикуются отдельно |",
+        f"| Security scan sources | {test_matrix['security_scan_sources']} | filesystem и image |",
+    ])
+    summary = f"""### Результаты проверки WAF\n\nE2E-наборы разворачивают одноразовый стенд с control-plane, runtime, базой данных, Vault и тестовыми upstream-сервисами. Они подтверждают цепочку: настройка через API -> compile/apply revision -> активная runtime-конфигурация -> фактический HTTP-результат.\n\n| Матрица | Количество | Результат |\n| --- | ---: | --- |\n{matrix_rows}\n\n| E2E-набор | Что подтверждает | Пройдено | Ошибок | Пропусков |\n| --- | --- | ---: | ---: | ---: |\n{e2e_rows}\n\n| DAST-набор | Что подтверждает | Высокий | Критический | Статус |\n| --- | --- | ---: | ---: | ---: |\n{dast_rows}\n{stability_section}\nВсе E2E-наборы пройдены без ошибок и пропусков. DAST не выявил блокирующих уязвимостей уровней «Высокий» и «Критический». Полные машиночитаемые доказательства приложены к релизу.\n"""
     (output / "release-evidence-summary.md").write_text(summary, encoding="utf-8")
     details = f"""# Доказательства проверок релиза {args.version}\n\n**Коммит:** `{args.commit}`  \n**Статус:** **пройдено**\n\n{summary}\n### Исходные доказательства\n\n`release-evidence-source.zip` содержит JSON и Markdown-отчёты E2E/DAST без тел запросов и секретов.\n"""
     (output / "release-evidence.md").write_text(details, encoding="utf-8")

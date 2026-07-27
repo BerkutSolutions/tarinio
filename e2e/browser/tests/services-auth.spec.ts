@@ -41,6 +41,9 @@ test("services.basic-auth-mask-reveal-preview", async ({ authenticatedPage: page
       await openPage(page, `/services/${siteID}`, "#service-editor-form");
       await page.locator('[data-wizard-tab="antibot"]').click();
       await expect(page.locator('[data-tab-panel="antibot"]')).toBeVisible();
+      await page.locator("#service-antibot-enabled").check();
+      await page.locator("#service-antibot-challenge").selectOption("cookie");
+      await page.locator("#service-antibot-session-ttl").selectOption("15");
       await page.locator("#service-use-auth-basic").check();
       await page.locator("#service-auth-order").selectOption("antibot_first");
       await page.locator("#service-auth-basic-template").selectOption("v6");
@@ -74,6 +77,7 @@ test("services.basic-auth-mask-reveal-preview", async ({ authenticatedPage: page
     await test.step("reload mask, reveal and hide", async () => {
       await openPage(page, `/services/${siteID}`, "#service-editor-form");
       await page.locator('[data-wizard-tab="antibot"]').click();
+      await expect(page.locator("#service-antibot-session-ttl")).toHaveValue("15");
       await expect(page.locator("#service-auth-order")).toHaveValue("antibot_first");
       const passwordInput = page.locator('[data-auth-user-password="0"]');
       await expect(passwordInput).toHaveAttribute("data-auth-user-password-stored", "true");

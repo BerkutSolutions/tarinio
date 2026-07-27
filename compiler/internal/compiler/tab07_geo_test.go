@@ -272,3 +272,17 @@ func TestGeo_Validate_InvalidDayOfWeek(t *testing.T) {
 		t.Fatal("expected error for day_of_week=7")
 	}
 }
+func TestGeo_CountryWhitelistCanAllowLocalAddresses(t *testing.T) {
+	conf := mustRenderSiteConf(t, "geo-local", EasyProfileInput{
+		SiteID: "geo-local", SecurityMode: "block", AllowedMethods: []string{"GET"},
+		MaxClientSize: "10m", WhitelistCountry: []string{"US"}, AllowLocalCountryIPs: true,
+	})
+	for _, marker := range []string{
+		`if ($waf_client_is_local = 1) { set $waf_country_guard "1:$waf_country_code"; }`,
+		`^(?:1:.*|0:(?:US))$`,
+	} {
+		if !strings.Contains(conf, marker) {
+			t.Fatalf("expected local-address country-policy marker %q, got:\n%s", marker, conf)
+		}
+	}
+}

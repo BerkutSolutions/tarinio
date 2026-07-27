@@ -100,6 +100,7 @@ type RevisionCatalogItem struct {
 	LastEventTime     string                     `json:"last_event_time,omitempty"`
 	LastEventSummary  string                     `json:"last_event_summary,omitempty"`
 	SnapshotError     string                     `json:"snapshot_error,omitempty"`
+	Changes           []RevisionCatalogChange    `json:"changes,omitempty"`
 }
 
 type RevisionTimelineEntry struct {
@@ -268,6 +269,7 @@ func (s *RevisionCatalogService) List(_ context.Context) (RevisionCatalogRespons
 		activeRevisionID = activeRevision.ID
 	}
 	siteScopes := buildRevisionSiteScopes(revisionsAsc, snapshotsByRevision, activeRevisionID, siteRefByID)
+	changesByRevision := buildRevisionChanges(revisionsAsc, snapshotsByRevision)
 
 	for _, revision := range revisionsDesc {
 		lastApplyJob, hasLastApplyJob := latestApplyJobByRevision[revision.ID]
@@ -295,6 +297,7 @@ func (s *RevisionCatalogService) List(_ context.Context) (RevisionCatalogRespons
 			SignatureKeyID:    revision.SignatureKeyID,
 		}
 		scope := siteScopes[revision.ID]
+		card.Changes = filterRevisionChanges(changesByRevision[revision.ID], revision.TargetSiteIDs)
 		_, hasSnapshot := snapshotsByRevision[revision.ID]
 		if hasSnapshot {
 			scopedSites, scopedActive := narrowScopeByTargets(scope, revision.TargetSiteIDs, siteRefByID)

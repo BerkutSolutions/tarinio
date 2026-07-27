@@ -34,8 +34,6 @@ export function draftToEasyProfilePart2(draft, deps) {
   const limitReqURL = String(draft.limit_req_url || "").trim();
   const limitReqRateRaw = String(draft.limit_req_rate || "").trim().toLowerCase().replace(/\s+/g, "");
   const limitReqRate = /^\d+r\/s$/.test(limitReqRateRaw) ? limitReqRateRaw : "100r/s";
-  const authBasicLocation = "sitewide";
-  const authBasicText = String(draft.auth_basic_text || "").trim() || "Restricted area";
   const authUsers = deps.normalizeAuthBasicUsers(draft.auth_basic_users);
   const authMode = deps.normalizeAuthMode(draft.auth_mode);
   const authOrder = deps.normalizeAuthOrder(draft.auth_order);
@@ -154,6 +152,7 @@ export function draftToEasyProfilePart2(draft, deps) {
       antibot_challenge: draft.antibot_challenge,
       antibot_challenge_template: draft.antibot_challenge_template || "v2",
       antibot_uri: draft.antibot_uri,
+      session_inactivity_minutes: deps.normalizeAuthSessionTTLMinutes(draft.antibot_session_inactivity_minutes),
       scanner_auto_ban_enabled: Boolean(draft.antibot_scanner_auto_ban_enabled),
       antibot_recaptcha_score: draft.antibot_recaptcha_score,
       antibot_recaptcha_sitekey: draft.antibot_recaptcha_sitekey,
@@ -171,10 +170,8 @@ export function draftToEasyProfilePart2(draft, deps) {
       use_auth_basic: draft.use_auth_basic,
       auth_mode: authMode,
       auth_order: authOrder,
-      auth_basic_location: authBasicLocation,
       auth_basic_user: firstUser.username,
       auth_basic_password: firstUser.password,
-      auth_basic_text: authBasicText,
       auth_basic_template: draft.auth_basic_template || "v1",
       users: authUsers,
       exclusion_rules: authExclusionRules,
@@ -184,6 +181,7 @@ export function draftToEasyProfilePart2(draft, deps) {
     security_country_policy: {
       blacklist_country: draft.blacklist_country,
       whitelist_country: draft.whitelist_country,
+      allow_local_ips: Boolean(draft.allow_local_country_ips),
       show_geo_block_page: draft.show_geo_block_page,
       geo_time_windows: deps.normalizeGeoTimeWindows(draft.geo_time_windows)
     },

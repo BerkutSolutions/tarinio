@@ -49,6 +49,19 @@ map $waf_country_header $waf_country_code {
     default $waf_country_header;
 }
 
+geo $waf_client_is_local {
+    default 0;
+    10.0.0.0/8 1;
+    100.64.0.0/10 1;
+    127.0.0.0/8 1;
+    169.254.0.0/16 1;
+    172.16.0.0/12 1;
+    192.168.0.0/16 1;
+    ::1/128 1;
+    fc00::/7 1;
+    fe80::/10 1;
+}
+
 map $http_x_city $waf_city_from_x_city {
     default "";
     ~(?i)^[A-Za-z0-9._-]+$ $http_x_city;

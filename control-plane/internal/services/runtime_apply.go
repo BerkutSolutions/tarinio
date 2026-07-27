@@ -1174,7 +1174,7 @@ func mapEasyInputs(items []easysiteprofiles.EasySiteProfile, virtualPatches []vi
 			AuthOrder:                  item.SecurityAuthBasic.AuthOrder,
 			AuthBasicUser:              item.SecurityAuthBasic.AuthBasicUser,
 			AuthBasicPassword:          item.SecurityAuthBasic.AuthBasicPassword,
-			AuthBasicText:              item.SecurityAuthBasic.AuthBasicText,
+			AuthBasicText:              "Restricted area",
 			AuthBasicTemplate:          item.SecurityAuthBasic.AuthBasicTemplate,
 			AuthUsers:                  mapAuthUsers(item.SecurityAuthBasic.Users),
 			AuthServiceTokens:          mapAuthServiceTokens(item.SecurityAuthBasic.ServiceTokens),
@@ -1183,6 +1183,7 @@ func mapEasyInputs(items []easysiteprofiles.EasySiteProfile, virtualPatches []vi
 			AntibotChallenge:           item.SecurityAntibot.AntibotChallenge,
 			AntibotChallengeTemplate:   item.SecurityAntibot.AntibotChallengeTemplate,
 			AntibotURI:                 item.SecurityAntibot.AntibotURI,
+			AntibotSessionTTLMin:       item.SecurityAntibot.SessionInactivityMinutes,
 			AntibotScannerAutoBan:      item.SecurityAntibot.ScannerAutoBanEnabled,
 			AntibotRecaptchaScore:      item.SecurityAntibot.AntibotRecaptchaScore,
 			AntibotRecaptchaKey:        item.SecurityAntibot.AntibotRecaptchaSitekey,
@@ -1211,10 +1212,11 @@ func mapEasyInputs(items []easysiteprofiles.EasySiteProfile, virtualPatches []vi
 
 			ExceptionsURI: append([]string(nil), item.SecurityBehaviorAndLimits.ExceptionsURI...),
 
-			BlacklistCountry: item.SecurityCountryPolicy.BlacklistCountry,
-			WhitelistCountry: item.SecurityCountryPolicy.WhitelistCountry,
-			ShowGeoBlockPage: item.SecurityCountryPolicy.ShowGeoBlockPage,
-			GeoTimeWindows:   mapGeoTimeWindows(item.SecurityCountryPolicy.GeoTimeWindows),
+			BlacklistCountry:     item.SecurityCountryPolicy.BlacklistCountry,
+			WhitelistCountry:     item.SecurityCountryPolicy.WhitelistCountry,
+			AllowLocalCountryIPs: item.SecurityCountryPolicy.AllowLocalIPs,
+			ShowGeoBlockPage:     item.SecurityCountryPolicy.ShowGeoBlockPage,
+			GeoTimeWindows:       mapGeoTimeWindows(item.SecurityCountryPolicy.GeoTimeWindows),
 
 			WSInspection: pipeline.WSInspectionInput{
 				UseWSInspection:   item.SecurityWebSocket.UseWSInspection,

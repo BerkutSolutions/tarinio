@@ -1,4 +1,5 @@
 import { confirmAction, escapeHtml, formatDate, setError, setLoading, statusBadge } from "../ui.js";
+import { renderServiceRevisionModal } from "./revisions.service-modal.js";
 
 function normalizeList(value) {
   return Array.isArray(value) ? value : [];
@@ -202,13 +203,13 @@ export async function renderRevisions(container, ctx) {
     selectedSiteID: "",
     pendingRevisionID: "",
     pendingBulkDelete: false,
-    expandedRevisionIDs: new Set(),
+    selectedRevisionID: "",
     selectedTimelineIndex: -1,
   };
 
   const closeModal = () => {
     state.selectedSiteID = "";
-    state.expandedRevisionIDs = new Set();
+    state.selectedRevisionID = "";
     modalNode?.classList.add("waf-hidden");
   };
 
@@ -376,121 +377,41 @@ export async function renderRevisions(container, ctx) {
   };
 
   const renderModal = () => {
-    if (!state.selectedSiteID) {
-      return;
-    }
+    if (!state.selectedSiteID) return;
     const deleteOthersButton = container.querySelector("#revisions-delete-others");
-    const { service, filteredRevisions: filtered, deletableRevisionIDs } = getSelectedServiceData();
+    const { service, filteredRevisions, deletableRevisionIDs } = getSelectedServiceData();
     if (!service) {
       closeModal();
       return;
     }
     if (deleteOthersButton) {
       deleteOthersButton.disabled = state.pendingBulkDelete || !deletableRevisionIDs.length;
-      deleteOthersButton.textContent = state.pendingBulkDelete
-        ? ctx.t("revisions.action.deletingOthers")
-        : ctx.t("revisions.action.deleteOthers");
+      deleteOthersButton.textContent = state.pendingBulkDelete ? ctx.t("revisions.action.deletingOthers") : ctx.t("revisions.action.deleteOthers");
     }
-    if (!state.expandedRevisionIDs.size && filtered.length) {
-      state.expandedRevisionIDs = new Set([String(filtered[0].id || "")]);
-    }
-    filtered.forEach((item) => {
-      if (item?.is_active) {
-        state.expandedRevisionIDs.add(String(item?.id || ""));
-      }
-    });
     modalSubtitleNode.textContent = ctx.t("revisions.modal.subtitle", { service: service.site_id, host: service.primary_host || "-" });
-    modalContentNode.innerHTML = `
-      <div class="revisions-modal-summary">
-        <div class="revisions-modal-chip"><span>${escapeHtml(ctx.t("revisions.modal.service"))}</span><strong>${escapeHtml(service.site_id)}</strong></div>
-        <div class="revisions-modal-chip"><span>${escapeHtml(ctx.t("revisions.modal.host"))}</span><strong>${escapeHtml(service.primary_host || "-")}</strong></div>
-        <div class="revisions-modal-chip"><span>${escapeHtml(ctx.t("revisions.modal.revisions"))}</span><strong>${escapeHtml(String(filtered.length))}</strong></div>
-      </div>
-      ${filtered.length ? `
-        <div class="revisions-modal-list">
-          ${filtered.map((item) => {
-            const sites = normalizeSites(item?.sites);
-            const isServiceActive = normalizeSiteIDs(item?.active_site_ids).includes(state.selectedSiteID);
-            const isExpanded = isServiceActive || state.expandedRevisionIDs.has(String(item?.id || ""));
-            const approvalPending = String(item?.approval_status || "").trim().toLowerCase() === "pending";
-            const applyDisabled = state.pendingRevisionID === item.id || isServiceActive || approvalPending;
-            const deleteDisabled = state.pendingRevisionID === item.id || state.pendingBulkDelete || Boolean(item?.is_active);
-            const visualStatus = revisionVisualStatus(item, state.selectedSiteID);
-            return `
-              <article class="revisions-modal-item ${isExpanded ? "is-expanded" : ""}">
-                <div class="revisions-modal-item-head">
-                  <div>
-                    <div class="revisions-modal-item-title">${escapeHtml(String(item?.id || "-"))}</div>
-                    <div class="revisions-modal-item-meta">${escapeHtml(ctx.t("revisions.field.version"))}: ${escapeHtml(String(item?.version ?? "-"))} - ${escapeHtml(formatDate(String(item?.created_at || "")))}</div>
-                  </div>
-                  <div class="revisions-modal-badges">
-                    ${statusBadge(visualStatus)}
-                    ${approvalPending ? `<button type="button" class="btn btn-sm" data-revision-approve="${escapeHtml(String(item?.id || ""))}">${escapeHtml(ctx.t("revisions.action.approve"))}</button>` : ""}
-                    <button type="button" class="btn btn-sm" data-revision-apply="${escapeHtml(String(item?.id || ""))}" ${applyDisabled ? "disabled" : ""}>
-                      ${escapeHtml(state.pendingRevisionID === item.id ? ctx.t("revisions.action.applying") : isServiceActive ? ctx.t("revisions.revision.applyBlocked") : ctx.t("revisions.action.apply"))}
-                    </button>
-                    <button type="button" class="btn ghost btn-sm" data-revision-delete="${escapeHtml(String(item?.id || ""))}" ${deleteDisabled ? "disabled" : ""}>
-                      ${escapeHtml(state.pendingRevisionID === item.id ? ctx.t("revisions.action.deleting") : ctx.t("revisions.action.delete"))}
-                    </button>
-                    ${isServiceActive ? "" : `
-                      <button type="button" class="revisions-accordion-indicator" data-revision-toggle="${escapeHtml(String(item?.id || ""))}" aria-label="${escapeHtml(ctx.t("revisions.action.toggleDetails"))}">
-                        ${isExpanded ? "-" : "+"}
-                      </button>
-                    `}
-                  </div>
-                </div>
-                <div class="revisions-modal-item-preview">
-                  <div class="revisions-modal-preview-tile">
-                    <span>${escapeHtml(ctx.t("revisions.revision.lastApply"))}</span>
-                    <strong>${escapeHtml(translateApplyResult(item?.last_apply_result || item?.last_apply_status || ctx.t("revisions.revision.noApply"), ctx))}</strong>
-                  </div>
-                  <div class="revisions-modal-preview-tile">
-                    <span>${escapeHtml(ctx.t("revisions.revision.lastEvent"))}</span>
-                    <strong>${escapeHtml(translateTimelineLabel({ summary: item?.last_event_summary, type: item?.last_event_type }, ctx))}</strong>
-                  </div>
-                </div>
-                <div class="revisions-modal-accordion ${isExpanded ? "" : "waf-hidden"}">
-                  <div class="revisions-modal-item-grid">
-                    <div class="revisions-modal-line revisions-modal-line-wide">
-                      <span>${escapeHtml(ctx.t("revisions.revision.sites"))}</span>
-                      <strong>${escapeHtml(sites.map((site) => formatServiceName(site, ctx)).join(", ") || "-")}</strong>
-                    </div>
-                    <div class="revisions-modal-line">
-                      <span>${escapeHtml(ctx.t("revisions.revision.checksum"))}</span>
-                      <strong>${escapeHtml(String(item?.checksum || "-"))}</strong>
-                    </div>
-                    <div class="revisions-modal-line">
-                      <span>${escapeHtml(ctx.t("revisions.revision.approvals"))}</span>
-                      <strong>${escapeHtml(String(item?.approval_status || "-"))} (${escapeHtml(String((item?.approvals || []).length))}/${escapeHtml(String(item?.required_approvals || 0))})</strong>
-                    </div>
-                    <div class="revisions-modal-line">
-                      <span>${escapeHtml(ctx.t("revisions.revision.compiledBy"))}</span>
-                      <strong>${escapeHtml(String(item?.compiled_by_name || item?.compiled_by_user_id || "-"))}</strong>
-                    </div>
-                    ${item?.last_apply_at ? `
-                      <div class="revisions-modal-line">
-                        <span>${escapeHtml(ctx.t("revisions.revision.lastApplyAt"))}</span>
-                        <strong>${escapeHtml(formatDate(String(item?.last_apply_at || "")))}</strong>
-                      </div>
-                    ` : ""}
-                    ${item?.snapshot_error ? `
-                      <div class="revisions-modal-line revisions-modal-line-wide">
-                        <span>${escapeHtml(ctx.t("revisions.revision.snapshotError"))}</span>
-                        <strong>${escapeHtml(String(item.snapshot_error))}</strong>
-                      </div>
-                    ` : ""}
-                  </div>
-                </div>
-              </article>
-            `;
-          }).join("")}
-        </div>
-      ` : `<div class="waf-empty">${escapeHtml(ctx.t("revisions.modal.empty"))}</div>`}
-    `;
+    const rendered = renderServiceRevisionModal({
+      service,
+      revisions: filteredRevisions,
+      siteID: state.selectedSiteID,
+      selectedRevisionID: state.selectedRevisionID,
+      pendingRevisionID: state.pendingRevisionID,
+      pendingBulkDelete: state.pendingBulkDelete,
+      ctx,
+      escapeHtml,
+      formatDate,
+      statusBadge,
+      revisionVisualStatus,
+      normalizeSites,
+      normalizeSiteIDs,
+      formatServiceName,
+      translateApplyResult,
+      translateTimelineLabel,
+    });
+    state.selectedRevisionID = rendered.selectedRevisionID;
+    modalContentNode.innerHTML = rendered.html;
     modalNode.classList.remove("waf-hidden");
     modalNode.focus();
   };
-
   const renderAll = () => {
     renderServices();
     renderSidebar();
@@ -618,7 +539,7 @@ export async function renderRevisions(container, ctx) {
       return;
     }
     state.selectedSiteID = String(tile.getAttribute("data-revision-site") || "");
-    state.expandedRevisionIDs = new Set();
+    state.selectedRevisionID = "";
     renderModal();
   });
 
@@ -640,18 +561,9 @@ export async function renderRevisions(container, ctx) {
     }
   });
   modalContentNode?.addEventListener("click", async (event) => {
-    const toggle = event.target.closest("[data-revision-toggle]");
-    if (toggle) {
-      const revisionID = String(toggle.getAttribute("data-revision-toggle") || "");
-      const current = normalizeList(state.payload?.revisions).find((item) => String(item?.id || "") === revisionID);
-      if (current?.is_active) {
-        return;
-      }
-      if (state.expandedRevisionIDs.has(revisionID)) {
-        state.expandedRevisionIDs.delete(revisionID);
-      } else {
-        state.expandedRevisionIDs.add(revisionID);
-      }
+    const selectButton = event.target.closest("[data-revision-select]");
+    if (selectButton) {
+      state.selectedRevisionID = String(selectButton.getAttribute("data-revision-select") || "");
       renderModal();
       return;
     }

@@ -246,7 +246,11 @@ test("anti-ddos.logs-refresh-detail-or-empty", async ({ authenticatedPage: page 
     expect(cells[1]).not.toBe("-");
     expect(cells[2]).not.toBe("-");
     expect(cells[3]).not.toBe("-");
-    expect(cells[4]).toMatch(/^(?:\d{1,3}\.){3}\d{1,3}$|^[0-9a-f:]+$/i);
+    expect(cells[4]).toMatch(/(?:\d{1,3}\.){3}\d{1,3}$|[0-9a-f:]+$/i);
+    await expect(logs.locator("#antiddos-log-page-size")).toHaveValue("10");
+    await logs.locator("#antiddos-log-page-size").selectOption("25");
+    await expect(logs.locator("#antiddos-log-page-size")).toHaveValue("25");
+    await expect(logs.locator(".antiddos-log-pager")).toBeVisible();
     await row.press("Enter");
     await expect(page.locator("#antiddos-model-log-detail-modal")).toBeVisible();
     const detail = page.locator("#antiddos-model-log-detail-content");

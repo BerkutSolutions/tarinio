@@ -77,6 +77,7 @@ test("services.toggles-conditional-fields-dynamic-lists-readback", async ({ auth
     await page.locator("#service-antibot-enabled").check();
     await page.locator("#service-antibot-challenge-template").selectOption("v5");
     await page.locator("#service-antibot-challenge").selectOption("javascript");
+    await page.locator("#service-antibot-session-ttl").selectOption("120");
     await page.locator("#service-antibot-escalation-enabled").check();
     await page.locator("#service-antibot-escalation-mode").selectOption("cookie");
     await page.locator("#service-auth-mode").selectOption("basic_or_token");
@@ -89,6 +90,7 @@ test("services.toggles-conditional-fields-dynamic-lists-readback", async ({ auth
     await expect(page.locator("[data-antibot-rule-remove]")).toHaveCount(0);
 
     await page.locator('[data-wizard-tab="geo"]').click();
+    await page.locator("#service-allow-local-country-ips").check();
     await page.locator("[data-geo-tw-add]").click();
     await expect(page.locator("[data-geo-tw-remove]")).toHaveCount(1);
     await page.locator("[data-geo-tw-remove]").click();
@@ -128,7 +130,8 @@ test("services.toggles-conditional-fields-dynamic-lists-readback", async ({ auth
     expect(profile?.security_websocket?.ws_block_patterns, profileResult.body).toContain("(?i)e2e-block");
     expect(profile?.front_service, profileResult.body).toMatchObject({ security_mode: "monitor", profile: "api", certificate_authority_server: "custom" });
     expect(profile?.security_behavior_and_limits, profileResult.body).toMatchObject({ limit_req_rate: "7r/m", ban_escalation_scope: "current_site" });
-    expect(profile?.security_antibot, profileResult.body).toMatchObject({ antibot_challenge: "javascript", antibot_challenge_template: "v5", challenge_escalation_mode: "cookie" });
+    expect(profile?.security_antibot, profileResult.body).toMatchObject({ antibot_challenge: "javascript", antibot_challenge_template: "v5", session_inactivity_minutes: 120, challenge_escalation_mode: "cookie" });
+    expect(profile?.security_country_policy?.allow_local_ips, profileResult.body).toBe(true);
     expect(profile?.security_auth_basic, profileResult.body).toMatchObject({ auth_mode: "basic_or_token", auth_order: "antibot_first", auth_basic_template: "v9", session_inactivity_minutes: 30 });
     const upstreamResult = await api("/api/upstreams");
     expect(upstreamResult.status, upstreamResult.body).toBe(200);
@@ -137,7 +140,7 @@ test("services.toggles-conditional-fields-dynamic-lists-readback", async ({ auth
     for (const [selector, value] of Object.entries({
       "#service-security-mode": "monitor", "#service-profile": "api", "#service-ca-server": "custom", "#service-upstream-scheme": "https",
       "#service-limit-req-rate-unit": "r/m", "#service-ban-escalation-scope": "current_site", "#service-antibot-challenge-template": "v5",
-      "#service-antibot-challenge": "javascript", "#service-antibot-escalation-mode": "cookie", "#service-auth-mode": "basic_or_token",
+      "#service-antibot-challenge": "javascript", "#service-antibot-session-ttl": "120", "#service-antibot-escalation-mode": "cookie", "#service-auth-mode": "basic_or_token",
       "#service-auth-order": "antibot_first", "#service-auth-basic-template": "v9", "#service-auth-basic-session-ttl": "30",
     })) await expect(page.locator(selector)).toHaveValue(value);
   } finally {

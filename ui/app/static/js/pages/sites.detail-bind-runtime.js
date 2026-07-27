@@ -121,10 +121,18 @@ export function bindDetailRuntime(deps) {
   const toggleCertificateImportActions = () => toggleCertificateImportActionsDep(container);
   const parseRawDraft = () => {
     const rawEnvText = String(container.querySelector("#service-raw-env")?.value || state.rawEnvText || "").trim();
+    const previousAccess = state.draft || {};
     const parsed = parseRawDraftDep(rawEnvText);
     state.rawEnvText = rawEnvText ? `${rawEnvText}\n` : "";
     state.rawMissingFields = normalizeArray(parsed.missingFields);
-    state.draft = ensureControlPlaneAccessManagementMethods(parsed.draft);
+    state.draft = ensureControlPlaneAccessManagementMethods({
+      ...parsed.draft,
+      use_allowlist: Boolean(previousAccess.use_allowlist),
+      use_exceptions: Boolean(previousAccess.use_exceptions),
+      access_allowlist: Array.isArray(previousAccess.access_allowlist) ? [...previousAccess.access_allowlist] : [],
+      access_denylist: Array.isArray(previousAccess.access_denylist) ? [...previousAccess.access_denylist] : [],
+      exceptions_ip: Array.isArray(previousAccess.exceptions_ip) ? [...previousAccess.exceptions_ip] : [],
+    });
     return state.draft;
   };
   const idInput = container.querySelector("#service-id");

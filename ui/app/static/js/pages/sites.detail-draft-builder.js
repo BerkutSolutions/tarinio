@@ -119,6 +119,7 @@ export function buildDetailDraftFromForm(container, state, deps = {}) {
     antibot_challenge: container.querySelector("#service-antibot-enabled")?.checked ? (container.querySelector("#service-antibot-challenge").value || "cookie") : "no",
     antibot_challenge_template: container.querySelector("#service-antibot-challenge-template")?.value || "v2",
     antibot_uri: container.querySelector("#service-antibot-uri").value.trim(),
+    antibot_session_inactivity_minutes: normalizeAuthSessionTTLMinutes(container.querySelector("#service-antibot-session-ttl")?.value),
     antibot_scanner_auto_ban_enabled: container.querySelector("#service-antibot-scanner-auto-ban-enabled")?.checked ?? false,
     antibot_recaptcha_score: Number(container.querySelector("#service-antibot-recaptcha-score").value || "0.7"),
     antibot_recaptcha_sitekey: container.querySelector("#service-antibot-recaptcha-sitekey").value.trim(),
@@ -155,10 +156,8 @@ export function buildDetailDraftFromForm(container, state, deps = {}) {
     use_auth_basic: container.querySelector("#service-use-auth-basic").checked,
     auth_mode: normalizeAuthMode(container.querySelector("#service-auth-mode")?.value || "basic"),
     auth_order: normalizeAuthOrder(container.querySelector("#service-auth-order")?.value || "auth_first"),
-    auth_basic_location: container.querySelector("#service-auth-basic-location").value.trim(),
     auth_basic_user: "",
     auth_basic_password: "",
-    auth_basic_text: container.querySelector("#service-auth-basic-text").value.trim(),
     auth_basic_template: container.querySelector("#service-auth-basic-template")?.value || "v1",
     auth_basic_users: Array.from(container.querySelectorAll("[data-auth-user-username]"))
       .map((input) => {
@@ -201,6 +200,7 @@ export function buildDetailDraftFromForm(container, state, deps = {}) {
     ),
     blacklist_country: normalizeStringArray(state.draft.blacklist_country),
     whitelist_country: normalizeStringArray(state.draft.whitelist_country),
+    allow_local_country_ips: Boolean(container.querySelector("#service-allow-local-country-ips")?.checked),
     show_geo_block_page: Boolean(container.querySelector("#service-show-geo-block-page")?.checked),
     use_custom_error_pages: Boolean(container.querySelector("#service-use-custom-error-pages")?.checked ?? true),
     disabled_error_pages: (() => {

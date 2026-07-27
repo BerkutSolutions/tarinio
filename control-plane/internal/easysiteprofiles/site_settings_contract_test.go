@@ -53,6 +53,7 @@ func TestSiteSettings_FieldContract(t *testing.T) {
 		"security_antibot.antibot_recaptcha_secret",
 		"security_antibot.antibot_recaptcha_sitekey",
 		"security_antibot.scanner_auto_ban_enabled",
+		"security_antibot.session_inactivity_minutes",
 		"security_antibot.antibot_turnstile_secret",
 		"security_antibot.antibot_turnstile_sitekey",
 		"security_antibot.antibot_uri",
@@ -62,12 +63,10 @@ func TestSiteSettings_FieldContract(t *testing.T) {
 		"security_antibot.challenge_escalation_mode",
 		"security_antibot.challenge_rules.challenge",
 		"security_antibot.challenge_rules.path",
-		"security_auth_basic.auth_basic_location",
 		"security_auth_basic.auth_mode",
 		"security_auth_basic.auth_order",
 		"security_auth_basic.auth_basic_password",
 		"security_auth_basic.auth_basic_template",
-		"security_auth_basic.auth_basic_text",
 		"security_auth_basic.auth_basic_user",
 		"security_auth_basic.exclusion_rules.methods",
 		"security_auth_basic.exclusion_rules.path",
@@ -117,6 +116,7 @@ func TestSiteSettings_FieldContract(t *testing.T) {
 		"security_behavior_and_limits.use_dnsbl",
 		"security_behavior_and_limits.use_limit_conn",
 		"security_behavior_and_limits.use_limit_req",
+		"security_country_policy.allow_local_ips",
 		"security_country_policy.blacklist_country",
 		"security_country_policy.whitelist_country",
 		"security_country_policy.show_geo_block_page",
@@ -340,6 +340,7 @@ func allFieldsProfile(siteID string) EasySiteProfile {
 
 	profile.SecurityAntibot.AntibotChallenge = AntibotChallengeRecaptcha
 	profile.SecurityAntibot.AntibotURI = "/challenge"
+	profile.SecurityAntibot.SessionInactivityMinutes = 90
 	profile.SecurityAntibot.ScannerAutoBanEnabled = true
 	profile.SecurityAntibot.AntibotRecaptchaScore = 0.8
 	profile.SecurityAntibot.AntibotRecaptchaSitekey = "recaptcha-site"
@@ -363,10 +364,8 @@ func allFieldsProfile(siteID string) EasySiteProfile {
 	profile.SecurityAuthBasic.UseAuthBasic = true
 	profile.SecurityAuthBasic.AuthMode = AuthModeBasicOrToken
 	profile.SecurityAuthBasic.AuthOrder = AuthOrderAntibotFirst
-	profile.SecurityAuthBasic.AuthBasicLocation = AuthBasicLocationSitewide
 	profile.SecurityAuthBasic.AuthBasicUser = "admin"
 	profile.SecurityAuthBasic.AuthBasicPassword = "super-secret"
-	profile.SecurityAuthBasic.AuthBasicText = "Private zone"
 	profile.SecurityAuthBasic.Users = []SecurityAuthUser{
 		{Username: "admin", Password: "super-secret", Enabled: true, LastLoginAt: "2026-06-24T10:00:00Z"},
 	}
@@ -380,6 +379,7 @@ func allFieldsProfile(siteID string) EasySiteProfile {
 
 	profile.SecurityCountryPolicy.BlacklistCountry = []string{"RU", "APAC"}
 	profile.SecurityCountryPolicy.WhitelistCountry = []string{"US", "EMEA"}
+	profile.SecurityCountryPolicy.AllowLocalIPs = true
 
 	profile.SecurityAPIPositive.UseAPIPositiveSecurity = true
 	profile.SecurityAPIPositive.OpenAPISchemaRef = "openapi/petstore.yaml"

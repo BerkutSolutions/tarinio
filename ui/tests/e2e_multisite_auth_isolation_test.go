@@ -71,7 +71,6 @@ func TestE2EMultisiteBasicAuthIsolation(t *testing.T) {
 		auth["use_auth_basic"] = true
 		auth["auth_mode"] = "basic"
 		auth["auth_order"] = "auth_first"
-		auth["auth_basic_location"] = "sitewide"
 		auth["auth_basic_user"] = item.username
 		auth["auth_basic_password"] = item.password
 		auth["users"] = []map[string]any{{"username": item.username, "password": item.password, "enabled": true}}

@@ -3,10 +3,18 @@ import { setError } from "../ui.js";
 export function parseRawDraftFromContainer(container, state, deps) {
   const { envToDraft, normalizeArray, applyServiceProfilePresetForMissingFields } = deps;
   const rawEnvText = String(container.querySelector("#service-raw-env")?.value || state.rawEnvText || "").trim();
+  const previousAccess = state.draft || {};
   const parsed = envToDraft(rawEnvText);
   state.rawEnvText = rawEnvText ? `${rawEnvText}\n` : "";
   state.rawMissingFields = normalizeArray(parsed.missingFields);
-  state.draft = applyServiceProfilePresetForMissingFields(parsed.draft, parsed.missingFields);
+  state.draft = {
+    ...applyServiceProfilePresetForMissingFields(parsed.draft, parsed.missingFields),
+    use_allowlist: Boolean(previousAccess.use_allowlist),
+    use_exceptions: Boolean(previousAccess.use_exceptions),
+    access_allowlist: Array.isArray(previousAccess.access_allowlist) ? [...previousAccess.access_allowlist] : [],
+    access_denylist: Array.isArray(previousAccess.access_denylist) ? [...previousAccess.access_denylist] : [],
+    exceptions_ip: Array.isArray(previousAccess.exceptions_ip) ? [...previousAccess.exceptions_ip] : [],
+  };
   return state.draft;
 }
 
@@ -123,6 +131,7 @@ export function getDraftFromForm(container, state, deps) {
     antibot_challenge: container.querySelector("#service-antibot-challenge").value,
     antibot_challenge_template: container.querySelector("#service-antibot-challenge-template")?.value || "v2",
     antibot_uri: container.querySelector("#service-antibot-uri").value.trim(),
+    antibot_session_inactivity_minutes: normalizeAuthSessionTTLMinutes(container.querySelector("#service-antibot-session-ttl")?.value),
     antibot_scanner_auto_ban_enabled: container.querySelector("#service-antibot-scanner-auto-ban-enabled")?.checked ?? true,
     antibot_recaptcha_score: Number(container.querySelector("#service-antibot-recaptcha-score").value || "0.7"),
     antibot_recaptcha_sitekey: container.querySelector("#service-antibot-recaptcha-sitekey").value.trim(),
@@ -144,10 +153,8 @@ export function getDraftFromForm(container, state, deps) {
       return { path: String(input.value || "").trim(), challenge: String(modeInput?.value || "").trim().toLowerCase() };
     }),
     use_auth_basic: container.querySelector("#service-use-auth-basic").checked,
-    auth_basic_location: container.querySelector("#service-auth-basic-location").value.trim(),
     auth_basic_user: "",
     auth_basic_password: "",
-    auth_basic_text: container.querySelector("#service-auth-basic-text").value.trim(),
     auth_basic_template: container.querySelector("#service-auth-basic-template")?.value || "v1",
     auth_basic_users: Array.from(container.querySelectorAll("[data-auth-user-username]")).map((input) => {
       const index = String(input.dataset.authUserUsername || "");
@@ -159,6 +166,7 @@ export function getDraftFromForm(container, state, deps) {
     auth_basic_session_inactivity_minutes: normalizeAuthSessionTTLMinutes(container.querySelector("#service-auth-basic-session-ttl")?.value),
     blacklist_country: normalizeStringArray(state.draft.blacklist_country),
     whitelist_country: normalizeStringArray(state.draft.whitelist_country),
+    allow_local_country_ips: Boolean(container.querySelector("#service-allow-local-country-ips")?.checked),
     show_geo_block_page: Boolean(container.querySelector("#service-show-geo-block-page")?.checked),
     use_custom_error_pages: Boolean(container.querySelector("#service-use-custom-error-pages")?.checked ?? true),
     disabled_error_pages: (() => {

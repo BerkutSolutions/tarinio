@@ -26,13 +26,11 @@ const (
 	AntibotChallengeHcaptcha   = "hcaptcha"
 	AntibotChallengeTurnstile  = "turnstile"
 	AntibotChallengeMcaptcha   = "mcaptcha"
-
-	AuthBasicLocationSitewide = "sitewide"
-	AuthModeBasic             = "basic"
-	AuthModeServiceToken      = "service_token"
-	AuthModeBasicOrToken      = "basic_or_token"
-	AuthOrderAuthFirst        = "auth_first"
-	AuthOrderAntibotFirst     = "antibot_first"
+	AuthModeBasic              = "basic"
+	AuthModeServiceToken       = "service_token"
+	AuthModeBasicOrToken       = "basic_or_token"
+	AuthOrderAuthFirst         = "auth_first"
+	AuthOrderAntibotFirst      = "antibot_first"
 
 	APIPositiveEnforcementMonitor = "monitor"
 	APIPositiveEnforcementBlock   = "block"
@@ -157,6 +155,7 @@ type SecurityBehaviorAndLimitsSettings struct {
 type SecurityAntibotSettings struct {
 	AntibotChallenge           string                 `json:"antibot_challenge"`
 	AntibotChallengeTemplate   string                 `json:"antibot_challenge_template,omitempty"`
+	SessionInactivityMinutes   int                    `json:"session_inactivity_minutes"`
 	AntibotURI                 string                 `json:"antibot_uri"`
 	ScannerAutoBanEnabled      bool                   `json:"scanner_auto_ban_enabled"`
 	AntibotRecaptchaScore      float64                `json:"antibot_recaptcha_score"`
@@ -186,10 +185,8 @@ type SecurityAuthBasicSettings struct {
 	UseAuthBasic      bool                        `json:"use_auth_basic"`
 	AuthMode          string                      `json:"auth_mode"`
 	AuthOrder         string                      `json:"auth_order"`
-	AuthBasicLocation string                      `json:"auth_basic_location"`
 	AuthBasicUser     string                      `json:"auth_basic_user"`
 	AuthBasicPassword string                      `json:"auth_basic_password"`
-	AuthBasicText     string                      `json:"auth_basic_text"`
 	AuthBasicTemplate string                      `json:"auth_basic_template,omitempty"`
 	Users             []SecurityAuthUser          `json:"users"`
 	ExclusionRules    []SecurityAuthExclusionRule `json:"exclusion_rules"`
@@ -233,6 +230,7 @@ type GeoTimeWindow struct {
 type SecurityCountryPolicySettings struct {
 	BlacklistCountry []string `json:"blacklist_country"`
 	WhitelistCountry []string `json:"whitelist_country"`
+	AllowLocalIPs    bool     `json:"allow_local_ips"`
 	ShowGeoBlockPage bool     `json:"show_geo_block_page"`
 	// GeoTimeWindows adds time-based geo-fencing on top of the static lists.
 	// All windows are evaluated and the first matching one wins.
@@ -475,6 +473,7 @@ func DefaultProfile(siteID string) EasySiteProfile {
 		SecurityAntibot: SecurityAntibotSettings{
 			AntibotChallenge:           defaultAntibotChallenge,
 			AntibotURI:                 "/challenge",
+			SessionInactivityMinutes:   10,
 			ScannerAutoBanEnabled:      false,
 			AntibotRecaptchaScore:      0.7,
 			AntibotRecaptchaSitekey:    "",
@@ -492,10 +491,8 @@ func DefaultProfile(siteID string) EasySiteProfile {
 			UseAuthBasic:      false,
 			AuthMode:          AuthModeBasic,
 			AuthOrder:         AuthOrderAuthFirst,
-			AuthBasicLocation: AuthBasicLocationSitewide,
 			AuthBasicUser:     "changeme",
 			AuthBasicPassword: "",
-			AuthBasicText:     "Restricted area",
 			AuthBasicTemplate: "v1",
 			Users: []SecurityAuthUser{
 				{

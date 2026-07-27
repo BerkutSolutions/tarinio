@@ -73,7 +73,6 @@ func TestE2EBasicAuthLifecycle(t *testing.T) {
 	auth["use_auth_basic"] = true
 	auth["auth_mode"] = "basic"
 	auth["auth_order"] = "auth_first"
-	auth["auth_basic_location"] = "sitewide"
 	auth["auth_basic_user"] = activeUser
 	auth["auth_basic_password"] = initialPassword
 	auth["session_inactivity_minutes"] = 5

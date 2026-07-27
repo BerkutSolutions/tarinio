@@ -209,13 +209,15 @@ func TestE2ESiteSettingsRoundtrip(t *testing.T) {
 		"security_antibot": map[string]any{
 			"antibot_challenge":          "javascript",
 			"antibot_uri":                "/challenge",
+			"session_inactivity_minutes": 15,
 			"scanner_auto_ban_enabled":   true,
 			"antibot_challenge_template": "v1",
 		},
-		"use_hsts":              true,
-		"referrer_policy":       "no-referrer-when-downgrade",
-		"proxy_cookie_flags":    "* SameSite=Lax",
-		"keep_upstream_headers": []string{"*"},
+		"security_country_policy": map[string]any{"blacklist_country": []string{"XX"}, "whitelist_country": []string{"US"}, "allow_local_ips": true},
+		"use_hsts":                true,
+		"referrer_policy":         "no-referrer-when-downgrade",
+		"proxy_cookie_flags":      "* SameSite=Lax",
+		"keep_upstream_headers":   []string{"*"},
 	}
 
 	// ── all-off profile ───────────────────────────────────────────────────────
@@ -270,6 +272,8 @@ func TestE2ESiteSettingsRoundtrip(t *testing.T) {
 		assertInConf(t, conf, "/wp-admin", "blacklist_uri")
 		assertInConf(t, conf, "waf_antibot_guard", "antibot_enabled")
 		assertInConf(t, conf, "waf_antibot_scanner_guard", "antibot_scanner_auto_ban")
+		assertInConf(t, conf, "Max-Age=900; Path=/", "antibot_session_ttl")
+		assertInConf(t, conf, "if ($waf_client_is_local = 1)", "country_policy_local_ip")
 		assertInConf(t, conf, "Strict-Transport-Security", "hsts")
 		assertInConf(t, conf, "max-age=31536000", "hsts_max_age")
 		assertInConf(t, conf, "includeSubDomains", "hsts_include_subdomains")

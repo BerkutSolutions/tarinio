@@ -509,7 +509,7 @@ e2e:browser:services-preview:
     E2E_BROWSER_CONTROL_PORT: "20782"
     E2E_BROWSER_CANARY_PORT: "20783"
     E2E_BROWSER_MTLS_PORT: "20784"
-    E2E_BROWSER_SPECS: "tests/services-antibot-preview.spec.ts tests/services-auth.spec.ts"
+    E2E_BROWSER_SPECS: "tests/services-antibot-preview.spec.ts tests/services-auth.spec.ts tests/services-allowlist.spec.ts"
 
 e2e:browser:services-controls:
   extends: .e2e:browser:lane-c
@@ -1193,8 +1193,9 @@ publish:github-mirror:
   timeout: 15m
   dependencies: []
   rules:
-    - if: '$PUBLISH_GITHUB == "1" && $CI_COMMIT_BRANCH == "main"'
-      allow_failure: false
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+      allow_failure: true
     - when: never
   script:
     - |
@@ -1238,10 +1239,12 @@ publish:github-release:
     - dast:baseline
     - dast:negative
   rules:
-    - if: '$PUBLISH_GITHUB == "1" && $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+/'
-      allow_failure: false
-    - if: '$PUBLISH_GITHUB == "1" && $CI_COMMIT_BRANCH == "main"'
-      allow_failure: false
+    - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+/'
+      when: manual
+      allow_failure: true
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+      allow_failure: true
     - when: never
   script:
     - |

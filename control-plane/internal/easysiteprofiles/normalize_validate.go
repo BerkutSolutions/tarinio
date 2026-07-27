@@ -87,6 +87,9 @@ func normalizeProfile(profile EasySiteProfile) EasySiteProfile {
 		profile.SecurityAntibot.AntibotChallenge = AntibotChallengeNo
 	}
 	profile.SecurityAntibot.AntibotURI = strings.TrimSpace(profile.SecurityAntibot.AntibotURI)
+	if profile.SecurityAntibot.SessionInactivityMinutes == 0 {
+		profile.SecurityAntibot.SessionInactivityMinutes = 10
+	}
 	profile.SecurityAntibot.AntibotRecaptchaSitekey = strings.TrimSpace(profile.SecurityAntibot.AntibotRecaptchaSitekey)
 	profile.SecurityAntibot.AntibotRecaptchaSecret = strings.TrimSpace(profile.SecurityAntibot.AntibotRecaptchaSecret)
 	profile.SecurityAntibot.AntibotHcaptchaSitekey = strings.TrimSpace(profile.SecurityAntibot.AntibotHcaptchaSitekey)
@@ -99,13 +102,10 @@ func normalizeProfile(profile EasySiteProfile) EasySiteProfile {
 		profile.SecurityAntibot.ChallengeEscalationMode = AntibotChallengeJavascript
 	}
 	profile.SecurityAntibot.ChallengeRules = normalizeAntibotChallengeRules(profile.SecurityAntibot.ChallengeRules)
-
-	profile.SecurityAuthBasic.AuthBasicLocation = strings.ToLower(strings.TrimSpace(profile.SecurityAuthBasic.AuthBasicLocation))
 	profile.SecurityAuthBasic.AuthMode = normalizeAuthMode(profile.SecurityAuthBasic.AuthMode)
 	profile.SecurityAuthBasic.AuthOrder = normalizeAuthOrder(profile.SecurityAuthBasic.AuthOrder)
 	profile.SecurityAuthBasic.AuthBasicUser = strings.TrimSpace(profile.SecurityAuthBasic.AuthBasicUser)
 	profile.SecurityAuthBasic.AuthBasicPassword = strings.TrimSpace(profile.SecurityAuthBasic.AuthBasicPassword)
-	profile.SecurityAuthBasic.AuthBasicText = strings.TrimSpace(profile.SecurityAuthBasic.AuthBasicText)
 	profile.SecurityAuthBasic.AuthBasicTemplate = strings.ToLower(strings.TrimSpace(profile.SecurityAuthBasic.AuthBasicTemplate))
 	if profile.SecurityAuthBasic.AuthBasicTemplate == "" {
 		profile.SecurityAuthBasic.AuthBasicTemplate = "v1"
@@ -324,6 +324,9 @@ func validateProfile(profile EasySiteProfile) error {
 			return errors.New("easy site profile security_antibot.antibot_uri must start with / when antibot is enabled")
 		}
 	}
+	if profile.SecurityAntibot.SessionInactivityMinutes != -1 && (profile.SecurityAntibot.SessionInactivityMinutes < 5 || profile.SecurityAntibot.SessionInactivityMinutes > 24*60) {
+		return errors.New("easy site profile security_antibot.session_inactivity_minutes must be -1 or between 5 and 1440")
+	}
 	if profile.SecurityAntibot.AntibotRecaptchaScore < 0 || profile.SecurityAntibot.AntibotRecaptchaScore > 1 {
 		return errors.New("easy site profile security_antibot.antibot_recaptcha_score must be between 0 and 1")
 	}
@@ -381,9 +384,6 @@ func validateProfile(profile EasySiteProfile) error {
 		}
 	}
 
-	if profile.SecurityAuthBasic.AuthBasicLocation != AuthBasicLocationSitewide {
-		return errors.New("easy site profile security_auth_basic.auth_basic_location must be sitewide")
-	}
 	if !slices.Contains(allowedAuthModes, profile.SecurityAuthBasic.AuthMode) {
 		return errors.New("easy site profile security_auth_basic.auth_mode has unsupported value")
 	}
@@ -395,9 +395,6 @@ func validateProfile(profile EasySiteProfile) error {
 	}
 	if profile.SecurityAuthBasic.UseAuthBasic && profile.SecurityAuthBasic.AuthMode != AuthModeServiceToken && profile.SecurityAuthBasic.AuthBasicPassword == "" {
 		return errors.New("easy site profile security_auth_basic.auth_basic_password is required when basic auth mode is enabled")
-	}
-	if profile.SecurityAuthBasic.AuthBasicText == "" {
-		return errors.New("easy site profile security_auth_basic.auth_basic_text is required")
 	}
 	if !slices.Contains([]string{"v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9"}, profile.SecurityAuthBasic.AuthBasicTemplate) {
 		return errors.New("easy site profile security_auth_basic.auth_basic_template has unsupported value")
@@ -463,9 +460,6 @@ func validateProfile(profile EasySiteProfile) error {
 		if strings.ContainsAny(token.Token, "|\r\n\t") {
 			return errors.New("easy site profile security_auth_basic.service_tokens.token contains unsupported characters")
 		}
-	}
-	if !isSafeHeaderValue(profile.SecurityAuthBasic.AuthBasicText) {
-		return errors.New("easy site profile security_auth_basic.auth_basic_text contains unsupported characters")
 	}
 
 	if profile.HTTPHeaders.ReferrerPolicy != "" {

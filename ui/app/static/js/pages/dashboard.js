@@ -18,7 +18,7 @@ import {
 } from "./dashboard.layout-core.js";
 import { applyAllGeometry } from "./dashboard.layout-geometry.js";
 import { createFrame, wireFrameInteractions } from "./dashboard.frame.js";
-import { renderSystemMemory, renderSystemCPU, prepareSeriesRows, renderRequestsSeries, bindRequestsChartHover } from "./dashboard.series.js";
+import { prepareSeriesRows, renderRequestsSeries, bindRequestsChartHover } from "./dashboard.series.js";
 import { renderCountryBadge, mergeWidgetData as mergeWidgetDataT4 } from "./dashboard.widgets.js";
 import { buildWidgetDetail as buildWidgetDetailT4 } from "./dashboard.detail-builder.js";
 import { createModalState } from "./dashboard.modal.js";
@@ -40,9 +40,9 @@ const DASHBOARD_DETAIL_MODEL_TTL_MS = 60000;
  "dashboard.widget.services" "dashboard.widget.requestsDay" "dashboard.widget.attacksDay"
  "dashboard.widget.blockedAttacks" "dashboard.widget.uniqueAttackers" "dashboard.widget.requestsSeries"
  "dashboard.widget.popularErrors" "dashboard.widget.topIPs" "dashboard.widget.topCountries" "dashboard.widget.topURLs"
- "dashboard.widget.memory" "dashboard.widget.cpu" "dashboard.widget.containersHealth"
+ "dashboard.widget.containersHealth"
  "services" "requests-day" "attacks-day" "blocked-attacks" "unique-attackers"
- "requests-series" "popular-errors" "top-ips" "top-countries" "top-urls" "memory" "cpu" "containers-health"
+ "requests-series" "popular-errors" "top-ips" "top-countries" "top-urls" "containers-health"
  "frame-resize-handle" "resize-se" "resize-e" "resize-s" "resize-w" "resize-n" "dashboard-frame-header"
 */
 
@@ -53,9 +53,7 @@ function mergeWidgetData(stats, detailModel, containersOverview, ctx) {
     formatPercent,
     formatUptimeLocalized,
     getContainerStatusTone,
-    formatContainerStatusLabel,
-    renderSystemMemory,
-    renderSystemCPU
+    formatContainerStatusLabel
   });
 }
 

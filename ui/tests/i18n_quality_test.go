@@ -234,6 +234,7 @@ var englishWordExceptionsQuality = map[string]struct{}{
 	"options":                         {},
 	"owasp":                           {},
 	"opensearch":                      {},
+	"page":                            {},
 	"passkey":                         {},
 	"passkeys":                        {},
 	"password":                        {},

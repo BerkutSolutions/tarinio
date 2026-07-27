@@ -201,6 +201,7 @@ type EasyProfileInput struct {
 	AntibotChallenge           string
 	AntibotChallengeTemplate   string
 	AntibotURI                 string
+	AntibotSessionTTLMin       int
 	AntibotScannerAutoBan      bool
 	AntibotRecaptchaScore      float64
 	AntibotRecaptchaKey        string
@@ -233,9 +234,10 @@ type EasyProfileInput struct {
 
 	ExceptionsURI []string
 
-	BlacklistCountry []string
-	WhitelistCountry []string
-	ShowGeoBlockPage bool
+	BlacklistCountry     []string
+	WhitelistCountry     []string
+	AllowLocalCountryIPs bool
+	ShowGeoBlockPage     bool
 	// GeoTimeWindows defines time-based geo-fencing rules compiled into nginx.
 	GeoTimeWindows []GeoTimeWindowInput
 

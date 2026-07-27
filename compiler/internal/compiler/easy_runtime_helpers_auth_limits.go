@@ -33,6 +33,16 @@ func antibotCookieName(siteID string) string {
 	return "waf_antibot_" + shortStableHash(siteID)
 }
 
+func antibotCookieTTLSeconds(profile EasyProfileInput) int {
+	if profile.AntibotSessionTTLMin < 0 {
+		return 2147483647
+	}
+	if profile.AntibotSessionTTLMin == 0 {
+		return 600
+	}
+	return profile.AntibotSessionTTLMin * 60
+}
+
 func authGateLoginURI() string {
 	return "/auth"
 }
@@ -259,8 +269,8 @@ func whitelistCountryGuardPattern(values []string) string {
 	}
 	if strings.HasPrefix(basePattern, "^(?:") && strings.HasSuffix(basePattern, ")$") {
 		core := strings.TrimSuffix(strings.TrimPrefix(basePattern, "^(?:"), ")$")
-		// GeoIP/header resolution can be unavailable in some runtime paths; whitelist must deny unknown country.
-		return "^(?:1:(?:" + core + ")|0:(?:" + core + "))$"
+		// Explicit request exceptions bypass the whitelist; ordinary requests must match a selected country.
+		return "^(?:1:.*|0:(?:" + core + "))$"
 	}
 	return ""
 }

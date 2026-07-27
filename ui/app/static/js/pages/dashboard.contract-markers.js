@@ -12,8 +12,6 @@ const DASHBOARD_CONTRACT_MARKERS_WIDGETS = [
   "dashboard.widget.topIPs",
   "dashboard.widget.topCountries",
   "dashboard.widget.topURLs",
-  "dashboard.widget.memory",
-  "dashboard.widget.cpu",
   "dashboard.widget.containersHealth"
 ];
 const DASHBOARD_CONTRACT_MARKERS_WIDGET_IDS = [
@@ -28,8 +26,6 @@ const DASHBOARD_CONTRACT_MARKERS_WIDGET_IDS = [
   "top-ips",
   "top-countries",
   "top-urls",
-  "memory",
-  "cpu",
   "containers-health"
 ];
 const DASHBOARD_CONTRACT_MARKERS_FRAME = [

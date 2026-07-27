@@ -45,7 +45,6 @@ func TestE2ECompilerRuntimeAuthContract(t *testing.T) {
 	auth["use_auth_basic"] = true
 	auth["auth_mode"] = "basic"
 	auth["auth_order"] = "auth_first"
-	auth["auth_basic_location"] = "sitewide"
 	auth["auth_basic_user"] = username
 	auth["auth_basic_password"] = password
 	auth["users"] = []map[string]any{{"username": username, "password": password, "enabled": true}}
