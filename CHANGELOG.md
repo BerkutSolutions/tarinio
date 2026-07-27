@@ -27,7 +27,7 @@
 ### E2E и CI
 
 - Все E2E/DAST jobs на shell runner теперь привязаны к стабильному Compose project и отдельному блоку портов своего CI_CONCURRENT_ID; прерванный job очищается следующим job того же слота и не может оставить конфликтующий порт для нового pipeline.
-- Runner tokens used in Compose project names are normalized to Docker-compatible lowercase identifiers for Go, browser, stack-health and DAST jobs.
+- E2E Compose projects use the numeric GitLab runner ID and concurrent slot, keeping Go, browser, stack-health and DAST names valid and collision-free for Compose, networks, volumes and Docker images.
 
 - Browser E2E выполняются параллельно на полностью раздельных Compose projects, сетях, volumes и диапазонах портов; стеки не разделяют runtime, cookies, Docker-метрики или данные.
 - Добавлены реальные проверки Anti-Bot TTL в сгенерированном nginx, локальных IP в country policy, белых списков в Easy/Raw, diff ревизий и пагинации Anti-DDoS.

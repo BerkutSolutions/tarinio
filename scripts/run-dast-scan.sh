@@ -15,8 +15,11 @@ if [ -n "${CI_CONCURRENT_ID:-}" ]; then
   case "$CI_CONCURRENT_ID" in
     *[!0-9]*|'') echo "[dast] ERROR: CI_CONCURRENT_ID must be numeric" >&2; exit 1 ;;
   esac
-  E2E_CI_RUNNER_TOKEN="$(printf '%s' "${CI_RUNNER_SHORT_TOKEN:-runner}" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9_-' '-')"
-  E2E_PROJECT="ci-${E2E_CI_RUNNER_TOKEN}-e2e-slot-${CI_CONCURRENT_ID}"
+  E2E_CI_RUNNER_ID="${CI_RUNNER_ID:-0}"
+  case "$E2E_CI_RUNNER_ID" in
+    *[!0-9]*|'') echo "[dast] ERROR: CI_RUNNER_ID must be numeric" >&2; exit 1 ;;
+  esac
+  E2E_PROJECT="ci-runner-${E2E_CI_RUNNER_ID}-e2e-slot-${CI_CONCURRENT_ID}"
 fi
 mkdir -p "$OUT"
 ZAP_DOCKER_NETWORK="${E2E_PROJECT}_waf-e2e-net"
